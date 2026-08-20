@@ -9,9 +9,19 @@ export async function login(formData: FormData) {
 
   if (!email || !password) redirect("/login?error=missing-fields");
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) redirect("/login?error=invalid-credentials");
+    if (error || !data.user || !data.session) {
+      console.error("ARC_LOGIN_AUTH_ERROR", error?.message ?? "No session returned");
+      redirect("/login?error=invalid-credentials");
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
+    console.error("ARC_LOGIN_SERVER_ERROR", error);
+    redirect("/login?error=server-error");
+  }
+
   redirect("/");
 }
