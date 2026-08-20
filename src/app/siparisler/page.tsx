@@ -1,6 +1,6 @@
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
-import { createOrder } from "./actions";
+import { OrderForm } from "./order-form";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 
@@ -16,21 +16,17 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
   if (variantsError) throw new Error(variantsError.message);
   if (productsError) throw new Error(productsError.message);
   const canManage = ["owner", "admin", "manager"].includes(membership.role);
+  const variantOptions = (variants ?? []).map((variant) => {
+    const product = products?.find((item) => item.id === variant.product_id);
+    return { id: variant.id, label: `${product?.name ?? "Ürün"} · ${variant.sku} · stok ${variant.stock}${variant.allow_backorder ? " · stoksuz satış açık" : ""}` };
+  });
 
   return <Shell active="orders" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>OPERASYON · CANLI</small><h2>Siparişler</h2><p>Sipariş oluşturulduğunda kalemler ve stok hareketleri atomik olarak işlenir. Stoksuz satış açık varyantlar negatif stoka düşebilir.</p></div></section>
+    <section className="subhead"><div><small>OPERASYON · CANLI</small><h2>Siparişler</h2><p>Çok kalemli sipariş, sipariş satırları ve stok hareketleri tek transaction içinde işlenir. Stoksuz satış açık varyantlar negatif stoka düşebilir.</p></div></section>
     {params.created && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.created} siparişi oluşturuldu.</strong></section>}
     {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>Sipariş oluşturulamadı: {params.error}</strong></section>}
 
-    {canManage && <section className="card" style={{padding:24,marginBottom:24}}><div className="head"><div><small>MANUEL SİPARİŞ</small><h3>Yeni sipariş</h3></div><span>ARC Native</span></div>
-      <form action={createOrder} style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:14,marginTop:20}}>
-        <label>Müşteri adı<input name="customer_name" style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label>
-        <label>E-posta<input name="customer_email" type="email" style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label>
-        <label>Ürün / varyant<select name="variant_id" required defaultValue="" style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="" disabled>Seçin</option>{variants?.map(v=>{const p=products?.find(item=>item.id===v.product_id);return <option key={v.id} value={v.id}>{p?.name ?? "Ürün"} · {v.sku} · stok {v.stock}{v.allow_backorder?" · stoksuz satış açık":""}</option>})}</select></label>
-        <label>Adet<input name="quantity" type="number" min="1" step="1" required defaultValue="1" style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label>
-        <button type="submit" style={{padding:12}}>Sipariş oluştur</button>
-      </form>
-    </section>}
+    {canManage && <section className="card" style={{padding:24,marginBottom:24}}><div className="head"><div><small>MANUEL SİPARİŞ</small><h3>Yeni sipariş</h3></div><span>ARC Native · Çok kalemli</span></div><OrderForm variants={variantOptions} /></section>}
 
     <section className="card table"><div className="head"><div><small>SİPARİŞ AKIŞI</small><h3>{orders?.length ?? 0} sipariş</h3></div><span>{organization.name}</span></div>
       <div className="row th"><span>SİPARİŞ</span><span>MÜŞTERİ</span><span>KAYNAK</span><span>TUTAR</span><span>DURUM</span></div>
