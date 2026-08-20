@@ -28,6 +28,19 @@ export async function requireTenant() {
     : preferred.organizations;
 
   if (!organization) throw new Error("Organization record is missing.");
+  if (organization.status !== "active" && organization.status !== "trial") {
+    redirect("/login?error=organization-inactive");
+  }
+
+  const { data: commerceModule, error: moduleError } = await supabase
+    .from("organization_modules")
+    .select("is_enabled")
+    .eq("organization_id", organization.id)
+    .eq("module_code", "commerce")
+    .maybeSingle();
+
+  if (moduleError) throw new Error(`Commerce access could not be resolved: ${moduleError.message}`);
+  if (!commerceModule?.is_enabled) redirect("/login?error=commerce-disabled");
 
   return { supabase, user, membership: preferred, organization };
 }
