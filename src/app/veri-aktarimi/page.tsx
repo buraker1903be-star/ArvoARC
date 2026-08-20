@@ -1,8 +1,10 @@
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
+import { importActiveProducts } from "./actions";
 
-export default async function ImportPage() {
-  const { supabase, organization } = await requireTenant();
+export default async function ImportPage({ searchParams }: { searchParams: Promise<{ imported?: string; errors?: string; error?: string }> }) {
+  const params = await searchParams;
+  const { supabase, organization, membership } = await requireTenant();
   const { data: batches, error } = await supabase
     .from("arc_import_batches")
     .select("id,kind,file_name,status,total_rows,imported_rows,skipped_rows,error_rows,created_at")
@@ -10,12 +12,20 @@ export default async function ImportPage() {
     .order("created_at", { ascending: false })
     .limit(20);
   if (error) throw new Error(error.message);
+  const canManage = ["owner", "admin", "manager"].includes(membership.role);
 
   return <Shell active="import" tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="subhead"><div><small>VERİ TAŞIMA</small><h2>Shopify Geçişi</h2><p>Shopify yalnızca eski veri kaynağıdır. Aktarım sonrasında ArvoARC bağımsız çalışır.</p></div></section>
+    {params.imported && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.imported} aktif ürün aktarıldı. Hata: {params.errors ?? "0"}</strong></section>}
+    {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>Aktarım başlatılamadı: {params.error}</strong></section>}
+
     <section className="card" style={{padding:24,marginBottom:24}}>
       <div className="head"><div><small>ÜRÜN AKTARIM POLİTİKASI</small><h3>Yalnızca aktif ürünler</h3></div><span>Tek seferlik migration</span></div>
       <p>Importer yalnızca Shopify CSV içinde <b>Status = active</b> olan ürünleri kabul eder. Draft ve archived ürünler atlanır. Varyantlar, fiyatlar ve ürün seçenekleri korunur; stok 0 başlar ve stoksuz satış varsayılan olarak açıktır.</p>
+      {canManage && <form action={importActiveProducts} style={{display:"flex",gap:12,alignItems:"end",marginTop:20,flexWrap:"wrap"}}>
+        <label style={{flex:"1 1 320px"}}>Shopify Products CSV<input name="file" type="file" accept=".csv,text/csv" required style={{display:"block",width:"100%",marginTop:8,padding:12}} /></label>
+        <button type="submit" style={{padding:12}}>Aktif ürünleri aktar</button>
+      </form>}
     </section>
     <section className="card table"><div className="head"><div><small>AKTARIM GEÇMİŞİ</small><h3>{batches?.length ?? 0} işlem</h3></div></div>
       <div className="row th"><span>DOSYA</span><span>TÜR</span><span>AKTARILAN</span><span>ATLANAN</span><span>DURUM</span></div>
