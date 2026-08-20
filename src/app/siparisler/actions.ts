@@ -10,15 +10,18 @@ export async function createOrder(formData: FormData) {
 
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const customerEmail = String(formData.get("customer_email") ?? "").trim();
-  const variantId = String(formData.get("variant_id") ?? "").trim();
-  const quantity = Number(formData.get("quantity") ?? 0);
+  const variantIds = formData.getAll("variant_id").map(String);
+  const quantities = formData.getAll("quantity").map((value) => Number(value));
 
-  if (!variantId || !Number.isInteger(quantity) || quantity <= 0) redirect("/siparisler?error=invalid-order");
+  if (!variantIds.length || variantIds.length !== quantities.length) redirect("/siparisler?error=invalid-order");
+
+  const items = variantIds.map((variantId, index) => ({ variant_id: variantId, quantity: quantities[index] }));
+  if (items.some((item) => !item.variant_id || !Number.isInteger(item.quantity) || item.quantity <= 0)) redirect("/siparisler?error=invalid-order");
 
   const { data, error } = await supabase.rpc("arc_create_order", {
     p_customer_name: customerName,
     p_customer_email: customerEmail,
-    p_items: [{ variant_id: variantId, quantity }],
+    p_items: items,
     p_source: "native",
   });
 
