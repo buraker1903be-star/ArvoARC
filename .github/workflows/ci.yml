@@ -22,9 +22,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+      - name: Verify repository root
+        run: |
+          pwd
+          ls -la
+          test -f package.json
+          test -f package-lock.json
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
       - name: Lint
         run: npm run lint
       - name: Build
