@@ -4,6 +4,9 @@ const messages: Record<string, string> = {
   "missing-fields": "E-posta ve şifre zorunludur.",
   "invalid-credentials": "E-posta veya şifre hatalı.",
   "no-organization": "Bu kullanıcıya bağlı aktif bir organizasyon bulunamadı.",
+  "organization-inactive": "Organizasyon aktif değil.",
+  "commerce-disabled": "ARVO ARC erişimi bu organizasyon için aktif değil.",
+  "server-error": "Giriş servisine ulaşılamadı. Sistem yöneticisi yapılandırmayı kontrol etmelidir.",
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
