@@ -16,8 +16,10 @@ export async function updateOrderStatus(formData:FormData){
   const paymentStatus=String(formData.get("payment_status")??"");
   if(!orderId||!orderStatuses.has(status)||!paymentStatuses.has(paymentStatus))redirect(`/siparisler/${orderId}?error=invalid-status`);
 
-  const {error}=await supabase.from("arc_orders").update({status,payment_status:paymentStatus,updated_at:new Date().toISOString()}).eq("organization_id",organization.id).eq("id",orderId);
+  const {data:ownedOrder}=await supabase.from("arc_orders").select("id").eq("organization_id",organization.id).eq("id",orderId).maybeSingle();
+  if(!ownedOrder)redirect(`/siparisler/${orderId}?error=order-not-found`);
+  const {error}=await supabase.rpc("arc_update_order_status",{p_order_id:orderId,p_status:status,p_payment_status:paymentStatus});
   if(error)redirect(`/siparisler/${orderId}?error=${encodeURIComponent(error.message)}`);
-  revalidatePath("/");revalidatePath("/siparisler");revalidatePath(`/siparisler/${orderId}`);
+  revalidatePath("/");revalidatePath("/siparisler");revalidatePath("/stok");revalidatePath("/urunler");revalidatePath(`/siparisler/${orderId}`);
   redirect(`/siparisler/${orderId}?saved=1`);
 }
