@@ -15,7 +15,7 @@ const navigation=[
 ] as const;
 
 export function Brand(){
-  return <span className="brand"><Image src="/arvo-arc-logo.png" alt="ARVO ARC" width={1909} height={373} priority sizes="190px"/></span>;
+  return <span className="brand"><Image src="/arvo-arc-logo.png" alt="ARVO ARC" width={190} height={37} priority sizes="190px" style={{display:"block",width:190,height:"auto",maxWidth:"100%"}}/></span>;
 }
 
 export function Shell({children,active="overview",tenantName="ArvoCulture",tenantPlan="enterprise"}:{children:React.ReactNode;active?:string;tenantName?:string;tenantPlan?:string}){
