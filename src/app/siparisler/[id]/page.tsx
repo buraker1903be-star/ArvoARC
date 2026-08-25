@@ -19,11 +19,12 @@ function AddressCard({title,address}:{title:string;address?:Address}){
 export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string}>}){
   const {id}=await params;const query=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
-  const [{data:order,error},{data:items,error:itemsError}]=await Promise.all([
+  const [{data:order,error},{data:items,error:itemsError},{data:events,error:eventsError}]=await Promise.all([
     supabase.from("arc_orders").select("id,order_number,source,status,payment_status,customer_name,customer_email,currency,subtotal,tax,shipping,total,metadata,created_at,updated_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
-    supabase.from("arc_order_items").select("id,product_name,sku,quantity,unit_price,total").eq("organization_id",organization.id).eq("order_id",id).order("product_name")
+    supabase.from("arc_order_items").select("id,product_name,sku,quantity,unit_price,total").eq("organization_id",organization.id).eq("order_id",id).order("product_name"),
+    supabase.from("arc_order_events").select("id,event_type,event_data,created_by,created_at").eq("organization_id",organization.id).eq("order_id",id).order("created_at",{ascending:false}).limit(50)
   ]);
-  if(error)throw new Error(error.message);if(itemsError)throw new Error(itemsError.message);if(!order)notFound();
+  if(error)throw new Error(error.message);if(itemsError)throw new Error(itemsError.message);if(eventsError)throw new Error(eventsError.message);if(!order)notFound();
   const canManage=["owner","admin","manager"].includes(membership.role);const meta=(order.metadata??{}) as OrderMeta;
   return <Shell active="orders" tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="subhead"><div><small><Link href="/siparisler">SİPARİŞLER</Link> · {order.source.toUpperCase()}</small><h2>{order.order_number}</h2><p>{new Date(order.created_at).toLocaleString("tr-TR")} · {order.customer_name||order.customer_email||"Misafir müşteri"}</p></div></section>
@@ -44,6 +45,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         </div>
       </aside>
     </div>
+    <section className="card" style={{padding:24,marginTop:24}}><div className="head"><div><small>İŞLEM GEÇMİŞİ</small><h3>Zaman çizelgesi</h3></div><span>{events?.length??0} kayıt</span></div><div style={{marginTop:16}}>{events?.length?events.map(event=>{const data=(event.event_data??{}) as Record<string,string|null>;const title=event.event_type==="status_updated"?"Sipariş durumu güncellendi":"Kargo bilgileri güncellendi";const detail=event.event_type==="status_updated"?`${statusLabels[data.old_status??""]??data.old_status??"—"} → ${statusLabels[data.new_status??""]??data.new_status??"—"} · Ödeme: ${paymentLabels[data.new_payment_status??""]??data.new_payment_status??"—"}`:`${data.shipping_carrier||"Kargo firması yok"} · ${data.tracking_number||"Takip numarası yok"}`;return <div className="order" key={event.id}><i>✓</i><div><b>{title}</b><small>{detail}</small></div><span style={{textAlign:"right",fontSize:10}}>{new Date(event.created_at).toLocaleString("tr-TR")}<small style={{display:"block"}}>{event.created_by?"Yetkili kullanıcı":"Sistem"}</small></span></div>}):<p>Henüz kayıtlı sipariş işlemi yok.</p>}</div></section>
     <section style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:20,marginTop:24}}><AddressCard title="FATURA ADRESİ" address={meta.billing}/><AddressCard title="TESLİMAT ADRESİ" address={meta.shipping_address}/></section>
   </Shell>;
 }
