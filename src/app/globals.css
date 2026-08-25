@@ -313,3 +313,29 @@ a.row:hover,.row:not(.th):hover{background:#f8faf7}
   .quick-actions{display:flex;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
   .quick-action{flex:0 0 210px;scroll-snap-align:start}
 }
+
+
+/* Customer profile */
+.customer-detail-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.55fr) minmax(280px,.55fr);
+  gap:20px;
+  align-items:start;
+}
+.customer-order-row{grid-template-columns:1.1fr .75fr 1fr .8fr 1fr}
+.customer-profile-card{padding:24px;position:sticky;top:24px}
+.customer-profile-card dl{display:grid;gap:0;margin:18px 0 22px}
+.customer-profile-card dl>div{padding:14px 0;border-top:1px solid var(--line)}
+.customer-profile-card dt{margin-bottom:6px;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.customer-profile-card dd{margin:0;color:var(--navy);font-size:12px;font-weight:650;line-height:1.55;overflow-wrap:anywhere}
+.customer-profile-card a{color:var(--navy)}
+.customer-primary-link{display:block;padding:13px 16px;border-radius:12px;background:var(--navy);color:#fff!important;text-align:center;text-decoration:none;font-size:11px;font-weight:800}
+.customer-primary-link:hover{background:var(--green)}
+@media (max-width:1000px){
+  .customer-detail-grid{grid-template-columns:1fr}
+  .customer-profile-card{position:static}
+}
+@media (max-width:760px){
+  .customer-order-row{grid-template-columns:1.2fr .8fr 1fr}
+  .customer-order-row>span:nth-child(3),.customer-order-row>span:nth-child(5){display:none}
+}
