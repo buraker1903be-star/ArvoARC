@@ -17,17 +17,19 @@ export async function createProduct(formData: FormData) {
   const description = String(formData.get("description") ?? "").trim();
   const status = String(formData.get("status") ?? "draft");
   const priceInput = Number(formData.get("price") ?? 0);
+  const compareAtPriceInput = Number(formData.get("compare_at_price") ?? 0);
   const stock = Number(formData.get("stock") ?? 0);
   const allowBackorder = formData.get("allow_backorder") === "on";
 
-  if (!name || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isInteger(stock)) redirect("/urunler?error=invalid-product");
+  if (!name || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isFinite(compareAtPriceInput) || compareAtPriceInput < 0 || !Number.isInteger(stock)) redirect("/urunler?error=invalid-product");
 
   const slug = `${slugify(name)}-${Date.now().toString(36)}`;
   const price = Math.round(priceInput * 100);
+  const compareAtPrice = compareAtPriceInput > priceInput ? Math.round(compareAtPriceInput * 100) : null;
   const { data: product, error: productError } = await supabase.from("arc_products").insert({ organization_id: organization.id, name, slug, description, status: status === "active" ? "active" : "draft", source: "native", created_by: user.id }).select("id").single();
   if (productError) redirect(`/urunler?error=${encodeURIComponent(productError.code ?? "product-create")}`);
 
-  const { error: variantError } = await supabase.from("arc_product_variants").insert({ organization_id: organization.id, product_id: product.id, sku, price, currency: "TRY", stock, allow_backorder: allowBackorder, attributes: {} });
+  const { error: variantError } = await supabase.from("arc_product_variants").insert({ organization_id: organization.id, product_id: product.id, sku, price, compare_at_price: compareAtPrice, currency: "TRY", stock, allow_backorder: allowBackorder, attributes: {} });
   if (variantError) {
     await supabase.from("arc_products").delete().eq("id", product.id).eq("organization_id", organization.id);
     redirect(`/urunler?error=${encodeURIComponent(variantError.code ?? "variant-create")}`);
