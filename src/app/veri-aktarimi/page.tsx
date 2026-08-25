@@ -1,6 +1,7 @@
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
 import { importActiveProducts, importHistoricalOrders, migrateShopifyImages } from "./actions";
+import { importKindLabel, importStatusLabel } from "@/lib/commerce-labels";
 
 export default async function ImportPage({ searchParams }: { searchParams: Promise<{ imported?: string; errors?: string; error?: string; images?: string; imageErrors?: string; remaining?: string; orders?: string; orderErrors?: string; orderSkipped?: string }> }) {
   const params = await searchParams;
@@ -44,7 +45,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
     </section>
     <section className="card table"><div className="head"><div><small>AKTARIM GEÇMİŞİ</small><h3>{batches?.length ?? 0} işlem</h3></div></div>
       <div className="row th"><span>DOSYA</span><span>TÜR</span><span>AKTARILAN</span><span>ATLANAN</span><span>DURUM</span></div>
-      {batches?.length ? batches.map((batch)=><div className="row" key={batch.id}><span><b>{batch.file_name ?? "Shopify CSV"}</b></span><span>{batch.kind}</span><span>{batch.imported_rows}/{batch.total_rows}</span><span>{batch.skipped_rows + batch.error_rows}</span><span><em>{batch.status}</em></span></div>) : <div style={{padding:24}}><strong>Henüz kayıtlı aktarım yok.</strong><p>İlk aktif ürün kataloğu aktarımı bu ekranda görünecek.</p></div>}
+      {batches?.length ? batches.map((batch)=><div className="row" key={batch.id}><span><b>{batch.file_name ?? "Shopify CSV"}</b></span><span>{importKindLabel(batch.kind)}</span><span>{batch.imported_rows}/{batch.total_rows}</span><span>{batch.skipped_rows + batch.error_rows}</span><span><em>{importStatusLabel(batch.status)}</em></span></div>) : <div style={{padding:24}}><strong>Henüz kayıtlı aktarım yok.</strong><p>İlk aktif ürün kataloğu aktarımı bu ekranda görünecek.</p></div>}
     </section>
   </Shell>;
 }
