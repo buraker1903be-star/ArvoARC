@@ -217,3 +217,48 @@ a.row:hover,.row:not(.th):hover{background:#f8faf7}
   html{scroll-behavior:auto}
   *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
 }
+
+
+/* Dashboard action center */
+.action-center{
+  margin:20px 0;
+  padding:24px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(243,247,240,.94));
+  box-shadow:var(--shadow);
+}
+.action-center-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:18px}
+.action-center-head small{color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.18em}
+.action-center-head h3{margin:5px 0 0;font-size:22px}
+.action-center-head a{color:var(--navy);font-size:12px;font-weight:800;text-decoration:none}
+.action-center-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.action-item{
+  position:relative;
+  display:grid;
+  min-height:148px;
+  padding:18px;
+  overflow:hidden;
+  border:1px solid rgba(0,32,69,.09);
+  border-radius:16px;
+  color:var(--navy);
+  text-decoration:none;
+  transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;
+}
+.action-item::after{content:"";position:absolute;right:-26px;top:-30px;width:92px;height:92px;border-radius:50%;background:var(--green);opacity:.09}
+.action-item:hover{transform:translateY(-2px);border-color:rgba(111,149,72,.42);box-shadow:0 14px 30px rgba(0,32,69,.09)}
+.action-item>span{font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--muted)}
+.action-item>strong{margin:8px 0 4px;font-size:34px;line-height:1}
+.action-item>small{max-width:230px;color:var(--muted);line-height:1.5}
+.action-item>b{align-self:end;margin-top:14px;font-size:11px;color:var(--green)}
+.action-item.danger{border-left:4px solid #b84435}
+.action-item.attention{border-left:4px solid #c99732}
+.action-item.success{border-left:4px solid var(--green)}
+@media (max-width:900px){
+  .action-center-grid{grid-template-columns:1fr}
+  .action-item{min-height:124px}
+}
+@media (max-width:620px){
+  .action-center{padding:18px}
+  .action-center-head{align-items:flex-start;flex-direction:column}
+}
