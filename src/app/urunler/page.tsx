@@ -30,6 +30,12 @@ export default async function Products({ searchParams }: { searchParams: Promise
     const meta=(product.metadata??{}) as ProductMeta;
     return [product.name,product.description,meta.vendor,meta.type,meta.tags].some(value=>(value??"").toLocaleLowerCase("tr-TR").includes(search));
   });
+  const variantsByProduct=new Map<string,typeof variants>();
+  for(const variant of variants??[]){
+    const list=variantsByProduct.get(variant.product_id)??[];
+    list.push(variant);
+    variantsByProduct.set(variant.product_id,list);
+  }
   const productImages=new Map(await Promise.all(visibleProducts.map(async product=>{
     const meta=(product.metadata??{}) as ProductMeta;
     const signed=await createProductImageUrls(supabase,meta.image_paths??[]);
@@ -47,8 +53,36 @@ export default async function Products({ searchParams }: { searchParams: Promise
       <label>Durum<select name="status" defaultValue="draft" style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="draft">Taslak</option><option value="active">Aktif</option></select></label><label style={{display:"flex",alignItems:"center",gap:10}}><input name="allow_backorder" type="checkbox" defaultChecked /> Stok yokken satışa devam et</label>
       <label style={{gridColumn:"1 / -1"}}>Açıklama<textarea name="description" rows={4} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><button type="submit" style={{padding:12}}>Ürün oluştur</button>
     </form></details>}
-    <section className="card table"><div className="head"><div><small>KATALOG</small><h3>{visibleProducts.length} ürün</h3></div><span>{organization.name}</span></div><div className="row th"><span>ÜRÜN</span><span>VARYANT</span><span>STOK</span><span>FİYAT</span><span>DURUM</span></div>
-      {visibleProducts.length ? visibleProducts.map((product)=>{const pv=variants?.filter(item=>item.product_id===product.id)??[];const prices=pv.map(v=>v.price);const totalStock=pv.reduce((sum,v)=>sum+v.stock,0);const backorder=pv.some(v=>v.allow_backorder);const meta=(product.metadata??{}) as ProductMeta;const image=productImages.get(product.id);const priceLabel=prices.length ? (Math.min(...prices)===Math.max(...prices)?money.format(prices[0]/100):`${money.format(Math.min(...prices)/100)} – ${money.format(Math.max(...prices)/100)}`) : "—";return <Link href={`/urunler/${product.id}`} className="row" key={product.id} style={{textDecoration:"none",color:"inherit"}}><span style={{display:"flex",gap:12,alignItems:"center"}}>{image?<Image src={image} alt="" width={52} height={52} sizes="52px" style={{width:52,height:52,objectFit:"cover",borderRadius:10}}/>:<i className="swatch">AC</i>}<span><b style={{display:"block"}}>{product.name}</b><small>{meta.vendor || (product.source==="shopify"?"Shopify aktarımı":"ARVO ARC")}</small></span></span><span><b>{pv.length}</b><small style={{display:"block"}}>{pv[0]?.sku??"SKU yok"}</small></span><span>{totalStock}{backorder?<small style={{display:"block"}}>stoksuz satış açık</small>:null}</span><span>{priceLabel}</span><span><em>{productStatusLabel(product.status)}</em></span></Link>}) : <div style={{padding:24}}><strong>Arama kriterine uygun ürün bulunamadı.</strong></div>}
+    <section className="product-catalog">
+      <div className="product-catalog-head"><div><small>KATALOG</small><h3>{visibleProducts.length} ürün</h3></div><span>{organization.name}</span></div>
+      {visibleProducts.length ? <div className="product-card-grid">{visibleProducts.map((product,index)=>{
+        const pv=variantsByProduct.get(product.id)??[];
+        const prices=pv.map(variant=>variant.price);
+        const totalStock=pv.reduce((sum,variant)=>sum+variant.stock,0);
+        const backorder=pv.some(variant=>variant.allow_backorder);
+        const meta=(product.metadata??{}) as ProductMeta;
+        const image=productImages.get(product.id);
+        const minPrice=prices.length?Math.min(...prices):0;
+        const maxPrice=prices.length?Math.max(...prices):0;
+        const priceLabel=prices.length?(minPrice===maxPrice?money.format(minPrice/100):`${money.format(minPrice/100)} – ${money.format(maxPrice/100)}`):"Fiyat girilmemiş";
+        const stockTone=totalStock<0?"danger":totalStock<=5?"low":"healthy";
+        return <Link href={`/urunler/${product.id}`} className="product-card" key={product.id}>
+          <div className="product-card-media">
+            {image?<Image src={image} alt={product.name} width={720} height={720} sizes="(max-width:640px) 100vw, (max-width:1100px) 50vw, 25vw" priority={index<4} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div className="product-card-placeholder"><span>ARVO ARC</span><b>{product.name.slice(0,2).toUpperCase()}</b></div>}
+            <em className={`product-status ${product.status}`}>{productStatusLabel(product.status)}</em>
+            <span className="product-source">{meta.vendor||(product.source==="shopify"?"Shopify arşivi":"ARVO ARC")}</span>
+          </div>
+          <div className="product-card-body">
+            <div className="product-card-title"><small>{meta.type||"Katalog ürünü"}</small><h3>{product.name}</h3></div>
+            <div className="product-card-price"><strong>{priceLabel}</strong><span>{pv.length} varyant</span></div>
+            <div className="product-card-stats">
+              <span><small>SKU</small><b>{pv[0]?.sku??"—"}</b></span>
+              <span><small>TOPLAM STOK</small><b className={stockTone}>{totalStock}</b></span>
+            </div>
+            <div className="product-card-footer"><span>{backorder?"Stoksuz satış açık":"Stok kontrollü"}</span><b>Düzenle →</b></div>
+          </div>
+        </Link>;
+      })}</div> : <div className="card product-empty"><strong>Arama kriterine uygun ürün bulunamadı.</strong><p>Filtreleri temizleyerek tüm kataloğu görüntüleyebilirsiniz.</p></div>}
     </section>
   </Shell>;
 }
