@@ -16,7 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="login-shell">
       <section className="login-card">
-        <div className="login-brand"><Image src="/arvo-arc-logo.png" alt="ARVO ARC" width={1909} height={373} priority sizes="210px"/></div>
+        <div className="login-brand"><Image src="/arvo-arc-logo.png" alt="ARVO ARC" width={220} height={43} priority sizes="220px" style={{display:"block",width:220,height:"auto",maxWidth:"100%"}}/></div>
         <small>ARVO CULTURE · ADAPTIVE RETAIL CORE</small>
         <h1>Operasyon merkezine hoş geldiniz.</h1>
         <p className="login-lead">ArvoOS hesabınızla güvenli biçimde devam edin.</p>
