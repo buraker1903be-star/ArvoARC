@@ -39,6 +39,8 @@ type EditableProductMetadata = {
   color?: string;
   gender?: string;
   age_group?: string;
+  badge?: string;
+  badge_tone?: string;
   [key: string]: unknown;
 };
 
@@ -79,6 +81,8 @@ export async function updateProduct(formData: FormData) {
     color: field(formData, "color", 120),
     gender: field(formData, "gender", 30),
     age_group: field(formData, "age_group", 30),
+    badge: field(formData, "badge", 40),
+    badge_tone: ["green", "navy", "gold", "red"].includes(field(formData, "badge_tone", 20)) ? field(formData, "badge_tone", 20) : "green",
   };
 
   const { error } = await supabase
@@ -101,13 +105,14 @@ export async function createVariant(formData:FormData){
   const title=String(formData.get("title")??"").trim()||"Default";
   const sku=String(formData.get("sku")??"").trim().toUpperCase();
   const priceInput=Number(formData.get("price")??0);
+  const compareAtPriceInput=Number(formData.get("compare_at_price")??0);
   const stock=Number(formData.get("stock")??0);
   const allowBackorder=formData.get("allow_backorder")==="on";
-  if(!productId||!sku||!Number.isFinite(priceInput)||priceInput<0||!Number.isInteger(stock))redirect(`/urunler/${productId}?error=invalid-variant`);
+  if(!productId||!sku||!Number.isFinite(priceInput)||priceInput<0||!Number.isFinite(compareAtPriceInput)||compareAtPriceInput<0||!Number.isInteger(stock))redirect(`/urunler/${productId}?error=invalid-variant`);
 
   const {data:product}=await supabase.from("arc_products").select("id").eq("organization_id",organization.id).eq("id",productId).maybeSingle();
   if(!product)redirect(`/urunler/${productId}?error=product-not-found`);
-  const {error}=await supabase.from("arc_product_variants").insert({organization_id:organization.id,product_id:productId,title,sku,price:Math.round(priceInput*100),currency:"TRY",stock,allow_backorder:allowBackorder,attributes:{},external_id:null});
+  const {error}=await supabase.from("arc_product_variants").insert({organization_id:organization.id,product_id:productId,title,sku,price:Math.round(priceInput*100),compare_at_price:compareAtPriceInput>priceInput?Math.round(compareAtPriceInput*100):null,currency:"TRY",stock,allow_backorder:allowBackorder,attributes:{},external_id:null});
   if(error)redirect(`/urunler/${productId}?error=${encodeURIComponent(error.code??error.message)}`);
   revalidatePath("/");revalidatePath("/urunler");revalidatePath(`/urunler/${productId}`);revalidatePath("/stok");
   redirect(`/urunler/${productId}?saved=variant-created`);
@@ -121,12 +126,13 @@ export async function updateVariant(formData: FormData) {
 
   const sku = String(formData.get("sku") ?? "").trim().toUpperCase();
   const priceInput = Number(formData.get("price") ?? 0);
+  const compareAtPriceInput = Number(formData.get("compare_at_price") ?? 0);
   const allowBackorder = formData.get("allow_backorder") === "on";
-  if (!productId || !variantId || !sku || !Number.isFinite(priceInput) || priceInput < 0) redirect(`/urunler/${productId}?error=invalid-variant`);
+  if (!productId || !variantId || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isFinite(compareAtPriceInput) || compareAtPriceInput < 0) redirect(`/urunler/${productId}?error=invalid-variant`);
 
   const { error } = await supabase
     .from("arc_product_variants")
-    .update({ sku, price: Math.round(priceInput * 100), allow_backorder: allowBackorder, updated_at: new Date().toISOString() })
+    .update({ sku, price: Math.round(priceInput * 100), compare_at_price: compareAtPriceInput > priceInput ? Math.round(compareAtPriceInput * 100) : null, allow_backorder: allowBackorder, updated_at: new Date().toISOString() })
     .eq("id", variantId)
     .eq("product_id", productId)
     .eq("organization_id", organization.id);
