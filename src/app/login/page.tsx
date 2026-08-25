@@ -13,16 +13,17 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { error } = await searchParams;
 
   return (
-    <main style={{minHeight:"100vh",display:"grid",placeItems:"center",padding:24}}>
-      <section className="card" style={{width:"min(440px,100%)",padding:32}}>
+    <main className="login-shell">
+      <section className="login-card">
+        <div className="login-brand"><span>ARVO</span><b>ARC</b></div>
         <small>ARVO CULTURE · ADAPTIVE RETAIL CORE</small>
-        <h1 style={{margin:"10px 0 6px"}}>ARVO ARC</h1>
-        <p>ArvoOS hesabınızla devam edin.</p>
-        {error && <p role="alert"><strong>{messages[error] ?? "Oturum açılamadı."}</strong></p>}
-        <form action={login} style={{display:"grid",gap:12,marginTop:24}}>
-          <label>E-posta<input name="email" type="email" autoComplete="email" required style={{display:"block",width:"100%",marginTop:6,padding:12}} /></label>
-          <label>Şifre<input name="password" type="password" autoComplete="current-password" required style={{display:"block",width:"100%",marginTop:6,padding:12}} /></label>
-          <button type="submit" style={{padding:12}}>Giriş yap</button>
+        <h1>Operasyon merkezine hoş geldiniz.</h1>
+        <p className="login-lead">ArvoOS hesabınızla güvenli biçimde devam edin.</p>
+        {error && <p className="alert error" role="alert"><strong>{messages[error] ?? "Oturum açılamadı."}</strong></p>}
+        <form action={login} className="form-stack">
+          <label>E-posta<input name="email" type="email" autoComplete="email" required /></label>
+          <label>Şifre<input name="password" type="password" autoComplete="current-password" required /></label>
+          <button type="submit">Giriş yap <span>→</span></button>
         </form>
       </section>
     </main>
