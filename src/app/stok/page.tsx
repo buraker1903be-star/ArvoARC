@@ -1,6 +1,7 @@
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
 import { adjustInventory } from "./actions";
+import { inventoryKindLabel } from "@/lib/commerce-labels";
 
 export default async function Stock({ searchParams }: { searchParams: Promise<{ error?: string; updated?: string; q?: string; filter?: string }> }) {
   const params = await searchParams;
@@ -57,6 +58,6 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
 
     <section className="card table"><div className="head"><div><small>STOK</small><h3>{visibleVariants.length} varyant</h3></div><span>{organization.name}</span></div><div className="row th"><span>ÜRÜN</span><span>SKU</span><span>STOK</span><span>POLİTİKA</span><span>DURUM</span></div>{visibleVariants.map((variant,index)=><div className="row" key={variant.id}><span><i className={`swatch s${index%5}`}>AC</i><b>{productName.get(variant.product_id) ?? "Ürün"}</b></span><span>{variant.sku}</span><span>{variant.stock}</span><span>{variant.allow_backorder ? "Stoksuz satış açık" : "Stok zorunlu"}</span><span><em>{variant.stock < 0 ? "Tedarik gerekli" : variant.stock === 0 ? "Stok sıfır" : "Stokta"}</em></span></div>)}</section>
 
-    <section className="card" style={{padding:24,marginTop:24}}><div className="head"><div><small>HAREKET GEÇMİŞİ</small><h3>Son 20 işlem</h3></div></div>{(movements ?? []).length ? (movements ?? []).map((movement)=>{const variant=variantMap.get(movement.variant_id);return <div className="order" key={movement.id}><i>{movement.quantity > 0 ? "+" : "−"}</i><div><b>{variant?.sku ?? "SKU"} · {movement.kind}</b><small>{movement.note || new Date(movement.created_at).toLocaleString("tr-TR")}</small></div><strong>{movement.quantity > 0 ? "+" : ""}{movement.quantity}</strong></div>}) : <p>Henüz stok hareketi yok.</p>}</section>
+    <section className="card" style={{padding:24,marginTop:24}}><div className="head"><div><small>HAREKET GEÇMİŞİ</small><h3>Son 20 işlem</h3></div></div>{(movements ?? []).length ? (movements ?? []).map((movement)=>{const variant=variantMap.get(movement.variant_id);return <div className="order" key={movement.id}><i>{movement.quantity > 0 ? "+" : "−"}</i><div><b>{variant?.sku ?? "SKU"} · {inventoryKindLabel(movement.kind)}</b><small>{movement.note || new Date(movement.created_at).toLocaleString("tr-TR")}</small></div><strong>{movement.quantity > 0 ? "+" : ""}{movement.quantity}</strong></div>}) : <p>Henüz stok hareketi yok.</p>}</section>
   </Shell>;
 }
