@@ -36,11 +36,17 @@ export default async function Products({ searchParams }: { searchParams: Promise
     list.push(variant);
     variantsByProduct.set(variant.product_id,list);
   }
-  const productImages=new Map(await Promise.all(visibleProducts.map(async product=>{
+  const firstImagePaths=visibleProducts.flatMap(product=>{
+    const path=((product.metadata??{}) as ProductMeta).image_paths?.[0];
+    return path?[path]:[];
+  });
+  const signedImageUrls=await createProductImageUrls(supabase,firstImagePaths);
+  const signedByPath=new Map(firstImagePaths.map((path,index)=>[path,signedImageUrls[index]]));
+  const productImages=new Map(visibleProducts.map(product=>{
     const meta=(product.metadata??{}) as ProductMeta;
-    const signed=await createProductImageUrls(supabase,meta.image_paths??[]);
-    return [product.id,signed[0]??meta.images?.[0]] as const;
-  })));
+    const path=meta.image_paths?.[0];
+    return [product.id,(path?signedByPath.get(path):undefined)??meta.images?.[0]] as const;
+  }));
 
   return <Shell active="products" tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="subhead"><div><small>KATALOG · CANLI</small><h2>Ürünler</h2><p>{activeProductCount} aktif katalog ürünü · {products?.length ?? 0} toplam ürün · {variants?.length ?? 0} varyant. Stoksuz satış açık varyantlarda satış stok sıfırın altına inse de devam eder.</p></div></section>
