@@ -1,8 +1,8 @@
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
-import { importActiveProducts, migrateShopifyImages } from "./actions";
+import { importActiveProducts, importHistoricalOrders, migrateShopifyImages } from "./actions";
 
-export default async function ImportPage({ searchParams }: { searchParams: Promise<{ imported?: string; errors?: string; error?: string; images?: string; imageErrors?: string; remaining?: string }> }) {
+export default async function ImportPage({ searchParams }: { searchParams: Promise<{ imported?: string; errors?: string; error?: string; images?: string; imageErrors?: string; remaining?: string; orders?: string; orderErrors?: string; orderSkipped?: string }> }) {
   const params = await searchParams;
   const { supabase, organization, membership } = await requireTenant();
   const { data: batches, error } = await supabase
@@ -17,6 +17,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   return <Shell active="import" tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="subhead"><div><small>VERİ TAŞIMA</small><h2>Shopify Geçişi</h2><p>Shopify yalnızca eski veri kaynağıdır. Aktarım sonrasında ArvoARC bağımsız çalışır.</p></div></section>
     {params.imported && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.imported} aktif ürün aktarıldı. Hata: {params.errors ?? "0"}</strong></section>}
+    {params.orders && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.orders} eski sipariş aktarıldı. Hata: {params.orderErrors ?? "0"}. Atlanan satır: {params.orderSkipped ?? "0"}</strong></section>}
     {params.images && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.images} ürünün görselleri ARC Storage’a taşındı. Hata: {params.imageErrors ?? "0"}. Kalan: {params.remaining ?? "0"}</strong></section>}
     {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>Aktarım başlatılamadı: {params.error}</strong></section>}
 
@@ -26,6 +27,14 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
       {canManage && <form action={importActiveProducts} style={{display:"flex",gap:12,alignItems:"end",marginTop:20,flexWrap:"wrap"}}>
         <label style={{flex:"1 1 320px"}}>Shopify Products CSV<input name="file" type="file" accept=".csv,text/csv" required style={{display:"block",width:"100%",marginTop:8,padding:12}} /></label>
         <button type="submit" style={{padding:12}}>Aktif ürünleri aktar</button>
+      </form>}
+    </section>
+    <section className="card" style={{padding:24,marginBottom:24}}>
+      <div className="head"><div><small>GEÇMİŞ SİPARİŞLER</small><h3>Shopify sipariş arşivini aktar</h3></div><span>Stok etkilemez</span></div>
+      <p>Shopify Orders CSV dosyasındaki eski siparişleri, müşteri bilgilerini ve sipariş kalemlerini aktarır. Tarihsel kayıt olduğu için mevcut stok miktarlarından yeniden düşüm yapılmaz.</p>
+      {canManage && <form action={importHistoricalOrders} style={{display:"flex",gap:12,alignItems:"end",marginTop:20,flexWrap:"wrap"}}>
+        <label style={{flex:"1 1 320px"}}>Shopify Orders CSV<input name="file" type="file" accept=".csv,text/csv" required style={{display:"block",width:"100%",marginTop:8,padding:12}} /></label>
+        <button type="submit" style={{padding:12}}>Eski siparişleri aktar</button>
       </form>}
     </section>
     <section className="card" style={{padding:24,marginBottom:24}}>
