@@ -11,25 +11,35 @@ const errorMessages: Record<string, string> = { forbidden: "Bu hesap ürün olu�
 
 type ProductMeta = { images?: string[]; image_paths?:string[]; vendor?: string; type?: string; tags?: string; badge?:string; badge_tone?:string };
 
-export default async function Products({ searchParams }: { searchParams: Promise<{ error?: string; created?: string; q?: string; filter?: string }> }) {
+export default async function Products({ searchParams }: { searchParams: Promise<{ error?: string; created?: string; q?: string; filter?: string; page?:string }> }) {
   const params = await searchParams;
   const { supabase, organization, membership } = await requireTenant();
-  const [{ data: products, error: productsError }, { data: variants, error: variantsError }] = await Promise.all([
-    supabase.from("arc_products").select("id,name,description,status,source,metadata,created_at").eq("organization_id", organization.id).order("created_at", { ascending: false }),
-    supabase.from("arc_product_variants").select("id,product_id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes").eq("organization_id", organization.id),
-  ]);
-  if (productsError) throw new Error(productsError.message);
-  if (variantsError) throw new Error(variantsError.message);
-  const canManage = ["owner", "admin", "manager"].includes(membership.role);
-  const activeProductCount=(products??[]).filter(product=>product.status==="active").length;
   const search=(params.q??"").trim().toLocaleLowerCase("tr-TR");
   const statusFilter=["active","draft","archived"].includes(params.filter??"")?params.filter:"all";
+  const pageSize=24;
+  const currentPage=search?1:Math.max(1,Number.parseInt(params.page??"1",10)||1);
+  let productsQuery=supabase.from("arc_products").select("id,name,description,status,source,metadata,created_at",{count:"exact"}).eq("organization_id",organization.id).order("created_at",{ascending:false});
+  if(statusFilter!=="all")productsQuery=productsQuery.eq("status",statusFilter);
+  if(!search)productsQuery=productsQuery.range((currentPage-1)*pageSize,currentPage*pageSize-1);
+  const [{data:products,error:productsError,count:filteredCount},{count:totalProductCount,error:totalCountError},{count:activeProductCount,error:activeCountError},{count:totalVariantCount,error:variantCountError}]=await Promise.all([
+    productsQuery,
+    supabase.from("arc_products").select("id",{count:"exact",head:true}).eq("organization_id",organization.id),
+    supabase.from("arc_products").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).eq("status","active"),
+    supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id),
+  ]);
+  if (productsError) throw new Error(productsError.message);
+  if(totalCountError||activeCountError||variantCountError)throw new Error((totalCountError??activeCountError??variantCountError)?.message??"Katalog sayıları okunamadı.");
+  const canManage = ["owner", "admin", "manager"].includes(membership.role);
   const visibleProducts=(products??[]).filter(product=>{
-    if(statusFilter!=="all"&&product.status!==statusFilter)return false;
     if(!search)return true;
     const meta=(product.metadata??{}) as ProductMeta;
     return [product.name,product.description,meta.vendor,meta.type,meta.tags].some(value=>(value??"").toLocaleLowerCase("tr-TR").includes(search));
   });
+  const visibleIds=visibleProducts.map(product=>product.id);
+  const {data:variants,error:variantsError}=visibleIds.length?await supabase.from("arc_product_variants").select("id,product_id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes").eq("organization_id",organization.id).in("product_id",visibleIds):{data:[],error:null};
+  if(variantsError)throw new Error(variantsError.message);
+  const totalPages=search?1:Math.max(1,Math.ceil((filteredCount??0)/pageSize));
+  const pageHref=(page:number)=>{const query=new URLSearchParams();if(statusFilter!=="all")query.set("filter",statusFilter);query.set("page",String(page));return `/urunler?${query}`};
   const variantsByProduct=new Map<string,typeof variants>();
   for(const variant of variants??[]){
     const list=variantsByProduct.get(variant.product_id)??[];
@@ -49,7 +59,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
   }));
 
   return <Shell active="products" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>KATALOG · CANLI</small><h2>Ürünler</h2><p>{activeProductCount} aktif katalog ürünü · {products?.length ?? 0} toplam ürün · {variants?.length ?? 0} varyant. Stoksuz satış açık varyantlarda satış stok sıfırın altına inse de devam eder.</p></div></section>
+    <section className="subhead"><div><small>KATALOG · CANLI</small><h2>Ürünler</h2><p>{activeProductCount??0} aktif katalog ürünü · {totalProductCount??0} toplam ürün · {totalVariantCount??0} varyant. Stoksuz satış açık varyantlarda satış stok sıfırın altına inse de devam eder.</p></div></section>
     {params.created === "1" && <section className="card" style={{padding:16,marginBottom:20}}><strong>Ürün başarıyla oluşturuldu.</strong></section>}
     {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>{errorMessages[params.error] ?? `Ürün işlemi tamamlanamadı (${params.error}).`}</strong></section>}
     <section className="card" style={{padding:20,marginBottom:20}}><form style={{display:"grid",gridTemplateColumns:"minmax(220px,1fr) 180px auto auto",gap:10,alignItems:"end"}}><label>Katalogda ara<input name="q" defaultValue={params.q??""} placeholder="Ürün, marka, tür veya etiket" style={{display:"block",width:"100%",padding:12,marginTop:6}}/></label><label>Durum<select name="filter" defaultValue={statusFilter} style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="all">Tüm ürünler</option><option value="active">Aktif</option><option value="draft">Taslak</option><option value="archived">Arşivlenmiş</option></select></label><button type="submit" style={{padding:12}}>Filtrele</button>{(params.q||statusFilter!=="all")&&<Link href="/urunler" style={{padding:12}}>Temizle</Link>}</form></section>
@@ -60,7 +70,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
       <label style={{gridColumn:"1 / -1"}}>Açıklama<textarea name="description" rows={4} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><button type="submit" style={{padding:12}}>Ürün oluştur</button>
     </form></details>}
     <section className="product-catalog">
-      <div className="product-catalog-head"><div><small>KATALOG</small><h3>{visibleProducts.length} ürün</h3></div><span>{organization.name}</span></div>
+      <div className="product-catalog-head"><div><small>KATALOG</small><h3>{search?visibleProducts.length:(filteredCount??0)} ürün</h3></div><span>{organization.name}</span></div>
       {visibleProducts.length ? <div className="product-card-grid">{visibleProducts.map((product,index)=>{
         const pv=variantsByProduct.get(product.id)??[];
         const prices=pv.map(variant=>variant.price);
@@ -94,6 +104,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
           </div>
         </Link>;
       })}</div> : <div className="card product-empty"><strong>Arama kriterine uygun ürün bulunamadı.</strong><p>Filtreleri temizleyerek tüm kataloğu görüntüleyebilirsiniz.</p></div>}
+      {!search&&totalPages>1&&<nav className="catalog-pagination" aria-label="Ürün sayfaları"><span>{currentPage}. sayfa / {totalPages}</span><div>{currentPage>1&&<Link href={pageHref(currentPage-1)}>← Önceki</Link>}{currentPage<totalPages&&<Link href={pageHref(currentPage+1)}>Sonraki →</Link>}</div></nav>}
     </section>
   </Shell>;
 }
