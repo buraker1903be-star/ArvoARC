@@ -20,6 +20,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
   if (productsError) throw new Error(productsError.message);
   if (variantsError) throw new Error(variantsError.message);
   const canManage = ["owner", "admin", "manager"].includes(membership.role);
+  const activeProductCount=(products??[]).filter(product=>product.status==="active").length;
   const productImages=new Map(await Promise.all((products??[]).map(async product=>{
     const meta=(product.metadata??{}) as ProductMeta;
     const signed=await createProductImageUrls(supabase,meta.image_paths??[]);
@@ -27,7 +28,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
   })));
 
   return <Shell active="products" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>KATALOG · CANLI</small><h2>Ürünler</h2><p>{products?.length ?? 0} aktif katalog ürünü · {variants?.length ?? 0} varyant. Stoksuz satış açık varyantlarda satış stok sıfırın altına inse de devam eder.</p></div></section>
+    <section className="subhead"><div><small>KATALOG · CANLI</small><h2>Ürünler</h2><p>{activeProductCount} aktif katalog ürünü · {products?.length ?? 0} toplam ürün · {variants?.length ?? 0} varyant. Stoksuz satış açık varyantlarda satış stok sıfırın altına inse de devam eder.</p></div></section>
     {params.created === "1" && <section className="card" style={{padding:16,marginBottom:20}}><strong>Ürün başarıyla oluşturuldu.</strong></section>}
     {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>{errorMessages[params.error] ?? `Ürün işlemi tamamlanamadı (${params.error}).`}</strong></section>}
     {canManage && <details className="card" style={{padding:24,marginBottom:24}}><summary style={{cursor:"pointer",fontWeight:800}}>+ Yeni ürün oluştur</summary><form action={createProduct} style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:14,marginTop:20}}>
