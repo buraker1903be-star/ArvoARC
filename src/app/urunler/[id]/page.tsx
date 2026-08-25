@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
-import { updateProduct, updateVariant } from "./actions";
+import { removeProductImage, updateProduct, updateVariant, uploadProductImages } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 
 type Meta={images?:string[];image_paths?:string[];vendor?:string;type?:string;tags?:string};
@@ -15,13 +15,16 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
     supabase.from("arc_product_variants").select("id,sku,title,price,currency,stock,allow_backorder,attributes").eq("organization_id",organization.id).eq("product_id",id).order("title")
   ]);
   if(error)throw new Error(error.message);if(variantError)throw new Error(variantError.message);if(!product)notFound();
-  const canManage=["owner","admin","manager"].includes(membership.role); const meta=(product.metadata??{}) as Meta; const signedImages=await createProductImageUrls(supabase,meta.image_paths??[]); const images=signedImages.length?signedImages:(meta.images??[]);
+  const canManage=["owner","admin","manager"].includes(membership.role); const meta=(product.metadata??{}) as Meta; const imagePaths=meta.image_paths??[]; const signedImages=await createProductImageUrls(supabase,imagePaths); const imageEntries=signedImages.length?signedImages.map((url,index)=>({url,path:imagePaths[index]})):(meta.images??[]).map(url=>({url,path:""}));
   return <Shell active="products" tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="subhead"><div><small><Link href="/urunler">ÜRÜNLER</Link> · {product.source.toUpperCase()}</small><h2>{product.name}</h2><p>{meta.vendor||"ARVO ARC"}{meta.type?` · ${meta.type}`:""} · {variants?.length??0} varyant</p></div></section>
-    {query.saved&&<section className="card" style={{padding:14,marginBottom:18}}><strong>{query.saved==="variant"?"Varyant":"Ürün"} bilgileri kaydedildi.</strong></section>}
+    {query.saved&&<section className="card" style={{padding:14,marginBottom:18}}><strong>{query.saved==="variant"?"Varyant":query.saved?.startsWith("image")?"Görseller":"Ürün"} bilgileri kaydedildi.</strong></section>}
     {query.error&&<section className="card" style={{padding:14,marginBottom:18}}><strong>İşlem tamamlanamadı: {query.error}</strong></section>}
     <div style={{display:"grid",gridTemplateColumns:"minmax(280px,.8fr) minmax(0,1.4fr)",gap:24}}>
-      <section className="card" style={{padding:20}}>{images[0]?<Image src={images[0]} alt={product.name} width={800} height={800} sizes="(max-width:900px) 100vw, 40vw" style={{width:"100%",height:"auto",aspectRatio:"1",objectFit:"cover",borderRadius:14}}/>:<div style={{aspectRatio:"1",display:"grid",placeItems:"center"}}>Görsel yok</div>}{images.length>1&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginTop:10}}>{images.slice(1,5).map(src=><Image key={src} src={src} alt="" width={160} height={160} sizes="120px" style={{width:"100%",aspectRatio:"1",objectFit:"cover",borderRadius:8}}/>)}</div>}</section>
+      <section className="card" style={{padding:20}}>
+        {imageEntries.length?<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>{imageEntries.map((image,index)=><div key={image.url} style={{position:"relative",gridColumn:index===0?"1 / -1":undefined}}><Image src={image.url} alt={index===0?product.name:""} width={800} height={800} sizes="(max-width:900px) 100vw, 40vw" style={{width:"100%",height:"auto",aspectRatio:"1",objectFit:"cover",borderRadius:14}}/>{canManage&&image.path?<form action={removeProductImage} style={{position:"absolute",right:8,top:8}}><input type="hidden" name="product_id" value={product.id}/><input type="hidden" name="path" value={image.path}/><button type="submit" aria-label="Görseli sil" style={{padding:"8px 10px"}}>Sil</button></form>:null}</div>)}</div>:<div style={{aspectRatio:"1",display:"grid",placeItems:"center"}}>Görsel yok</div>}
+        {canManage&&<form action={uploadProductImages} style={{marginTop:16,display:"grid",gap:10}}><input type="hidden" name="product_id" value={product.id}/><label>Ürün görselleri<input name="images" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple required style={{display:"block",width:"100%",padding:10,marginTop:6}}/></label><small>En fazla 5 dosya birden, ürün başına 8 görsel ve dosya başına 10 MB.</small><button type="submit" style={{padding:12}}>Görselleri yükle</button></form>}
+      </section>
       <section className="card" style={{padding:24}}><div className="head"><div><small>ÜRÜN BİLGİLERİ</small><h3>Düzenle</h3></div><span>{product.source}</span></div>
         {canManage?<form action={updateProduct} style={{display:"grid",gap:14,marginTop:18}}><input type="hidden" name="id" value={product.id}/><label>Ürün adı<input name="name" defaultValue={product.name} required style={{display:"block",width:"100%",padding:12,marginTop:6}}/></label><label>Durum<select name="status" defaultValue={product.status} style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="active">Aktif</option><option value="draft">Taslak</option></select></label><label>Açıklama<textarea name="description" defaultValue={product.description??""} rows={10} style={{display:"block",width:"100%",padding:12,marginTop:6}}/></label><button type="submit" style={{padding:12}}>Ürün bilgilerini kaydet</button></form>:<div dangerouslySetInnerHTML={{__html:product.description||"Açıklama bulunmuyor."}}/>}
         {meta.tags&&<p><b>Etiketler:</b> {meta.tags}</p>}
