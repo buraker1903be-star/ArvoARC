@@ -1,8 +1,8 @@
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
-import { importActiveProducts } from "./actions";
+import { importActiveProducts, migrateShopifyImages } from "./actions";
 
-export default async function ImportPage({ searchParams }: { searchParams: Promise<{ imported?: string; errors?: string; error?: string }> }) {
+export default async function ImportPage({ searchParams }: { searchParams: Promise<{ imported?: string; errors?: string; error?: string; images?: string; imageErrors?: string; remaining?: string }> }) {
   const params = await searchParams;
   const { supabase, organization, membership } = await requireTenant();
   const { data: batches, error } = await supabase
@@ -17,6 +17,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   return <Shell active="import" tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="subhead"><div><small>VERİ TAŞIMA</small><h2>Shopify Geçişi</h2><p>Shopify yalnızca eski veri kaynağıdır. Aktarım sonrasında ArvoARC bağımsız çalışır.</p></div></section>
     {params.imported && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.imported} aktif ürün aktarıldı. Hata: {params.errors ?? "0"}</strong></section>}
+    {params.images && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.images} ürünün görselleri ARC Storage’a taşındı. Hata: {params.imageErrors ?? "0"}. Kalan: {params.remaining ?? "0"}</strong></section>}
     {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>Aktarım başlatılamadı: {params.error}</strong></section>}
 
     <section className="card" style={{padding:24,marginBottom:24}}>
@@ -26,6 +27,11 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
         <label style={{flex:"1 1 320px"}}>Shopify Products CSV<input name="file" type="file" accept=".csv,text/csv" required style={{display:"block",width:"100%",marginTop:8,padding:12}} /></label>
         <button type="submit" style={{padding:12}}>Aktif ürünleri aktar</button>
       </form>}
+    </section>
+    <section className="card" style={{padding:24,marginBottom:24}}>
+      <div className="head"><div><small>GÖRSEL BAĞIMSIZLAŞTIRMA</small><h3>Shopify CDN bağını kaldır</h3></div><span>Supabase Storage</span></div>
+      <p>Mevcut Shopify ürün görsellerini güvenli biçimde ARC depolamasına kopyalar. İşlem zaman aşımını önlemek için her çalıştırmada 5 ürünü taşır.</p>
+      {canManage&&<form action={migrateShopifyImages}><button type="submit" style={{padding:12}}>Sonraki görsel grubunu taşı</button></form>}
     </section>
     <section className="card table"><div className="head"><div><small>AKTARIM GEÇMİŞİ</small><h3>{batches?.length ?? 0} işlem</h3></div></div>
       <div className="row th"><span>DOSYA</span><span>TÜR</span><span>AKTARILAN</span><span>ATLANAN</span><span>DURUM</span></div>

@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
 import { updateProduct, updateVariant } from "./actions";
+import { createProductImageUrls } from "@/lib/product-images";
 
-type Meta={images?:string[];vendor?:string;type?:string;tags?:string};
+type Meta={images?:string[];image_paths?:string[];vendor?:string;type?:string;tags?:string};
 
 export default async function ProductDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string}>}){
   const {id}=await params; const query=await searchParams; const {supabase,organization,membership}=await requireTenant();
@@ -14,7 +15,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
     supabase.from("arc_product_variants").select("id,sku,title,price,currency,stock,allow_backorder,attributes").eq("organization_id",organization.id).eq("product_id",id).order("title")
   ]);
   if(error)throw new Error(error.message);if(variantError)throw new Error(variantError.message);if(!product)notFound();
-  const canManage=["owner","admin","manager"].includes(membership.role); const meta=(product.metadata??{}) as Meta; const images=meta.images??[];
+  const canManage=["owner","admin","manager"].includes(membership.role); const meta=(product.metadata??{}) as Meta; const signedImages=await createProductImageUrls(supabase,meta.image_paths??[]); const images=signedImages.length?signedImages:(meta.images??[]);
   return <Shell active="products" tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="subhead"><div><small><Link href="/urunler">ÜRÜNLER</Link> · {product.source.toUpperCase()}</small><h2>{product.name}</h2><p>{meta.vendor||"ARVO ARC"}{meta.type?` · ${meta.type}`:""} · {variants?.length??0} varyant</p></div></section>
     {query.saved&&<section className="card" style={{padding:14,marginBottom:18}}><strong>{query.saved==="variant"?"Varyant":"Ürün"} bilgileri kaydedildi.</strong></section>}

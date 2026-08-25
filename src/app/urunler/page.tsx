@@ -3,11 +3,12 @@ import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
 import { createProduct } from "./actions";
+import { createProductImageUrls } from "@/lib/product-images";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 const errorMessages: Record<string, string> = { forbidden: "Bu hesap ürün oluşturma yetkisine sahip değil.", "invalid-product": "Ürün bilgilerini kontrol edin.", "23505": "Bu SKU zaten kullanılıyor." };
 
-type ProductMeta = { images?: string[]; vendor?: string; type?: string; tags?: string };
+type ProductMeta = { images?: string[]; image_paths?:string[]; vendor?: string; type?: string; tags?: string };
 
 export default async function Products({ searchParams }: { searchParams: Promise<{ error?: string; created?: string }> }) {
   const params = await searchParams;
@@ -19,6 +20,11 @@ export default async function Products({ searchParams }: { searchParams: Promise
   if (productsError) throw new Error(productsError.message);
   if (variantsError) throw new Error(variantsError.message);
   const canManage = ["owner", "admin", "manager"].includes(membership.role);
+  const productImages=new Map(await Promise.all((products??[]).map(async product=>{
+    const meta=(product.metadata??{}) as ProductMeta;
+    const signed=await createProductImageUrls(supabase,meta.image_paths??[]);
+    return [product.id,signed[0]??meta.images?.[0]] as const;
+  })));
 
   return <Shell active="products" tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="subhead"><div><small>KATALOG · CANLI</small><h2>Ürünler</h2><p>{products?.length ?? 0} aktif katalog ürünü · {variants?.length ?? 0} varyant. Stoksuz satış açık varyantlarda satış stok sıfırın altına inse de devam eder.</p></div></section>
@@ -31,7 +37,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
       <label style={{gridColumn:"1 / -1"}}>Açıklama<textarea name="description" rows={4} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><button type="submit" style={{padding:12}}>Ürün oluştur</button>
     </form></details>}
     <section className="card table"><div className="head"><div><small>KATALOG</small><h3>{products?.length ?? 0} ürün</h3></div><span>{organization.name}</span></div><div className="row th"><span>ÜRÜN</span><span>VARYANT</span><span>STOK</span><span>FİYAT</span><span>DURUM</span></div>
-      {products?.length ? products.map((product)=>{const pv=variants?.filter(item=>item.product_id===product.id)??[];const prices=pv.map(v=>v.price);const totalStock=pv.reduce((sum,v)=>sum+v.stock,0);const backorder=pv.some(v=>v.allow_backorder);const meta=(product.metadata??{}) as ProductMeta;const image=meta.images?.[0];const priceLabel=prices.length ? (Math.min(...prices)===Math.max(...prices)?money.format(prices[0]/100):`${money.format(Math.min(...prices)/100)} – ${money.format(Math.max(...prices)/100)}`) : "—";return <Link href={`/urunler/${product.id}`} className="row" key={product.id} style={{textDecoration:"none",color:"inherit"}}><span style={{display:"flex",gap:12,alignItems:"center"}}>{image?<Image src={image} alt="" width={52} height={52} sizes="52px" style={{width:52,height:52,objectFit:"cover",borderRadius:10}}/>:<i className="swatch">AC</i>}<span><b style={{display:"block"}}>{product.name}</b><small>{meta.vendor || (product.source==="shopify"?"Shopify aktarımı":"ARVO ARC")}</small></span></span><span><b>{pv.length}</b><small style={{display:"block"}}>{pv[0]?.sku??"SKU yok"}</small></span><span>{totalStock}{backorder?<small style={{display:"block"}}>stoksuz satış açık</small>:null}</span><span>{priceLabel}</span><span><em>{product.status}</em></span></Link>}) : <div style={{padding:24}}><strong>Henüz ürün yok.</strong></div>}
+      {products?.length ? products.map((product)=>{const pv=variants?.filter(item=>item.product_id===product.id)??[];const prices=pv.map(v=>v.price);const totalStock=pv.reduce((sum,v)=>sum+v.stock,0);const backorder=pv.some(v=>v.allow_backorder);const meta=(product.metadata??{}) as ProductMeta;const image=productImages.get(product.id);const priceLabel=prices.length ? (Math.min(...prices)===Math.max(...prices)?money.format(prices[0]/100):`${money.format(Math.min(...prices)/100)} – ${money.format(Math.max(...prices)/100)}`) : "—";return <Link href={`/urunler/${product.id}`} className="row" key={product.id} style={{textDecoration:"none",color:"inherit"}}><span style={{display:"flex",gap:12,alignItems:"center"}}>{image?<Image src={image} alt="" width={52} height={52} sizes="52px" style={{width:52,height:52,objectFit:"cover",borderRadius:10}}/>:<i className="swatch">AC</i>}<span><b style={{display:"block"}}>{product.name}</b><small>{meta.vendor || (product.source==="shopify"?"Shopify aktarımı":"ARVO ARC")}</small></span></span><span><b>{pv.length}</b><small style={{display:"block"}}>{pv[0]?.sku??"SKU yok"}</small></span><span>{totalStock}{backorder?<small style={{display:"block"}}>stoksuz satış açık</small>:null}</span><span>{priceLabel}</span><span><em>{product.status}</em></span></Link>}) : <div style={{padding:24}}><strong>Henüz ürün yok.</strong></div>}
     </section>
   </Shell>;
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
+import { copyShopifyImages } from "@/lib/product-images";
 
 type Row = Record<string,string>;
 
@@ -25,10 +26,13 @@ export async function importActiveProducts(formData:FormData){
   let imported=0,errors=0;
   for(const [handle,g] of active){try{
     const first=g.find(r=>r.Title?.trim())??g[0]; const description=(first["Body (HTML)"]??"").replace(/<style[^>]*>[\s\S]*?<\/style>/gi,"").trim();
-    const images=[...new Set(g.map(r=>r["Image Src"]?.trim()).filter(Boolean))];
+    const shopifyImageSources=[...new Set(g.map(r=>r["Image Src"]?.trim()).filter((value):value is string=>Boolean(value)))];
     const optionNames:Record<number,string>={};
     for(const i of [1,2,3]) optionNames[i]=g.find(r=>r[`Option${i} Name`]?.trim())?.[`Option${i} Name`]?.trim()??"";
-    const {data:product,error:pe}=await supabase.from("arc_products").upsert({organization_id:organization.id,name:first.Title?.trim()||handle,slug:handle,description,status:"active",source:"shopify",external_id:handle,metadata:{shopify_handle:handle,vendor:first.Vendor??"",type:first.Type??"",tags:first.Tags??"",images}},{onConflict:"organization_id,source,external_id"}).select("id").single(); if(pe)throw pe;
+    const {data:product,error:pe}=await supabase.from("arc_products").upsert({organization_id:organization.id,name:first.Title?.trim()||handle,slug:handle,description,status:"active",source:"shopify",external_id:handle,metadata:{shopify_handle:handle,vendor:first.Vendor??"",type:first.Type??"",tags:first.Tags??"",images:[],shopify_image_sources:shopifyImageSources,images_migrated:false}},{onConflict:"organization_id,source,external_id"}).select("id").single(); if(pe)throw pe;
+    const copiedImages=await copyShopifyImages(supabase,organization.id,product.id,shopifyImageSources);
+    const {error:imageMetadataError}=await supabase.from("arc_products").update({metadata:{shopify_handle:handle,vendor:first.Vendor??"",type:first.Type??"",tags:first.Tags??"",images:[],image_paths:copiedImages.paths,shopify_image_sources:shopifyImageSources,images_migrated:copiedImages.errors.length===0,image_migration_errors:copiedImages.errors}}).eq("organization_id",organization.id).eq("id",product.id);
+    if(imageMetadataError)throw imageMetadataError;
     const variants=g.filter(r=>r["Variant Price"]?.trim()||r["Variant SKU"]?.trim()||r["Option1 Value"]?.trim()); const seen=new Set<string>(); let n=0;
     for(const r of variants){const key=[r["Option1 Value"],r["Option2 Value"],r["Option3 Value"],r["Variant SKU"],r["Variant Price"]].join("|");if(seen.has(key))continue;seen.add(key);n++;
       const attrs:Record<string,string>={};for(const i of [1,2,3]){const name=optionNames[i],value=r[`Option${i} Value`]?.trim();if(name&&value)attrs[name]=value;}
@@ -40,4 +44,41 @@ export async function importActiveProducts(formData:FormData){
   }catch(e){errors++;await supabase.from("arc_import_errors").insert({batch_id:batch.id,organization_id:organization.id,row_key:handle,message:e instanceof Error?e.message:"Import error"});}}
   await supabase.from("arc_import_batches").update({status:errors?"failed":"completed",imported_rows:imported,error_rows:errors,completed_at:new Date().toISOString()}).eq("id",batch.id);
   revalidatePath("/urunler");revalidatePath("/veri-aktarimi");redirect(`/veri-aktarimi?imported=${imported}&errors=${errors}`);
+}
+
+type ProductMetadata={
+  images?:string[];
+  image_paths?:string[];
+  shopify_image_sources?:string[];
+  images_migrated?:boolean;
+  image_migration_errors?:string[];
+  [key:string]:unknown;
+};
+
+export async function migrateShopifyImages(){
+  const {supabase,organization,membership}=await requireTenant();
+  if(!["owner","admin","manager"].includes(membership.role)) redirect("/veri-aktarimi?error=forbidden");
+
+  const {data:products,error}=await supabase.from("arc_products").select("id,metadata").eq("organization_id",organization.id).eq("source","shopify").limit(250);
+  if(error)redirect(`/veri-aktarimi?error=${encodeURIComponent(error.message)}`);
+
+  const pending=(products??[]).filter(product=>!((product.metadata??{}) as ProductMetadata).images_migrated).slice(0,5);
+  let migrated=0,failed=0;
+  for(const product of pending){
+    const metadata=(product.metadata??{}) as ProductMetadata;
+    const sources=metadata.shopify_image_sources?.length
+      ? metadata.shopify_image_sources
+      : (metadata.images??[]).filter(source=>{try{return new URL(source).hostname==="cdn.shopify.com";}catch{return false;}});
+    if(!sources.length){
+      const {error:updateError}=await supabase.from("arc_products").update({metadata:{...metadata,images:[],image_paths:[],images_migrated:true,image_migration_errors:[]}}).eq("organization_id",organization.id).eq("id",product.id);
+      if(updateError)failed++;else migrated++;
+      continue;
+    }
+    const result=await copyShopifyImages(supabase,organization.id,product.id,sources);
+    const {error:updateError}=await supabase.from("arc_products").update({metadata:{...metadata,images:[],image_paths:result.paths,shopify_image_sources:sources,images_migrated:result.errors.length===0,image_migration_errors:result.errors}}).eq("organization_id",organization.id).eq("id",product.id);
+    if(updateError||result.errors.length)failed++;else migrated++;
+  }
+
+  revalidatePath("/urunler");revalidatePath("/veri-aktarimi");
+  redirect(`/veri-aktarimi?images=${migrated}&imageErrors=${failed}&remaining=${Math.max(0,(products?.filter(product=>!((product.metadata??{}) as ProductMetadata).images_migrated).length??0)-pending.length)}`);
 }

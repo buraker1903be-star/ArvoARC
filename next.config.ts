@@ -9,6 +9,11 @@ const config: NextConfig = {
         hostname: "cdn.shopify.com",
         pathname: "/s/files/**",
       },
+      {
+        protocol: "https",
+        hostname: "**.supabase.co",
+        pathname: "/storage/v1/object/sign/arc-product-images/**",
+      },
     ],
   },
 };
