@@ -27,7 +27,7 @@ export function Shell({children,active="overview",tenantName="ArvoCulture",tenan
     <aside>
       <Brand/>
       <div className="tenant"><span>{initials}</span><div><b>{tenantName}</b><small>{tenantPlan} · ARVO ARC</small></div></div>
-      <nav aria-label="Ana menü">{navigation.map(([key,label,href,icon])=><Link className={active===key?"active":""} key={key} href={href} aria-current={active===key?"page":undefined}><i>{icon}</i><span>{label}</span></Link>)}</nav>
+      <nav aria-label="Ana menü">{navigation.map(([key,label,href,icon])=><Link prefetch={false} className={active===key?"active":""} key={key} href={href} aria-current={active===key?"page":undefined}><i>{icon}</i><span>{label}</span></Link>)}</nav>
       <div className="powered"><small>POWERED BY</small><b>ARVO OS</b><span>Adaptive Retail Core</span></div>
     </aside>
     <main>
@@ -35,7 +35,7 @@ export function Shell({children,active="overview",tenantName="ArvoCulture",tenan
         <div><small>{tenantName.toUpperCase()} / TÜRKİYE</small><h1>Commerce Console</h1></div>
         <div className="topbar-actions">
           <a className="secondary-action" href="/magaza" target="_blank" rel="noreferrer">Mağazayı görüntüle ↗</a>
-          <Link className="primary-action" href="/urunler">+ Yeni ürün</Link>
+          <Link prefetch={false} className="primary-action" href="/urunler">+ Yeni ürün</Link>
           <span className="avatar">{initials}</span>
           <form action={signOut}><button className="ghost-action" type="submit">Çıkış</button></form>
         </div>
