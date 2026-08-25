@@ -42,13 +42,17 @@ export async function saveThemeDraft(formData:FormData){
 export async function publishTheme(){
   const {supabase,user,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/tema?error=forbidden");
-  const [{data:draft,error:draftError},{data:published}]=await Promise.all([
+  const [{data:draft,error:draftError},{data:published},{data:settings}]=await Promise.all([
     supabase.from("arc_store_themes").select("config,version").eq("organization_id",organization.id).eq("mode","draft").maybeSingle(),
-    supabase.from("arc_store_themes").select("version").eq("organization_id",organization.id).eq("mode","published").maybeSingle()
+    supabase.from("arc_store_themes").select("version").eq("organization_id",organization.id).eq("mode","published").maybeSingle(),
+    supabase.from("arc_store_settings").select("store_name,logo_path,favicon_path,primary_color,accent_color").eq("organization_id",organization.id).maybeSingle()
   ]);
   if(draftError||!draft)redirect("/tema?error=draft-not-found");
   const now=new Date().toISOString();
-  const {error}=await supabase.from("arc_store_themes").upsert({organization_id:organization.id,mode:"published",version:(published?.version??0)+1,config:draft.config,updated_by:user.id,published_at:now,updated_at:now},{onConflict:"organization_id,mode"});
+  const logoUrl=settings?.logo_path?supabase.storage.from("organization-assets").getPublicUrl(settings.logo_path).data.publicUrl:undefined;
+  const faviconUrl=settings?.favicon_path?supabase.storage.from("organization-assets").getPublicUrl(settings.favicon_path).data.publicUrl:undefined;
+  const config={...(draft.config as Record<string,unknown>),store_name:settings?.store_name??organization.name,logo_url:logoUrl,favicon_url:faviconUrl};
+  const {error}=await supabase.from("arc_store_themes").upsert({organization_id:organization.id,mode:"published",version:(published?.version??0)+1,config,updated_by:user.id,published_at:now,updated_at:now},{onConflict:"organization_id,mode"});
   if(error)redirect(`/tema?error=${encodeURIComponent(error.code??error.message)}`);
   revalidatePath("/tema");redirect("/tema?published=1");
 }
