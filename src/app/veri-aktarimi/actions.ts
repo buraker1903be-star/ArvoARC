@@ -56,10 +56,10 @@ export async function importActiveProducts(formData:FormData){
     const variants=g.filter(r=>r["Variant Price"]?.trim()||r["Variant SKU"]?.trim()||r["Option1 Value"]?.trim()); const seen=new Set<string>(); let n=0;
     for(const r of variants){const key=[r["Option1 Value"],r["Option2 Value"],r["Option3 Value"],r["Variant SKU"],r["Variant Price"]].join("|");if(seen.has(key))continue;seen.add(key);n++;
       const attrs:Record<string,string>={};for(const i of [1,2,3]){const name=optionNames[i],value=r[`Option${i} Value`]?.trim();if(name&&value)attrs[name]=value;}
-      const sku=r["Variant SKU"]?.trim()||`ARC-${handle.slice(0,35).toUpperCase()}-${String(n).padStart(3,"0")}`; const price=Math.round(Number((r["Variant Price"]||"0").replace(",","."))*100);
+      const sku=r["Variant SKU"]?.trim()||`ARC-${handle.slice(0,35).toUpperCase()}-${String(n).padStart(3,"0")}`; const price=moneyToCents(r["Variant Price"]); const rawCompareAtPrice=moneyToCents(r["Variant Compare At Price"]); const compareAtPrice=rawCompareAtPrice>price?rawCompareAtPrice:null;
       const externalId=`${handle}:${n}`;
       const {data:existing}=await supabase.from("arc_product_variants").select("stock").eq("organization_id",organization.id).eq("external_id",externalId).maybeSingle();
-      const {error:ve}=await supabase.from("arc_product_variants").upsert({organization_id:organization.id,product_id:product.id,sku,title:Object.values(attrs).join(" / ")||"Default",price,currency:"TRY",stock:existing?.stock??0,attributes:attrs,external_id:externalId,allow_backorder:true},{onConflict:"organization_id,external_id"});if(ve)throw ve;
+      const {error:ve}=await supabase.from("arc_product_variants").upsert({organization_id:organization.id,product_id:product.id,sku,title:Object.values(attrs).join(" / ")||"Default",price,compare_at_price:compareAtPrice,currency:"TRY",stock:existing?.stock??0,attributes:attrs,external_id:externalId,allow_backorder:true},{onConflict:"organization_id,external_id"});if(ve)throw ve;
     } imported++;
   }catch(e){errors++;await supabase.from("arc_import_errors").insert({batch_id:batch.id,organization_id:organization.id,row_key:handle,message:e instanceof Error?e.message:"Import error"});}}
   await supabase.from("arc_import_batches").update({status:errors?"failed":"completed",imported_rows:imported,error_rows:errors,completed_at:new Date().toISOString()}).eq("id",batch.id);
