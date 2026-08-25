@@ -40,7 +40,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
   });
 
   return <Shell active="stock" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>OPERASYON · CANLI</small><h2>Stok Yönetimi</h2><p>Negatif stok desteklenir. Stoksuz satış açık varyantlar eksi stoka düşebilir; tüm değişiklikler hareket bazında kaydedilir.</p></div></section>
+    <section className="subhead"><div><small>OPERASYON · CANLI</small><h2>Stok Yönetimi</h2><p>Negatif stok desteklenir. Stoksuz satış açık varyantlar eksi stoka düşebilir; tüm değişiklikler hareket bazında kaydedilir.</p></div><a href="/api/disari-aktar/stok" style={{padding:"12px 16px",background:"var(--ink)",color:"white"}}>CSV indir ↓</a></section>
     {params.updated === "1" && <section className="card" style={{padding:16,marginBottom:20}}><strong>Stok hareketi kaydedildi.</strong></section>}
     {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>İşlem tamamlanamadı: {params.error}</strong></section>}
     <section className="metrics"><article><span>TOPLAM STOK</span><strong>{totalUnits}</strong><small>{variants?.length??0} varyant</small></article><article><span>NEGATİF</span><strong>{negative.length}</strong><small>Tedarik gerekli</small></article><article><span>STOK SIFIR</span><strong>{zero.length}</strong><small>Satış politikası kontrolü</small></article><article><span>DÜŞÜK STOK</span><strong>{low.length}</strong><small>1–{lowStockThreshold} adet arası</small></article></section>
