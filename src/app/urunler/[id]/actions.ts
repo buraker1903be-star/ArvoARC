@@ -6,24 +6,89 @@ import { requireTenant } from "@/lib/tenant";
 
 const allowedRoles = new Set(["owner", "admin", "manager"]);
 
+const field = (formData: FormData, name: string, maxLength: number) =>
+  String(formData.get(name) ?? "").trim().slice(0, maxLength);
+
+const slugify = (value: string) =>
+  value
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[çÇ]/g, "c")
+    .replace(/[ğĞ]/g, "g")
+    .replace(/[ıİ]/g, "i")
+    .replace(/[öÖ]/g, "o")
+    .replace(/[şŞ]/g, "s")
+    .replace(/[üÜ]/g, "u")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 160);
+
+type EditableProductMetadata = {
+  subtitle?: string;
+  vendor?: string;
+  type?: string;
+  tags?: string;
+  seo_title?: string;
+  seo_description?: string;
+  google_product_category?: string;
+  gtin?: string;
+  mpn?: string;
+  condition?: string;
+  material?: string;
+  color?: string;
+  gender?: string;
+  age_group?: string;
+  [key: string]: unknown;
+};
+
 export async function updateProduct(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   const id = String(formData.get("id") ?? "");
   if (!allowedRoles.has(membership.role)) redirect(`/urunler/${id}?error=forbidden`);
 
-  const name = String(formData.get("name") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
-  const requestedStatus=String(formData.get("status")??"draft");
-  const status=["active","draft","archived"].includes(requestedStatus)?requestedStatus:"draft";
-  if (!id || !name) redirect(`/urunler/${id}?error=invalid-product`);
+  const name = field(formData, "name", 200);
+  const description = field(formData, "description", 20000);
+  const requestedStatus = field(formData, "status", 20);
+  const status = ["active", "draft", "archived"].includes(requestedStatus) ? requestedStatus : "draft";
+  const slug = slugify(field(formData, "slug", 180) || name);
+  if (!id || !name || !slug) redirect(`/urunler/${id}?error=invalid-product`);
+
+  const { data: currentProduct, error: currentProductError } = await supabase
+    .from("arc_products")
+    .select("metadata")
+    .eq("id", id)
+    .eq("organization_id", organization.id)
+    .maybeSingle();
+
+  if (currentProductError || !currentProduct) redirect(`/urunler/${id}?error=product-not-found`);
+  const currentMetadata = (currentProduct.metadata ?? {}) as EditableProductMetadata;
+  const metadata: EditableProductMetadata = {
+    ...currentMetadata,
+    subtitle: field(formData, "subtitle", 240),
+    vendor: field(formData, "vendor", 120),
+    type: field(formData, "type", 120),
+    tags: field(formData, "tags", 500),
+    seo_title: field(formData, "seo_title", 70),
+    seo_description: field(formData, "seo_description", 180),
+    google_product_category: field(formData, "google_product_category", 240),
+    gtin: field(formData, "gtin", 32),
+    mpn: field(formData, "mpn", 80),
+    condition: field(formData, "condition", 20) || "new",
+    material: field(formData, "material", 120),
+    color: field(formData, "color", 120),
+    gender: field(formData, "gender", 30),
+    age_group: field(formData, "age_group", 30),
+  };
 
   const { error } = await supabase
     .from("arc_products")
-    .update({ name, description, status, updated_at: new Date().toISOString() })
+    .update({ name, slug, description, status, metadata, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("organization_id", organization.id);
 
-  if (error) redirect(`/urunler/${id}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/urunler/${id}?error=${encodeURIComponent(error.code ?? error.message)}`);
+  revalidatePath("/");
   revalidatePath("/urunler");
   revalidatePath(`/urunler/${id}`);
   redirect(`/urunler/${id}?saved=product`);
