@@ -35,6 +35,8 @@ create table public.arc_collection_products (
 create index arc_collections_org_status_idx on public.arc_collections(organization_id,status);
 create index arc_collection_products_org_product_idx on public.arc_collection_products(organization_id,product_id);
 create index arc_collection_products_collection_position_idx on public.arc_collection_products(collection_id,position);
+create index arc_collection_products_collection_org_idx on public.arc_collection_products(collection_id,organization_id);
+create index arc_collection_products_product_org_idx on public.arc_collection_products(product_id,organization_id);
 
 alter table public.arc_collections enable row level security;
 alter table public.arc_collection_products enable row level security;
