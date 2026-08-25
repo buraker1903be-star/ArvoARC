@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { login } from "./actions";
 
 const messages: Record<string, string> = {
@@ -15,7 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="login-shell">
       <section className="login-card">
-        <div className="login-brand"><span>ARVO</span><b>ARC</b></div>
+        <div className="login-brand"><Image src="/arvo-arc-logo.png" alt="ARVO ARC" width={1909} height={373} priority sizes="210px"/></div>
         <small>ARVO CULTURE · ADAPTIVE RETAIL CORE</small>
         <h1>Operasyon merkezine hoş geldiniz.</h1>
         <p className="login-lead">ArvoOS hesabınızla güvenli biçimde devam edin.</p>
