@@ -339,3 +339,32 @@ a.row:hover,.row:not(.th):hover{background:#f8faf7}
   .customer-order-row{grid-template-columns:1.2fr .8fr 1fr}
   .customer-order-row>span:nth-child(3),.customer-order-row>span:nth-child(5){display:none}
 }
+
+
+/* Analytics period comparison */
+.period-comparison{
+  margin:20px 0;
+  padding:24px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:linear-gradient(135deg,var(--navy),#073461);
+  color:#fff;
+  box-shadow:0 18px 45px rgba(0,32,69,.16);
+}
+.period-comparison-title{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:18px}
+.period-comparison-title small{font-size:9px;font-weight:800;letter-spacing:.18em;opacity:.65}
+.period-comparison-title h3{margin:5px 0 0;font-size:23px}
+.period-comparison-title>span{font-size:10px;opacity:.65}
+.period-comparison-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:rgba(255,255,255,.14)}
+.period-comparison-grid article{display:grid;grid-template-columns:1fr auto;gap:6px 14px;padding:18px;background:var(--navy)}
+.period-comparison-grid article>span{grid-column:1/-1;font-size:10px;font-weight:750;letter-spacing:.06em;opacity:.7}
+.period-comparison-grid article>strong{font-size:22px}
+.period-comparison-grid article>small{align-self:center;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:800}
+.period-comparison-grid .up{background:rgba(111,149,72,.28);color:#dff5c8}
+.period-comparison-grid .down{background:rgba(184,68,53,.28);color:#ffd9d4}
+.period-comparison-grid .neutral{background:rgba(255,255,255,.1);color:#fff}
+@media (max-width:700px){
+  .period-comparison{padding:18px}
+  .period-comparison-grid{grid-template-columns:1fr}
+  .period-comparison-title{align-items:flex-start;flex-direction:column}
+}
