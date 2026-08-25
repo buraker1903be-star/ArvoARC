@@ -86,7 +86,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
         const compareLabel=comparePrices.length?money.format(Math.max(...comparePrices)/100):"";
         const priceLabel=prices.length?(minPrice===maxPrice?money.format(minPrice/100):`${money.format(minPrice/100)} – ${money.format(maxPrice/100)}`):"Fiyat girilmemiş";
         const stockTone=totalStock<0?"danger":totalStock<=5?"low":"healthy";
-        return <Link href={`/urunler/${product.id}`} className="product-card" key={product.id}>
+        return <Link prefetch={false} href={`/urunler/${product.id}`} className="product-card" key={product.id}>
           <div className="product-card-media">
             {image?<Image src={image} alt={product.name} width={720} height={720} sizes="(max-width:640px) 100vw, (max-width:1100px) 50vw, 25vw" priority={index<4} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div className="product-card-placeholder"><span>ARVO ARC</span><b>{product.name.slice(0,2).toUpperCase()}</b></div>}
             <em className={`product-status ${product.status}`}>{productStatusLabel(product.status)}</em>
@@ -104,7 +104,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
           </div>
         </Link>;
       })}</div> : <div className="card product-empty"><strong>Arama kriterine uygun ürün bulunamadı.</strong><p>Filtreleri temizleyerek tüm kataloğu görüntüleyebilirsiniz.</p></div>}
-      {!search&&totalPages>1&&<nav className="catalog-pagination" aria-label="Ürün sayfaları"><span>{currentPage}. sayfa / {totalPages}</span><div>{currentPage>1&&<Link href={pageHref(currentPage-1)}>← Önceki</Link>}{currentPage<totalPages&&<Link href={pageHref(currentPage+1)}>Sonraki →</Link>}</div></nav>}
+      {!search&&totalPages>1&&<nav className="catalog-pagination" aria-label="Ürün sayfaları"><span>{currentPage}. sayfa / {totalPages}</span><div>{currentPage>1&&<Link prefetch={false} href={pageHref(currentPage-1)}>← Önceki</Link>}{currentPage<totalPages&&<Link prefetch={false} href={pageHref(currentPage+1)}>Sonraki →</Link>}</div></nav>}
     </section>
   </Shell>;
 }
