@@ -7,6 +7,9 @@ import { copyShopifyImages } from "@/lib/product-images";
 
 type Row = Record<string,string>;
 
+const clean=(value:string|undefined,max=500)=>String(value??"").trim().slice(0,max);
+const slugify=(value:string)=>value.toLocaleLowerCase("tr-TR").replace(/[çÇ]/g,"c").replace(/[ğĞ]/g,"g").replace(/[ıİ]/g,"i").replace(/[öÖ]/g,"o").replace(/[şŞ]/g,"s").replace(/[üÜ]/g,"u").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,160);
+
 function parseCsv(text:string):Row[]{
   const matrix:string[][]=[]; let row:string[]=[]; let cell=""; let quoted=false;
   for(let i=0;i<text.length;i++){const c=text[i]; if(c==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}else if(c===','&&!quoted){row.push(cell);cell="";}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(cell);if(row.some(Boolean))matrix.push(row);row=[];cell="";}else cell+=c;}
@@ -27,12 +30,43 @@ export async function importActiveProducts(formData:FormData){
   for(const [handle,g] of active){try{
     const first=g.find(r=>r.Title?.trim())??g[0]; const description=(first["Body (HTML)"]??"").replace(/<style[^>]*>[\s\S]*?<\/style>/gi,"").trim();
     const shopifyImageSources=[...new Set(g.map(r=>r["Image Src"]?.trim()).filter((value):value is string=>Boolean(value)))];
+    const plainDescription=description.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
+    const shopifyMetadata={
+      shopify_handle:handle,
+      vendor:clean(first.Vendor,120),
+      type:clean(first.Type,120),
+      tags:clean(first.Tags,500),
+      subtitle:clean(first["SEO Description"],240)||plainDescription.slice(0,140),
+      seo_title:clean(first["SEO Title"],70)||clean(first.Title,70),
+      seo_description:clean(first["SEO Description"],180)||plainDescription.slice(0,180),
+      google_product_category:clean(first["Google Shopping / Google Product Category"],240),
+      gender:clean(first["Google Shopping / Gender"],30),
+      age_group:clean(first["Google Shopping / Age Group"],30),
+      mpn:clean(first["Google Shopping / MPN"],80),
+      condition:clean(first["Google Shopping / Condition"],20)||"new",
+      gtin:clean(g.find(row=>row["Variant Barcode"]?.trim())?.["Variant Barcode"],32),
+      images:[],
+      shopify_image_sources:shopifyImageSources,
+      images_migrated:false
+    };
     const optionNames:Record<number,string>={};
     for(const i of [1,2,3]) optionNames[i]=g.find(r=>r[`Option${i} Name`]?.trim())?.[`Option${i} Name`]?.trim()??"";
-    const {data:product,error:pe}=await supabase.from("arc_products").upsert({organization_id:organization.id,name:first.Title?.trim()||handle,slug:handle,description,status:"active",source:"shopify",external_id:handle,metadata:{shopify_handle:handle,vendor:first.Vendor??"",type:first.Type??"",tags:first.Tags??"",images:[],shopify_image_sources:shopifyImageSources,images_migrated:false}},{onConflict:"organization_id,source,external_id"}).select("id").single(); if(pe)throw pe;
+    const {data:product,error:pe}=await supabase.from("arc_products").upsert({organization_id:organization.id,name:first.Title?.trim()||handle,slug:handle,description,status:"active",source:"shopify",external_id:handle,metadata:shopifyMetadata},{onConflict:"organization_id,source,external_id"}).select("id").single(); if(pe)throw pe;
     const copiedImages=await copyShopifyImages(supabase,organization.id,product.id,shopifyImageSources);
-    const {error:imageMetadataError}=await supabase.from("arc_products").update({metadata:{shopify_handle:handle,vendor:first.Vendor??"",type:first.Type??"",tags:first.Tags??"",images:[],image_paths:copiedImages.paths,shopify_image_sources:shopifyImageSources,images_migrated:copiedImages.errors.length===0,image_migration_errors:copiedImages.errors}}).eq("organization_id",organization.id).eq("id",product.id);
+    const {error:imageMetadataError}=await supabase.from("arc_products").update({metadata:{...shopifyMetadata,image_paths:copiedImages.paths,images_migrated:copiedImages.errors.length===0,image_migration_errors:copiedImages.errors}}).eq("organization_id",organization.id).eq("id",product.id);
     if(imageMetadataError)throw imageMetadataError;
+    if(shopifyMetadata.type){
+      const collectionSlug=slugify(shopifyMetadata.type)||`koleksiyon-${product.id.slice(0,8)}`;
+      const {data:collection,error:collectionError}=await supabase.from("arc_collections").upsert({
+        organization_id:organization.id,title:shopifyMetadata.type,slug:collectionSlug,status:"active",source:"shopify",
+        seo_title:shopifyMetadata.type,seo_description:"",metadata:{shopify_product_type:shopifyMetadata.type}
+      },{onConflict:"organization_id,slug"}).select("id").single();
+      if(collectionError)throw collectionError;
+      const {error:membershipError}=await supabase.from("arc_collection_products").upsert({
+        organization_id:organization.id,collection_id:collection.id,product_id:product.id
+      },{onConflict:"collection_id,product_id"});
+      if(membershipError)throw membershipError;
+    }
     const variants=g.filter(r=>r["Variant Price"]?.trim()||r["Variant SKU"]?.trim()||r["Option1 Value"]?.trim()); const seen=new Set<string>(); let n=0;
     for(const r of variants){const key=[r["Option1 Value"],r["Option2 Value"],r["Option3 Value"],r["Variant SKU"],r["Variant Price"]].join("|");if(seen.has(key))continue;seen.add(key);n++;
       const attrs:Record<string,string>={};for(const i of [1,2,3]){const name=optionNames[i],value=r[`Option${i} Value`]?.trim();if(name&&value)attrs[name]=value;}
@@ -43,7 +77,7 @@ export async function importActiveProducts(formData:FormData){
     } imported++;
   }catch(e){errors++;await supabase.from("arc_import_errors").insert({batch_id:batch.id,organization_id:organization.id,row_key:handle,message:e instanceof Error?e.message:"Import error"});}}
   await supabase.from("arc_import_batches").update({status:errors?"failed":"completed",imported_rows:imported,error_rows:errors,completed_at:new Date().toISOString()}).eq("id",batch.id);
-  revalidatePath("/urunler");revalidatePath("/veri-aktarimi");redirect(`/veri-aktarimi?imported=${imported}&errors=${errors}`);
+  revalidatePath("/urunler");revalidatePath("/koleksiyonlar");revalidatePath("/veri-aktarimi");redirect(`/veri-aktarimi?imported=${imported}&errors=${errors}`);
 }
 
 type ProductMetadata={
