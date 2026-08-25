@@ -13,7 +13,9 @@ const number=(fd:FormData,key:string,fallback:number,min=0,max=100)=>{const valu
 export async function saveThemeDraft(formData:FormData){
   const {supabase,user,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/tema?error=forbidden");
+  const {data:current}=await supabase.from("arc_store_themes").select("version,config").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();
   const config={
+    ...((current?.config??{}) as Record<string,unknown>),
     announcement:text(formData,"announcement",180),
     hero_eyebrow:text(formData,"hero_eyebrow",100),
     hero_title:text(formData,"hero_title",100),
@@ -49,7 +51,6 @@ export async function saveThemeDraft(formData:FormData){
     footer_tagline:text(formData,"footer_tagline",240),instagram_url:text(formData,"instagram_url",240),facebook_url:text(formData,"facebook_url",240)
   };
   if(!config.hero_title||!config.hero_description)redirect("/tema?error=required-fields");
-  const {data:current}=await supabase.from("arc_store_themes").select("version").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();
   const {error}=await supabase.from("arc_store_themes").upsert({organization_id:organization.id,mode:"draft",version:current?.version??1,config,updated_by:user.id,updated_at:new Date().toISOString()},{onConflict:"organization_id,mode"});
   if(error)redirect(`/tema?error=${encodeURIComponent(error.code??error.message)}`);
   revalidatePath("/tema");redirect("/tema?saved=draft");
