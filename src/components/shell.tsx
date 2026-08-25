@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
 
@@ -14,7 +15,7 @@ const navigation=[
 ] as const;
 
 export function Brand(){
-  return <span className="brand" aria-label="ARVO ARC"><b>ARVO</b><i>ARC</i></span>;
+  return <span className="brand"><Image src="/arvo-arc-logo.png" alt="ARVO ARC" width={1909} height={373} priority sizes="190px"/></span>;
 }
 
 export function Shell({children,active="overview",tenantName="ArvoCulture",tenantPlan="enterprise"}:{children:React.ReactNode;active?:string;tenantName?:string;tenantPlan?:string}){
