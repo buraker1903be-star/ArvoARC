@@ -6,6 +6,7 @@ const navigation=[
   ["overview","Genel Bakış","/","⌂"],
   ["operations","Operasyon Merkezi","/operasyon","◆"],
   ["products","Ürünler","/urunler","◇"],
+  ["collections","Koleksiyonlar","/koleksiyonlar","◫"],
   ["stock","Stok Yönetimi","/stok","▤"],
   ["orders","Siparişler","/siparisler","▧"],
   ["customers","Müşteriler","/musteriler","◎"],
