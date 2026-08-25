@@ -34,19 +34,12 @@ export default async function Dashboard() {
   const sales = orders.reduce((sum, order) => sum + order.total, 0);
   const stock = variants.reduce((sum, variant) => sum + variant.stock, 0);
   const recentOrders = orders.slice(0, 5);
-  const dailySales = Array.from({ length: 14 }, (_, index) => {
-    const day = new Date(now);
-    day.setUTCHours(0, 0, 0, 0);
-    day.setUTCDate(day.getUTCDate() - (13 - index));
-    const nextDay = new Date(day);
-    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-    return orders
-      .filter((order) => {
-        const createdAt = new Date(order.created_at);
-        return createdAt >= day && createdAt < nextDay;
-      })
-      .reduce((sum, order) => sum + order.total, 0);
-  });
+  const chartStart=new Date(now);chartStart.setUTCHours(0,0,0,0);chartStart.setUTCDate(chartStart.getUTCDate()-13);
+  const dailySales=Array<number>(14).fill(0);
+  for(const order of orders){
+    const day=Math.floor((new Date(order.created_at).getTime()-chartStart.getTime())/86_400_000);
+    if(day>=0&&day<14)dailySales[day]+=order.total;
+  }
   const maxDailySales = Math.max(...dailySales, 1);
   const negativeStock = variants.filter((variant) => variant.stock < 0);
   const lowStock = variants.filter((variant) => variant.stock >= 0 && variant.stock <= 5);
@@ -87,6 +80,7 @@ export default async function Dashboard() {
     ["Stok", String(stock), `${variants.length} varyant`],
   ];
 
+  const variantByProduct=new Map(variants.map(variant=>[variant.product_id,variant]));
   return <Shell tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="intro"><div><p>ARVO ARC · CANLI</p><h2>Mağaza operasyonun <em>tek merkezde.</em></h2><span>{organization.name} için Supabase commerce verileri.</span></div><span>Son 30 gün</span></section>
     <nav className="quick-actions" aria-label="Hızlı işlemler">{quickActions.map((action)=><Link href={action.href} className="quick-action" key={action.label}><i aria-hidden="true">{action.icon}</i><span><b>{action.label}</b><small>{action.detail}</small></span></Link>)}</nav>
@@ -96,6 +90,6 @@ export default async function Dashboard() {
       <div className="action-center-grid">{actionItems.map((item)=><Link href={item.href} className={`action-item ${item.tone}`} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small><b>İncele →</b></Link>)}</div>
     </section>
     <section className="grid"><article className="card sales"><div className="head"><div><small>SON 30 GÜN</small><h3>{money.format(sales / 100)}</h3></div><span>Gerçek sipariş toplamı</span></div><div className="bars" aria-label="Son 14 günlük satış grafiği">{dailySales.map((value,i)=><i key={i} title={money.format(value / 100)} style={{height:`${Math.max(6, Math.round((value / maxDailySales) * 100))}%`}}/>)}</div><div className="labels"><span>14 gün önce</span><span>Günlük satış</span><span>Bugün</span></div></article><article className="card"><div className="head"><div><small>SON SİPARİŞLER</small><h3>Akış</h3></div><Link href="/siparisler">Tümünü gör →</Link></div>{recentOrders.length ? recentOrders.map(o=><div className="order" key={o.id}><i>{(o.customer_name || "Müşteri").split(" ").map((x: string)=>x[0]).join("").slice(0,2)}</i><div><b>{o.order_number} · {o.customer_name || "Müşteri"}</b><small>{orderStatusLabel(o.status)}</small></div><strong>{money.format(o.total / 100)}</strong></div>) : <p>Henüz sipariş yok.</p>}</article></section>
-    <section className="card table"><div className="head"><div><small>KATALOG</small><h3>Son ürünler</h3></div><Link href="/urunler">Ürünleri yönet →</Link></div><div className="row th"><span>ÜRÜN</span><span>SKU</span><span>STOK</span><span>FİYAT</span><span>DURUM</span></div>{products.length ? products.map((p,i)=>{const variant=variants.find(v=>v.product_id===p.id);return <div className="row" key={p.id}><span><i className={`swatch s${i%5}`}>AC</i><b>{p.name}</b></span><span>{variant?.sku ?? "—"}</span><span>{variant?.stock ?? 0}</span><span>{variant ? money.format(variant.price/100) : "—"}</span><span><em>{productStatusLabel(p.status)}</em></span></div>}) : <p>Henüz ürün yok. İlk ürününü ekleyerek başlayabilirsin.</p>}</section>
+    <section className="card table"><div className="head"><div><small>KATALOG</small><h3>Son ürünler</h3></div><Link href="/urunler">Ürünleri yönet →</Link></div><div className="row th"><span>ÜRÜN</span><span>SKU</span><span>STOK</span><span>FİYAT</span><span>DURUM</span></div>{products.length ? products.map((p,i)=>{const variant=variantByProduct.get(p.id);return <div className="row" key={p.id}><span><i className={`swatch s${i%5}`}>AC</i><b>{p.name}</b></span><span>{variant?.sku ?? "—"}</span><span>{variant?.stock ?? 0}</span><span>{variant ? money.format(variant.price/100) : "—"}</span><span><em>{productStatusLabel(p.status)}</em></span></div>}) : <p>Henüz ürün yok. İlk ürününü ekleyerek başlayabilirsin.</p>}</section>
   </Shell>;
 }
