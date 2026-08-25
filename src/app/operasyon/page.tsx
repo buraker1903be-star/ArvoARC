@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
+import { orderStatusLabel, paymentStatusLabel } from "@/lib/commerce-labels";
 
 type ProductMeta={image_paths?:string[];images?:string[];images_migrated?:boolean};
 const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"});
@@ -27,8 +28,8 @@ export default async function Operations(){
     <section className="metrics"><article><span>TOPLAM AKSİYON</span><strong>{totalActions}</strong><small>Kontrol bekleyen</small></article><article><span>AÇIK SİPARİŞ</span><strong>{openOrders.length}</strong><small>Bekliyor veya hazırlanıyor</small></article><article><span>STOK UYARISI</span><strong>{criticalStock.length+lowStock.length}</strong><small>Kritik ve düşük stok</small></article><article><span>GÖRSEL EKSİĞİ</span><strong>{missingImages.length}</strong><small>Aktif ürün</small></article></section>
 
     <section className="grid">
-      <article className="card"><div className="head"><div><small>SİPARİŞ</small><h3>Açık siparişler</h3></div><Link href="/siparisler?filter=processing">Tüm siparişler →</Link></div>{openOrders.slice(0,8).map(order=><Link className="order" href={`/siparisler/${order.id}`} key={order.id}><i>▧</i><div><b>{order.order_number} · {order.customer_name||"Müşteri"}</b><small>{order.status} · {new Date(order.created_at).toLocaleDateString("tr-TR")}</small></div><strong>{money.format(order.total/100)}</strong></Link>)}{!openOrders.length&&<p>Açık sipariş bulunmuyor.</p>}</article>
-      <article className="card"><div className="head"><div><small>ÖDEME</small><h3>Ödeme kontrolü</h3></div><Link href="/siparisler">Siparişlere git →</Link></div>{paymentPending.slice(0,8).map(order=><Link className="order" href={`/siparisler/${order.id}`} key={order.id}><i>₺</i><div><b>{order.order_number}</b><small>{order.payment_status}</small></div><strong>{money.format(order.total/100)}</strong></Link>)}{!paymentPending.length&&<p>Ödeme bekleyen sipariş bulunmuyor.</p>}</article>
+      <article className="card"><div className="head"><div><small>SİPARİŞ</small><h3>Açık siparişler</h3></div><Link href="/siparisler?filter=processing">Tüm siparişler →</Link></div>{openOrders.slice(0,8).map(order=><Link className="order" href={`/siparisler/${order.id}`} key={order.id}><i>▧</i><div><b>{order.order_number} · {order.customer_name||"Müşteri"}</b><small>{orderStatusLabel(order.status)} · {new Date(order.created_at).toLocaleDateString("tr-TR")}</small></div><strong>{money.format(order.total/100)}</strong></Link>)}{!openOrders.length&&<p>Açık sipariş bulunmuyor.</p>}</article>
+      <article className="card"><div className="head"><div><small>ÖDEME</small><h3>Ödeme kontrolü</h3></div><Link href="/siparisler">Siparişlere git →</Link></div>{paymentPending.slice(0,8).map(order=><Link className="order" href={`/siparisler/${order.id}`} key={order.id}><i>₺</i><div><b>{order.order_number}</b><small>{paymentStatusLabel(order.payment_status)}</small></div><strong>{money.format(order.total/100)}</strong></Link>)}{!paymentPending.length&&<p>Ödeme bekleyen sipariş bulunmuyor.</p>}</article>
     </section>
 
     <section className="grid" style={{marginTop:20}}>
