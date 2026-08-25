@@ -30,7 +30,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
 
     <section className="card table"><div className="head"><div><small>SİPARİŞ AKIŞI</small><h3>{orders?.length ?? 0} sipariş</h3></div><span>{organization.name}</span></div>
       <div className="row th"><span>SİPARİŞ</span><span>MÜŞTERİ</span><span>KAYNAK</span><span>TUTAR</span><span>DURUM</span></div>
-      {orders?.length ? orders.map(order=><div className="row" key={order.id}><span><b>{order.order_number}</b></span><span>{order.customer_name || order.customer_email || "Misafir"}</span><span>{order.source}</span><span>{money.format(order.total/100)}</span><span><em>{order.status} · {order.payment_status}</em></span></div>) : <div style={{padding:24}}><strong>Henüz sipariş yok.</strong><p>İlk manuel siparişi oluşturabilir veya sonraki aşamada Shopify bağlantısını kullanabilirsiniz.</p></div>}
+      {orders?.length ? orders.map(order=><div className="row" key={order.id}><span><b>{order.order_number}</b></span><span>{order.customer_name || order.customer_email || "Misafir"}</span><span>{order.source}</span><span>{money.format(order.total/100)}</span><span><em>{order.status} · {order.payment_status}</em></span></div>) : <div style={{padding:24}}><strong>Henüz sipariş yok.</strong><p>İlk manuel siparişi oluşturabilir veya Veri Aktarımı ekranından eski Shopify sipariş arşivinizi yükleyebilirsiniz.</p></div>}
     </section>
   </Shell>;
 }
