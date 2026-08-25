@@ -102,7 +102,7 @@ details[open]>summary::after{content:"−"}
 .metrics small{color:var(--green-dark);font-size:9px;font-weight:700}
 
 .grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:22px}
-.card{border:1px solid rgba(211,220,208,.92);border-radius:var(--radius);background:rgba(255,255,255,.92);box-shadow:var(--shadow-sm)}
+.card{padding:24px;border:1px solid rgba(211,220,208,.92);border-radius:var(--radius);background:rgba(255,255,255,.92);box-shadow:var(--shadow-sm)}
 .card:hover{border-color:#ccd8c8}
 .head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
 .head h3{margin:6px 0 0;font-size:23px;line-height:1.15;font-weight:740;letter-spacing:-.04em}
@@ -177,7 +177,7 @@ a.row:hover,.row:not(.th):hover{background:#f8faf7}
 @media(max-width:820px){
   .shell{display:block}
   .shell>aside{height:auto;position:relative;padding:20px}
-  .brand{padding-bottom:18px}
+  .brand{width:210px;margin-bottom:16px}
   .tenant{margin-bottom:14px}
   .shell nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:none}
   .powered{display:none}
