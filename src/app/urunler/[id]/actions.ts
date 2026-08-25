@@ -52,3 +52,68 @@ export async function updateVariant(formData: FormData) {
   revalidatePath("/stok");
   redirect(`/urunler/${productId}?saved=variant`);
 }
+
+
+const imageTypes:Record<string,string>={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif","image/avif":"avif"};
+const maxImageBytes=10*1024*1024;
+type ProductMetadata={image_paths?:string[];images?:string[];[key:string]:unknown};
+
+export async function uploadProductImages(formData:FormData){
+  const {supabase,organization,membership}=await requireTenant();
+  const productId=String(formData.get("product_id")??"");
+  if(!allowedRoles.has(membership.role))redirect(`/urunler/${productId}?error=forbidden`);
+  const files=formData.getAll("images").filter((value):value is File=>value instanceof File&&value.size>0);
+  if(!productId||!files.length||files.length>5)redirect(`/urunler/${productId}?error=invalid-images`);
+
+  const {data:product,error:productError}=await supabase.from("arc_products").select("metadata").eq("organization_id",organization.id).eq("id",productId).maybeSingle();
+  if(productError||!product)redirect(`/urunler/${productId}?error=product-not-found`);
+  const metadata=(product.metadata??{}) as ProductMetadata;
+  const existing=metadata.image_paths??[];
+  if(existing.length+files.length>8)redirect(`/urunler/${productId}?error=max-8-images`);
+
+  const uploaded:string[]=[];
+  for(const [index,file] of files.entries()){
+    const extension=imageTypes[file.type.toLowerCase()];
+    if(!extension||file.size>maxImageBytes){
+      if(uploaded.length)await supabase.storage.from("arc-product-images").remove(uploaded);
+      redirect(`/urunler/${productId}?error=invalid-image-file`);
+    }
+    const path=`${organization.id}/${productId}/manual-${Date.now()}-${index+1}.${extension}`;
+    const {error}=await supabase.storage.from("arc-product-images").upload(path,await file.arrayBuffer(),{contentType:file.type,cacheControl:"31536000",upsert:false});
+    if(error){
+      if(uploaded.length)await supabase.storage.from("arc-product-images").remove(uploaded);
+      redirect(`/urunler/${productId}?error=${encodeURIComponent(error.message)}`);
+    }
+    uploaded.push(path);
+  }
+
+  const {error:updateError}=await supabase.from("arc_products").update({metadata:{...metadata,image_paths:[...existing,...uploaded],images:[]}}).eq("organization_id",organization.id).eq("id",productId);
+  if(updateError){
+    await supabase.storage.from("arc-product-images").remove(uploaded);
+    redirect(`/urunler/${productId}?error=${encodeURIComponent(updateError.message)}`);
+  }
+  revalidatePath("/urunler");revalidatePath(`/urunler/${productId}`);
+  redirect(`/urunler/${productId}?saved=images`);
+}
+
+export async function removeProductImage(formData:FormData){
+  const {supabase,organization,membership}=await requireTenant();
+  const productId=String(formData.get("product_id")??"");
+  const path=String(formData.get("path")??"");
+  if(!allowedRoles.has(membership.role))redirect(`/urunler/${productId}?error=forbidden`);
+  const prefix=`${organization.id}/${productId}/`;
+  if(!productId||!path.startsWith(prefix))redirect(`/urunler/${productId}?error=invalid-image-path`);
+
+  const {data:product,error:productError}=await supabase.from("arc_products").select("metadata").eq("organization_id",organization.id).eq("id",productId).maybeSingle();
+  if(productError||!product)redirect(`/urunler/${productId}?error=product-not-found`);
+  const metadata=(product.metadata??{}) as ProductMetadata;
+  const paths=metadata.image_paths??[];
+  if(!paths.includes(path))redirect(`/urunler/${productId}?error=image-not-found`);
+
+  const {error:storageError}=await supabase.storage.from("arc-product-images").remove([path]);
+  if(storageError)redirect(`/urunler/${productId}?error=${encodeURIComponent(storageError.message)}`);
+  const {error:updateError}=await supabase.from("arc_products").update({metadata:{...metadata,image_paths:paths.filter(item=>item!==path)}}).eq("organization_id",organization.id).eq("id",productId);
+  if(updateError)redirect(`/urunler/${productId}?error=${encodeURIComponent(updateError.message)}`);
+  revalidatePath("/urunler");revalidatePath(`/urunler/${productId}`);
+  redirect(`/urunler/${productId}?saved=image-removed`);
+}
