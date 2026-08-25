@@ -8,8 +8,6 @@ import { copyShopifyImages } from "@/lib/product-images";
 type Row = Record<string,string>;
 
 const clean=(value:string|undefined,max=500)=>String(value??"").trim().slice(0,max);
-const slugify=(value:string)=>value.toLocaleLowerCase("tr-TR").replace(/[çÇ]/g,"c").replace(/[ğĞ]/g,"g").replace(/[ıİ]/g,"i").replace(/[öÖ]/g,"o").replace(/[şŞ]/g,"s").replace(/[üÜ]/g,"u").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,160);
-
 function parseCsv(text:string):Row[]{
   const matrix:string[][]=[]; let row:string[]=[]; let cell=""; let quoted=false;
   for(let i=0;i<text.length;i++){const c=text[i]; if(c==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}else if(c===','&&!quoted){row.push(cell);cell="";}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(cell);if(row.some(Boolean))matrix.push(row);row=[];cell="";}else cell+=c;}
@@ -55,18 +53,6 @@ export async function importActiveProducts(formData:FormData){
     const copiedImages=await copyShopifyImages(supabase,organization.id,product.id,shopifyImageSources);
     const {error:imageMetadataError}=await supabase.from("arc_products").update({metadata:{...shopifyMetadata,image_paths:copiedImages.paths,images_migrated:copiedImages.errors.length===0,image_migration_errors:copiedImages.errors}}).eq("organization_id",organization.id).eq("id",product.id);
     if(imageMetadataError)throw imageMetadataError;
-    if(shopifyMetadata.type){
-      const collectionSlug=slugify(shopifyMetadata.type)||`koleksiyon-${product.id.slice(0,8)}`;
-      const {data:collection,error:collectionError}=await supabase.from("arc_collections").upsert({
-        organization_id:organization.id,title:shopifyMetadata.type,slug:collectionSlug,status:"active",source:"shopify",
-        seo_title:shopifyMetadata.type,seo_description:"",metadata:{shopify_product_type:shopifyMetadata.type}
-      },{onConflict:"organization_id,slug"}).select("id").single();
-      if(collectionError)throw collectionError;
-      const {error:membershipError}=await supabase.from("arc_collection_products").upsert({
-        organization_id:organization.id,collection_id:collection.id,product_id:product.id
-      },{onConflict:"collection_id,product_id"});
-      if(membershipError)throw membershipError;
-    }
     const variants=g.filter(r=>r["Variant Price"]?.trim()||r["Variant SKU"]?.trim()||r["Option1 Value"]?.trim()); const seen=new Set<string>(); let n=0;
     for(const r of variants){const key=[r["Option1 Value"],r["Option2 Value"],r["Option3 Value"],r["Variant SKU"],r["Variant Price"]].join("|");if(seen.has(key))continue;seen.add(key);n++;
       const attrs:Record<string,string>={};for(const i of [1,2,3]){const name=optionNames[i],value=r[`Option${i} Value`]?.trim();if(name&&value)attrs[name]=value;}
