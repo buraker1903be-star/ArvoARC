@@ -596,6 +596,13 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 @media(max-width:650px){.global-progress{top:12px;width:calc(100% - 24px);min-width:0}}
 @media(prefers-reduced-motion:reduce){.global-spinner,button.is-pending::before{animation-duration:1.4s}}
 
+/* Fast route transitions and rendering */
+.product-card,.table .row,.collection-card,.order{content-visibility:auto;contain-intrinsic-size:auto 82px}
+.product-card{contain-intrinsic-size:auto 430px}
+.route-loading{min-height:100vh;padding:34px;background:#f5f7f5}.route-loading-head{display:flex;justify-content:space-between;margin-bottom:30px}.route-loading-head span,.route-loading-metrics i,.route-loading-grid section,.route-loading-table{display:block;border-radius:16px;background:linear-gradient(100deg,#e9eeea 20%,#f8faf8 40%,#e9eeea 60%);background-size:220% 100%;animation:arvo-shimmer 1.15s ease-in-out infinite}.route-loading-head span:first-child{width:260px;height:44px}.route-loading-head span:last-child{width:180px;height:44px}.route-loading-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-bottom:22px}.route-loading-metrics i{height:112px;border-radius:0}.route-loading-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:20px}.route-loading-grid section{height:290px}.route-loading-table{height:330px;margin-top:20px}.route-loading>b{position:fixed;left:50%;top:22px;z-index:9999;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:13px;background:var(--navy);box-shadow:0 16px 40px rgba(0,32,69,.2);color:#fff;font-size:10px;transform:translateX(-50%)}.route-loading>b i{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:var(--lime);border-radius:50%;animation:arvo-spin .7s linear infinite}@keyframes arvo-shimmer{to{background-position:-220% 0}}
+@media(max-width:800px){.route-loading{padding:18px}.route-loading-metrics{grid-template-columns:repeat(2,1fr)}.route-loading-grid{grid-template-columns:1fr}.route-loading-grid section{height:210px}}
+@media(prefers-reduced-motion:reduce){.route-loading-head span,.route-loading-metrics i,.route-loading-grid section,.route-loading-table{animation:none}}
+
 
 /* Storefront theme studio */
 .theme-flash{margin-bottom:18px;padding:14px 18px;border-color:#cfe1c4;background:#f5faf1;color:var(--green-dark)}.theme-flash.error{border-color:#efd0d0;background:#fff4f4;color:var(--danger)}
