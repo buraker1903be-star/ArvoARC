@@ -51,10 +51,8 @@ details[open]>summary::after{content:"−"}
     radial-gradient(circle at 15% 4%,rgba(216,243,106,.13),transparent 14rem),
     linear-gradient(165deg,#0c2117 0%,#10271b 48%,#091b12 100%);
   border-right:1px solid rgba(255,255,255,.06);box-shadow:18px 0 50px rgba(11,30,19,.08)}
-.brand{display:flex;align-items:center;padding:4px 10px 28px;letter-spacing:-.055em;line-height:1;font-weight:850}
-.brand b,.brand i{font-size:27px}
-.brand b{color:#fff}
-.brand i{color:var(--green);font-style:normal}
+.brand{width:100%;height:62px;margin:0 0 22px;padding:12px 14px;border:1px solid rgba(255,255,255,.12);border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:rgba(255,255,255,.97);box-shadow:0 12px 30px rgba(0,0,0,.16)}
+.brand img{display:block!important;width:190px!important;max-width:100%!important;height:auto!important;max-height:37px!important;object-fit:contain!important}
 .tenant{margin-bottom:24px;padding:13px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:rgba(255,255,255,.055);display:flex;gap:11px;align-items:center;backdrop-filter:blur(14px)}
 .tenant>span,.avatar{width:38px;height:38px;flex:0 0 auto;border-radius:11px;display:grid;place-items:center;background:linear-gradient(145deg,var(--lime),#b6db4d);color:#173018;font-size:10px;font-weight:850;box-shadow:0 6px 18px rgba(216,243,106,.14)}
 .tenant div{min-width:0;display:flex;flex-direction:column}
@@ -121,7 +119,10 @@ a.order:hover{padding-left:8px;padding-right:8px;background:var(--surface-soft)}
 .order small{overflow:hidden;text-overflow:ellipsis;color:#7b887f;font-size:9px}
 .order>strong{color:#263b2e}
 
-.table{margin-top:22px;overflow:hidden}
+.table{margin-top:22px;padding:24px 0 0;overflow:hidden}
+.table>.head{padding:0 24px 18px}
+.table>.row{padding-left:24px;padding-right:24px}
+.table>div:not(.head):not(.row){margin-left:24px;margin-right:24px}
 .row{display:grid;grid-template-columns:2.2fr 1fr .7fr .8fr .9fr;align-items:center;min-height:67px;padding:0 2px;border-top:1px solid #e8ece6;color:#314138;font-size:11px}
 a.row:hover,.row:not(.th):hover{background:#f8faf7}
 .row>span{min-width:0;padding:8px}
@@ -156,9 +157,8 @@ a.row:hover,.row:not(.th):hover{background:#f8faf7}
   linear-gradient(145deg,#091c12,#10271a 55%,#0a2035)}
 .login-shell::before{content:"";position:absolute;inset:0;opacity:.18;background-image:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,black,transparent)}
 .login-card{position:relative;width:min(470px,100%);padding:42px;border:1px solid rgba(255,255,255,.13);border-radius:24px;background:rgba(255,255,255,.96);box-shadow:0 35px 100px rgba(0,0,0,.3)}
-.login-brand{display:flex;align-items:baseline;margin-bottom:28px;letter-spacing:-.06em;font-size:25px;font-weight:850}
-.login-brand span{color:var(--navy)}
-.login-brand b{color:var(--green)}
+.login-brand{width:244px;max-width:100%;margin-bottom:30px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+.login-brand img{display:block!important;width:220px!important;max-width:100%!important;height:auto!important;max-height:43px!important;object-fit:contain!important}
 .login-card>small{color:#748178;font-size:8px;font-weight:800;letter-spacing:.16em}
 .login-card h1{margin:12px 0 8px;font-size:32px;line-height:1.15;font-weight:760;letter-spacing:-.05em}
 .login-lead{margin:0;color:var(--muted);font-size:12px}
