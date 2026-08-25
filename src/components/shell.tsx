@@ -8,6 +8,7 @@ const navigation=[
   ["products","Ürünler","/urunler","◇"],
   ["collections","Koleksiyonlar","/koleksiyonlar","◫"],
   ["discounts","İndirimler","/indirimler","%"],
+  ["theme","Tema Düzenleyici","/tema","◩"],
   ["stock","Stok Yönetimi","/stok","▤"],
   ["orders","Siparişler","/siparisler","▧"],
   ["customers","Müşteriler","/musteriler","◎"],
