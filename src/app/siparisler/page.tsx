@@ -21,8 +21,9 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
   const search=(params.q??"").trim().toLocaleLowerCase("tr-TR");
   const statusFilter=["pending","confirmed","processing","fulfilled","cancelled","refunded"].includes(params.filter??"")?params.filter:"all";
   const visibleOrders=(orders??[]).filter(order=>(statusFilter==="all"||order.status===statusFilter)&&(!search||[order.order_number,order.customer_name,order.customer_email].some(value=>(value??"").toLocaleLowerCase("tr-TR").includes(search))));
+  const productById=new Map((products??[]).map(product=>[product.id,product]));
   const variantOptions = (variants ?? []).map((variant) => {
-    const product = products?.find((item) => item.id === variant.product_id);
+    const product = productById.get(variant.product_id);
     return { id: variant.id, label: `${product?.name ?? "Ürün"} · ${variant.sku} · stok ${variant.stock}${variant.allow_backorder ? " · stoksuz satış açık" : ""}` };
   });
 
