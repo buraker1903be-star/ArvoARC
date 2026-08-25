@@ -551,3 +551,21 @@ a.row:hover,.row:not(.th):hover{background:#f8faf7}
 .discount-row a{color:var(--navy);font-size:9px;font-weight:800}.discount-row-head{min-height:42px;background:#f7f9fa;color:var(--muted);font-size:8px;font-weight:800;letter-spacing:.11em}
 @media(max-width:1050px){.discount-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.discount-table{overflow-x:auto}.discount-row{min-width:930px}}
 @media(max-width:650px){.discount-metrics{grid-template-columns:1fr}.discount-guide{align-items:flex-start;flex-direction:column}}
+
+
+/* Discount rule engine */
+.discount-flash{margin-bottom:18px;padding:14px 18px;border-color:#cfe1c4;background:#f5faF1;color:var(--green-dark)}
+.discount-flash.error{border-color:#efd0d0;background:#fff4f4;color:var(--danger)}
+.discount-builder{margin-bottom:30px;padding:24px}.discount-builder>summary{cursor:pointer;font-size:12px;font-weight:850}
+.discount-builder>form{margin-top:22px}.discount-builder-head{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin-bottom:18px}
+.discount-builder-head small{color:var(--green);font-size:8px;font-weight:850;letter-spacing:.16em}.discount-builder-head h3{margin:5px 0 0;font-size:22px}.discount-builder-head>span{max-width:360px;color:var(--muted);font-size:10px;text-align:right}
+.discount-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.discount-form-grid .wide{grid-column:span 2}.discount-form-grid label>small{display:block;margin-top:6px;color:var(--muted);font-size:8px;font-weight:550}.discount-form-grid .check{display:flex;align-items:center;gap:9px;min-height:44px;padding-top:19px}.discount-form-grid .check input{width:auto;margin:0;accent-color:var(--green)}
+.discount-packages{margin:30px 0}.discount-package-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.discount-package{position:relative;overflow:hidden;padding:20px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,#fff,#f7f9fa);box-shadow:var(--shadow-sm)}
+.discount-package::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:#9ba8b3}.discount-package.active::before{background:var(--green)}.discount-package.paused::before{background:#bd8b32}
+.discount-package-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.discount-package-top>span{display:flex;flex-direction:column;gap:4px}.discount-package-top b{color:var(--navy);font-size:11px;letter-spacing:.08em}.discount-package-top small{color:var(--muted);font-size:8px}.discount-package-top em{padding:6px 8px;border-radius:999px;background:#edf4e8;color:var(--green-dark);font-size:8px;font-style:normal;font-weight:800}.discount-package.paused .discount-package-top em{background:#fbf3e5;color:#9a6a18}
+.discount-package-value{display:flex;align-items:flex-end;justify-content:space-between;margin:22px 0 14px;padding-bottom:16px;border-bottom:1px solid var(--line)}.discount-package-value strong{color:var(--green-dark);font-size:30px;line-height:1;letter-spacing:-.05em}.discount-package-value span{color:var(--muted);font-size:9px}
+.discount-package h3{min-height:44px;margin:0 0 12px;font-size:16px;line-height:1.35}.discount-package ul{min-height:98px;margin:0;padding:0;list-style:none}.discount-package li{padding:4px 0;color:var(--muted);font-size:9px}.discount-package li::before{content:"✓";margin-right:7px;color:var(--green);font-weight:900}
+.discount-package-actions{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}.discount-package-actions form{flex:1}.discount-package-actions button{width:100%;padding:9px;font-size:9px}.discount-package-actions .danger-button{border:1px solid #ecd4d4;background:#fff;color:var(--danger);box-shadow:none}.discount-package-actions .danger-button:hover{background:var(--danger);color:#fff}
+@media(max-width:1100px){.discount-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.discount-package-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.discount-builder-head{flex-direction:column}.discount-builder-head>span{text-align:left}.discount-form-grid{grid-template-columns:1fr}.discount-form-grid .wide{grid-column:auto}.discount-package-grid{grid-template-columns:1fr}}
