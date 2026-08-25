@@ -1,12 +1,12 @@
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
-import { removeBrandAsset,updatePanelDomainSettings,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset } from "./actions";
+import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset } from "./actions";
 
 const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending_dns:"DNS bekleniyor",verifying:"Doğrulanıyor",active:"Aktif",failed:"Bağlantı hatası"};
 
 export default async function Settings({searchParams}:{searchParams:Promise<{saved?:string;error?:string}>}){
   const query=await searchParams;const {supabase,organization,membership}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
   const logoUrl=settings?.logo_path?supabase.storage.from("organization-assets").getPublicUrl(settings.logo_path).data.publicUrl:"";
@@ -82,5 +82,31 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
         </section>
       </section>
     </div>
+    <section className="card settings-section payment-section">
+      <div className="head"><div><small>ÖDEME ALTYAPISI</small><h3>Ödeme yöntemleri</h3><p>Her mağaza kendi havale hesabını ve PayTR mağaza numarasını yönetir.</p></div><span>GÜVENLİ YAPILANDIRMA</span></div>
+      {canManage?<form action={updatePaymentSettings} className="payment-form">
+        <article className="payment-method">
+          <div className="payment-title"><div><small>MANUEL ÖDEME</small><h4>Havale / EFT</h4></div><label className="switch-row"><input type="checkbox" name="bank_transfer_enabled" defaultChecked={settings?.bank_transfer_enabled}/><span>Etkin</span></label></div>
+          <p>Sipariş sonrası müşteriye banka bilgilerini ve ödeme açıklamasını gösterir.</p>
+          <div className="payment-fields">
+            <label>Banka adı<input name="bank_name" defaultValue={settings?.bank_name??""} placeholder="Banka adı"/></label>
+            <label>Hesap sahibi<input name="bank_account_holder" defaultValue={settings?.bank_account_holder??""} placeholder="Şirket veya kişi adı"/></label>
+            <label className="wide">IBAN<input name="bank_iban" defaultValue={settings?.bank_iban??""} placeholder="TR00 0000 0000 0000 0000 0000 00" maxLength={32}/></label>
+            <label className="wide">Müşteriye gösterilecek açıklama<textarea name="bank_transfer_instructions" defaultValue={settings?.bank_transfer_instructions??""} placeholder="Sipariş numaranızı havale açıklamasına yazınız." rows={3}/></label>
+          </div>
+        </article>
+        <article className="payment-method paytr-method">
+          <div className="payment-title"><div><small>KARTLA ÖDEME</small><h4>PayTR iFrame API</h4></div><label className="switch-row"><input type="checkbox" name="paytr_enabled" defaultChecked={settings?.paytr_enabled}/><span>Etkin</span></label></div>
+          <p>Kart bilgileri ARVO ARC sunucularına gelmeden PayTR’ın güvenli ödeme ekranında işlenir.</p>
+          <div className="payment-fields">
+            <label className="wide">Mağaza numarası<input name="paytr_merchant_id" defaultValue={settings?.paytr_merchant_id??""} placeholder="PayTR merchant_id" autoComplete="off"/></label>
+            <label>En yüksek taksit<select name="paytr_max_installment" defaultValue={settings?.paytr_max_installment??0}><option value="0">PayTR belirlesin</option>{[1,2,3,4,5,6,9,12].map(value=><option key={value} value={value}>{value} taksit</option>)}</select></label>
+            <div className="check-stack"><label><input type="checkbox" name="paytr_test_mode" defaultChecked={settings?.paytr_test_mode??true}/> Test modu</label><label><input type="checkbox" name="paytr_no_installment" defaultChecked={settings?.paytr_no_installment}/> Taksiti kapat</label></div>
+          </div>
+          <div className="security-note"><b>Gizli anahtarlar panelde saklanmaz.</b><p>PAYTR_MERCHANT_KEY ve PAYTR_MERCHANT_SALT yalnızca mağazanın Vercel sunucu ortamına eklenir.</p><code>https://arvoculture.com/api/paytr/callback</code></div>
+        </article>
+        <button className="payment-save" type="submit">Ödeme ayarlarını kaydet</button>
+      </form>:<p>Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
+    </section>
   </Shell>;
 }
