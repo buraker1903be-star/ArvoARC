@@ -8,6 +8,7 @@ const roles=new Set(["owner","admin","manager"]);
 const text=(fd:FormData,key:string,max:number)=>String(fd.get(key)??"").trim().slice(0,max);
 const href=(value:string)=>value.startsWith("/")?value.slice(0,240):"/";
 const color=(value:string,fallback:string)=>/^#[0-9A-Fa-f]{6}$/.test(value)?value.toUpperCase():fallback;
+const number=(fd:FormData,key:string,fallback:number,min=0,max=100)=>{const value=Number(fd.get(key));return Number.isFinite(value)?Math.min(max,Math.max(min,value)):fallback};
 
 export async function saveThemeDraft(formData:FormData){
   const {supabase,user,organization,membership}=await requireTenant();
@@ -35,12 +36,12 @@ export async function saveThemeDraft(formData:FormData){
     sticky_header:formData.get("sticky_header")==="on",show_search:formData.get("show_search")==="on",show_account:formData.get("show_account")==="on",
     product_card_style:["editorial","bordered","minimal"].includes(text(formData,"product_card_style",20))?text(formData,"product_card_style",20):"editorial",
     product_image_ratio:["portrait","square","landscape"].includes(text(formData,"product_image_ratio",20))?text(formData,"product_image_ratio",20):"portrait",
-    products_per_row:Math.min(5,Math.max(2,Number(formData.get("products_per_row")??4))),
+    products_per_row:number(formData,"products_per_row",4,2,5),
     show_vendor:formData.get("show_vendor")==="on",show_badges:formData.get("show_badges")==="on",show_quick_add:formData.get("show_quick_add")==="on",
     show_manifest:formData.get("show_manifest")==="on",show_worlds:formData.get("show_worlds")==="on",show_featured:formData.get("show_featured")==="on",
     show_campaign:formData.get("show_campaign")==="on",show_values:formData.get("show_values")==="on",
-    order_manifest:Number(formData.get("order_manifest")??20),order_worlds:Number(formData.get("order_worlds")??30),order_featured:Number(formData.get("order_featured")??40),
-    order_campaign:Number(formData.get("order_campaign")??50),order_values:Number(formData.get("order_values")??60),
+    order_manifest:number(formData,"order_manifest",20,10,90),order_worlds:number(formData,"order_worlds",30,10,90),order_featured:number(formData,"order_featured",40,10,90),
+    order_campaign:number(formData,"order_campaign",50,10,90),order_values:number(formData,"order_values",60,10,90),
     manifest_title:text(formData,"manifest_title",140),manifest_description:text(formData,"manifest_description",360),
     apparel_title:text(formData,"apparel_title",100),apparel_description:text(formData,"apparel_description",180),
     beauty_title:text(formData,"beauty_title",100),beauty_description:text(formData,"beauty_description",180),
