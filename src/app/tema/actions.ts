@@ -30,13 +30,50 @@ export async function saveThemeDraft(formData:FormData){
     accent_color:color(text(formData,"accent_color",7),"#D9FF43"),
     background_color:color(text(formData,"background_color",7),"#F5F2EC"),
     typography:["editorial","modern","minimal"].includes(text(formData,"typography",20))?text(formData,"typography",20):"editorial",
-    hero_style:["editorial-orbs","minimal","split"].includes(text(formData,"hero_style",30))?text(formData,"hero_style",30):"editorial-orbs"
+    hero_style:["editorial-orbs","minimal","split"].includes(text(formData,"hero_style",30))?text(formData,"hero_style",30):"editorial-orbs",
+    header_layout:["centered","logo-left","minimal"].includes(text(formData,"header_layout",20))?text(formData,"header_layout",20):"centered",
+    sticky_header:formData.get("sticky_header")==="on",show_search:formData.get("show_search")==="on",show_account:formData.get("show_account")==="on",
+    product_card_style:["editorial","bordered","minimal"].includes(text(formData,"product_card_style",20))?text(formData,"product_card_style",20):"editorial",
+    product_image_ratio:["portrait","square","landscape"].includes(text(formData,"product_image_ratio",20))?text(formData,"product_image_ratio",20):"portrait",
+    products_per_row:Math.min(5,Math.max(2,Number(formData.get("products_per_row")??4))),
+    show_vendor:formData.get("show_vendor")==="on",show_badges:formData.get("show_badges")==="on",show_quick_add:formData.get("show_quick_add")==="on",
+    show_manifest:formData.get("show_manifest")==="on",show_worlds:formData.get("show_worlds")==="on",show_featured:formData.get("show_featured")==="on",
+    show_campaign:formData.get("show_campaign")==="on",show_values:formData.get("show_values")==="on",
+    order_manifest:Number(formData.get("order_manifest")??20),order_worlds:Number(formData.get("order_worlds")??30),order_featured:Number(formData.get("order_featured")??40),
+    order_campaign:Number(formData.get("order_campaign")??50),order_values:Number(formData.get("order_values")??60),
+    manifest_title:text(formData,"manifest_title",140),manifest_description:text(formData,"manifest_description",360),
+    apparel_title:text(formData,"apparel_title",100),apparel_description:text(formData,"apparel_description",180),
+    beauty_title:text(formData,"beauty_title",100),beauty_description:text(formData,"beauty_description",180),
+    trust_one:text(formData,"trust_one",80),trust_two:text(formData,"trust_two",80),trust_three:text(formData,"trust_three",80),trust_four:text(formData,"trust_four",80),
+    footer_tagline:text(formData,"footer_tagline",240),instagram_url:text(formData,"instagram_url",240),facebook_url:text(formData,"facebook_url",240)
   };
   if(!config.hero_title||!config.hero_description)redirect("/tema?error=required-fields");
   const {data:current}=await supabase.from("arc_store_themes").select("version").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();
   const {error}=await supabase.from("arc_store_themes").upsert({organization_id:organization.id,mode:"draft",version:current?.version??1,config,updated_by:user.id,updated_at:new Date().toISOString()},{onConflict:"organization_id,mode"});
   if(error)redirect(`/tema?error=${encodeURIComponent(error.code??error.message)}`);
   revalidatePath("/tema");redirect("/tema?saved=draft");
+}
+
+
+const themeAssetTypes:Record<string,string>={"image/png":"png","image/jpeg":"jpg","image/webp":"webp","image/avif":"avif"};
+export async function uploadThemeAsset(formData:FormData){
+  const {supabase,user,organization,membership}=await requireTenant();
+  if(!roles.has(membership.role))redirect("/tema?error=forbidden");
+  const slot=["hero_image","campaign_image"].includes(text(formData,"slot",30))?text(formData,"slot",30):"";
+  const file=formData.get("file");
+  if(!slot||!(file instanceof File)||!file.size||file.size>8*1024*1024||!themeAssetTypes[file.type])redirect("/tema?error=invalid-theme-image");
+  const {data:draft,error:draftError}=await supabase.from("arc_store_themes").select("config,version").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();
+  if(draftError||!draft)redirect("/tema?error=draft-not-found");
+  const config=(draft.config??{}) as Record<string,unknown>;const oldPath=String(config[`${slot}_path`]??"");
+  const path=`${organization.id}/commerce/theme/${slot}-${Date.now()}.${themeAssetTypes[file.type]}`;
+  const {error:uploadError}=await supabase.storage.from("organization-assets").upload(path,await file.arrayBuffer(),{contentType:file.type,cacheControl:"31536000",upsert:false});
+  if(uploadError)redirect(`/tema?error=${encodeURIComponent(uploadError.message)}`);
+  const publicUrl=supabase.storage.from("organization-assets").getPublicUrl(path).data.publicUrl;
+  const next={...config,[`${slot}_path`]:path,[`${slot}_url`]:publicUrl};
+  const {error}=await supabase.from("arc_store_themes").update({config:next,updated_by:user.id,updated_at:new Date().toISOString()}).eq("organization_id",organization.id).eq("mode","draft");
+  if(error){await supabase.storage.from("organization-assets").remove([path]);redirect(`/tema?error=${encodeURIComponent(error.message)}`);}
+  if(oldPath&&oldPath.startsWith(`${organization.id}/`))await supabase.storage.from("organization-assets").remove([oldPath]);
+  revalidatePath("/tema");redirect(`/tema?saved=${slot}`);
 }
 
 export async function publishTheme(){
