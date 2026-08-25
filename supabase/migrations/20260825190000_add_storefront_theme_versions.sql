@@ -16,15 +16,20 @@ revoke all on table public.arc_store_themes from anon,authenticated;
 grant select on table public.arc_store_themes to anon;
 grant select,insert,update,delete on table public.arc_store_themes to authenticated;
 
+drop policy if exists "public reads published store themes" on public.arc_store_themes;
 create policy "public reads published store themes" on public.arc_store_themes for select to anon
 using (mode='published');
+drop policy if exists "arc members read store themes" on public.arc_store_themes;
 create policy "arc members read store themes" on public.arc_store_themes for select to authenticated
 using (exists (select 1 from public.organization_memberships m where m.organization_id=arc_store_themes.organization_id and m.user_id=(select auth.uid()) and m.is_active=true));
+drop policy if exists "arc managers insert store themes" on public.arc_store_themes;
 create policy "arc managers insert store themes" on public.arc_store_themes for insert to authenticated
 with check (exists (select 1 from public.organization_memberships m where m.organization_id=arc_store_themes.organization_id and m.user_id=(select auth.uid()) and m.is_active=true and m.role::text in ('owner','admin','manager')));
+drop policy if exists "arc managers update store themes" on public.arc_store_themes;
 create policy "arc managers update store themes" on public.arc_store_themes for update to authenticated
 using (exists (select 1 from public.organization_memberships m where m.organization_id=arc_store_themes.organization_id and m.user_id=(select auth.uid()) and m.is_active=true and m.role::text in ('owner','admin','manager')))
 with check (exists (select 1 from public.organization_memberships m where m.organization_id=arc_store_themes.organization_id and m.user_id=(select auth.uid()) and m.is_active=true and m.role::text in ('owner','admin','manager')));
+drop policy if exists "arc managers delete store themes" on public.arc_store_themes;
 create policy "arc managers delete store themes" on public.arc_store_themes for delete to authenticated
 using (mode='draft' and exists (select 1 from public.organization_memberships m where m.organization_id=arc_store_themes.organization_id and m.user_id=(select auth.uid()) and m.is_active=true and m.role::text in ('owner','admin','manager')));
 
