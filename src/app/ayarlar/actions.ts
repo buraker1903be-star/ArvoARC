@@ -14,17 +14,14 @@ export async function updateStoreSettings(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
   const storeName=String(formData.get("store_name")??"").trim();
-  const storefrontUrl=String(formData.get("storefront_url")??"").trim();
   const currency=String(formData.get("currency")??"TRY").trim().toUpperCase();
   const locale=String(formData.get("locale")??"tr-TR").trim();
   const threshold=Number(formData.get("low_stock_threshold")??5);
   const primaryColor=String(formData.get("primary_color")??"#002045").trim();
   const accentColor=String(formData.get("accent_color")??"#6f9548").trim();
-  let url:URL;
-  try{url=new URL(storefrontUrl);}catch{redirect("/ayarlar?error=invalid-url");}
-  if(url.protocol!=="https:"||url.username||url.password||!storeName||!/^[A-Z]{3}$/.test(currency)||!Number.isInteger(threshold)||threshold<0||threshold>10000||!/^#[0-9A-Fa-f]{6}$/.test(primaryColor)||!/^#[0-9A-Fa-f]{6}$/.test(accentColor))redirect("/ayarlar?error=invalid-settings");
+  if(!storeName||!/^[A-Z]{3}$/.test(currency)||!Number.isInteger(threshold)||threshold<0||threshold>10000||!/^#[0-9A-Fa-f]{6}$/.test(primaryColor)||!/^#[0-9A-Fa-f]{6}$/.test(accentColor))redirect("/ayarlar?error=invalid-settings");
 
-  const {error}=await supabase.from("arc_store_settings").upsert({organization_id:organization.id,store_name:storeName,storefront_url:url.toString().replace(/\/$/,""),currency,locale,low_stock_threshold:threshold,primary_color:primaryColor,accent_color:accentColor,updated_at:new Date().toISOString()},{onConflict:"organization_id"});
+  const {error}=await supabase.from("arc_store_settings").upsert({organization_id:organization.id,store_name:storeName,currency,locale,low_stock_threshold:threshold,primary_color:primaryColor,accent_color:accentColor,updated_at:new Date().toISOString()},{onConflict:"organization_id"});
   if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/ayarlar");revalidatePath("/stok");revalidatePath("/magaza");
   redirect("/ayarlar?saved=general");
@@ -67,18 +64,36 @@ export async function removeBrandAsset(formData:FormData){
   revalidatePath("/ayarlar");redirect(`/ayarlar?saved=${kind}-removed`);
 }
 
-export async function updateDomainSettings(formData:FormData){
+export async function updatePanelDomainSettings(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
-  const customDomain=String(formData.get("custom_domain")??"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/.*$/,"").replace(/\.$/,"");
-  const platformSubdomain=String(formData.get("platform_subdomain")??"").trim().toLowerCase();
+  const panelDomain=String(formData.get("panel_custom_domain")??"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/.*$/,"").replace(/\.$/,"");
+  if(!panelDomain||!domainPattern.test(panelDomain))redirect("/ayarlar?error=invalid-panel-domain");
+  const {data:settings}=await supabase.from("arc_store_settings").select("custom_domain").eq("organization_id",organization.id).maybeSingle();
+  if(panelDomain===settings?.custom_domain)redirect("/ayarlar?error=panel-storefront-domain-conflict");
+  const {error}=await supabase.from("arc_store_settings").update({
+    panel_custom_domain:panelDomain,panel_domain_status:"pending_dns",
+    panel_domain_verification_token:`arvo-verification=${randomUUID().replace(/-/g,"")}`,
+    panel_domain_verified_at:null,updated_at:new Date().toISOString()
+  }).eq("organization_id",organization.id);
+  if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.code??error.message)}`);
+  revalidatePath("/ayarlar");redirect("/ayarlar?saved=panel-domain");
+}
+
+export async function updateStorefrontDomainSettings(formData:FormData){
+  const {supabase,organization,membership}=await requireTenant();
+  if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
+  const customDomain=String(formData.get("storefront_custom_domain")??"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\/.*$/,"").replace(/\.$/,"");
+  const platformSubdomain=String(formData.get("storefront_subdomain")??"").trim().toLowerCase();
   if(customDomain&&!domainPattern.test(customDomain))redirect("/ayarlar?error=invalid-domain");
   if(platformSubdomain&&!subdomainPattern.test(platformSubdomain))redirect("/ayarlar?error=invalid-subdomain");
   if(!customDomain&&!platformSubdomain)redirect("/ayarlar?error=domain-required");
 
   const token=`arvo-verification=${randomUUID().replace(/-/g,"")}`;
   const domainStatus=customDomain?"pending_dns":"active";
-  const storefrontUrl=customDomain?`https://${customDomain}`:`https://${platformSubdomain}.app.arvoculture.com`;
+  const {data:settings}=await supabase.from("arc_store_settings").select("panel_custom_domain").eq("organization_id",organization.id).maybeSingle();
+  if(customDomain&&customDomain===settings?.panel_custom_domain)redirect("/ayarlar?error=panel-storefront-domain-conflict");
+  const storefrontUrl=customDomain?`https://${customDomain}`:`https://${platformSubdomain}.shop.arvo-os.com`;
   const {error}=await supabase.from("arc_store_settings").update({
     custom_domain:customDomain||null,platform_subdomain:platformSubdomain||null,
     domain_status:domainStatus,domain_verification_token:customDomain?token:null,
