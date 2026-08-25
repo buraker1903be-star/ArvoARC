@@ -27,6 +27,32 @@ export async function updateStoreSettings(formData:FormData){
   redirect("/ayarlar?saved=general");
 }
 
+export async function updatePaymentSettings(formData:FormData){
+  const {supabase,organization,membership}=await requireTenant();
+  if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
+  const bankTransferEnabled=formData.get("bank_transfer_enabled")==="on";
+  const paytrEnabled=formData.get("paytr_enabled")==="on";
+  const bankName=String(formData.get("bank_name")??"").trim();
+  const bankAccountHolder=String(formData.get("bank_account_holder")??"").trim();
+  const bankIban=String(formData.get("bank_iban")??"").replace(/\s+/g,"").toUpperCase();
+  const bankTransferInstructions=String(formData.get("bank_transfer_instructions")??"").trim();
+  const paytrMerchantId=String(formData.get("paytr_merchant_id")??"").trim();
+  const paytrTestMode=formData.get("paytr_test_mode")==="on";
+  const paytrNoInstallment=formData.get("paytr_no_installment")==="on";
+  const paytrMaxInstallment=Number(formData.get("paytr_max_installment")??0);
+  if(bankTransferEnabled&&(!bankName||!bankAccountHolder||!/^TR\d{24}$/.test(bankIban)))redirect("/ayarlar?error=invalid-bank-transfer");
+  if(paytrEnabled&&!paytrMerchantId)redirect("/ayarlar?error=paytr-merchant-required");
+  if(!Number.isInteger(paytrMaxInstallment)||paytrMaxInstallment<0||paytrMaxInstallment>12)redirect("/ayarlar?error=invalid-installment");
+  const {error}=await supabase.from("arc_store_settings").update({
+    bank_transfer_enabled:bankTransferEnabled,bank_name:bankName||null,bank_account_holder:bankAccountHolder||null,
+    bank_iban:bankIban||null,bank_transfer_instructions:bankTransferInstructions||null,
+    paytr_enabled:paytrEnabled,paytr_test_mode:paytrTestMode,paytr_merchant_id:paytrMerchantId||null,
+    paytr_no_installment:paytrNoInstallment,paytr_max_installment:paytrMaxInstallment,updated_at:new Date().toISOString()
+  }).eq("organization_id",organization.id);
+  if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/ayarlar");redirect("/ayarlar?saved=payments");
+}
+
 export async function uploadBrandAsset(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
