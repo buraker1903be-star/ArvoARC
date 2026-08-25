@@ -12,8 +12,9 @@ export default async function Dashboard() {
   thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 29);
   thirtyDaysAgo.setUTCHours(0, 0, 0, 0);
 
-  const [ordersResult, productsResult, productCountResult, activeProductCountResult, variantsResult] = await Promise.all([
+  const [ordersResult, openOrderCountResult, productsResult, productCountResult, activeProductCountResult, variantsResult] = await Promise.all([
     supabase.from("arc_orders").select("id,order_number,customer_name,status,total,currency,created_at").eq("organization_id", organization.id).gte("created_at", thirtyDaysAgo.toISOString()).order("created_at", { ascending: false }),
+    supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).in("status", ["pending", "confirmed", "processing"]),
     supabase.from("arc_products").select("id,name,slug,status,created_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(5),
     supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
     supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).eq("status", "active"),
@@ -21,6 +22,7 @@ export default async function Dashboard() {
   ]);
 
   if (ordersResult.error) throw new Error(ordersResult.error.message);
+  if (openOrderCountResult.error) throw new Error(openOrderCountResult.error.message);
   if (productsResult.error) throw new Error(productsResult.error.message);
   if (productCountResult.error) throw new Error(productCountResult.error.message);
   if (activeProductCountResult.error) throw new Error(activeProductCountResult.error.message);
@@ -46,16 +48,15 @@ export default async function Dashboard() {
       .reduce((sum, order) => sum + order.total, 0);
   });
   const maxDailySales = Math.max(...dailySales, 1);
-  const openOrders = orders.filter((order) => ["pending", "confirmed", "processing"].includes(order.status));
   const negativeStock = variants.filter((variant) => variant.stock < 0);
   const lowStock = variants.filter((variant) => variant.stock >= 0 && variant.stock <= 5);
   const actionItems = [
     {
       label: "İşlem bekleyen sipariş",
-      value: openOrders.length,
-      detail: openOrders.length ? "Onay ve hazırlık akışını tamamlayın" : "Sipariş akışı güncel",
+      value: openOrderCountResult.count ?? 0,
+      detail: openOrderCountResult.count ? "Onay ve hazırlık akışını tamamlayın" : "Sipariş akışı güncel",
       href: "/operasyon",
-      tone: openOrders.length ? "attention" : "success",
+      tone: openOrderCountResult.count ? "attention" : "success",
     },
     {
       label: "Kritik stok",
@@ -72,6 +73,13 @@ export default async function Dashboard() {
       tone: lowStock.length ? "attention" : "success",
     },
   ];
+  const quickActions = [
+    { label: "Yeni ürün", detail: "Kataloğa ürün ekle", href: "/urunler", icon: "+" },
+    { label: "Yeni sipariş", detail: "Manuel sipariş oluştur", href: "/siparisler", icon: "↗" },
+    { label: "Stok işlemi", detail: "Stok seviyesini güncelle", href: "/stok", icon: "⇅" },
+    { label: "Müşteriler", detail: "Müşteri kayıtlarını aç", href: "/musteriler", icon: "◎" },
+    { label: "Veri aktarımı", detail: "CSV arşivi içe aktar", href: "/veri-aktarimi", icon: "↓" },
+  ];
   const metrics = [
     ["Net satış", money.format(sales / 100), "Son 30 gün"],
     ["Sipariş", String(orders.length), "Son 30 gün"],
@@ -81,6 +89,7 @@ export default async function Dashboard() {
 
   return <Shell tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="intro"><div><p>ARVO ARC · CANLI</p><h2>Mağaza operasyonun <em>tek merkezde.</em></h2><span>{organization.name} için Supabase commerce verileri.</span></div><span>Son 30 gün</span></section>
+    <nav className="quick-actions" aria-label="Hızlı işlemler">{quickActions.map((action)=><Link href={action.href} className="quick-action" key={action.label}><i aria-hidden="true">{action.icon}</i><span><b>{action.label}</b><small>{action.detail}</small></span></Link>)}</nav>
     <section className="metrics">{metrics.map(([label,value,change])=><article key={label}><span>{label}</span><strong>{value}</strong><small>{change}</small></article>)}</section>
     <section className="action-center" aria-labelledby="action-center-title">
       <div className="action-center-head"><div><small>BUGÜNÜN ÖNCELİKLERİ</small><h3 id="action-center-title">Operasyon özeti</h3></div><Link href="/operasyon">Operasyon merkezini aç →</Link></div>
