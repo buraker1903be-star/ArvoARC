@@ -72,17 +72,3 @@ set metadata = metadata || jsonb_strip_nulls(jsonb_build_object(
 ))
 where source='shopify';
 
-insert into public.arc_collections(organization_id,title,slug,status,source,seo_title,metadata)
-select distinct p.organization_id,trim(p.metadata->>'type'),
-  coalesce(nullif(trim(both '-' from regexp_replace(translate(lower(trim(p.metadata->>'type')),'çğıöşü','cgiosu'),'[^a-z0-9]+','-','g')),''),'koleksiyon-'||substr(md5(trim(p.metadata->>'type')),1,10)),
-  'active','shopify',trim(p.metadata->>'type'),jsonb_build_object('shopify_product_type',trim(p.metadata->>'type'))
-from public.arc_products p
-where p.source='shopify' and nullif(trim(p.metadata->>'type'),'') is not null
-on conflict(organization_id,slug) do nothing;
-
-insert into public.arc_collection_products(organization_id,collection_id,product_id)
-select p.organization_id,c.id,p.id
-from public.arc_products p join public.arc_collections c
-  on c.organization_id=p.organization_id and c.metadata->>'shopify_product_type'=trim(p.metadata->>'type')
-where p.source='shopify' and nullif(trim(p.metadata->>'type'),'') is not null
-on conflict(collection_id,product_id) do nothing;
