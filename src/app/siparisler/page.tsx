@@ -26,7 +26,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
   });
 
   return <Shell active="orders" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>OPERASYON · CANLI</small><h2>Siparişler</h2><p>Çok kalemli sipariş, sipariş satırları ve stok hareketleri tek transaction içinde işlenir. Stoksuz satış açık varyantlar negatif stoka düşebilir.</p></div></section>
+    <section className="subhead"><div><small>OPERASYON · CANLI</small><h2>Siparişler</h2><p>Çok kalemli sipariş, sipariş satırları ve stok hareketleri tek transaction içinde işlenir. Stoksuz satış açık varyantlar negatif stoka düşebilir.</p></div><a href="/api/disari-aktar/siparisler" style={{padding:"12px 16px",background:"var(--ink)",color:"white"}}>CSV indir ↓</a></section>
     {params.created && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.created} siparişi oluşturuldu.</strong></section>}
     {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>Sipariş oluşturulamadı: {params.error}</strong></section>}
 
