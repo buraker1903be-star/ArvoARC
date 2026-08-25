@@ -82,3 +82,106 @@ export async function migrateShopifyImages(){
   revalidatePath("/urunler");revalidatePath("/veri-aktarimi");
   redirect(`/veri-aktarimi?images=${migrated}&imageErrors=${failed}&remaining=${Math.max(0,(products?.filter(product=>!((product.metadata??{}) as ProductMetadata).images_migrated).length??0)-pending.length)}`);
 }
+
+
+function moneyToCents(value:string|undefined){
+  const raw=(value??"").trim().replace(/\s/g,"");
+  if(!raw)return 0;
+  const normalized=raw.includes(",")&&raw.includes(".")?raw.replace(/,/g,""):raw.replace(",",".");
+  const amount=Number(normalized.replace(/[^0-9.-]/g,""));
+  return Number.isFinite(amount)?Math.max(0,Math.round(amount*100)):0;
+}
+
+function historicalOrderStatus(row:Row){
+  const financial=(row["Financial Status"]??"").trim().toLowerCase();
+  const fulfillment=(row["Fulfillment Status"]??"").trim().toLowerCase();
+  if((row["Cancelled at"]??"").trim())return "cancelled";
+  if(financial==="refunded")return "refunded";
+  if(fulfillment==="fulfilled")return "fulfilled";
+  if(fulfillment==="partial")return "processing";
+  if(["paid","partially_refunded"].includes(financial))return "confirmed";
+  return "pending";
+}
+
+function historicalPaymentStatus(row:Row){
+  const value=(row["Financial Status"]??"").trim().toLowerCase();
+  if(value==="paid")return "paid";
+  if(value==="authorized")return "authorized";
+  if(value==="partially_refunded")return "partially_refunded";
+  if(value==="refunded")return "refunded";
+  if(["voided","failed"].includes(value))return "failed";
+  return "pending";
+}
+
+export async function importHistoricalOrders(formData:FormData){
+  const {supabase,user,organization,membership}=await requireTenant();
+  if(!["owner","admin","manager"].includes(membership.role))redirect("/veri-aktarimi?error=forbidden");
+  const file=formData.get("file");
+  if(!(file instanceof File)||!file.name.toLowerCase().endsWith(".csv"))redirect("/veri-aktarimi?error=orders-csv-required");
+
+  const rows=parseCsv(await file.text());
+  const groups=new Map<string,Row[]>();
+  let skipped=0;
+  for(const row of rows){
+    const key=(row.Name??row.Id??"").trim();
+    if(!key){skipped++;continue;}
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key)!.push(row);
+  }
+
+  const {data:batch,error:batchError}=await supabase.from("arc_import_batches").insert({
+    organization_id:organization.id,source:"shopify",kind:"orders",file_name:file.name,status:"processing",
+    total_rows:groups.size,skipped_rows:skipped,created_by:user.id
+  }).select("id").single();
+  if(batchError)redirect(`/veri-aktarimi?error=${encodeURIComponent(batchError.message)}`);
+
+  const {data:variants}=await supabase.from("arc_product_variants").select("id,sku").eq("organization_id",organization.id);
+  const variantBySku=new Map((variants??[]).filter(v=>v.sku).map(v=>[v.sku.trim().toLowerCase(),v.id]));
+  let imported=0,errors=0;
+
+  for(const [key,group] of groups){
+    try{
+      const first=group[0];
+      const subtotal=moneyToCents(first.Subtotal);
+      const tax=moneyToCents(first.Taxes);
+      const shipping=moneyToCents(first.Shipping);
+      const total=moneyToCents(first.Total)||(subtotal+tax+shipping);
+      const createdAt=(first["Created at"]??"").trim();
+      const parsedCreatedAt=createdAt&&!Number.isNaN(Date.parse(createdAt))?new Date(createdAt).toISOString():new Date().toISOString();
+      const externalId=(first.Id??key).trim();
+      const customerName=(first["Billing Name"]??first["Shipping Name"]??"").trim();
+
+      const {data:order,error:orderError}=await supabase.from("arc_orders").upsert({
+        organization_id:organization.id,order_number:key,source:"shopify",external_id:externalId,
+        status:historicalOrderStatus(first),payment_status:historicalPaymentStatus(first),
+        customer_email:(first.Email??"").trim()||null,customer_name:customerName||null,
+        currency:(first.Currency??"TRY").trim()||"TRY",subtotal,tax,shipping,total,created_at:parsedCreatedAt,
+        metadata:{historical_import:true,shopify_created_at:createdAt||null,financial_status:first["Financial Status"]??null,fulfillment_status:first["Fulfillment Status"]??null}
+      },{onConflict:"organization_id,source,external_id"}).select("id").single();
+      if(orderError)throw orderError;
+
+      const {error:deleteError}=await supabase.from("arc_order_items").delete().eq("organization_id",organization.id).eq("order_id",order.id);
+      if(deleteError)throw deleteError;
+      const items=group.map(row=>{
+        const quantity=Math.max(0,Number.parseInt(row["Lineitem quantity"]??"0",10)||0);
+        const unitPrice=moneyToCents(row["Lineitem price"]);
+        const sku=(row["Lineitem sku"]??"").trim();
+        return {organization_id:organization.id,order_id:order.id,variant_id:sku?variantBySku.get(sku.toLowerCase())??null:null,
+          product_name:(row["Lineitem name"]??"Ürün").trim()||"Ürün",sku:sku||"SHOPIFY-HISTORICAL",
+          quantity,unit_price:unitPrice,total:unitPrice*quantity};
+      }).filter(item=>item.quantity>0);
+      if(items.length){
+        const {error:itemError}=await supabase.from("arc_order_items").insert(items);
+        if(itemError)throw itemError;
+      }
+      imported++;
+    }catch(error){
+      errors++;
+      await supabase.from("arc_import_errors").insert({batch_id:batch.id,organization_id:organization.id,row_key:key,message:error instanceof Error?error.message:"Order import error"});
+    }
+  }
+
+  await supabase.from("arc_import_batches").update({status:errors?"failed":"completed",imported_rows:imported,error_rows:errors,completed_at:new Date().toISOString()}).eq("id",batch.id);
+  revalidatePath("/siparisler");revalidatePath("/veri-aktarimi");
+  redirect(`/veri-aktarimi?orders=${imported}&orderErrors=${errors}&orderSkipped=${skipped}`);
+}
