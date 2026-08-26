@@ -15,7 +15,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
   const params = await searchParams;
   const { supabase, organization, membership } = await requireTenant();
   const search=(params.q??"").trim().toLocaleLowerCase("tr-TR");
-  const statusFilter=["active","draft","archived"].includes(params.filter??"")?params.filter:"all";
+  const statusFilter:string=["active","draft","archived"].includes(params.filter??"")?(params.filter as string):"all";
   const pageSize=24;
   const currentPage=search?1:Math.max(1,Number.parseInt(params.page??"1",10)||1);
   let productsQuery=supabase.from("arc_products").select("id,name,description,status,source,metadata,created_at",{count:"exact"}).eq("organization_id",organization.id).order("created_at",{ascending:false});
