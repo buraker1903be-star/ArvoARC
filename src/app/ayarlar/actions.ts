@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
+import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/vercel-domains";
 
 const roles=new Set(["owner","admin","manager"]);
 const imageTypes:Record<string,string>={"image/png":"png","image/jpeg":"jpg","image/webp":"webp","image/x-icon":"ico","image/vnd.microsoft.icon":"ico"};
@@ -97,10 +98,13 @@ export async function updatePanelDomainSettings(formData:FormData){
   if(!panelDomain||!domainPattern.test(panelDomain))redirect("/ayarlar?error=invalid-panel-domain");
   const {data:settings}=await supabase.from("arc_store_settings").select("custom_domain").eq("organization_id",organization.id).maybeSingle();
   if(panelDomain===settings?.custom_domain)redirect("/ayarlar?error=panel-storefront-domain-conflict");
+  let provision;
+  try{provision=await ensureVercelProjectDomain(panelDomain,"panel");}
+  catch(error){redirect(`/ayarlar?error=${encodeURIComponent(error instanceof Error?error.message:"Vercel alan adı eklenemedi")}`);}
   const {error}=await supabase.from("arc_store_settings").update({
-    panel_custom_domain:panelDomain,panel_domain_status:"pending_dns",
+    panel_custom_domain:panelDomain,panel_domain_status:provision.active?"active":"pending_dns",
     panel_domain_verification_token:`arvo-verification=${randomUUID().replace(/-/g,"")}`,
-    panel_domain_verified_at:null,updated_at:new Date().toISOString()
+    panel_domain_verified_at:provision.active?new Date().toISOString():null,updated_at:new Date().toISOString()
   }).eq("organization_id",organization.id);
   if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.code??error.message)}`);
   revalidatePath("/ayarlar");redirect("/ayarlar?saved=panel-domain");
@@ -116,15 +120,43 @@ export async function updateStorefrontDomainSettings(formData:FormData){
   if(!customDomain&&!platformSubdomain)redirect("/ayarlar?error=domain-required");
 
   const token=`arvo-verification=${randomUUID().replace(/-/g,"")}`;
-  const domainStatus=customDomain?"pending_dns":"active";
   const {data:settings}=await supabase.from("arc_store_settings").select("panel_custom_domain").eq("organization_id",organization.id).maybeSingle();
   if(customDomain&&customDomain===settings?.panel_custom_domain)redirect("/ayarlar?error=panel-storefront-domain-conflict");
+  let provision=null;
+  if(customDomain){
+    try{provision=await ensureVercelProjectDomain(customDomain,"storefront");}
+    catch(error){redirect(`/ayarlar?error=${encodeURIComponent(error instanceof Error?error.message:"Vercel alan adı eklenemedi")}`);}
+  }
   const storefrontUrl=customDomain?`https://${customDomain}`:`https://${platformSubdomain}.shop.arvo-os.com`;
   const {error}=await supabase.from("arc_store_settings").update({
     custom_domain:customDomain||null,platform_subdomain:platformSubdomain||null,
-    domain_status:domainStatus,domain_verification_token:customDomain?token:null,
-    domain_verified_at:customDomain?null:new Date().toISOString(),storefront_url:storefrontUrl,updated_at:new Date().toISOString()
+    domain_status:customDomain?(provision?.active?"active":"pending_dns"):"active",domain_verification_token:customDomain?token:null,
+    domain_verified_at:customDomain&&provision?.active?new Date().toISOString():customDomain?null:new Date().toISOString(),storefront_url:storefrontUrl,updated_at:new Date().toISOString()
   }).eq("organization_id",organization.id);
   if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.code??error.message)}`);
   revalidatePath("/ayarlar");revalidatePath("/magaza");redirect("/ayarlar?saved=domain");
+}
+
+export async function verifyPanelDomain(){
+  const {supabase,organization,membership}=await requireTenant();
+  if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
+  const {data}=await supabase.from("arc_store_settings").select("panel_custom_domain").eq("organization_id",organization.id).maybeSingle();
+  if(!data?.panel_custom_domain)redirect("/ayarlar?error=panel-domain-required");
+  let result;
+  try{result=await verifyVercelProjectDomain(data.panel_custom_domain,"panel");}
+  catch(error){redirect(`/ayarlar?error=${encodeURIComponent(error instanceof Error?error.message:"Vercel doğrulaması başarısız")}`);}
+  await supabase.from("arc_store_settings").update({panel_domain_status:result.active?"active":"pending_dns",panel_domain_verified_at:result.active?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("organization_id",organization.id);
+  revalidatePath("/ayarlar");redirect(result.active?"/ayarlar?saved=panel-domain-verified":"/ayarlar?error=panel-dns-not-ready");
+}
+
+export async function verifyStorefrontDomain(){
+  const {supabase,organization,membership}=await requireTenant();
+  if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
+  const {data}=await supabase.from("arc_store_settings").select("custom_domain").eq("organization_id",organization.id).maybeSingle();
+  if(!data?.custom_domain)redirect("/ayarlar?error=domain-required");
+  let result;
+  try{result=await verifyVercelProjectDomain(data.custom_domain,"storefront");}
+  catch(error){redirect(`/ayarlar?error=${encodeURIComponent(error instanceof Error?error.message:"Vercel doğrulaması başarısız")}`);}
+  await supabase.from("arc_store_settings").update({domain_status:result.active?"active":"pending_dns",domain_verified_at:result.active?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("organization_id",organization.id);
+  revalidatePath("/ayarlar");revalidatePath("/magaza");redirect(result.active?"/ayarlar?saved=storefront-domain-verified":"/ayarlar?error=storefront-dns-not-ready");
 }

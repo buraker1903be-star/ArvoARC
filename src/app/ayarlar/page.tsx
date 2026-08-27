@@ -1,6 +1,6 @@
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
-import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset } from "./actions";
+import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
 
 const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending_dns:"DNS bekleniyor",verifying:"Doğrulanıyor",active:"Aktif",failed:"Bağlantı hatası"};
 
@@ -60,6 +60,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
             <div><span>1</span><p><b>CNAME kaydı</b><code>{settings.panel_custom_domain} → 78128f864bd971a1.vercel-dns-017.com</code></p></div>
             <div><span>2</span><p><b>Vercel doğrulaması</b><small>Alan adı ARVO ARC projesine eklenir ve DNS kaydı kontrol edilir.</small></p></div>
             <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli panel bağlantısı etkinleşir.</small></p></div>
+            {canManage&&<form action={verifyPanelDomain}><button type="submit">DNS bağlantısını doğrula</button></form>}
           </div>}
         </section>
 
@@ -77,6 +78,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
             <div><span>1</span><p><b>Vercel DNS kaydı</b><small>Vercel’in mağaza projesinde göstereceği CNAME veya A kaydını DNS sağlayıcınıza ekleyin.</small></p></div>
             <div><span>2</span><p><b>Mağaza yayını</b><code>https://{settings.custom_domain}</code></p></div>
             <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli mağaza bağlantısı etkinleşir.</small></p></div>
+            {canManage&&<form action={verifyStorefrontDomain}><button type="submit">DNS bağlantısını doğrula</button></form>}
           </div>}
           <div className="domain-note"><b>Doğru ayrım</b><p><strong>app.arvoculture.com</strong> yönetim panelidir; <strong>arvoculture.com</strong> ise müşterilerin alışveriş yaptığı mağazadır.</p></div>
         </section>
