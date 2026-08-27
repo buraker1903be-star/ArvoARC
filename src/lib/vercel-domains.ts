@@ -1,7 +1,7 @@
 type DomainKind="panel"|"storefront";
 
 type VercelErrorBody={error?:{code?:string;message?:string};message?:string};
-type VercelProjectDomain={name?:string;verified?:boolean;verification?:unknown[]};
+type VercelProjectDomain={name?:string;projectId?:string;verified?:boolean;verification?:unknown[]};
 type VercelDomainConfig={misconfigured?:boolean};
 type VercelProject={id?:string;name?:string;accountId?:string};
 
@@ -70,6 +70,24 @@ async function getDomainConfig(domain:string,teamId:string,token:string){
   return vercelRequest<VercelDomainConfig>(`/v6/domains/${encodeURIComponent(domain)}/config?${query}`,token);
 }
 
+function apexDomain(domain:string){
+  const labels=domain.split(".");
+  return labels.length>2?labels.slice(-2).join("."):domain;
+}
+
+async function findAssociatedProjectDomain(domain:string,teamId:string,token:string){
+  const query=new URLSearchParams({teamId,limit:"100"});
+  const result=await vercelRequest<{projectDomains?:VercelProjectDomain[]}>(`/v1/domains/${encodeURIComponent(apexDomain(domain))}/project-domains?${query}`,token);
+  return result.projectDomains?.find(item=>item.name===domain)??null;
+}
+
+async function moveProjectDomain(domain:string,sourceProjectId:string,targetProjectId:string,teamId:string,token:string){
+  const query=new URLSearchParams({teamId});
+  return vercelRequest<VercelProjectDomain>(`/v1/projects/${encodeURIComponent(sourceProjectId)}/domains/${encodeURIComponent(domain)}/move?${query}`,token,{
+    method:"POST",body:JSON.stringify({projectId:targetProjectId}),
+  });
+}
+
 export async function ensureVercelProjectDomain(domain:string,kind:DomainKind):Promise<DomainProvisionResult>{
   const {token,teamId,projectId}=configuration(kind);
   await assertVercelAccess(kind,token,teamId,projectId);
@@ -83,7 +101,14 @@ export async function ensureVercelProjectDomain(domain:string,kind:DomainKind):P
     const apiError=error as Error&{status?:number};
     if(apiError.status!==400)throw error;
     projectDomain=await findProjectDomain(domain,projectId,teamId,token);
-    if(!projectDomain)throw error;
+    if(!projectDomain){
+      const associated=await findAssociatedProjectDomain(domain,teamId,token).catch(()=>null);
+      if(associated?.projectId&&associated.projectId!==projectId){
+        projectDomain=await moveProjectDomain(domain,associated.projectId,projectId,teamId,token);
+      }else{
+        throw error;
+      }
+    }
   }
   const config=await getDomainConfig(domain,teamId,token);
   const verified=projectDomain?.verified===true;
