@@ -3,6 +3,8 @@ type DomainKind="panel"|"storefront";
 type VercelErrorBody={error?:{code?:string;message?:string};message?:string};
 type VercelProjectDomain={name?:string;verified?:boolean;verification?:unknown[]};
 type VercelDomainConfig={misconfigured?:boolean};
+type VercelUser={user?:{id?:string;username?:string;email?:string}};
+type VercelProject={id?:string;name?:string;accountId?:string};
 
 export type DomainProvisionResult={
   active:boolean;
@@ -42,6 +44,32 @@ async function vercelRequest<T>(path:string,token:string,init?:RequestInit){
   return body;
 }
 
+async function assertVercelAccess(kind:DomainKind,token:string,teamId:string,projectId:string){
+  try{
+    await vercelRequest<VercelUser>("/v2/user",token);
+  }catch(error){
+    const apiError=error as Error&{status?:number};
+    if(apiError.status===401||apiError.status===403){
+      throw new Error("ARVO_VERCEL_TOKEN geçersiz, süresi dolmuş veya token değeri eksik kopyalanmış.");
+    }
+    throw error;
+  }
+
+  const query=new URLSearchParams({teamId});
+  try{
+    const project=await vercelRequest<VercelProject>(`/v9/projects/${encodeURIComponent(projectId)}?${query}`,token);
+    if(project.accountId&&project.accountId!==teamId){
+      throw new Error(`${kind==="panel"?"Panel":"Mağaza"} projesi ARVO_VERCEL_TEAM_ID ile aynı Vercel ekibinde değil.`);
+    }
+  }catch(error){
+    const apiError=error as Error&{status?:number};
+    if(apiError.status===401||apiError.status===403||apiError.status===404){
+      throw new Error(`Token geçerli ancak ${kind==="panel"?"ARVO_VERCEL_PANEL_PROJECT_ID":"ARVO_VERCEL_STOREFRONT_PROJECT_ID"} projesine erişemiyor. Project ID ve token ekip kapsamını kontrol edin.`);
+    }
+    throw error;
+  }
+}
+
 async function findProjectDomain(domain:string,projectId:string,teamId:string,token:string){
   const query=new URLSearchParams({teamId,limit:"100"});
   const result=await vercelRequest<{domains?:VercelProjectDomain[]}>(`/v9/projects/${encodeURIComponent(projectId)}/domains?${query}`,token);
@@ -55,6 +83,7 @@ async function getDomainConfig(domain:string,teamId:string,token:string){
 
 export async function ensureVercelProjectDomain(domain:string,kind:DomainKind):Promise<DomainProvisionResult>{
   const {token,teamId,projectId}=configuration(kind);
+  await assertVercelAccess(kind,token,teamId,projectId);
   const query=new URLSearchParams({teamId});
   let projectDomain:VercelProjectDomain|null=null;
   try{
@@ -75,6 +104,7 @@ export async function ensureVercelProjectDomain(domain:string,kind:DomainKind):P
 
 export async function verifyVercelProjectDomain(domain:string,kind:DomainKind):Promise<DomainProvisionResult>{
   const {token,teamId,projectId}=configuration(kind);
+  await assertVercelAccess(kind,token,teamId,projectId);
   const query=new URLSearchParams({teamId});
   try{
     await vercelRequest<VercelProjectDomain>(`/v9/projects/${encodeURIComponent(projectId)}/domains/${encodeURIComponent(domain)}/verify?${query}`,token,{method:"POST"});
