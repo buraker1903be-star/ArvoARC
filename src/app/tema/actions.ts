@@ -9,12 +9,28 @@ const text=(fd:FormData,key:string,max:number)=>String(fd.get(key)??"").trim().s
 const href=(value:string)=>value.startsWith("/")?value.slice(0,240):"/";
 const color=(value:string,fallback:string)=>/^#[0-9A-Fa-f]{6}$/.test(value)?value.toUpperCase():fallback;
 const number=(fd:FormData,key:string,fallback:number,min=0,max=100)=>{const value=Number(fd.get(key));return Number.isFinite(value)?Math.min(max,Math.max(min,value)):fallback};
+const allowedSections=new Set(["hero","manifest","worlds","featured","campaign","values","footer"]);
+type ThemeSection={id:string;type:string;enabled:boolean;order:number};
+function sectionLayout(fd:FormData):ThemeSection[]{
+  try{
+    const parsed=JSON.parse(String(fd.get("section_layout_json")??"[]")) as unknown;
+    if(!Array.isArray(parsed))throw new Error();
+    const seen=new Set<string>();
+    const layout=parsed.flatMap((item,index)=>{
+      if(!item||typeof item!=="object")return[];
+      const value=item as Record<string,unknown>,id=String(value.id??""),type=String(value.type??id);
+      if(!allowedSections.has(type)||!id||seen.has(id))return[];
+      seen.add(id);return[{id,type,enabled:value.enabled!==false,order:(index+1)*10}];
+    });
+    return layout.length?layout:["hero","manifest","worlds","featured","campaign","values","footer"].map((id,index)=>({id,type:id,enabled:true,order:(index+1)*10}));
+  }catch{return["hero","manifest","worlds","featured","campaign","values","footer"].map((id,index)=>({id,type:id,enabled:true,order:(index+1)*10}));}
+}
 
 export async function saveThemeDraft(formData:FormData){
   const {supabase,user,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/tema?error=forbidden");
   const {data:current}=await supabase.from("arc_store_themes").select("version,config").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();
-  const config={
+  const layout=sectionLayout(formData);const section=(type:string)=>layout.find(item=>item.type===type);const config={
     ...((current?.config??{}) as Record<string,unknown>),
     announcement:text(formData,"announcement",180),
     hero_eyebrow:text(formData,"hero_eyebrow",100),
@@ -40,10 +56,10 @@ export async function saveThemeDraft(formData:FormData){
     product_image_ratio:["portrait","square","landscape"].includes(text(formData,"product_image_ratio",20))?text(formData,"product_image_ratio",20):"portrait",
     products_per_row:number(formData,"products_per_row",4,2,5),
     show_vendor:formData.get("show_vendor")==="on",show_badges:formData.get("show_badges")==="on",show_quick_add:formData.get("show_quick_add")==="on",
-    show_manifest:formData.get("show_manifest")==="on",show_worlds:formData.get("show_worlds")==="on",show_featured:formData.get("show_featured")==="on",
-    show_campaign:formData.get("show_campaign")==="on",show_values:formData.get("show_values")==="on",
-    order_manifest:number(formData,"order_manifest",20,10,90),order_worlds:number(formData,"order_worlds",30,10,90),order_featured:number(formData,"order_featured",40,10,90),
-    order_campaign:number(formData,"order_campaign",50,10,90),order_values:number(formData,"order_values",60,10,90),
+    section_layout:layout,show_manifest:section("manifest")?.enabled??false,show_worlds:section("worlds")?.enabled??false,show_featured:section("featured")?.enabled??false,
+    show_campaign:section("campaign")?.enabled??false,show_values:section("values")?.enabled??false,
+    order_manifest:section("manifest")?.order??20,order_worlds:section("worlds")?.order??30,order_featured:section("featured")?.order??40,
+    order_campaign:section("campaign")?.order??50,order_values:section("values")?.order??60,
     manifest_title:text(formData,"manifest_title",140),manifest_description:text(formData,"manifest_description",360),
     apparel_title:text(formData,"apparel_title",100),apparel_description:text(formData,"apparel_description",180),
     beauty_title:text(formData,"beauty_title",100),beauty_description:text(formData,"beauty_description",180),
