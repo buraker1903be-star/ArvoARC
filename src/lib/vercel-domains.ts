@@ -11,13 +11,17 @@ export type DomainProvisionResult={
 };
 
 function configuration(kind:DomainKind){
-  const token=process.env.VERCEL_AUTOMATION_TOKEN;
-  const teamId=process.env.VERCEL_AUTOMATION_TEAM_ID;
+  const token=process.env.ARVO_VERCEL_TOKEN??process.env.VERCEL_AUTOMATION_TOKEN;
+  const teamId=process.env.ARVO_VERCEL_TEAM_ID??process.env.VERCEL_AUTOMATION_TEAM_ID;
   const projectId=kind==="panel"
-    ?process.env.VERCEL_PANEL_PROJECT_ID
-    :process.env.VERCEL_STOREFRONT_PROJECT_ID;
+    ?(process.env.ARVO_VERCEL_PANEL_PROJECT_ID??process.env.VERCEL_PANEL_PROJECT_ID)
+    :(process.env.ARVO_VERCEL_STOREFRONT_PROJECT_ID??process.env.VERCEL_STOREFRONT_PROJECT_ID);
   if(!token||!teamId||!projectId){
-    throw new Error("Vercel domain otomasyonu henüz yapılandırılmadı.");
+    const missing=[];
+    if(!token)missing.push("ARVO_VERCEL_TOKEN");
+    if(!teamId)missing.push("ARVO_VERCEL_TEAM_ID");
+    if(!projectId)missing.push(kind==="panel"?"ARVO_VERCEL_PANEL_PROJECT_ID":"ARVO_VERCEL_STOREFRONT_PROJECT_ID");
+    throw new Error(`Vercel domain otomasyonu eksik: ${missing.join(", ")}`);
   }
   return {token,teamId,projectId};
 }
