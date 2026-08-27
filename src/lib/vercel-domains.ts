@@ -3,7 +3,6 @@ type DomainKind="panel"|"storefront";
 type VercelErrorBody={error?:{code?:string;message?:string};message?:string};
 type VercelProjectDomain={name?:string;verified?:boolean;verification?:unknown[]};
 type VercelDomainConfig={misconfigured?:boolean};
-type VercelUser={user?:{id?:string;username?:string;email?:string}};
 type VercelProject={id?:string;name?:string;accountId?:string};
 
 export type DomainProvisionResult={
@@ -45,16 +44,6 @@ async function vercelRequest<T>(path:string,token:string,init?:RequestInit){
 }
 
 async function assertVercelAccess(kind:DomainKind,token:string,teamId:string,projectId:string){
-  try{
-    await vercelRequest<VercelUser>("/v2/user",token);
-  }catch(error){
-    const apiError=error as Error&{status?:number};
-    if(apiError.status===401||apiError.status===403){
-      throw new Error("ARVO_VERCEL_TOKEN geçersiz, süresi dolmuş veya token değeri eksik kopyalanmış.");
-    }
-    throw error;
-  }
-
   const query=new URLSearchParams({teamId});
   try{
     const project=await vercelRequest<VercelProject>(`/v9/projects/${encodeURIComponent(projectId)}?${query}`,token);
