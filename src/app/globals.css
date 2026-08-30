@@ -533,7 +533,7 @@ a.row:hover,.row:not(.th):hover{background:#f8faf7}
 /* Discounts */
 .discount-badge,.catalog-badge{position:absolute;right:14px;top:14px;z-index:2;display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:7px 10px;border-radius:999px;color:#fff;font-size:10px;font-style:normal;font-weight:850;letter-spacing:.04em;box-shadow:0 8px 20px rgba(0,0,0,.18)}
 .discount-badge{background:linear-gradient(135deg,#a43f3f,#d85a4f)}
-.catalog-badge.green{background:var(--green)}.catalog-badge.navy{background:var(--navy)}.catalog-badge.gold{background:#a47b1f}.catalog-badge.red{background:var(--danger)}
+.product-card-badges{position:absolute;z-index:2;top:14px;right:14px;display:flex;align-items:flex-end;flex-direction:column;gap:6px}.product-card-badges .discount-badge,.product-card-badges .catalog-badge{position:static}.catalog-badge.bestseller{background:#17202a}.catalog-badge.green{background:var(--green)}.catalog-badge.navy{background:var(--navy)}.catalog-badge.gold{background:#a47b1f}.catalog-badge.red{background:var(--danger)}
 .product-card-price s{color:#8b969f;font-size:10px;font-weight:650}
 .discount-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}
 .discount-metrics article{padding:22px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,#fff,#f5f8f2);box-shadow:var(--shadow-sm)}

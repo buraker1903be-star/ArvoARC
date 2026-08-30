@@ -21,14 +21,15 @@ export default async function Products({ searchParams }: { searchParams: Promise
   let productsQuery=supabase.from("arc_products").select("id,name,description,status,source,metadata,created_at",{count:"exact"}).eq("organization_id",organization.id).order("created_at",{ascending:false});
   if(statusFilter!=="all")productsQuery=productsQuery.eq("status",statusFilter);
   if(!search)productsQuery=productsQuery.range((currentPage-1)*pageSize,currentPage*pageSize-1);
-  const [{data:products,error:productsError,count:filteredCount},{count:totalProductCount,error:totalCountError},{count:activeProductCount,error:activeCountError},{count:totalVariantCount,error:variantCountError}]=await Promise.all([
+  const [{data:products,error:productsError,count:filteredCount},{count:totalProductCount,error:totalCountError},{count:activeProductCount,error:activeCountError},{count:totalVariantCount,error:variantCountError},{data:bestSellerCollection,error:bestSellerCollectionError}]=await Promise.all([
     productsQuery,
     supabase.from("arc_products").select("id",{count:"exact",head:true}).eq("organization_id",organization.id),
     supabase.from("arc_products").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).eq("status","active"),
     supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id),
+    supabase.from("arc_collections").select("id").eq("organization_id",organization.id).eq("title","Çok Satanlar").eq("status","active").maybeSingle(),
   ]);
   if (productsError) throw new Error(productsError.message);
-  if(totalCountError||activeCountError||variantCountError)throw new Error((totalCountError??activeCountError??variantCountError)?.message??"Katalog sayıları okunamadı.");
+  if(totalCountError||activeCountError||variantCountError||bestSellerCollectionError)throw new Error((totalCountError??activeCountError??variantCountError??bestSellerCollectionError)?.message??"Katalog sayıları okunamadı.");
   const canManage = ["owner", "admin", "manager"].includes(membership.role);
   const visibleProducts=(products??[]).filter(product=>{
     if(!search)return true;
@@ -36,8 +37,12 @@ export default async function Products({ searchParams }: { searchParams: Promise
     return [product.name,product.description,meta.vendor,meta.type,meta.tags].some(value=>(value??"").toLocaleLowerCase("tr-TR").includes(search));
   });
   const visibleIds=visibleProducts.map(product=>product.id);
-  const {data:variants,error:variantsError}=visibleIds.length?await supabase.from("arc_product_variants").select("id,product_id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes").eq("organization_id",organization.id).in("product_id",visibleIds):{data:[],error:null};
-  if(variantsError)throw new Error(variantsError.message);
+  const [{data:variants,error:variantsError},{data:bestSellerMemberships,error:bestSellerMembershipError}]=await Promise.all([
+    visibleIds.length?supabase.from("arc_product_variants").select("id,product_id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes").eq("organization_id",organization.id).in("product_id",visibleIds):Promise.resolve({data:[],error:null}),
+    visibleIds.length&&bestSellerCollection?supabase.from("arc_collection_products").select("product_id").eq("organization_id",organization.id).eq("collection_id",bestSellerCollection.id).in("product_id",visibleIds):Promise.resolve({data:[],error:null}),
+  ]);
+  if(variantsError||bestSellerMembershipError)throw new Error((variantsError??bestSellerMembershipError)?.message??"Ürün rozetleri okunamadı.");
+  const bestSellerIds=new Set((bestSellerMemberships??[]).map(item=>item.product_id));
   const totalPages=search?1:Math.max(1,Math.ceil((filteredCount??0)/pageSize));
   const pageHref=(page:number)=>{const query=new URLSearchParams();if(statusFilter!=="all")query.set("filter",statusFilter);query.set("page",String(page));return `/urunler?${query}`};
   const variantsByProduct=new Map<string,typeof variants>();
@@ -90,7 +95,11 @@ export default async function Products({ searchParams }: { searchParams: Promise
           <div className="product-card-media">
             {image?<Image src={image} alt={product.name} width={720} height={720} sizes="(max-width:640px) 100vw, (max-width:1100px) 50vw, 25vw" priority={index<4} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div className="product-card-placeholder"><span>ARVO ARC</span><b>{product.name.slice(0,2).toUpperCase()}</b></div>}
             <em className={`product-status ${product.status}`}>{productStatusLabel(product.status)}</em>
-            {maxDiscount>0?<span className="discount-badge">-%{maxDiscount}</span>:meta.badge?<span className={`catalog-badge ${meta.badge_tone??"green"}`}>{meta.badge}</span>:null}
+            <span className="product-card-badges">
+              {bestSellerIds.has(product.id)?<span className="catalog-badge bestseller">Çok Satan</span>:null}
+              {maxDiscount>0?<span className="discount-badge">-%{maxDiscount}</span>:null}
+              {meta.badge&&meta.badge.toLocaleLowerCase("tr-TR")!=="çok satan"?<span className={`catalog-badge ${meta.badge_tone??"green"}`}>{meta.badge}</span>:null}
+            </span>
             <span className="product-source">{meta.vendor||(product.source==="shopify"?"Shopify arşivi":"ARVO ARC")}</span>
           </div>
           <div className="product-card-body">
