@@ -1,84 +1,58 @@
-# PayTR entegrasyonu — ARC tarafı
+# Müşteri hesapları — ARC tarafı
 
-Bu paket ArvoARC reposuna eklenir. Dosyaları aynı yollara kopyalayın.
+## HANGİ REPO: C:\ArvoARC
 
-## 1. Migration
+`supabase/migrations/20260907000000_add_customer_accounts.sql`
+dosyasını repoya koyun ve Supabase SQL Editor'de çalıştırın.
 
-`supabase/migrations/20260906001000_add_storefront_order_settlement.sql`
+## Ne yapıyor
 
-Supabase SQL Editor'e yapıştırıp çalıştırın ya da `supabase db push`.
+**1. Siparişe sahiplik alanı.** `arc_orders` tablosuna `user_id`
+eklenir; `auth.users` tablosuna bağlı.
 
-Bu fonksiyon **bilerek `anon` rolüne açılmıyor**. Yalnızca sunucudaki
-callback servisi, `service_role` anahtarıyla çağırabilir. Açılsaydı
-herkes kendi siparişini "ödendi" işaretleyebilirdi.
+**2. Müşteri okuma politikası.** Müşteri YALNIZCA kendi
+siparişlerini okur. Yazma, güncelleme, silme yetkisi yoktur —
+sipariş durumunu yalnızca panel ve ödeme servisi değiştirir.
+Mevcut personel politikalarına dokunulmaz, yanına eklenir.
 
-## 2. Ortam değişkenleri (Vercel → ArvoARC projesi)
+**3. Geçmiş siparişleri sahiplenme.** Müşteri misafir olarak
+sipariş verip sonra kayıt olabilir. `claim_arvoculture_orders`
+fonksiyonu, **doğrulanmış** e-posta adresiyle eşleşen ve henüz bir
+hesaba bağlanmamış siparişleri kullanıcıya bağlar.
 
-| Değişken | Açıklama |
-| --- | --- |
-| `PAYTR_MERCHANT_ID` | PayTR panelinden |
-| `PAYTR_MERCHANT_KEY` | PayTR panelinden — **Sensitive işaretleyin** |
-| `PAYTR_MERCHANT_SALT` | PayTR panelinden — **Sensitive işaretleyin** |
-| `PAYTR_TEST_MODE` | Başlangıçta `1`. Canlıya geçerken `0`. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → service_role |
-| `STOREFRONT_URL` | `https://arvoculture.com` |
+E-posta istemciden değil `auth.jwt()` içinden okunur ve
+doğrulanmamış e-postayla sahiplenme yapılmaz. Aksi hâlde biri
+başkasının e-postasını gönderip onun sipariş geçmişini kendi
+hesabına bağlayabilirdi.
 
-`NEXT_PUBLIC_` öneki **kullanmayın**. Bu değerler tarayıcıya sızarsa
-herkes sizin adınıza ödeme oturumu açabilir.
+**4. Sipariş listeleme.** `get_arvoculture_my_orders` giriş yapmış
+müşterinin kendi siparişlerini kalemleriyle döndürür.
 
-`SUPABASE_SERVICE_ROLE_KEY` RLS'i tamamen atlar. Yalnızca Vercel
-ortam değişkeninde tutun, koda yazmayın, commit etmeyin.
+**5. Otomatik bağlama.** Giriş yapmış müşteri sipariş verirse
+sipariş doğrudan hesabına yazılır.
 
-## 3. PayTR panelinde bildirim URL'si
+## Supabase panelinde yapılacaklar
 
-PayTR → Ayarlar → **Bildirim URL**:
+**Authentication → Providers → Email:** açık olmalı, "Confirm
+email" işaretli olsun. Doğrulama olmadan sipariş sahiplenme
+çalışmaz.
 
-```
-https://<arc-adresiniz>/api/storefront/paytr-bildirim
-```
+**Authentication → URL Configuration:**
+- Site URL: `https://arvoculture.com`
+- Redirect URLs listesine `https://arvoculture.com/hesap` ekleyin
 
-Bu adres tanımlanmazsa ödeme alınır ama sipariş "ödendi" olmaz.
+**Authentication → Email Templates:** şablonlar İngilizce gelir,
+Türkçeleştirin. Gönderim alan adını da doğrulamanız önerilir;
+varsayılan Supabase adresinden gelen e-postalar spam'e düşebiliyor.
 
-## 4. Akış
+## Google / Facebook girişi
 
-```
-Vitrin (sepet)
-   ↓ POST /api/storefront/odeme  { email, name, phone, address, items }
-ARC: create_arvoculture_storefront_order   → tutarı SUNUCU hesaplar
-   ↓
-ARC: PayTR get-token                        → token
-   ↓
-Vitrin: iFrame açılır, müşteri öder
-   ↓
-PayTR → POST /api/storefront/paytr-bildirim (sunucudan sunucuya)
-   ↓ imza doğrulanır
-ARC: settle_arvoculture_storefront_order    → paid + stok düşer
-```
+Supabase Auth destekliyor ama her sağlayıcı için OAuth uygulaması
+açmanız gerekiyor:
 
-**İstemciden gelen hiçbir tutar kullanılmaz.** Müşteri yalnızca SKU ve
-adet gönderir; fiyat, indirim, kargo ve toplam veritabanından hesaplanır.
-Bu olmadan tarayıcı konsolundan fiyat değiştirilerek sipariş verilebilir.
+- **Google:** Google Cloud Console → OAuth 2.0 Client ID
+- **Facebook:** Meta for Developers → Facebook Login
 
-## 5. Test
-
-`PAYTR_TEST_MODE=1` iken PayTR'ın test kartlarını kullanın. Bir sipariş
-verip şunları doğrulayın:
-
-- ARC panelinde sipariş `pending` olarak düştü mü
-- Ödeme sonrası `paid` + `confirmed` oldu mu
-- Stok düştü mü
-- Aynı bildirimi PayTR tekrarlarsa stok **ikinci kez düşmüyor** olmalı
-
-Hepsi doğruysa `PAYTR_TEST_MODE=0` yapıp yeniden dağıtın.
-
-## Sırada — vitrin tarafı
-
-Bu paket ARC tarafını tamamlıyor. Vitrinde hâlâ eksik olanlar:
-
-- Sepet sayfası (kargo hesabıyla)
-- Adres formu, misafir alışveriş
-- KVKK / mesafeli satış / ön bilgilendirme onayları
-- PayTR iFrame'ini açan ödeme sayfası
-- `/siparis/tamam` ve `/siparis/hata` sayfaları
-
-Bunları bir sonraki adımda yazacağım.
+Aldığınız Client ID ve Secret değerlerini Supabase →
+Authentication → Providers altına girersiniz. Sonra bana haber
+verin, vitrindeki butonları etkinleştireyim.
