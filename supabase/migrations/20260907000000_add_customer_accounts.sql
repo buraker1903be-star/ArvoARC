@@ -129,7 +129,9 @@ as $$
             'quantity', i.quantity,
             'total', i.total
           )
-          order by i.created_at
+          -- arc_order_items tablosunda created_at yok; kalemler
+          -- eklenme sırasını koruyan kimliğe göre sıralanır.
+          order by i.id
         )
         from public.arc_order_items i
         where i.order_id = o.id
