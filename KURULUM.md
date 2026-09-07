@@ -1,91 +1,74 @@
-# Tedarikçi entegrasyonu — 3. adım (zamanlanmış senkron)
+# Aktarım parçalara bölündü
 
-## HANGİ REPO: C:\ArvoARC
+## Sorun
 
-Bu paket 2. adımın dosyalarını da içeriyor; ikisini birden
-uygulamadıysanız doğrudan bunu kullanın.
+Tek çağrıda 4.000 ürün işlemek Vercel'in süre sınırını aşıyordu;
+istek 379 üründe sessizce kesildi. Vercel Hobby planında bir
+fonksiyon en fazla 60 saniye çalışabilir.
 
-### Dosyalar
+## Çözüm
 
-```
-src/lib/supplier/tarzyeri.ts
-src/app/api/tedarikci/ice-aktar/route.ts
-vercel.json
-```
+Aktarım artık her çağrıda **120 ürün** işliyor ve nerede kaldığını
+veritabanına kaydediyor. Sonraki çağrı oradan devam ediyor.
 
-**`vercel.json` dikkat:** mevcut dosyanızdaki `regions` ayarı
-korundu. Kendi dosyanızda başka ayarlar varsa üzerine yazmadan
-önce karşılaştırın; yalnızca `crons` bölümünü eklemek yeterli.
+Yanıtta ilerleme görünüyor:
 
-### Bağımlılık
-
-```powershell
-cd C:\ArvoARC
-npm install fast-xml-parser
+```json
+{ "mode": "tam", "toplam": 4000, "baslangic": 360,
+  "okunan": 120, "kalan": 3520, "bitti": false,
+  "sonraki": "480 / 4000" }
 ```
 
-### Ortam değişkenleri
+`"bitti": true` görene kadar aynı komutu tekrarlayın.
 
-| Key | Açıklama |
-| --- | --- |
-| `SUPPLIER_SYNC_SECRET` | Elle tetikleme için, siz belirleyin |
-| `CRON_SECRET` | Zamanlanmış görev için, siz belirleyin |
-| `SUPABASE_SERVICE_ROLE_KEY` | Zaten tanımlı olmalı |
+Stok modu bölünmüyor — o zaten hafif ve tek turda biter.
 
-Vercel Cron, `CRON_SECRET` değerini otomatik olarak
-`Authorization: Bearer ...` başlığında gönderir.
+## Kurulum
 
-### Push
+### 1) Migration
 
-```powershell
+`supabase/migrations/20260910001000_supplier_sync_cursor.sql`
+dosyasını Supabase SQL Editor'de çalıştırın.
+
+### 2) Kod
+
+`src/app/api/tedarikci/ice-aktar/route.ts` dosyasını
+güncelleyin, sonra:
+
+```bash
+cd ~/Desktop/ArvoARC
 git add -A
-git commit -m "Tedarikci XML ice aktarma ve zamanlanmis stok senkronu"
+git commit -m "Aktarim parcalara bolundu"
 git push
 ```
 
-## Zamanlama
+### 3) Çalıştırma
 
-Günde üç kez: **06:00, 12:00, 18:00** (UTC).
+Elle, bitene kadar tekrarlayarak:
 
-Türkiye saatiyle 09:00, 15:00, 21:00. Sabah açılıştan önce, öğlen
-ve akşam. Stok hareketinin en yoğun olduğu saatleri kapsıyor.
-
-Değiştirmek için `vercel.json` içindeki `schedule` alanı. Biçim
-standart cron: `dakika saat gün ay haftagünü`.
-
-## Ne yapıyor
-
-**Zamanlanmış çalıştırma her zaman stok modunda.** Stok, maliyet
-ve satış fiyatı güncellenir. Ürün adları, açıklamalar ve
-görseller değişmez.
-
-Bu bilinçli: panelde bir ürün adını düzelttiyseniz her senkronda
-tedarikçinin adı geri gelsin istemezsiniz.
-
-**Tam aktarım elle tetiklenir:**
-
-```powershell
+```bash
 curl -X POST "https://arc.arvo-os.com/api/tedarikci/ice-aktar?mod=tam&anahtar=ANAHTARINIZ"
 ```
 
-Yeni ürünler geldiğinde ya da tedarikçi katalogda değişiklik
-yaptığında çalıştırın.
+Ya da hazır betikle (önerilen):
 
-## Doğrulama
-
-İlk cron çalışmasından sonra Vercel → Logs → Cron sekmesinde
-sonucu görürsünüz. Ayrıca:
-
-```sql
-select code, last_synced_at, last_sync_note
-from arc_suppliers where code = 'tarzyeri';
+```bash
+chmod +x aktarim.sh
+./aktarim.sh ANAHTARINIZ
 ```
 
-## Uyarı
+Betik bitene kadar kendisi tekrarlar, her turda ilerlemeyi yazar.
+4.000 ürün için yaklaşık 35 tur, birkaç dakika sürer.
 
-Vercel'in Hobby planında cron **günde bir kez** çalışır. Pro
-planda sınır yok. Planınız Hobby ise zamanlamayı `0 6 * * *`
-olarak değiştirin ya da Pro'ya geçin.
+## Baştan başlatmak isterseniz
 
-Stok senkronu günde tek sefer yeterli olmayabilir; tedarikçide
-tükenen ürünü satma riski artar.
+```sql
+update arc_suppliers set sync_cursor = 0 where code = 'tarzyeri';
+```
+
+## İlerlemeyi görmek
+
+```sql
+select sync_cursor, sync_total, last_sync_note
+from arc_suppliers where code = 'tarzyeri';
+```

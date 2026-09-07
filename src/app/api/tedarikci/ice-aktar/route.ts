@@ -5,7 +5,12 @@ import { fetchTarzyeri, slugify } from "@/lib/supplier/tarzyeri";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // Büyük akış; varsayılan süre yetmez.
-export const maxDuration = 300;
+// Vercel Hobby planında üst sınır 60 saniye; aktarım bu yüzden
+// parçalara bölünüyor.
+export const maxDuration = 60;
+
+/** Tek çağrıda işlenecek ürün sayısı. */
+const BATCH = 120;
 
 /**
  * Tedarikçi XML içe aktarma.
@@ -104,8 +109,22 @@ async function runSync(mode: "tam" | "stok") {
   }
 
   const orgId = rule.organization_id as string;
+
+  /*
+    Parça parça işleme. Her çağrı `sync_cursor` konumundan başlar,
+    BATCH kadar ürün işler ve imleci ilerletir. Liste bittiğinde
+    imleç sıfırlanır.
+  */
+  const start = mode === "tam" ? (rule.sync_cursor ?? 0) : 0;
+  const slice =
+    mode === "tam"
+      ? products.slice(start, start + BATCH)
+      : products;
+
   const stats = {
-    okunan: products.length,
+    toplam: products.length,
+    baslangic: start,
+    okunan: slice.length,
     yeniUrun: 0,
     guncellenenUrun: 0,
     yeniVaryant: 0,
@@ -127,7 +146,7 @@ async function runSync(mode: "tam" | "stok") {
     (existing ?? []).map((row) => [row.supplier_product_code, row]),
   );
 
-  for (const product of products) {
+  for (const product of slice) {
     if (!product.productCode || product.variants.length === 0) {
       stats.atlanan += 1;
       continue;
@@ -269,14 +288,28 @@ async function runSync(mode: "tam" | "stok") {
     }
   }
 
+  const next = mode === "tam" ? start + slice.length : 0;
+  const bitti = mode !== "tam" || next >= products.length;
+
   await supabase
     .from("arc_suppliers")
     .update({
       last_synced_at: new Date().toISOString(),
-      last_sync_note: `${mode} · ${stats.yeniUrun} yeni, ${stats.guncellenenVaryant} güncel`,
+      last_sync_note: bitti
+        ? `${mode} tamamlandı · ${products.length} ürün`
+        : `${mode} sürüyor · ${next} / ${products.length}`,
+      sync_cursor: bitti ? 0 : next,
+      sync_total: products.length,
       updated_at: new Date().toISOString(),
     })
     .eq("id", rule.id);
 
-  return NextResponse.json({ mode, ...stats });
+  return NextResponse.json({
+    mode,
+    ...stats,
+    kalan: bitti ? 0 : products.length - next,
+    bitti,
+    // Bitmediyse aynı komutu tekrar çalıştırın.
+    sonraki: bitti ? null : `${next} / ${products.length}`,
+  });
 }
