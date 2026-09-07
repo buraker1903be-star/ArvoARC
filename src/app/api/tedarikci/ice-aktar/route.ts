@@ -275,13 +275,14 @@ async function runSync(mode: "tam" | "stok") {
 
         if (variantId) {
           // Stok modunda ad ve seçenekler değiştirilmez.
+          /*
+            `options` sütunu bu şemada yok; renk ve beden başlıkta
+            birleştiriliyor. Varsayılan bir sütun adı kullanmak
+            varyant eklemesini sessizce başarısız kılıyordu.
+          */
           const patch =
             mode === "tam"
-              ? {
-                  ...base,
-                  title: `${variant.color} / ${variant.size}`,
-                  options: { Renk: variant.color, Beden: variant.size },
-                }
+              ? { ...base, title: `${variant.color} / ${variant.size}` }
               : {
                   stock: variant.quantity,
                   cost_price: product.costPrice,
@@ -289,17 +290,21 @@ async function runSync(mode: "tam" | "stok") {
                   updated_at: base.updated_at,
                 };
 
-          await supabase
+          const { error: updateError } = await supabase
             .from("arc_product_variants")
             .update(patch)
             .eq("id", variantId);
+
+          // Hata artık yutulmuyor; aksi hâlde sayaç artıyor ama
+          // veritabanına hiçbir şey yazılmıyordu.
+          if (updateError) throw updateError;
           stats.guncellenenVaryant += 1;
         } else {
-          await supabase.from("arc_product_variants").insert({
-            ...base,
-            title: `${variant.color} / ${variant.size}`,
-            options: { Renk: variant.color, Beden: variant.size },
-          });
+          const { error: insertError } = await supabase
+            .from("arc_product_variants")
+            .insert({ ...base, title: `${variant.color} / ${variant.size}` });
+
+          if (insertError) throw insertError;
           stats.yeniVaryant += 1;
         }
       }
