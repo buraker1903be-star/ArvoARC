@@ -1,0 +1,258 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { fetchTarzyeri, slugify } from "@/lib/supplier/tarzyeri";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+// Büyük akış; varsayılan süre yetmez.
+export const maxDuration = 300;
+
+/**
+ * Tedarikçi XML içe aktarma.
+ *
+ * İki modda çalışır:
+ *   - `?mod=tam`  → ürün, varyant, görsel ve fiyat: hepsi güncellenir
+ *   - `?mod=stok` → yalnızca stok ve maliyet (varsayılan, hızlı)
+ *
+ * Stok modu zamanlanmış görev için tasarlandı; günde birkaç kez
+ * çalışıp stoğu biten varyantları kapatır. Bu olmadan tedarikçide
+ * tükenen ürünü satmaya devam edersiniz.
+ *
+ * Görseller indirilip kopyalanmaz; tedarikçinin CDN adresleri
+ * doğrudan kullanılır. 4.000 ürünün görselini taşımak saatler
+ * sürer ve depolama maliyeti üretir.
+ */
+
+function serviceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Supabase ortam değişkenleri eksik");
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+export async function POST(request: Request) {
+  // Basit koruma: uç nokta herkese açık olmamalı.
+  const secret = process.env.SUPPLIER_SYNC_SECRET;
+  const provided =
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+    new URL(request.url).searchParams.get("anahtar");
+
+  if (!secret || provided !== secret) {
+    return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
+  }
+
+  const mode =
+    new URL(request.url).searchParams.get("mod") === "tam" ? "tam" : "stok";
+
+  const supabase = serviceClient();
+
+  // --- Tedarikçi ayarları ------------------------------------
+  const { data: suppliers, error: supplierError } = await supabase
+    .from("arc_suppliers")
+    .select("*, organizations!inner(slug)")
+    .eq("code", "tarzyeri")
+    .eq("organizations.slug", "arvoculture")
+    .limit(1);
+
+  const rule = suppliers?.[0];
+  if (supplierError || !rule) {
+    return NextResponse.json(
+      { error: "tedarikci_bulunamadi", detail: supplierError?.message },
+      { status: 400 },
+    );
+  }
+
+  if (!rule.feed_url) {
+    return NextResponse.json({ error: "feed_url_tanimsiz" }, { status: 400 });
+  }
+
+  // --- XML --------------------------------------------------
+  let products;
+  try {
+    products = await fetchTarzyeri(rule.feed_url);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "xml_okunamadi", detail: (error as Error).message },
+      { status: 502 },
+    );
+  }
+
+  const orgId = rule.organization_id as string;
+  const stats = {
+    okunan: products.length,
+    yeniUrun: 0,
+    guncellenenUrun: 0,
+    yeniVaryant: 0,
+    guncellenenVaryant: 0,
+    pasifVaryant: 0,
+    atlanan: 0,
+    hata: [] as string[],
+  };
+
+  // Mevcut ürünleri tek seferde çekip eşleştiriyoruz; ürün başına
+  // sorgu atmak 4.000 üründe dakikalar sürer.
+  const { data: existing } = await supabase
+    .from("arc_products")
+    .select("id, supplier_product_code, slug")
+    .eq("organization_id", orgId)
+    .eq("supplier", "tarzyeri");
+
+  const byCode = new Map(
+    (existing ?? []).map((row) => [row.supplier_product_code, row]),
+  );
+
+  for (const product of products) {
+    if (!product.productCode || product.variants.length === 0) {
+      stats.atlanan += 1;
+      continue;
+    }
+
+    try {
+      const known = byCode.get(product.productCode);
+      let productId = known?.id as string | undefined;
+
+      // --- Ürün ---------------------------------------------
+      if (mode === "tam" || !productId) {
+        const payload = {
+          organization_id: orgId,
+          name: product.name,
+          slug: known?.slug ?? `${slugify(product.name)}-${product.productCode.toLowerCase()}`,
+          description: product.detailHtml || product.description,
+          status: product.active
+            ? rule.publish_directly
+              ? "active"
+              : "draft"
+            : "archived",
+          supplier: "tarzyeri",
+          supplier_product_code: product.productCode,
+          supplier_synced_at: new Date().toISOString(),
+          metadata: {
+            vendor: rule.brand_override ?? "ArvoCulture",
+            product_type: product.subCategory,
+            subtitle: product.description,
+            image_paths: product.images,
+            supplier_category: `${product.mainCategory} > ${product.topCategory} > ${product.subCategory}`,
+          },
+        };
+
+        if (productId) {
+          await supabase.from("arc_products").update(payload).eq("id", productId);
+          stats.guncellenenUrun += 1;
+        } else {
+          const { data: inserted, error } = await supabase
+            .from("arc_products")
+            .insert(payload)
+            .select("id")
+            .single();
+
+          if (error || !inserted) throw error ?? new Error("ürün eklenemedi");
+          productId = inserted.id;
+          stats.yeniUrun += 1;
+        }
+      }
+
+      if (!productId) {
+        stats.atlanan += 1;
+        continue;
+      }
+
+      // --- Varyantlar ---------------------------------------
+      const { data: currentVariants } = await supabase
+        .from("arc_product_variants")
+        .select("id, supplier_sku")
+        .eq("organization_id", orgId)
+        .eq("product_id", productId);
+
+      const bySku = new Map(
+        (currentVariants ?? []).map((row) => [row.supplier_sku, row.id]),
+      );
+
+      const seen = new Set<string>();
+
+      for (const variant of product.variants) {
+        seen.add(variant.sku);
+
+        // Satış fiyatı sunucuda hesaplanır; maliyet ayrıca saklanır.
+        const { data: priceRow } = await supabase.rpc("arc_sale_price", {
+          p_cost: product.costPrice,
+          p_margin: rule.margin_percent,
+          p_shipping: rule.shipping_markup,
+          p_round: rule.round_to_kurus,
+        });
+
+        const salePrice = Number(priceRow) || product.costPrice;
+        const variantId = bySku.get(variant.sku);
+
+        const base = {
+          organization_id: orgId,
+          product_id: productId,
+          sku: variant.sku,
+          supplier: "tarzyeri",
+          supplier_sku: variant.sku,
+          cost_price: product.costPrice,
+          price: salePrice,
+          stock: variant.quantity,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (variantId) {
+          // Stok modunda ad ve seçenekler değiştirilmez.
+          const patch =
+            mode === "tam"
+              ? {
+                  ...base,
+                  title: `${variant.color} / ${variant.size}`,
+                  options: { Renk: variant.color, Beden: variant.size },
+                }
+              : {
+                  stock: variant.quantity,
+                  cost_price: product.costPrice,
+                  price: salePrice,
+                  updated_at: base.updated_at,
+                };
+
+          await supabase
+            .from("arc_product_variants")
+            .update(patch)
+            .eq("id", variantId);
+          stats.guncellenenVaryant += 1;
+        } else {
+          await supabase.from("arc_product_variants").insert({
+            ...base,
+            title: `${variant.color} / ${variant.size}`,
+            options: { Renk: variant.color, Beden: variant.size },
+          });
+          stats.yeniVaryant += 1;
+        }
+      }
+
+      // Tedarikçiden düşen varyantların stoğu sıfırlanır.
+      // Silmiyoruz: geçmiş siparişlerin bağlantısı kopmasın.
+      for (const [sku, id] of bySku) {
+        if (sku && !seen.has(sku)) {
+          await supabase
+            .from("arc_product_variants")
+            .update({ stock: 0, updated_at: new Date().toISOString() })
+            .eq("id", id);
+          stats.pasifVaryant += 1;
+        }
+      }
+    } catch (error) {
+      stats.hata.push(`${product.productCode}: ${(error as Error).message}`);
+      if (stats.hata.length > 20) break;
+    }
+  }
+
+  await supabase
+    .from("arc_suppliers")
+    .update({
+      last_synced_at: new Date().toISOString(),
+      last_sync_note: `${mode} · ${stats.yeniUrun} yeni, ${stats.guncellenenVaryant} güncel`,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", rule.id);
+
+  return NextResponse.json({ mode, ...stats });
+}
