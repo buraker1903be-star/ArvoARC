@@ -56,17 +56,37 @@ function text(value: unknown): string {
 }
 
 export async function fetchTarzyeri(url: string): Promise<SupplierProduct[]> {
+  /*
+    Tarayıcı kimliği olmayan istekleri engelleyen sunucular XML
+    yerine bir HTML sayfası döndürüyor. Gerçek bir tarayıcı gibi
+    başlık göndermek bunu aşıyor.
+  */
   const response = await fetch(url, {
-    // Akış büyük; önbelleğe alınmaz.
     cache: "no-store",
-    headers: { Accept: "application/xml, text/xml" },
+    redirect: "follow",
+    headers: {
+      Accept: "application/xml, text/xml, */*",
+      "Accept-Language": "tr-TR,tr;q=0.9",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    },
   });
 
   if (!response.ok) {
-    throw new Error(`XML alınamadı: ${response.status}`);
+    throw new Error(`XML alınamadı: HTTP ${response.status}`);
   }
 
   const xml = await response.text();
+
+  // Engellenme durumunda gelen HTML'i erken yakala; aksi hâlde
+  // ayrıştırıcı anlaşılmaz bir hata veriyor.
+  if (/^\s*<!DOCTYPE html/i.test(xml) || /^\s*<html/i.test(xml)) {
+    throw new Error(
+      "Sunucu XML yerine HTML döndürdü. Tarzyeri erişimi engelliyor " +
+        "olabilir; bağlantıyı ve IP kısıtlamasını kontrol edin.",
+    );
+  }
   const parsed = parser.parse(xml) as {
     products?: { product?: Record<string, unknown>[] };
   };
