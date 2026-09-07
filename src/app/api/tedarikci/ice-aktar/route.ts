@@ -268,9 +268,11 @@ async function runSync(mode: "tam" | "stok") {
         ürün başına onlarca ağ turu üretiyordu; toplu yazımda bir
         tur yeterli.
 
-        Çakışma anahtarı (organization_id, sku): kayıt varsa
-        güncellenir, yoksa eklenir. Ayrıca mevcut varyantları
-        sorgulamaya da gerek kalmıyor.
+        Çakışma anahtarı (organization_id, supplier_sku).
+        `sku` alanı kullanılamaz: mağazanın kendi ürünlerinde aynı
+        SKU birden çok varyantta geçiyor. `supplier_sku` ise
+        tedarikçi barkodudur, gerçekten benzersizdir ve yalnızca
+        içe aktarılan ürünlerde dolu — kendi kataloğa dokunmaz.
       */
       const rows = product.variants.map((variant) => {
         seen.add(variant.sku);
@@ -291,7 +293,7 @@ async function runSync(mode: "tam" | "stok") {
       if (rows.length > 0) {
         const { error: upsertError } = await supabase
           .from("arc_product_variants")
-          .upsert(rows, { onConflict: "organization_id,sku" });
+          .upsert(rows, { onConflict: "organization_id,supplier_sku" });
 
         if (upsertError) throw upsertError;
         stats.yeniVaryant += rows.length;
