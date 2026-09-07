@@ -131,6 +131,23 @@ async function runSync(mode: "tam" | "stok") {
   const orgId = rule.organization_id as string;
 
   /*
+    Boş akış geçici bir kesinti demektir. Önceden "bitti" sayılıp
+    imleç sıfırlanıyordu; aktarım hep aynı yerde başa dönüyor ve
+    sonsuz döngüye giriyordu. Artık hata döndürülüyor, imleç
+    olduğu yerde kalıyor.
+  */
+  if (products.length === 0) {
+    return NextResponse.json(
+      {
+        error: "xml_bos",
+        detail: "Akış boş döndü; tedarikçi tarafında geçici kesinti olabilir.",
+        imlec: rule.sync_cursor ?? 0,
+      },
+      { status: 503 },
+    );
+  }
+
+  /*
     Parça parça işleme. Her çağrı `sync_cursor` konumundan başlar,
     BATCH kadar ürün işler ve imleci ilerletir. Liste bittiğinde
     imleç sıfırlanır.
