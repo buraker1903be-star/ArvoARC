@@ -136,14 +136,40 @@ async function runSync(mode: "tam" | "stok") {
 
   // Mevcut ürünleri tek seferde çekip eşleştiriyoruz; ürün başına
   // sorgu atmak 4.000 üründe dakikalar sürer.
-  const { data: existing } = await supabase
-    .from("arc_products")
-    .select("id, supplier_product_code, slug")
-    .eq("organization_id", orgId)
-    .eq("supplier", "tarzyeri");
+  /*
+    Supabase `select` varsayılan olarak en fazla 1000 satır
+    döndürür. Sınırı aşan ürünler "yok" sanılıp yeniden eklenmeye
+    çalışılıyor ve slug çakışması veriyordu. Sayfalayarak tamamı
+    okunur.
+  */
+  const existing: Array<{
+    id: string;
+    supplier_product_code: string | null;
+    slug: string;
+  }> = [];
+
+  for (let page = 0; page < 50; page += 1) {
+    const from = page * 1000;
+    const { data, error } = await supabase
+      .from("arc_products")
+      .select("id, supplier_product_code, slug")
+      .eq("organization_id", orgId)
+      .eq("supplier", "tarzyeri")
+      .range(from, from + 999);
+
+    if (error) {
+      return NextResponse.json(
+        { error: "urunler_okunamadi", detail: error.message },
+        { status: 500 },
+      );
+    }
+
+    existing.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
 
   const byCode = new Map(
-    (existing ?? []).map((row) => [row.supplier_product_code, row]),
+    existing.map((row) => [row.supplier_product_code, row]),
   );
 
   for (const product of slice) {
@@ -161,7 +187,14 @@ async function runSync(mode: "tam" | "stok") {
         const payload = {
           organization_id: orgId,
           name: product.name,
-          slug: known?.slug ?? `${slugify(product.name)}-${product.productCode.toLowerCase()}`,
+          /*
+            Slug ürün koduyla sonlanır; tedarikçide aynı adı
+            taşıyan farklı ürünler olduğu için ad tek başına
+            benzersiz değil.
+          */
+          slug:
+            known?.slug ??
+            `${slugify(product.name)}-${product.productCode.toLowerCase()}`,
           description: product.detailHtml || product.description,
           status: product.active
             ? rule.publish_directly

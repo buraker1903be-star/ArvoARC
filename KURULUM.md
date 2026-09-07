@@ -1,52 +1,71 @@
-# XML erişimi — tarayıcı kimliği
+# İçe aktarma — 1000 satır sınırı düzeltmesi
 
 ## HANGİ REPO: ~/Desktop/ArvoARC
 
-`src/lib/supplier/tarzyeri.ts` dosyasını güncelleyin, sonra:
+Yalnızca şu dosyayı değiştirin:
+
+```
+src/app/api/tedarikci/ice-aktar/route.ts
+```
+
+**Zip'i klasör üzerine kopyalamayın** — bu, bugün üç kez dosya
+kaybına yol açtı. Dosyayı tek başına açıp içeriğini kopyalayın.
 
 ```bash
 cd ~/Desktop/ArvoARC
 git add -A
-git commit -m "XML istegine tarayici kimligi eklendi"
+git status     # yalnızca route.ts görünmeli
+git commit -m "Urun okumada sayfalama"
 git push
 ```
 
 ## Sorun
 
-Tarzyeri XML yerine bir HTML sayfası döndürdü:
+İlk aktarım sorunsuz tamamlandı: 3.277 ürün, yaklaşık 14.000
+varyant, hata yok.
 
-```
-readTagExp returned undefined... Context: "<!DOCTYPE html>..."
-```
+İkinci çalıştırmada yüzlerce "duplicate key" hatası çıktı.
 
-Tarayıcı kimliği (`User-Agent`) olmayan istekleri engelleyen
-sunucular böyle davranıyor — genelde bir hata ya da giriş sayfası
-döndürüyorlar.
+Sebep: Supabase `select` sorguları varsayılan olarak **en fazla
+1000 satır** döndürüyor. Mevcut ürünleri okurken yalnızca ilk
+1000'i alıyor, kalan 2.277 ürünü "yok" sanıp yeniden eklemeye
+çalışıyor ve slug çakışması veriyordu.
+
+Veri bozulmadı — çakışan kayıtlar eklenmedi, mevcutları olduğu
+gibi kaldı.
 
 ## Çözüm
 
-İstek artık gerçek bir tarayıcı gibi başlık gönderiyor. Ayrıca
-gelen yanıt HTML ise erken yakalanıp anlaşılır bir hata veriyor;
-öncesinde ayrıştırıcının teknik hatası görünüyordu.
+Mevcut ürünler artık sayfalanarak okunuyor; tamamı belleğe
+alınıyor. Tekrar çalıştırmalarda ürünler doğru eşleşecek ve
+güncellenecek.
 
-## Yine olmazsa
+## Son çalıştırmadaki "toplam: 0"
 
-İki ihtimal kalır:
+Son turda XML boş döndü (`"toplam":0`). Geçici bir bağlantı
+sorunu ya da Tarzyeri tarafında anlık kesinti olabilir. Bir
+sonraki çalıştırmada normale dönmesi beklenir; dönmezse haber
+verin.
 
-**1. IP kısıtlaması.** Tarzyeri yalnızca Türkiye'den erişime izin
-veriyor olabilir; Vercel fonksiyonu ABD'den (iad1) çıkıyor.
+## Doğrulama
 
-Vercel projesinin `vercel.json` dosyasında `"regions": ["fra1"]`
-yazıyor ama bu yalnızca bazı planlarda geçerli. Tarzyeri'ye
-sorun: "Sunucumuz Frankfurt'tan bağlanıyor, IP kısıtlamanız var
-mı?"
-
-**2. Bağlantı süresi dolmuş olabilir.** Bağlantıyı tarayıcıda
-açıp XML geliyor mu kontrol edin:
-
-```
-https://www.tarzyeri.com/export/1db1de47-16ba-4a5a-a875-fe3f5691543e
+```sql
+select count(*) as urun,
+       (select count(*) from arc_product_variants where supplier='tarzyeri') as varyant
+from arc_products where supplier = 'tarzyeri';
 ```
 
-Tarayıcıda XML görüyor ama sunucudan gelmiyorsa kesinlikle IP ya
-da User-Agent engeli vardır.
+3.277 ürün ve 14.000 civarı varyant görmelisiniz.
+
+```sql
+select p.name, v.title,
+       v.cost_price/100.0 as alis,
+       v.price/100.0 as satis,
+       v.stock
+from arc_product_variants v
+join arc_products p on p.id = v.product_id
+where v.supplier = 'tarzyeri'
+limit 5;
+```
+
+Fiyatlar `,90` ile bitmeli; satış ≈ alış × 1,40 + 60 TL.
