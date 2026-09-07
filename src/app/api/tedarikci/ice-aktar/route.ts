@@ -152,11 +152,18 @@ async function runSync(mode: "tam" | "stok") {
     BATCH kadar ürün işler ve imleci ilerletir. Liste bittiğinde
     imleç sıfırlanır.
   */
-  const start = mode === "tam" ? (rule.sync_cursor ?? 0) : 0;
-  const slice =
-    mode === "tam"
-      ? products.slice(start, start + BATCH)
-      : products;
+  /*
+    Stok modu da parçalanır. 3.264 ürünü tek turda güncellemek
+    60 saniyeye sığmıyor; zamanlanmış görev yarıda kesilirse
+    kataloğun bir kısmı eski stokla kalır ve tükenen ürünü
+    satarsınız.
+
+    Stok modunda parça daha büyük: ürün ve görsel yazılmadığı
+    için tur başına iş daha az.
+  */
+  const size = mode === "tam" ? BATCH : BATCH * 3;
+  const start = rule.sync_cursor ?? 0;
+  const slice = products.slice(start, start + size);
 
   const stats = {
     toplam: products.length,
@@ -300,21 +307,31 @@ async function runSync(mode: "tam" | "stok") {
         mağazanın kendi varyantları ve geçmiş sipariş bağlantıları
         etkilenmez.
       */
-      const rows = product.variants.map((variant) => {
-        seen.add(variant.sku);
-        return {
-          organization_id: orgId,
-          product_id: productId,
-          sku: variant.sku,
-          supplier: "tarzyeri",
-          supplier_sku: variant.sku,
-          cost_price: product.costPrice,
-          price,
-          stock: variant.quantity,
-          title: `${variant.color} / ${variant.size}`,
-          updated_at: now,
-        };
-      });
+      /*
+        Tedarikçi zaman zaman aynı barkodu bir üründe iki kez
+        gönderiyor. Tekrarlar atlanır; aksi hâlde tüm ürün
+        benzersizlik hatasıyla düşüyor.
+      */
+      const rows = product.variants
+        .filter((variant) => {
+          if (seen.has(variant.sku)) return false;
+          seen.add(variant.sku);
+          return true;
+        })
+        .map((variant) => {
+          return {
+            organization_id: orgId,
+            product_id: productId,
+            sku: variant.sku,
+            supplier: "tarzyeri",
+            supplier_sku: variant.sku,
+            cost_price: product.costPrice,
+            price,
+            stock: variant.quantity,
+            title: `${variant.color} / ${variant.size}`,
+            updated_at: now,
+          };
+        });
 
       if (rows.length > 0) {
         const { error: clearError } = await supabase
@@ -351,8 +368,8 @@ async function runSync(mode: "tam" | "stok") {
     }
   }
 
-  const next = mode === "tam" ? start + slice.length : 0;
-  const bitti = mode !== "tam" || next >= products.length;
+  const next = start + slice.length;
+  const bitti = next >= products.length;
 
   await supabase
     .from("arc_suppliers")
