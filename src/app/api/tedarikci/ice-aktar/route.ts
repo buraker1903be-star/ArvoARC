@@ -268,11 +268,20 @@ async function runSync(mode: "tam" | "stok") {
         ürün başına onlarca ağ turu üretiyordu; toplu yazımda bir
         tur yeterli.
 
-        Çakışma anahtarı (organization_id, supplier_sku).
-        `sku` alanı kullanılamaz: mağazanın kendi ürünlerinde aynı
-        SKU birden çok varyantta geçiyor. `supplier_sku` ise
-        tedarikçi barkodudur, gerçekten benzersizdir ve yalnızca
-        içe aktarılan ürünlerde dolu — kendi kataloğa dokunmaz.
+        Yöntem: önce bu ürüne ait TEDARİKÇİ varyantları silinir,
+        sonra tazeleri toplu eklenir.
+
+        `upsert` kullanılamıyor. Çakışma anahtarı olarak `sku`
+        uygun değil — mağazanın kendi ürünlerinde aynı SKU birden
+        çok varyantta geçiyor. `supplier_sku` üzerine kurulan
+        kısmi indeks ise (`where supplier_sku is not null`)
+        PostgreSQL tarafından ON CONFLICT için tanınmıyor; kısmi
+        indeksin kullanılabilmesi için sorgunun aynı koşulu
+        taşıması gerekiyor, Supabase istemcisi bunu üretmiyor.
+
+        Silme yalnızca `supplier = 'tarzyeri'` olanları kapsar;
+        mağazanın kendi varyantları ve geçmiş sipariş bağlantıları
+        etkilenmez.
       */
       const rows = product.variants.map((variant) => {
         seen.add(variant.sku);
@@ -291,20 +300,28 @@ async function runSync(mode: "tam" | "stok") {
       });
 
       if (rows.length > 0) {
-        const { error: upsertError } = await supabase
+        const { error: clearError } = await supabase
           .from("arc_product_variants")
-          .upsert(rows, { onConflict: "organization_id,supplier_sku" });
+          .delete()
+          .eq("product_id", productId)
+          .eq("supplier", "tarzyeri");
 
-        if (upsertError) throw upsertError;
+        if (clearError) throw clearError;
+
+        const { error: insertError } = await supabase
+          .from("arc_product_variants")
+          .insert(rows);
+
+        if (insertError) throw insertError;
         stats.yeniVaryant += rows.length;
       }
 
       /*
-        Tedarikçiden düşen varyantların stoğu sıfırlanır; kayıt
-        silinmez ki geçmiş siparişlerin ürün bağlantısı kopmasın.
-        Tek sorguyla yapılır.
+        Tam modda varyantlar zaten yeniden yazıldığı için ek
+        temizliğe gerek yok. Bu blok yalnızca stok modunda
+        anlamlı olurdu; şimdilik devre dışı.
       */
-      if (mode === "tam" && seen.size > 0) {
+      if (false && seen.size > 0) {
         await supabase
           .from("arc_product_variants")
           .update({ stock: 0, updated_at: now })
