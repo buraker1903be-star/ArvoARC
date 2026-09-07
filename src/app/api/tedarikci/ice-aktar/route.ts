@@ -10,7 +10,27 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /** Tek çağrıda işlenecek ürün sayısı. */
-const BATCH = 120;
+const BATCH = 40;
+
+/**
+ * Satış fiyatı — ARC'taki `arc_sale_price` fonksiyonunun aynısı.
+ *
+ * Önceden her varyant için ayrı bir RPC çağrısı yapılıyordu;
+ * 120 ürün için 500'den fazla ağ turu demekti ve süre sınırını
+ * aşıyordu. Aynı hesabı burada yapmak işlemi saniyeler mertebesine
+ * indiriyor. Kural değişirse iki yer birlikte güncellenmelidir.
+ */
+function salePrice(
+  cost: number,
+  margin: number,
+  shipping: number,
+  round: number,
+) {
+  if (!cost || cost <= 0) return 0;
+  const raw = (cost * (100 + margin)) / 100 + shipping;
+  if (!round || round <= 0) return Math.round(raw);
+  return Math.ceil((raw - round) / 100) * 100 + round;
+}
 
 /**
  * Tedarikçi XML içe aktarma.
@@ -128,7 +148,6 @@ async function runSync(mode: "tam" | "stok") {
     yeniUrun: 0,
     guncellenenUrun: 0,
     yeniVaryant: 0,
-    guncellenenVaryant: 0,
     pasifVaryant: 0,
     atlanan: 0,
     hata: [] as string[],
@@ -235,90 +254,60 @@ async function runSync(mode: "tam" | "stok") {
       }
 
       // --- Varyantlar ---------------------------------------
-      const { data: currentVariants } = await supabase
-        .from("arc_product_variants")
-        .select("id, supplier_sku")
-        .eq("organization_id", orgId)
-        .eq("product_id", productId);
-
-      const bySku = new Map(
-        (currentVariants ?? []).map((row) => [row.supplier_sku, row.id]),
-      );
-
       const seen = new Set<string>();
+      const price = salePrice(
+        product.costPrice,
+        rule.margin_percent,
+        rule.shipping_markup,
+        rule.round_to_kurus,
+      );
+      const now = new Date().toISOString();
 
-      for (const variant of product.variants) {
+      /*
+        Varyantlar tek bir `upsert` ile yazılır. Tek tek eklemek
+        ürün başına onlarca ağ turu üretiyordu; toplu yazımda bir
+        tur yeterli.
+
+        Çakışma anahtarı (organization_id, sku): kayıt varsa
+        güncellenir, yoksa eklenir. Ayrıca mevcut varyantları
+        sorgulamaya da gerek kalmıyor.
+      */
+      const rows = product.variants.map((variant) => {
         seen.add(variant.sku);
-
-        // Satış fiyatı sunucuda hesaplanır; maliyet ayrıca saklanır.
-        const { data: priceRow } = await supabase.rpc("arc_sale_price", {
-          p_cost: product.costPrice,
-          p_margin: rule.margin_percent,
-          p_shipping: rule.shipping_markup,
-          p_round: rule.round_to_kurus,
-        });
-
-        const salePrice = Number(priceRow) || product.costPrice;
-        const variantId = bySku.get(variant.sku);
-
-        const base = {
+        return {
           organization_id: orgId,
           product_id: productId,
           sku: variant.sku,
           supplier: "tarzyeri",
           supplier_sku: variant.sku,
           cost_price: product.costPrice,
-          price: salePrice,
+          price,
           stock: variant.quantity,
-          updated_at: new Date().toISOString(),
+          title: `${variant.color} / ${variant.size}`,
+          updated_at: now,
         };
+      });
 
-        if (variantId) {
-          // Stok modunda ad ve seçenekler değiştirilmez.
-          /*
-            `options` sütunu bu şemada yok; renk ve beden başlıkta
-            birleştiriliyor. Varsayılan bir sütun adı kullanmak
-            varyant eklemesini sessizce başarısız kılıyordu.
-          */
-          const patch =
-            mode === "tam"
-              ? { ...base, title: `${variant.color} / ${variant.size}` }
-              : {
-                  stock: variant.quantity,
-                  cost_price: product.costPrice,
-                  price: salePrice,
-                  updated_at: base.updated_at,
-                };
+      if (rows.length > 0) {
+        const { error: upsertError } = await supabase
+          .from("arc_product_variants")
+          .upsert(rows, { onConflict: "organization_id,sku" });
 
-          const { error: updateError } = await supabase
-            .from("arc_product_variants")
-            .update(patch)
-            .eq("id", variantId);
-
-          // Hata artık yutulmuyor; aksi hâlde sayaç artıyor ama
-          // veritabanına hiçbir şey yazılmıyordu.
-          if (updateError) throw updateError;
-          stats.guncellenenVaryant += 1;
-        } else {
-          const { error: insertError } = await supabase
-            .from("arc_product_variants")
-            .insert({ ...base, title: `${variant.color} / ${variant.size}` });
-
-          if (insertError) throw insertError;
-          stats.yeniVaryant += 1;
-        }
+        if (upsertError) throw upsertError;
+        stats.yeniVaryant += rows.length;
       }
 
-      // Tedarikçiden düşen varyantların stoğu sıfırlanır.
-      // Silmiyoruz: geçmiş siparişlerin bağlantısı kopmasın.
-      for (const [sku, id] of bySku) {
-        if (sku && !seen.has(sku)) {
-          await supabase
-            .from("arc_product_variants")
-            .update({ stock: 0, updated_at: new Date().toISOString() })
-            .eq("id", id);
-          stats.pasifVaryant += 1;
-        }
+      /*
+        Tedarikçiden düşen varyantların stoğu sıfırlanır; kayıt
+        silinmez ki geçmiş siparişlerin ürün bağlantısı kopmasın.
+        Tek sorguyla yapılır.
+      */
+      if (mode === "tam" && seen.size > 0) {
+        await supabase
+          .from("arc_product_variants")
+          .update({ stock: 0, updated_at: now })
+          .eq("product_id", productId)
+          .not("sku", "in", `(${[...seen].map((s) => `"${s}"`).join(",")})`);
       }
     } catch (error) {
       stats.hata.push(`${product.productCode}: ${(error as Error).message}`);
