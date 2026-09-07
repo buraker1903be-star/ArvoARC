@@ -32,6 +32,26 @@ function serviceClient() {
   });
 }
 
+/**
+ * Zamanlanmış stok senkronu.
+ *
+ * Vercel Cron yalnızca GET isteği atar ve `Authorization: Bearer
+ * <CRON_SECRET>` başlığı gönderir. Elle tetikleme için POST
+ * kullanılır; ikisi de aynı işi yapar.
+ */
+export async function GET(request: Request) {
+  const cronSecret = process.env.CRON_SECRET;
+  const header = request.headers.get("authorization");
+
+  if (!cronSecret || header !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
+  }
+
+  // Zamanlanmış çalıştırma her zaman stok modunda; tam aktarım
+  // elle tetiklenir çünkü uzun sürer ve ürün adlarını ezer.
+  return runSync("stok");
+}
+
 export async function POST(request: Request) {
   // Basit koruma: uç nokta herkese açık olmamalı.
   const secret = process.env.SUPPLIER_SYNC_SECRET;
@@ -46,6 +66,10 @@ export async function POST(request: Request) {
   const mode =
     new URL(request.url).searchParams.get("mod") === "tam" ? "tam" : "stok";
 
+  return runSync(mode);
+}
+
+async function runSync(mode: "tam" | "stok") {
   const supabase = serviceClient();
 
   // --- Tedarikçi ayarları ------------------------------------
