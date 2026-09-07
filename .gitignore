@@ -6,3 +6,4 @@ out
 .vercel
 *.log
 *.tsbuildinfo
+.DS_Store
