@@ -1,53 +1,32 @@
-# Açıklama metni ve kategori düzeltmesi
+# HTML varlık listesi genişletildi
 
-## 1) ARC — `src/lib/supplier/tarzyeri.ts`
+## HANGİ REPO: C:\Users\PC\Desktop\Burak\ArvoARC
+
+`src/lib/supplier/tarzyeri.ts`
 
 ```powershell
 cd C:\Users\PC\Desktop\Burak\ArvoARC
-# dosyayi kopyalayin
 git add -A
 git status      # yalnizca tarzyeri.ts
-git commit -m "HTML varliklari cozuluyor"
+git commit -m "HTML varlik listesi genisletildi"
 git push
 ```
 
-### Sorun
+## Neden
 
-Açıklamalar `&Uuml;R&Uuml;N &Ouml;ZELLİKLERİ` biçiminde
-geliyordu. Tedarikçi HTML varlıkları kullanıyor; XML
-ayrıştırıcısı bunları çözmüyor çünkü değerler CDATA içinde.
+Veritabanındaki metinleri SQL ile onardık ama içe aktarma kodu
+yalnızca Türkçe karakterleri tanıyordu. Tedarikçi akışında
+şunlar da geçiyor:
 
-### Çözüm
-
-Türkçe karakterler (Ü, Ö, Ç, İ, Ş, Ğ) ve yaygın işaretler
-çözülüyor. Sayısal varlıklar (`&#199;`, `&#x00C7;`) da
-destekleniyor.
-
-### Sonra
-
-Açıklamaların düzelmesi için ürünlerin yeniden yazılması gerekir.
-Ama mevcut ürünlerde ad ve açıklama artık korunuyor (görsel
-koruması için) — bu yüzden tam aktarım onları güncellemez.
-
-İki seçenek:
-
-**A) Tedarikçi ürünlerini silip yeniden aktarın.** Temiz sonuç
-ama panelde yaptığınız düzenlemeler gider.
-
-```sql
-delete from arc_product_variants where supplier = 'tarzyeri';
-delete from arc_products where supplier = 'tarzyeri';
-update arc_suppliers set sync_cursor = 0 where code = 'tarzyeri';
+```
+&rsquo; ’    &ldquo; “    &bull; •
+&hellip; …   &acirc; â    &eacute; é
+&rarr; →     &gt; >       &lt; <
 ```
 
-**B) Mevcut açıklamaları SQL ile düzeltin.** Görseller ve
-düzenlemeler korunur. Bunu isterseniz sorguyu yazarım.
+Bunlar eklenmezse yeni gelen ürünlerde aynı sorun tekrarlar.
 
-Ben B'yi öneriyorum — 3.264 ürünü yeniden aktarmak yerine
-metinleri yerinde onarmak daha az riskli.
+## Durum
 
-## 2) Vitrin — kategori
-
-`arvoculture-metin.zip` paketinde. Eşofman, ceket, pantolon,
-hırka gibi ürünler "Kişisel Bakım" olarak sınıflanıyordu; giyim
-anahtar kelimeleri genişletildi.
+Mevcut 3.264 ürünün açıklamaları onarıldı. Kalan 26 kayıtta
+`description` alanı zaten boş — sorun değil.

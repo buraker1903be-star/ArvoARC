@@ -67,8 +67,14 @@ const ENTITIES: Record<string, string> = {
   Gbreve: "Ğ", gbreve: "ğ",
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
   nbsp: " ", ndash: "–", mdash: "—",
-  laquo: "«", raquo: "»", hellip: "…",
+  // Tedarikçi akışında gerçekten karşılaşılan işaretler.
+  rsquo: "’", lsquo: "‘", ldquo: "“", rdquo: "”",
+  bull: "•", hellip: "…", rarr: "→", larr: "←",
+  acirc: "â", ecirc: "ê", icirc: "î", ocirc: "ô", ucirc: "û",
+  eacute: "é", egrave: "è", agrave: "à",
+  laquo: "«", raquo: "»",
   deg: "°", euro: "€", pound: "£", copy: "©", reg: "®", trade: "™",
+  times: "×", middot: "·", frac12: "½",
 };
 
 function decodeEntities(value: string): string {
