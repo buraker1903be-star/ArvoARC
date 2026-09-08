@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { fetchTarzyeri, slugify } from "@/lib/supplier/tarzyeri";
+import { fetchTarzyeri, parseDetail, slugify } from "@/lib/supplier/tarzyeri";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -236,11 +236,17 @@ async function runSync(mode: "tam" | "stok") {
 
           Yeni üründe tedarikçi verisi olduğu gibi kullanılır.
         */
+        // Tablolar ayrıştırılıp yapılandırılmış olarak saklanır;
+        // vitrin bunları liste hâlinde gösterebilsin.
+        const detail = parseDetail(product.detailHtml);
+
         const fresh = {
           name: product.name,
           slug: `${slugify(product.name)}-${product.productCode.toLowerCase()}`,
-          description: product.detailHtml || product.description,
+          description: detail.intro || product.description,
           metadata: {
+            specs: detail.specs,
+            size_guide: detail.sizeGuide,
             vendor: rule.brand_override ?? "ArvoCulture",
             product_type: product.subCategory,
             subtitle: product.description,

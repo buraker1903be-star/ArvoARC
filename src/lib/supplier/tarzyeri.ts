@@ -181,6 +181,58 @@ export async function fetchTarzyeri(url: string): Promise<SupplierProduct[]> {
   });
 }
 
+/**
+ * Tedarikçi açıklamasını okunabilir hâle getirir.
+ *
+ * `detail` alanı iki HTML tablosu içeriyor: ürün özellikleri ve
+ * beden tablosu. Etiketler düzleştirilince "Cinsiyet Kadın Kumaş
+ * İki iplik penye Sezon Kış..." gibi tek bir okunmaz paragraf
+ * çıkıyor.
+ *
+ * Burada tablo satırları ayrıştırılıp etiket/değer çiftlerine
+ * dönüştürülüyor; vitrin bunları liste olarak gösterebiliyor.
+ */
+export type SpecRow = { label: string; value: string };
+
+export function parseDetail(html: string): {
+  intro: string;
+  specs: SpecRow[];
+  sizeGuide: SpecRow[];
+} {
+  if (!html) return { intro: "", specs: [], sizeGuide: [] };
+
+  const tables = html.match(/<table[\s\S]*?<\/table>/gi) ?? [];
+  const strip = (v: string) =>
+    v.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+  const readRows = (table: string): SpecRow[] => {
+    const rows = table.match(/<tr[\s\S]*?<\/tr>/gi) ?? [];
+    const out: SpecRow[] = [];
+
+    for (const row of rows) {
+      const cells = (row.match(/<td[\s\S]*?<\/td>/gi) ?? []).map(strip);
+      const filled = cells.filter(Boolean);
+
+      // Başlık satırları tek hücreli; atlanır.
+      if (filled.length < 2) continue;
+
+      out.push({
+        label: filled[0]!,
+        value: filled.slice(1).join(" · "),
+      });
+    }
+    return out;
+  };
+
+  const specs = tables[0] ? readRows(tables[0]) : [];
+  const sizeGuide = tables[1] ? readRows(tables[1]) : [];
+
+  // Tabloların dışında kalan serbest metin (ürün hikâyesi).
+  const intro = strip(html.replace(/<table[\s\S]*?<\/table>/gi, ""));
+
+  return { intro, specs, sizeGuide };
+}
+
 /** Ürün adından URL uyumlu slug üretir. */
 export function slugify(value: string) {
   return value
