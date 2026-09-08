@@ -38,7 +38,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
   });
   const visibleIds=visibleProducts.map(product=>product.id);
   const [{data:variants,error:variantsError},{data:bestSellerMemberships,error:bestSellerMembershipError}]=await Promise.all([
-    visibleIds.length?supabase.from("arc_product_variants").select("id,product_id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes").eq("organization_id",organization.id).in("product_id",visibleIds):Promise.resolve({data:[],error:null}),
+    visibleIds.length?supabase.from("arc_product_variants").select("id,product_id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price,supplier").eq("organization_id",organization.id).in("product_id",visibleIds):Promise.resolve({data:[],error:null}),
     visibleIds.length&&bestSellerCollection?supabase.from("arc_collection_products").select("product_id").eq("organization_id",organization.id).eq("collection_id",bestSellerCollection.id).in("product_id",visibleIds):Promise.resolve({data:[],error:null}),
   ]);
   if(variantsError||bestSellerMembershipError)throw new Error((variantsError??bestSellerMembershipError)?.message??"Ürün rozetleri okunamadı.");
@@ -90,6 +90,26 @@ export default async function Products({ searchParams }: { searchParams: Promise
         const comparePrices=discounted.map(variant=>variant.compare_at_price??0);
         const compareLabel=comparePrices.length?money.format(Math.max(...comparePrices)/100):"";
         const priceLabel=prices.length?(minPrice===maxPrice?money.format(minPrice/100):`${money.format(minPrice/100)} – ${money.format(maxPrice/100)}`):"Fiyat girilmemiş";
+
+        /*
+          Tedarikçi ürünlerinde alış maliyeti ve kâr.
+
+          Maliyet aktarımda `cost_price` alanına yazılıyor.
+          Kendi ürünlerimizde bu alan boş olduğu için kâr
+          gösterilmez — uydurma bir rakam göstermek yanıltıcı
+          olur.
+
+          Varyantların maliyeti aynı olduğu için ilki alınıyor;
+          farklıysa aralık gösterilir.
+        */
+        const costs=pv.map(variant=>variant.cost_price).filter((value):value is number=>typeof value==="number"&&value>0);
+        const minCost=costs.length?Math.min(...costs):0;
+        const maxCost=costs.length?Math.max(...costs):0;
+        const costLabel=costs.length?(minCost===maxCost?money.format(minCost/100):`${money.format(minCost/100)} – ${money.format(maxCost/100)}`):null;
+        // Kâr, en düşük satış ile en yüksek maliyet üzerinden:
+        // en kötü senaryoyu göstermek daha güvenli.
+        const profit=costs.length&&prices.length?minPrice-maxCost:0;
+        const margin=costs.length&&maxCost>0?Math.round((profit/maxCost)*100):0;
         const stockTone=totalStock<0?"danger":totalStock<=5?"low":"healthy";
         return <Link prefetch={false} href={`/urunler/${product.id}`} className="product-card" key={product.id}>
           <div className="product-card-media">
@@ -105,6 +125,15 @@ export default async function Products({ searchParams }: { searchParams: Promise
           <div className="product-card-body">
             <div className="product-card-title"><small>{meta.type||"Katalog ürünü"}</small><h3>{product.name}</h3></div>
             <div className="product-card-price"><strong>{priceLabel}</strong><span>{compareLabel?<><s>{compareLabel}</s> · </>:null}{pv.length} varyant</span></div>
+            {costLabel?(
+              <div className="product-card-margin">
+                <span>Alış {costLabel}</span>
+                <strong data-loss={profit<=0?"true":undefined}>
+                  {profit>0?`+${money.format(profit/100)}`:money.format(profit/100)}
+                  {" · "}%{margin}
+                </strong>
+              </div>
+            ):null}
             <div className="product-card-stats">
               <span><small>SKU</small><b>{pv[0]?.sku??"—"}</b></span>
               <span><small>TOPLAM STOK</small><b className={stockTone}>{totalStock}</b></span>
