@@ -19,20 +19,46 @@ export const dynamic = "force-dynamic";
  */
 const STOREFRONT = process.env.STOREFRONT_URL ?? "https://arvoculture.com";
 
+/*
+  Tarayıcı, farklı alan adına giden istekleri sunucu açıkça izin
+  vermedikçe engelliyor. Vitrin arvoculture.com'da, bu uç nokta
+  arc.arvo-os.com'da; izin başlıkları olmadan istek hiç
+  ulaşmıyordu.
+
+  İzin yalnızca vitrine veriliyor; başka bir siteden çağrılamaz.
+*/
+const CORS = {
+  "Access-Control-Allow-Origin": STOREFRONT,
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400",
+};
+
+/** Tarayıcının ön kontrol isteği. */
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS });
+}
+
 export async function POST(request: Request) {
   let body: { islem?: string; email?: string; sifre?: string };
 
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "gecersiz_istek" }, { status: 400 });
+    return NextResponse.json(
+      { error: "gecersiz_istek" },
+      { status: 400, headers: CORS },
+    );
   }
 
   const email = (body.email ?? "").trim().toLowerCase();
   const islem = body.islem;
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
-    return NextResponse.json({ error: "gecersiz_eposta" }, { status: 400 });
+    return NextResponse.json(
+      { error: "gecersiz_eposta" },
+      { status: 400, headers: CORS },
+    );
   }
 
   const supabase = createServiceClient();
@@ -41,7 +67,10 @@ export async function POST(request: Request) {
     if (islem === "kayit") {
       const sifre = body.sifre ?? "";
       if (sifre.length < 8) {
-        return NextResponse.json({ error: "kisa_sifre" }, { status: 400 });
+        return NextResponse.json(
+          { error: "kisa_sifre" },
+          { status: 400, headers: CORS },
+        );
       }
 
       const { data, error } = await supabase.auth.admin.generateLink({
@@ -55,7 +84,7 @@ export async function POST(request: Request) {
         // Zaten kayıtlı e-posta: kullanıcıya hesabın varlığını
         // sızdırmadan yanıt veriyoruz.
         if (/already registered|already been registered/i.test(error.message)) {
-          return NextResponse.json({ ok: true });
+          return NextResponse.json({ ok: true }, { headers: CORS });
         }
         throw error;
       }
@@ -66,7 +95,7 @@ export async function POST(request: Request) {
         await sendEmail({ to: email, ...mail });
       }
 
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true }, { headers: CORS });
     }
 
     if (islem === "sifirla") {
@@ -83,7 +112,7 @@ export async function POST(request: Request) {
       */
       if (error) {
         console.warn("Şifre sıfırlama bağlantısı üretilemedi:", error.message);
-        return NextResponse.json({ ok: true });
+        return NextResponse.json({ ok: true }, { headers: CORS });
       }
 
       const link = data.properties?.action_link;
@@ -92,12 +121,18 @@ export async function POST(request: Request) {
         await sendEmail({ to: email, ...mail });
       }
 
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true }, { headers: CORS });
     }
 
-    return NextResponse.json({ error: "bilinmeyen_islem" }, { status: 400 });
+    return NextResponse.json(
+      { error: "bilinmeyen_islem" },
+      { status: 400, headers: CORS },
+    );
   } catch (error) {
     console.error("Kimlik e-postası hatası:", error);
-    return NextResponse.json({ error: "islem_basarisiz" }, { status: 500 });
+    return NextResponse.json(
+      { error: "islem_basarisiz" },
+      { status: 500, headers: CORS },
+    );
   }
 }
