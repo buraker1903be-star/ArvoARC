@@ -27,16 +27,33 @@ const STOREFRONT = process.env.STOREFRONT_URL ?? "https://arvoculture.com";
 
   İzin yalnızca vitrine veriliyor; başka bir siteden çağrılamaz.
 */
-const CORS = {
-  "Access-Control-Allow-Origin": STOREFRONT,
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
+/*
+  Vitrin hem `arvoculture.com` hem `www.arvoculture.com`
+  üzerinden açılabiliyor ve tarayıcı bu ikisini farklı köken
+  sayıyor. Sabit tek bir adrese izin vermek, www ile gelen
+  isteklerin engellenmesine yol açıyordu.
+*/
+const ALLOWED = new Set([
+  STOREFRONT,
+  STOREFRONT.replace("https://", "https://www."),
+]);
+
+function corsHeaders(request: Request) {
+  const origin = request.headers.get("origin") ?? "";
+  return {
+    // Yalnızca tanınan köken yansıtılır; bilinmeyen sitelere
+    // izin verilmez.
+    "Access-Control-Allow-Origin": ALLOWED.has(origin) ? origin : STOREFRONT,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
+}
 
 /** Tarayıcının ön kontrol isteği. */
-export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: CORS });
+export async function OPTIONS(request: Request) {
+  return new Response(null, { status: 204, headers: corsHeaders(request) });
 }
 
 export async function POST(request: Request) {
@@ -47,7 +64,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json(
       { error: "gecersiz_istek" },
-      { status: 400, headers: CORS },
+      { status: 400, headers: corsHeaders(request) },
     );
   }
 
@@ -57,10 +74,11 @@ export async function POST(request: Request) {
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
     return NextResponse.json(
       { error: "gecersiz_eposta" },
-      { status: 400, headers: CORS },
+      { status: 400, headers: corsHeaders(request) },
     );
   }
 
+  const CORS = corsHeaders(request);
   const supabase = createServiceClient();
 
   try {
