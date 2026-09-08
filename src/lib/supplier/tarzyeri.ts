@@ -50,9 +50,45 @@ function toKurus(value: unknown): number {
   return Number.isFinite(num) ? Math.round(num * 100) : 0;
 }
 
+/**
+ * HTML varlıklarını çözer.
+ *
+ * Tedarikçi açıklamaları `&Uuml;R&Uuml;N &Ouml;ZELLİKLERİ`
+ * biçiminde geliyor; çözülmezse sitede okunamaz hâlde görünüyor.
+ * Ayrıştırıcı bunu kendiliğinden yapmıyor çünkü değerler CDATA
+ * içinde geliyor.
+ */
+const ENTITIES: Record<string, string> = {
+  Uuml: "Ü", uuml: "ü",
+  Ouml: "Ö", ouml: "ö",
+  Ccedil: "Ç", ccedil: "ç",
+  Idot: "İ", inodot: "ı", Iuml: "İ", iuml: "i",
+  Scedil: "Ş", scedil: "ş",
+  Gbreve: "Ğ", gbreve: "ğ",
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
+  nbsp: " ", ndash: "–", mdash: "—",
+  laquo: "«", raquo: "»", hellip: "…",
+  deg: "°", euro: "€", pound: "£", copy: "©", reg: "®", trade: "™",
+};
+
+function decodeEntities(value: string): string {
+  return value
+    // Adlandırılmış varlıklar: &Uuml; → Ü
+    .replace(/&([A-Za-z][A-Za-z0-9]+);/g, (match, name: string) =>
+      ENTITIES[name] ?? match,
+    )
+    // Sayısal varlıklar: &#199; ve &#x00C7;
+    .replace(/&#(\d+);/g, (_m, code: string) =>
+      String.fromCodePoint(Number(code)),
+    )
+    .replace(/&#[xX]([0-9a-fA-F]+);/g, (_m, code: string) =>
+      String.fromCodePoint(parseInt(code, 16)),
+    );
+}
+
 function text(value: unknown): string {
   if (value === null || value === undefined) return "";
-  return String(value).trim();
+  return decodeEntities(String(value)).trim();
 }
 
 export async function fetchTarzyeri(url: string): Promise<SupplierProduct[]> {
