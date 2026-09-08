@@ -78,9 +78,15 @@ export function orderConfirmationHtml({
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;">
     <tr>
       <td style="padding:32px 28px 8px;">
-        <p style="margin:0 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8b8f85;">
-          ArvoCulture
-        </p>
+        <!--
+          Logo. E-posta istemcilerinin çoğu görselleri varsayılan
+          olarak engelliyor; bu yüzden alt metin anlamlı ve
+          yüksekliği sabit — engellenen görsel düzeni bozmasın.
+        -->
+        <img src="https://arvoculture.com/arvoculture-logo-transparent.png"
+             alt="ArvoCulture"
+             width="150" height="18"
+             style="display:block;width:150px;height:auto;margin:0 0 18px;border:0;">
         <h1 style="margin:0 0 6px;font-size:24px;line-height:1.25;color:#10120f;font-weight:600;">
           Siparişiniz alındı
         </h1>
