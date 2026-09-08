@@ -186,3 +186,79 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+/**
+ * Kargo bildirimi.
+ *
+ * Sipariş kargoya verildiğinde gönderilir. Takip numarası ve
+ * varsa takip bağlantısı içerir; müşteri kargo firmasının
+ * sitesinde arama yapmak zorunda kalmasın.
+ */
+export function shippingNoticeHtml({
+  orderNumber,
+  customerName,
+  carrier,
+  trackingNumber,
+  trackingUrl,
+}: {
+  orderNumber: string;
+  customerName: string;
+  carrier: string;
+  trackingNumber: string;
+  trackingUrl?: string | null;
+}) {
+  const trackingBlock = trackingUrl
+    ? `<a href="${trackingUrl}"
+          style="display:inline-block;margin:20px 0 6px;padding:13px 26px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
+         Kargomu takip et
+       </a>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:24px 12px;background:#f4f3ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;">
+    <tr>
+      <td style="padding:32px 28px;">
+        <img src="https://arvoculture.com/arvoculture-logo-transparent.png"
+             alt="ArvoCulture" width="150" height="18"
+             style="display:block;width:150px;height:auto;margin:0 0 22px;border:0;">
+
+        <h1 style="margin:0 0 10px;font-size:22px;line-height:1.3;color:#10120f;font-weight:600;">
+          Siparişiniz kargoda
+        </h1>
+        <p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#5a5f54;">
+          Merhaba ${escapeHtml(customerName)}, ${escapeHtml(orderNumber)}
+          numaralı siparişiniz kargoya teslim edildi.
+        </p>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+               style="background:#faf9f5;border-radius:10px;">
+          <tr>
+            <td style="padding:14px 16px;font-size:13px;line-height:1.7;color:#5a5f54;">
+              Kargo firması
+              <strong style="color:#10120f;"> ${escapeHtml(carrier)}</strong><br>
+              Takip numarası
+              <strong style="color:#10120f;"> ${escapeHtml(trackingNumber)}</strong>
+            </td>
+          </tr>
+        </table>
+
+        ${trackingBlock}
+
+        <p style="margin:16px 0 0;font-size:12px;line-height:1.6;color:#8b8f85;">
+          Takip bilgisi kargo firmasının sistemine düşene kadar birkaç saat
+          geçebilir. Teslim alırken paketin hasarlı olup olmadığını kontrol
+          etmenizi öneririz.
+        </p>
+      </td>
+    </tr>
+  </table>
+
+  <p style="max-width:520px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
+    ARVOCULTURE GROUP TEKNOLOJİ SANAYİ VE TİCARET LTD. ŞTİ.
+  </p>
+</body>
+</html>`;
+}

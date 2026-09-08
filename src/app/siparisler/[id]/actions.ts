@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { sendEmail } from "@/lib/email/resend";
+import { shippingNoticeHtml } from "@/lib/email/order-confirmation";
 import { requireTenant } from "@/lib/tenant";
 
 const roles=new Set(["owner","admin","manager"]);
@@ -46,6 +48,37 @@ export async function updateFulfillmentDetails(formData:FormData){
   if(readError||!order)redirect(`/siparisler/${orderId}?error=order-not-found`);
   const metadata=(order.metadata??{}) as OrderMetadata;
   const {error}=await supabase.from("arc_orders").update({metadata:{...metadata,shipping_carrier:carrier||null,tracking_number:trackingNumber||null,tracking_url:trackingUrl||null,internal_note:internalNote||null},updated_at:new Date().toISOString()}).eq("organization_id",organization.id).eq("id",orderId);
+
+  /*
+    Kargo bildirimi.
+
+    Yalnızca takip numarası YENİ girildiğinde gönderilir: aynı
+    siparişi tekrar kaydettiğinizde müşteriye ikinci bir e-posta
+    gitmemeli.
+
+    Gönderim hatası kaydetmeyi başarısız saymaz; bilgi zaten
+    veritabanına yazıldı.
+  */
+  if(!error&&trackingNumber&&trackingNumber!==metadata.tracking_number){
+    try{
+      const {data:order}=await supabase.from("arc_orders").select("order_number,customer_name,customer_email").eq("id",orderId).single();
+      if(order?.customer_email){
+        await sendEmail({
+          to:order.customer_email,
+          subject:`Siparişiniz kargoda · ${order.order_number}`,
+          html:shippingNoticeHtml({
+            orderNumber:order.order_number,
+            customerName:order.customer_name||"değerli müşterimiz",
+            carrier:carrier||"Kargo",
+            trackingNumber,
+            trackingUrl:trackingUrl||null,
+          }),
+        });
+      }
+    }catch(mailError){
+      console.error("Kargo bildirimi gönderilemedi:",mailError);
+    }
+  }
   if(error)redirect(`/siparisler/${orderId}?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/siparisler");revalidatePath(`/siparisler/${orderId}`);
   redirect(`/siparisler/${orderId}?saved=fulfillment`);

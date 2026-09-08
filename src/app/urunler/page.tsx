@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
-import { createProduct } from "./actions";
+import { createProduct, bulkUpdateStatus } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel } from "@/lib/commerce-labels";
 
@@ -74,6 +74,59 @@ export default async function Products({ searchParams }: { searchParams: Promise
       <label>Durum<select name="status" defaultValue="draft" style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="draft">Taslak</option><option value="active">Aktif</option></select></label><label style={{display:"flex",alignItems:"center",gap:10}}><input name="allow_backorder" type="checkbox" defaultChecked /> Stok yokken satışa devam et</label>
       <label style={{gridColumn:"1 / -1"}}>Açıklama<textarea name="description" rows={4} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><button type="submit" style={{padding:12}}>Ürün oluştur</button>
     </form></details>}
+
+      {canManage?(
+        <details className="panel-card" style={{marginBottom:16}}>
+          <summary style={{cursor:"pointer",fontWeight:600}}>
+            Toplu durum değişikliği
+          </summary>
+
+          <p style={{margin:"12px 0",fontSize:13,color:"#7c8177",lineHeight:1.6}}>
+            Tedarikçiden gelen ürünleri tek tek yayınlamak yerine
+            topluca açıp kapatabilirsiniz. En az bir filtre
+            seçmelisiniz; filtresiz işlem tüm katalogu değiştirir
+            ve geri alması zordur.
+          </p>
+
+          <form action={bulkUpdateStatus} style={{display:"grid",gap:12,maxWidth:520}}>
+            <label>
+              Tedarikçi
+              <select name="supplier" style={{display:"block",width:"100%",padding:12,marginTop:6}}>
+                <option value="">Seçiniz</option>
+                <option value="tarzyeri">Tarzyeri</option>
+              </select>
+            </label>
+
+            <label>
+              Koleksiyon (isteğe bağlı, slug)
+              <input name="collection" placeholder="ornek: erkek-t-shirt"
+                     style={{display:"block",width:"100%",padding:12,marginTop:6}} />
+            </label>
+
+            <label>
+              Yalnızca şu durumdakiler
+              <select name="current_status" style={{display:"block",width:"100%",padding:12,marginTop:6}}>
+                <option value="">Hepsi</option>
+                <option value="draft">Taslak</option>
+                <option value="active">Yayında</option>
+                <option value="archived">Arşiv</option>
+              </select>
+            </label>
+
+            <label>
+              Yeni durum
+              <select name="status" required style={{display:"block",width:"100%",padding:12,marginTop:6}}>
+                <option value="active">Yayında</option>
+                <option value="draft">Taslak</option>
+                <option value="archived">Arşiv</option>
+              </select>
+            </label>
+
+            <button type="submit" className="button">Uygula</button>
+          </form>
+        </details>
+      ):null}
+
     <section className="product-catalog">
       <div className="product-catalog-head"><div><small>KATALOG</small><h3>{search?visibleProducts.length:(filteredCount??0)} ürün</h3></div><span>{organization.name}</span></div>
       {visibleProducts.length ? <div className="product-card-grid">{visibleProducts.map((product,index)=>{

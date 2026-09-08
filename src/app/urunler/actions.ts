@@ -37,3 +37,69 @@ export async function createProduct(formData: FormData) {
 
   revalidatePath("/"); revalidatePath("/urunler"); redirect("/urunler?created=1");
 }
+
+/**
+ * Toplu durum değişikliği.
+ *
+ * 3.264 tedarikçi ürününü tek tek yayınlamak makul değil.
+ * Bu eylem bir filtreye uyan tüm ürünlerin durumunu değiştirir.
+ *
+ * Filtre zorunlu: filtresiz çalıştırmak tüm katalogu tek
+ * hamlede değiştirir ve geri alması zordur.
+ */
+export async function bulkUpdateStatus(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+
+  if (!["owner", "admin", "manager"].includes(membership.role)) {
+    redirect("/urunler?error=forbidden");
+  }
+
+  const status = String(formData.get("status") ?? "").trim();
+  const supplier = String(formData.get("supplier") ?? "").trim();
+  const collectionSlug = String(formData.get("collection") ?? "").trim();
+  const currentStatus = String(formData.get("current_status") ?? "").trim();
+
+  if (!["active", "draft", "archived"].includes(status)) {
+    redirect("/urunler?error=invalid-status");
+  }
+
+  // En az bir daraltıcı koşul olmalı.
+  if (!supplier && !collectionSlug) {
+    redirect("/urunler?error=bulk-needs-filter");
+  }
+
+  let query = supabase
+    .from("arc_products")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("organization_id", organization.id);
+
+  if (supplier) query = query.eq("supplier", supplier);
+  if (currentStatus) query = query.eq("status", currentStatus);
+
+  if (collectionSlug) {
+    const { data: collection } = await supabase
+      .from("arc_collections")
+      .select("id")
+      .eq("organization_id", organization.id)
+      .eq("slug", collectionSlug)
+      .maybeSingle();
+
+    if (!collection) redirect("/urunler?error=collection-not-found");
+
+    const { data: members } = await supabase
+      .from("arc_collection_products")
+      .select("product_id")
+      .eq("collection_id", collection.id);
+
+    const ids = (members ?? []).map((row) => row.product_id);
+    if (ids.length === 0) redirect("/urunler?error=empty-collection");
+
+    query = query.in("id", ids);
+  }
+
+  const { error } = await query;
+  if (error) redirect("/urunler?error=bulk-failed");
+
+  revalidatePath("/urunler");
+  redirect("/urunler?ok=bulk");
+}
