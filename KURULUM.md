@@ -1,71 +1,69 @@
-# İçe aktarma — 1000 satır sınırı düzeltmesi
+# Görsel koruma + stok modu düzeltmesi
 
-## HANGİ REPO: ~/Desktop/ArvoARC
+## HANGİ REPO: C:\Users\PC\Desktop\Burak\ArvoARC
 
-Yalnızca şu dosyayı değiştirin:
+İki dosya:
 
 ```
 src/app/api/tedarikci/ice-aktar/route.ts
+vercel.json
 ```
 
-**Zip'i klasör üzerine kopyalamayın** — bu, bugün üç kez dosya
-kaybına yol açtı. Dosyayı tek başına açıp içeriğini kopyalayın.
-
-```bash
-cd ~/Desktop/ArvoARC
+```powershell
+cd C:\Users\PC\Desktop\Burak\ArvoARC
 git add -A
-git status     # yalnızca route.ts görünmeli
-git commit -m "Urun okumada sayfalama"
+git status      # iki dosya gorunmeli
+git commit -m "Gorsel korumasi ve stok modu duzeltmesi"
 git push
 ```
 
-## Sorun
+## 1. Görselleriniz korunuyor
 
-İlk aktarım sorunsuz tamamlandı: 3.277 ürün, yaklaşık 14.000
-varyant, hata yok.
+Mevcut ürünlerde **ad, açıklama ve görseller artık hiç
+yazılmıyor**. Yalnızca stok, fiyat ve durum güncelleniyor.
 
-İkinci çalıştırmada yüzlerce "duplicate key" hatası çıktı.
+Yani panelde bir ürünün fotoğrafını kendi çektiğinizle
+değiştirdiyseniz, o fotoğraf kalıcı olarak kalır. Sonraki
+senkronlar dokunmaz.
 
-Sebep: Supabase `select` sorguları varsayılan olarak **en fazla
-1000 satır** döndürüyor. Mevcut ürünleri okurken yalnızca ilk
-1000'i alıyor, kalan 2.277 ürünü "yok" sanıp yeniden eklemeye
-çalışıyor ve slug çakışması veriyordu.
+Yeni gelen ürünlerde tedarikçi verisi olduğu gibi kullanılır.
 
-Veri bozulmadı — çakışan kayıtlar eklenmedi, mevcutları olduğu
-gibi kaldı.
+**Yan etkisi:** tedarikçi bir ürünün fotoğrafını iyileştirirse
+siz göremezsiniz. Belirli bir ürünün görselini tedarikçiden
+tazelemek isterseniz, o ürünü ARC'ta silip aktarımı tekrar
+çalıştırmanız gerekir.
 
-## Çözüm
+## 2. Stok modu artık silmiyor
 
-Mevcut ürünler artık sayfalanarak okunuyor; tamamı belleğe
-alınıyor. Tekrar çalıştırmalarda ürünler doğru eşleşecek ve
-güncellenecek.
+Önceden stok modu da varyantları silip yeniden ekliyordu.
+Gereksiz iş yapıyordu ve tedarikçinin aynı barkodu farklı
+ürünlerde göndermesi durumunda benzersizlik hatası üretiyordu
+(TR-8767, TR-11186, TR-4467-1107 hataları buradan geliyordu).
 
-## Son çalıştırmadaki "toplam: 0"
+Artık stok modunda kayıt silinmiyor; `supplier_sku` üzerinden
+yalnızca stok, maliyet ve fiyat güncelleniyor.
 
-Son turda XML boş döndü (`"toplam":0`). Geçici bir bağlantı
-sorunu ya da Tarzyeri tarafında anlık kesinti olabilir. Bir
-sonraki çalıştırmada normale dönmesi beklenir; dönmezse haber
-verin.
+Yanıtta artık `guncellenenVaryant` sayacı var; `yeniVaryant`
+yalnızca tam modda artıyor.
+
+## 3. Cron 10 dakikada bir
+
+`vercel.json` güncellendi. Katalog ~5 saatte tam turlanıyor.
 
 ## Doğrulama
 
-```sql
-select count(*) as urun,
-       (select count(*) from arc_product_variants where supplier='tarzyeri') as varyant
-from arc_products where supplier = 'tarzyeri';
+Push ve deploy sonrası bir stok turu çalıştırın:
+
+```powershell
+.\stok.ps1 435b55338be7410da39bfd08ea686ec8
 ```
 
-3.277 ürün ve 14.000 civarı varyant görmelisiniz.
+Bu sefer `yeniVaryant: 0` ve `guncellenenVaryant` dolu olmalı.
+Mükerrer barkod hataları da kaybolmalı.
+
+Cron'un çalıştığını izlemek için:
 
 ```sql
-select p.name, v.title,
-       v.cost_price/100.0 as alis,
-       v.price/100.0 as satis,
-       v.stock
-from arc_product_variants v
-join arc_products p on p.id = v.product_id
-where v.supplier = 'tarzyeri'
-limit 5;
+select sync_cursor, last_synced_at, last_sync_note
+from arc_suppliers where code = 'tarzyeri';
 ```
-
-Fiyatlar `,90` ile bitmeli; satış ≈ alış × 1,40 + 60 TL.

@@ -172,6 +172,7 @@ async function runSync(mode: "tam" | "stok") {
     yeniUrun: 0,
     guncellenenUrun: 0,
     yeniVaryant: 0,
+    guncellenenVaryant: 0,
     pasifVaryant: 0,
     atlanan: 0,
     hata: [] as string[],
@@ -227,26 +228,18 @@ async function runSync(mode: "tam" | "stok") {
 
       // --- Ürün ---------------------------------------------
       if (mode === "tam" || !productId) {
-        const payload = {
-          organization_id: orgId,
+        /*
+          Mevcut üründe ad, açıklama ve GÖRSELLER korunur.
+          Bu ürünlerin fotoğraflarını kendiniz düzenlemiş
+          olabilirsiniz; her senkronda tedarikçininkiyle
+          değiştirmek o emeği siler.
+
+          Yeni üründe tedarikçi verisi olduğu gibi kullanılır.
+        */
+        const fresh = {
           name: product.name,
-          /*
-            Slug ürün koduyla sonlanır; tedarikçide aynı adı
-            taşıyan farklı ürünler olduğu için ad tek başına
-            benzersiz değil.
-          */
-          slug:
-            known?.slug ??
-            `${slugify(product.name)}-${product.productCode.toLowerCase()}`,
+          slug: `${slugify(product.name)}-${product.productCode.toLowerCase()}`,
           description: product.detailHtml || product.description,
-          status: product.active
-            ? rule.publish_directly
-              ? "active"
-              : "draft"
-            : "archived",
-          supplier: "tarzyeri",
-          supplier_product_code: product.productCode,
-          supplier_synced_at: new Date().toISOString(),
           metadata: {
             vendor: rule.brand_override ?? "ArvoCulture",
             product_type: product.subCategory,
@@ -256,8 +249,26 @@ async function runSync(mode: "tam" | "stok") {
           },
         };
 
+        const payload = {
+          organization_id: orgId,
+          status: product.active
+            ? rule.publish_directly
+              ? "active"
+              : "draft"
+            : "archived",
+          supplier: "tarzyeri",
+          supplier_product_code: product.productCode,
+          supplier_synced_at: new Date().toISOString(),
+          // Yalnızca yeni üründe içerik alanları yazılır.
+          ...(productId ? {} : fresh),
+        };
+
         if (productId) {
-          await supabase.from("arc_products").update(payload).eq("id", productId);
+          const { error } = await supabase
+            .from("arc_products")
+            .update(payload)
+            .eq("id", productId);
+          if (error) throw error;
           stats.guncellenenUrun += 1;
         } else {
           const { data: inserted, error } = await supabase
@@ -334,20 +345,43 @@ async function runSync(mode: "tam" | "stok") {
         });
 
       if (rows.length > 0) {
-        const { error: clearError } = await supabase
-          .from("arc_product_variants")
-          .delete()
-          .eq("product_id", productId)
-          .eq("supplier", "tarzyeri");
+        if (mode === "tam") {
+          // Tam modda varyantlar baştan yazılır.
+          const { error: clearError } = await supabase
+            .from("arc_product_variants")
+            .delete()
+            .eq("product_id", productId)
+            .eq("supplier", "tarzyeri");
+          if (clearError) throw clearError;
 
-        if (clearError) throw clearError;
+          const { error: insertError } = await supabase
+            .from("arc_product_variants")
+            .insert(rows);
+          if (insertError) throw insertError;
+          stats.yeniVaryant += rows.length;
+        } else {
+          /*
+            Stok modunda kayıt silinmez; yalnızca stok, maliyet ve
+            fiyat güncellenir. Silip yeniden eklemek gereksiz iş
+            yapıyor ve tedarikçinin aynı barkodu farklı ürünlerde
+            göndermesi durumunda benzersizlik hatası üretiyordu.
+          */
+          for (const row of rows) {
+            const { error: updateError } = await supabase
+              .from("arc_product_variants")
+              .update({
+                stock: row.stock,
+                cost_price: row.cost_price,
+                price: row.price,
+                updated_at: row.updated_at,
+              })
+              .eq("organization_id", orgId)
+              .eq("supplier_sku", row.supplier_sku);
 
-        const { error: insertError } = await supabase
-          .from("arc_product_variants")
-          .insert(rows);
-
-        if (insertError) throw insertError;
-        stats.yeniVaryant += rows.length;
+            if (updateError) throw updateError;
+            stats.guncellenenVaryant += 1;
+          }
+        }
       }
 
       /*
