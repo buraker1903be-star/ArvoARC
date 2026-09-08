@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 import { paytrConfig } from "@/lib/paytr/config";
+import { sendEmail } from "@/lib/email/resend";
+import { orderConfirmationHtml } from "@/lib/email/order-confirmation";
 import { createServiceClient } from "@/lib/paytr/service-client";
 
 export const runtime = "nodejs";
@@ -80,6 +82,21 @@ export async function POST(request: Request) {
     );
 
     if (settleError) throw settleError;
+
+    /*
+      Sipariş onay e-postası. Yalnızca başarılı ödemede gönderilir.
+
+      Gönderim hatası bildirimi başarısız saymamalı: PayTR "OK"
+      almazsa bildirimi tekrarlar, sipariş ikinci kez işlenmeye
+      çalışılır. E-posta ikincil bir iş; kendi içinde yutulur.
+    */
+    if (status === "success") {
+      try {
+        await sendOrderConfirmation(supabase, order.id);
+      } catch (mailError) {
+        console.error("Sipariş e-postası gönderilemedi:", mailError);
+      }
+    }
   } catch (error) {
     // OK dönmezsek PayTR bildirimi tekrarlar ve kuyruk şişer.
     // Hata loglanır, sipariş panelden manuel kapatılır.
@@ -87,4 +104,66 @@ export async function POST(request: Request) {
   }
 
   return new Response("OK");
+}
+
+/**
+ * Sipariş onay e-postasını hazırlayıp gönderir.
+ *
+ * Kalemler ve tutarlar veritabanından okunur; PayTR
+ * bildiriminden gelen değerlere güvenilmez.
+ */
+async function sendOrderConfirmation(
+  supabase: ReturnType<typeof createServiceClient>,
+  orderId: string,
+) {
+  const { data: order } = await supabase
+    .from("arc_orders")
+    .select(
+      "order_number, customer_name, customer_email, subtotal, shipping, total, metadata",
+    )
+    .eq("id", orderId)
+    .single();
+
+  if (!order?.customer_email) return;
+
+  const { data: items } = await supabase
+    .from("arc_order_items")
+    .select("product_name, quantity, total")
+    .eq("order_id", orderId);
+
+  const meta = (order.metadata ?? {}) as Record<string, unknown>;
+  const rawAddress = (meta.shipping_address ?? meta.address ?? {}) as Record<
+    string,
+    string | null
+  >;
+
+  const html = orderConfirmationHtml({
+    orderNumber: order.order_number,
+    customerName: order.customer_name || "değerli müşterimiz",
+    items: (items ?? []).map((item: {
+      product_name: string;
+      quantity: number;
+      total: number;
+    }) => ({
+      name: item.product_name,
+      quantity: item.quantity,
+      total: item.total,
+    })),
+    subtotal: order.subtotal ?? 0,
+    discount: Number(meta.discount ?? 0),
+    shipping: order.shipping ?? 0,
+    total: order.total ?? 0,
+    address: {
+      line: rawAddress.line ?? rawAddress.address1 ?? undefined,
+      district: rawAddress.district ?? rawAddress.province ?? undefined,
+      city: rawAddress.city ?? undefined,
+      postal: rawAddress.postal ?? rawAddress.zip ?? undefined,
+    },
+  });
+
+  await sendEmail({
+    to: order.customer_email,
+    subject: `Siparişiniz alındı · ${order.order_number}`,
+    html,
+  });
 }
