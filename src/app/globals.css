@@ -742,7 +742,17 @@ a.is-pending-link{pointer-events:none;opacity:.68}
   varyantları ayırt etmek için. Metin listede hangisinin ne
   olduğunu anlamak zor.
 */
-.product-row{grid-template-columns:44px 2.4fr 1fr .9fr 1fr .9fr}
+/*
+  Ürün satırı. Görsel sütunu sabit ve dar; kalan alan ürün adına
+  gidiyor.
+
+  Öncesinde `.row` içindeki genel sütun tanımı bu kuralı eziyordu
+  ve görsel sütunu gereksiz genişliyordu: ürün adı üç satıra
+  sarıyor, görselin sağında büyük boşluk kalıyordu.
+*/
+.table .row.product-row{
+  grid-template-columns:46px minmax(0,2.6fr) .9fr .9fr 1.1fr 1fr;
+}
 
 .product-thumb{
   width:34px;height:34px;flex:0 0 auto;
@@ -764,3 +774,18 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 }
 
 .product-row .profit[data-loss="true"]{color:#c62d24}
+
+/*
+  Ürün adı iki satırla sınırlı: uzun tedarikçi adları satırı
+  üç kata çıkarıp listeyi dağıtıyordu.
+*/
+.product-row>span:nth-child(2) b{
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  line-height:1.35;
+}
+
+/* Görsel hücresinde boşluk olmasın. */
+.product-row>span.product-thumb{padding:4px}
