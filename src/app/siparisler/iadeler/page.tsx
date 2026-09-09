@@ -68,6 +68,8 @@ export default async function ReturnsPage({
           <h1>Siparişler</h1>
           <p>{pendingCount ?? 0} iade talebi bekliyor.</p>
         </div>
+
+        {/* Sekmeler: Siparişler · İade talepleri */}
         <nav className="ac-bar-actions">
           <Link className="ac-btn" href="/siparisler">
             Siparişler
@@ -79,6 +81,16 @@ export default async function ReturnsPage({
           >
             İade talepleri
           </Link>
+        </nav>
+      </section>
+
+      <div className="ac-stack">
+        {/*
+          Durum filtreleri ayrı şeritte: sekmelerle aynı satıra
+          sıkıştırıldığında düğmeler alt alta diziliyor ve
+          okunmuyordu.
+        */}
+        <nav className="ac-filter">
           {[
             ["beklemede", "Bekleyenler"],
             ["onaylandi", "Ürün bekleniyor"],
@@ -99,9 +111,6 @@ export default async function ReturnsPage({
             </Link>
           ))}
         </nav>
-      </section>
-
-      <div className="ac-stack">
         {params.ok && (
           <section className="ac ac-pad-sm">
             <strong>

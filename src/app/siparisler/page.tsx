@@ -72,21 +72,28 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
         <h1>Siparişler</h1>
         <p>{visibleOrders.length} kayıt · {organization.name}</p>
       </div>
-      <div className="ac-bar-actions">
-        {/*
-          İade talepleri ayrı bir menü öğesiydi. İade siparişin
-          bir aşaması; aynı sayfada sekme olarak durması akışı
-          bölmüyor.
-        */}
-        <Link className="ac-btn" href="/siparisler" style={{borderColor:"var(--c-accent)",color:"var(--c-accent)"}}>
+      {/*
+        Sekmeler. İade siparişin bir aşaması; ayrı menü öğesi
+        akışı bölüyordu.
+      */}
+      <nav className="ac-bar-actions">
+        <Link
+          className="ac-btn"
+          href="/siparisler"
+          style={{borderColor:"var(--c-accent)",color:"var(--c-accent)"}}
+        >
           Siparişler
         </Link>
         <Link className="ac-btn" href="/siparisler/iadeler">
           İade talepleri
-          {(pendingReturns??0) > 0 ? <em className="ac-tag" data-tone="warn" style={{marginLeft:"var(--s2)"}}>{pendingReturns}</em> : null}
+          {(pendingReturns??0) > 0 ? (
+            <em className="ac-tag" data-tone="warn" style={{marginLeft:"var(--s2)"}}>
+              {pendingReturns}
+            </em>
+          ) : null}
         </Link>
         <a className="ac-btn" href="/api/disari-aktar/siparisler">CSV indir</a>
-      </div>
+      </nav>
     </section>
 
     <div className="ac-stack">

@@ -571,3 +571,24 @@ textarea.ac-input{resize:vertical;line-height:1.55}
   color:var(--c-ink-3);
   text-align:center;
 }
+
+/*
+  Üst şerit eylemleri her zaman yatay. Dar ekranda sarıyor ama
+  dikey dizilmiyor: düğmeler tek sütuna sıkıştığında okunmuyor
+  ve sayfayı uzatıyordu.
+*/
+.ac-bar-actions{
+  flex-direction:row;
+  align-items:center;
+}
+
+.ac-bar-actions > *{
+  flex:0 0 auto;
+}
+
+/* Filtre şeridi düğmelerden oluşabiliyor: girdi kuralları
+   onları bozmasın. */
+.ac-filter > a.ac-btn{
+  flex:0 0 auto;
+  height:38px;
+}
