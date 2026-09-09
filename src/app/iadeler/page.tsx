@@ -12,7 +12,7 @@ const money = new Intl.NumberFormat("tr-TR", {
 
 const STATUS: Record<string, { label: string; tone?: string }> = {
   beklemede: { label: "Bekliyor", tone: "warn" },
-  onaylandi: { label: "Onaylandı" },
+  onaylandi: { label: "Ürün bekleniyor", tone: "warn" },
   reddedildi: { label: "Reddedildi", tone: "bad" },
   tamamlandi: { label: "İade edildi", tone: "muted" },
 };
@@ -33,7 +33,7 @@ export default async function ReturnsPage({
   const { supabase, organization, membership } = await requireTenant();
   const canResolve = ["owner", "admin"].includes(membership.role);
 
-  const filter = ["beklemede", "tamamlandi", "reddedildi"].includes(
+  const filter = ["beklemede", "onaylandi", "tamamlandi", "reddedildi"].includes(
     params.filter ?? "",
   )
     ? params.filter
@@ -71,6 +71,7 @@ export default async function ReturnsPage({
         <nav className="ac-bar-actions">
           {[
             ["beklemede", "Bekleyenler"],
+            ["onaylandi", "Ürün bekleniyor"],
             ["tamamlandi", "İade edilenler"],
             ["reddedildi", "Reddedilenler"],
           ].map(([key, label]) => (
@@ -96,7 +97,9 @@ export default async function ReturnsPage({
             <strong>
               {params.ok === "tamamlandi"
                 ? "İade tamamlandı ve müşteriye bildirildi."
-                : "Talep reddedildi ve müşteriye bildirildi."}
+                : params.ok === "onaylandi"
+                  ? "Talep onaylandı. Müşteri ürünü gönderdiğinde iadeyi tamamlayın."
+                  : "Talep reddedildi ve müşteriye bildirildi."}
             </strong>
           </section>
         )}
@@ -198,15 +201,21 @@ export default async function ReturnsPage({
                 </p>
               ) : null}
 
-              {request.status === "beklemede" && canResolve ? (
+              {request.status === "onaylandi" && canResolve ? (
                 <>
                   <hr className="ac-divider" />
+
+                  <p style={{ margin: "0 0 var(--s3)", fontSize: "var(--t-sm)", color: "var(--c-ink-3)", lineHeight: 1.6 }}>
+                    Talep onaylandı, müşteri ürünü gönderecek. Ürün elinize
+                    ulaşıp kontrol ettikten sonra iadeyi tamamlayın.
+                  </p>
 
                   <form
                     action={resolveReturn}
                     style={{ display: "grid", gap: "var(--s3)", maxWidth: 420 }}
                   >
                     <input type="hidden" name="request_id" value={request.id} />
+                    <input type="hidden" name="decision" value="iade-et" />
 
                     <label>
                       İade tutarı (₺)
@@ -227,14 +236,47 @@ export default async function ReturnsPage({
                         name="note"
                         rows={2}
                         maxLength={500}
-                        placeholder="İsteğe bağlı; e-postada görünür."
+                        placeholder="Değer kaybı kesintisi varsa açıklayın."
+                        className="ac-input"
+                      />
+                    </label>
+
+                    <p style={{ margin: 0, fontSize: "var(--t-sm)", color: "var(--c-bad)", lineHeight: 1.6 }}>
+                      Bu adım PayTR üzerinden gerçek para iadesi başlatır ve
+                      geri alınamaz. Ürünü teslim aldığınızdan emin olun.
+                    </p>
+
+                    <button className="ac-btn ac-btn-primary" type="submit">
+                      Ürünü aldım, iadeyi tamamla
+                    </button>
+                  </form>
+                </>
+              ) : null}
+
+              {request.status === "beklemede" && canResolve ? (
+                <>
+                  <hr className="ac-divider" />
+
+                  <form
+                    action={resolveReturn}
+                    style={{ display: "grid", gap: "var(--s3)", maxWidth: 420 }}
+                  >
+                    <input type="hidden" name="request_id" value={request.id} />
+
+                    <label>
+                      Müşteriye not
+                      <textarea
+                        name="note"
+                        rows={2}
+                        maxLength={500}
+                        placeholder="Kargo talimatı, iade adresi gibi bilgiler. E-postada görünür."
                         className="ac-input"
                       />
                     </label>
 
                     <p style={{ margin: 0, fontSize: "var(--t-sm)", color: "var(--c-ink-3)", lineHeight: 1.6 }}>
-                      Onay PayTR üzerinden gerçek para iadesi başlatır ve geri
-                      alınamaz. Boş bırakılırsa kalem toplamı iade edilir.
+                      Onay para iadesi yapmaz; müşteriye ürünü gönderebileceğini
+                      bildirir. Para, ürün elinize ulaştıktan sonra iade edilir.
                     </p>
 
                     <div style={{ display: "flex", gap: "var(--s2)" }}>
@@ -244,7 +286,7 @@ export default async function ReturnsPage({
                         name="decision"
                         value="onayla"
                       >
-                        Onayla ve iade et
+                        Onayla
                       </button>
                       <button
                         className="ac-btn"

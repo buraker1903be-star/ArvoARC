@@ -372,15 +372,34 @@ export function returnDecisionEmail({
     ? "İade talebiniz onaylandı"
     : "İade talebiniz hakkında";
 
+  /*
+    İki farklı onay mesajı: talep onaylandığında ürünü göndermesi
+    isteniyor, para iade edildiğinde tutar bildiriliyor.
+  */
   const body = approved
-    ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.65;color:#5a5f54;">
-         ${escapeHtml(orderNumber)} numaralı siparişiniz için iade talebiniz
-         onaylandı${amount ? ` ve <strong>${money(amount)}</strong> tutarında iade işlemi başlatıldı` : ""}.
-       </p>
-       <p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
-         Tutarın kartınıza yansıma süresi bankanıza bağlıdır; genellikle
-         birkaç iş günü sürer.
-       </p>`
+    ? amount
+      ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.65;color:#5a5f54;">
+           ${escapeHtml(orderNumber)} numaralı siparişiniz için ürününüz
+           tarafımıza ulaştı ve <strong>${money(amount)}</strong> tutarında
+           iade işlemi başlatıldı.
+         </p>
+         <p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
+           Tutarın kartınıza yansıma süresi bankanıza bağlıdır; genellikle
+           birkaç iş günü sürer.
+         </p>`
+      : `<p style="margin:0 0 12px;font-size:14px;line-height:1.65;color:#5a5f54;">
+           ${escapeHtml(orderNumber)} numaralı siparişiniz için iade talebiniz
+           onaylandı.
+         </p>
+         <p style="margin:0 0 12px;font-size:14px;line-height:1.65;color:#5a5f54;">
+           <strong>Sıradaki adım:</strong> ürünü kullanılmamış ve yeniden
+           satılabilir durumda, kutusu ve faturasıyla birlikte on gün içinde
+           kargoya verin.
+         </p>
+         <p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
+           Ürün tarafımıza ulaşıp kontrol edildikten sonra ödemeniz iade
+           edilir ve tekrar bilgilendirilirsiniz.
+         </p>`
     : `<p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
          ${escapeHtml(orderNumber)} numaralı siparişiniz için iade talebiniz
          değerlendirildi ve karşılanamadı.

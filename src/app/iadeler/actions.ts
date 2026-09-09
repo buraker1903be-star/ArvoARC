@@ -24,7 +24,7 @@ export async function resolveReturn(formData: FormData) {
   const decision = String(formData.get("decision") ?? "");
   const note = String(formData.get("note") ?? "").trim().slice(0, 500);
 
-  if (!id || !["onayla", "reddet"].includes(decision)) {
+  if (!id || !["onayla", "reddet", "iade-et"].includes(decision)) {
     redirect("/iadeler?error=invalid");
   }
 
@@ -36,7 +36,16 @@ export async function resolveReturn(formData: FormData) {
     .single();
 
   if (!request) redirect("/iadeler?error=not-found");
-  if (request.status !== "beklemede") redirect("/iadeler?error=already-resolved");
+  /*
+    Onay ve ret yalnızca bekleyen talepte; para iadesi yalnızca
+    onaylanmış talepte yapılabiliyor.
+  */
+  if (decision === "iade-et" && request.status !== "onaylandi") {
+    redirect("/iadeler?error=not-approved");
+  }
+  if (decision !== "iade-et" && request.status !== "beklemede") {
+    redirect("/iadeler?error=already-resolved");
+  }
 
   const order = (Array.isArray(request.arc_orders)
     ? request.arc_orders[0]
@@ -80,7 +89,44 @@ export async function resolveReturn(formData: FormData) {
     redirect("/iadeler?ok=reddedildi");
   }
 
-  /* --- Onay: PayTR iadesi --- */
+  /* --- Onay: para henüz iade edilmiyor --- */
+
+  /*
+    Onay yalnızca "ürünü gönderebilirsiniz" demek. Para, ürün
+    elimize ulaşıp kontrol edildikten sonra iade ediliyor.
+
+    Öncesinde onay anında iade yapılıyordu: ürün gelmezse ya da
+    hasarlı gelirse elimizde bir şey kalmıyordu.
+  */
+  if (decision === "onayla") {
+    await supabase
+      .from("arc_return_requests")
+      .update({
+        status: "onaylandi",
+        status_note: note || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (order.customer_email) {
+      try {
+        const mail = returnDecisionEmail({
+          approved: true,
+          orderNumber: order.order_number,
+          customerName: order.customer_name || "değerli müşterimiz",
+          note,
+        });
+        await sendEmail({ to: order.customer_email, ...mail });
+      } catch (mailError) {
+        console.error("İade onay bildirimi gönderilemedi:", mailError);
+      }
+    }
+
+    revalidatePath("/iadeler");
+    redirect("/iadeler?ok=onaylandi&filter=onaylandi");
+  }
+
+  /* --- Ürün teslim alındı: PayTR iadesi --- */
 
   /*
     Tutar seçilen kalemlerden hesaplanıyor. Formdan gelen
