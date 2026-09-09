@@ -175,6 +175,18 @@ export default async function SuppliersPage({
                   </label>
 
                   <label>
+                    Ek hizmet bedeli (₺)
+                    <input
+                      name="service_fee"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      defaultValue={((supplier.service_fee ?? 0) / 100).toFixed(2)}
+                      className="ac-input"
+                    />
+                  </label>
+
+                  <label>
                     Yuvarlama (kuruş)
                     <input
                       name="round_to_kurus"
@@ -279,8 +291,9 @@ function previewPrice(
   margin: number,
   shipping: number,
   round: number,
+  service = 0,
 ) {
-  const raw = (cost * (100 + margin)) / 100 + shipping;
+  const raw = ((cost + service) * (100 + margin)) / 100 + shipping;
   if (!round || round <= 0) return Math.round(raw);
   return Math.ceil((raw - round) / 100) * 100 + round;
 }

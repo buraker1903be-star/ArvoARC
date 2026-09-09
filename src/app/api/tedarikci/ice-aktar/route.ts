@@ -20,14 +20,26 @@ const BATCH = 40;
  * aşıyordu. Aynı hesabı burada yapmak işlemi saniyeler mertebesine
  * indiriyor. Kural değişirse iki yer birlikte güncellenmelidir.
  */
+/**
+ * Satış fiyatı.
+ *
+ * Hizmet bedeli maliyete eklenip kâr oranı ondan sonra
+ * uygulanır. Tarzyeri'nde paketleme, kalite kontrol ve ense
+ * etiketi ürün başına yaklaşık 45 TL tutuyor; bunlar XML
+ * fiyatına dâhil değil.
+ *
+ * Kâr oranını yalnızca ürün bedeline uygulamak hizmet
+ * maliyetini kârsız bırakırdı.
+ */
 function salePrice(
   cost: number,
   margin: number,
   shipping: number,
   round: number,
+  service = 0,
 ) {
   if (!cost || cost <= 0) return 0;
-  const raw = (cost * (100 + margin)) / 100 + shipping;
+  const raw = ((cost + service) * (100 + margin)) / 100 + shipping;
   if (!round || round <= 0) return Math.round(raw);
   return Math.ceil((raw - round) / 100) * 100 + round;
 }
@@ -263,6 +275,7 @@ async function runSync(mode: "tam" | "stok") {
           rule.margin_percent,
           rule.shipping_markup,
           rule.round_to_kurus,
+          rule.service_fee ?? 0,
         );
 
         const seenSkus = new Set<string>();
@@ -358,6 +371,7 @@ async function runSync(mode: "tam" | "stok") {
         rule.margin_percent,
         rule.shipping_markup,
         rule.round_to_kurus,
+        rule.service_fee ?? 0,
       );
       const now = new Date().toISOString();
 
