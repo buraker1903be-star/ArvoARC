@@ -89,7 +89,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
             <form action={quickStatus} style={{margin:0}}>
               <input type="hidden" name="order_id" value={order.id}/>
               <input type="hidden" name="status" value={next.key}/>
-              <button type="submit" className="quick-action">{next.label} →</button>
+              <button type="submit" className="row-action">{next.label} →</button>
             </form>
           ):<span/>}
         </div>;

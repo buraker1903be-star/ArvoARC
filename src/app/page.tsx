@@ -12,13 +12,21 @@ export default async function Dashboard() {
   thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 29);
   thirtyDaysAgo.setUTCHours(0, 0, 0, 0);
 
-  const [ordersResult, openOrderCountResult, productsResult, productCountResult, activeProductCountResult, variantsResult] = await Promise.all([
+  const [ordersResult, openOrderCountResult, productsResult, productCountResult, activeProductCountResult, variantCountResult, stockSumResult, negativeStockResult, lowStockResult] = await Promise.all([
     supabase.from("arc_orders").select("id,order_number,customer_name,status,total,currency,created_at").eq("organization_id", organization.id).gte("created_at", thirtyDaysAgo.toISOString()).order("created_at", { ascending: false }),
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).in("status", ["pending", "confirmed", "processing"]),
     supabase.from("arc_products").select("id,name,slug,status,created_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(5),
     supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
     supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).eq("status", "active"),
-    supabase.from("arc_product_variants").select("id,product_id,sku,stock,price,currency").eq("organization_id", organization.id),
+    /*
+      Varyantların tamamı çekiliyordu; Supabase 1000 satırda
+      kestiği için "1000 varyant" yazıyor ve toplam stok eksik
+      hesaplanıyordu. Sayım ve toplama veritabanında yapılıyor.
+    */
+    supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id", organization.id),
+    supabase.rpc("arc_total_stock_units"),
+    supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id", organization.id).lt("stock",0),
+    supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id", organization.id).gte("stock",0).lte("stock",5),
   ]);
 
   if (ordersResult.error) throw new Error(ordersResult.error.message);
@@ -26,13 +34,16 @@ export default async function Dashboard() {
   if (productsResult.error) throw new Error(productsResult.error.message);
   if (productCountResult.error) throw new Error(productCountResult.error.message);
   if (activeProductCountResult.error) throw new Error(activeProductCountResult.error.message);
-  if (variantsResult.error) throw new Error(variantsResult.error.message);
+  if (variantCountResult.error) throw new Error(variantCountResult.error.message);
 
   const orders = ordersResult.data ?? [];
   const products = productsResult.data ?? [];
-  const variants = variantsResult.data ?? [];
   const sales = orders.reduce((sum, order) => sum + order.total, 0);
-  const stock = variants.reduce((sum, variant) => sum + variant.stock, 0);
+  /* Sayaçlar veritabanından; katalog belleğe alınmıyor. */
+  const variantCount = variantCountResult.count ?? 0;
+  const stock = typeof stockSumResult.data === "number" ? stockSumResult.data : 0;
+  const negativeStockCount = negativeStockResult.count ?? 0;
+  const lowStockCount = lowStockResult.count ?? 0;
   const recentOrders = orders.slice(0, 5);
   const chartStart=new Date(now);chartStart.setUTCHours(0,0,0,0);chartStart.setUTCDate(chartStart.getUTCDate()-13);
   const dailySales=Array<number>(14).fill(0);
@@ -41,8 +52,6 @@ export default async function Dashboard() {
     if(day>=0&&day<14)dailySales[day]+=order.total;
   }
   const maxDailySales = Math.max(...dailySales, 1);
-  const negativeStock = variants.filter((variant) => variant.stock < 0);
-  const lowStock = variants.filter((variant) => variant.stock >= 0 && variant.stock <= 5);
   const actionItems = [
     {
       label: "İşlem bekleyen sipariş",
@@ -53,17 +62,17 @@ export default async function Dashboard() {
     },
     {
       label: "Kritik stok",
-      value: negativeStock.length,
-      detail: negativeStock.length ? "Eksi stokları hemen düzeltin" : "Eksi stok bulunmuyor",
+      value: negativeStockCount,
+      detail: negativeStockCount ? "Eksi stokları hemen düzeltin" : "Eksi stok bulunmuyor",
       href: "/stok?filter=negative",
-      tone: negativeStock.length ? "danger" : "success",
+      tone: negativeStockCount ? "danger" : "success",
     },
     {
       label: "Azalan stok",
-      value: lowStock.length,
-      detail: lowStock.length ? "5 ve altındaki varyantları inceleyin" : "Stok seviyeleri sağlıklı",
+      value: lowStockCount,
+      detail: lowStockCount ? "5 ve altındaki varyantları inceleyin" : "Stok seviyeleri sağlıklı",
       href: "/stok?filter=low",
-      tone: lowStock.length ? "attention" : "success",
+      tone: lowStockCount ? "attention" : "success",
     },
   ];
   const quickActions = [
@@ -77,10 +86,16 @@ export default async function Dashboard() {
     ["Net satış", money.format(sales / 100), "Son 30 gün"],
     ["Sipariş", String(orders.length), "Son 30 gün"],
     ["Ürün", String(productCountResult.count ?? 0), `${activeProductCountResult.count ?? 0} aktif`],
-    ["Stok", String(stock), `${variants.length} varyant`],
+    ["Stok", stock.toLocaleString("tr-TR"), `${variantCount.toLocaleString("tr-TR")} varyant`],
   ];
 
-  const variantByProduct=new Map(variants.map(variant=>[variant.product_id,variant]));
+  /* Son eklenen ürünlerin varyantları yalnızca o beş ürün için
+     çekilir; tüm katalog belleğe alınmaz. */
+  const recentProductIds=products.map(product=>product.id);
+  const {data:recentVariants}=recentProductIds.length
+    ?await supabase.from("arc_product_variants").select("product_id,sku,stock,price,currency").eq("organization_id",organization.id).in("product_id",recentProductIds)
+    :{data:[]};
+  const variantByProduct=new Map((recentVariants??[]).map(variant=>[variant.product_id,variant]));
   return <Shell tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="intro"><div><p>ARVO ARC · CANLI</p><h2>Mağaza operasyonun <em>tek merkezde.</em></h2><span>{organization.name} için Supabase commerce verileri.</span></div><span>Son 30 gün</span></section>
     <nav className="quick-actions" aria-label="Hızlı işlemler">{quickActions.map((action)=><Link href={action.href} className="quick-action" key={action.label}><i aria-hidden="true">{action.icon}</i><span><b>{action.label}</b><small>{action.detail}</small></span></Link>)}</nav>

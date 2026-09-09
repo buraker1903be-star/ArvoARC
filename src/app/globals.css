@@ -84,8 +84,13 @@ details[open]>summary::after{content:"−"}
 .topbar-actions .ghost-action:hover{border-color:var(--line);background:#fff;color:var(--danger)}
 .topbar-actions .avatar{border-radius:50%;box-shadow:none}
 
-.intro,.subhead{display:flex;align-items:flex-end;justify-content:space-between;padding:52px 0 34px}
-.intro h2,.subhead h2{max-width:900px;margin:8px 0 6px;font-size:clamp(35px,4vw,54px);line-height:1.06;font-weight:760;letter-spacing:-.055em}
+/*
+  Sayfa başlığı. Dolgu 52px'ten 26px'e, başlık boyutu yarıya
+  indirildi: dev başlık ekranın üçte birini yiyordu ve panelde
+  asıl gösterilmesi gereken veri katlanmanın altında kalıyordu.
+*/
+.intro,.subhead{display:flex;align-items:flex-end;justify-content:space-between;padding:26px 0 20px}
+.intro h2,.subhead h2{max-width:900px;margin:6px 0 4px;font-size:clamp(22px,2.2vw,30px);line-height:1.15;font-weight:750;letter-spacing:-.03em}
 .intro h2 em{color:#6b7e90;font-weight:500;font-style:normal}
 .intro>div>span,.intro>span,.subhead p{color:var(--muted);font-size:12px}
 .subhead p{max-width:780px;margin:8px 0 0;line-height:1.65}
@@ -93,7 +98,7 @@ details[open]>summary::after{content:"−"}
 .subhead>a:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(8,43,80,.22)}
 
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:22px;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:rgba(255,255,255,.86);box-shadow:var(--shadow-sm)}
-.metrics article{min-width:0;padding:22px 23px;display:grid;gap:8px;border-right:1px solid var(--line)}
+.metrics article{min-width:0;padding:14px 18px;display:grid;gap:4px;border-right:1px solid var(--line)}
 .metrics article:last-child{border-right:0}
 .metrics span{color:#748078;font-size:9px;font-weight:750;letter-spacing:.14em;text-transform:uppercase}
 .metrics strong{overflow:hidden;text-overflow:ellipsis;font-size:clamp(24px,2vw,31px);line-height:1.15;font-weight:760;letter-spacing:-.045em}
@@ -694,7 +699,14 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 */
 .table .row{grid-template-columns:2fr 1fr .7fr .8fr .9fr 150px}
 
-.quick-action{
+/*
+  Satır içi eylem düğmesi.
+
+  Sınıf adı `quick-action` idi ve Genel Bakış sayfasındaki
+  kısayol kartlarıyla çakışıyordu: kısayollar beş sütunluk
+  ızgara yerine alt alta diziliyordu. Ad değiştirildi.
+*/
+.row-action{
   padding:8px 14px;
   border:1px solid #d9e9d0;
   border-radius:999px;
@@ -707,7 +719,7 @@ a.is-pending-link{pointer-events:none;opacity:.68}
   transition:background-color .16s ease,border-color .16s ease;
 }
 
-.quick-action:hover{background:#edf6e8;border-color:#3f6e32}
+.row-action:hover{background:#edf6e8;border-color:#3f6e32}
 
 /* Satırın tamamı bağlantı; düğme tıklaması ona karışmasın. */
 .table .row form{display:flex;justify-content:flex-end;padding:8px}
