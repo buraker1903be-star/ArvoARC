@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import { InteractionFeedback } from "@/components/interaction-feedback";
 import "./globals.css";
+/* Tasarım sistemi globals'tan sonra yüklenir: tek dil kuran
+   kurallar eski sayfa stillerini ezmelidir. */
+import "./design.css";
 
 const manrope=Manrope({subsets:["latin","latin-ext"],variable:"--font-manrope",display:"swap"});
 

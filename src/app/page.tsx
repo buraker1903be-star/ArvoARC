@@ -97,30 +97,61 @@ export default async function Dashboard() {
     :{data:[]};
   const variantByProduct=new Map((recentVariants??[]).map(variant=>[variant.product_id,variant]));
   return <Shell tenantName={organization.name} tenantPlan={organization.plan_code}>
-    {/*
-      Üst şerit: sayfa kimliği ve hızlı işlemler tek satırda.
-      Dev başlık ekranın üçte birini yiyordu ve panelde asıl
-      gösterilmesi gereken veri katlanmanın altında kalıyordu.
-    */}
-    <section className="page-bar">
+    <section className="ac-bar">
       <div>
-        <h2>Genel Bakış</h2>
+        <h1>Genel Bakış</h1>
         <p>{organization.name} · son 30 gün</p>
       </div>
-      <nav className="page-bar-actions" aria-label="Hızlı işlemler">
+      <nav className="ac-bar-actions" aria-label="Hızlı işlemler">
         {quickActions.map((action)=>(
-          <Link href={action.href} key={action.label}>
-            <i aria-hidden="true">{action.icon}</i>
+          <Link className="ac-btn" href={action.href} key={action.label}>
             {action.label}
           </Link>
         ))}
       </nav>
     </section>
 
-    <section className="metrics">{metrics.map(([label,value,change])=><article key={label}><span>{label}</span><strong>{value}</strong><small>{change}</small></article>)}</section>
-    <section className="action-center" aria-labelledby="action-center-title">
-      <div className="action-center-head"><div><small>BUGÜNÜN ÖNCELİKLERİ</small><h3 id="action-center-title">Operasyon özeti</h3></div><Link href="/operasyon">Operasyon merkezini aç →</Link></div>
-      <div className="action-center-grid">{actionItems.map((item)=><Link href={item.href} className={`action-item ${item.tone}`} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small><b>İncele →</b></Link>)}</div>
+    <section className="ac-metrics">
+      {metrics.map(([label,value,change])=>(
+        <article className="ac-metric" key={label}>
+          <span>{label}</span>
+          <strong>{value}</strong>
+          <small>{change}</small>
+        </article>
+      ))}
+    </section>
+    {/*
+      Aksiyon özeti. İki katmanlı başlık kaldırıldı: "Bugünün
+      öncelikleri / Operasyon özeti" aynı şeyi iki kez
+      söylüyordu.
+
+      Renk artık anlam taşıyor: sıfır olan sayaç nötr, dikkat
+      gerektiren sarı, sorunlu kırmızı.
+    */}
+    <section className="ac ac-pad" style={{marginTop:"var(--s5)"}}>
+      <div className="ac-head">
+        <div>
+          <h3>Aksiyon bekleyenler</h3>
+          <p>Bugün ilgilenilmesi gereken kayıtlar.</p>
+        </div>
+        <Link href="/operasyon">Operasyon merkezi →</Link>
+      </div>
+
+      <div className="ac-metrics">
+        {actionItems.map((item)=>(
+          <Link
+            className="ac-metric ac-lift"
+            data-tone={Number(item.value)===0?undefined:item.tone==="danger"?"bad":"warn"}
+            href={item.href}
+            key={item.label}
+            style={{textDecoration:"none"}}
+          >
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <small>{item.detail}</small>
+          </Link>
+        ))}
+      </div>
     </section>
     <section className="grid"><article className="card sales"><div className="head"><div><small>SON 30 GÜN</small><h3>{money.format(sales / 100)}</h3></div><span>Gerçek sipariş toplamı</span></div><div className="bars" aria-label="Son 14 günlük satış grafiği">{dailySales.map((value,i)=><i key={i} title={money.format(value / 100)} style={{height:`${Math.max(6, Math.round((value / maxDailySales) * 100))}%`}}/>)}</div><div className="labels"><span>14 gün önce</span><span>Günlük satış</span><span>Bugün</span></div></article><article className="card"><div className="head"><div><small>SON SİPARİŞLER</small><h3>Akış</h3></div><Link href="/siparisler">Tümünü gör →</Link></div>{recentOrders.length ? recentOrders.map(o=><div className="order" key={o.id}><i>{(o.customer_name || "Müşteri").split(" ").map((x: string)=>x[0]).join("").slice(0,2)}</i><div><b>{o.order_number} · {o.customer_name || "Müşteri"}</b><small>{orderStatusLabel(o.status)}</small></div><strong>{money.format(o.total / 100)}</strong></div>) : <p>Henüz sipariş yok.</p>}</article></section>
     <section className="card table"><div className="head"><div><small>KATALOG</small><h3>Son ürünler</h3></div><Link href="/urunler">Ürünleri yönet →</Link></div><div className="row th"><span>ÜRÜN</span><span>SKU</span><span>STOK</span><span>FİYAT</span><span>DURUM</span></div>{products.length ? products.map((p,i)=>{const variant=variantByProduct.get(p.id);return <div className="row" key={p.id}><span><i className={`swatch s${i%5}`}>AC</i><b>{p.name}</b></span><span>{variant?.sku ?? "—"}</span><span>{variant?.stock ?? 0}</span><span>{variant ? money.format(variant.price/100) : "—"}</span><span><em>{productStatusLabel(p.status)}</em></span></div>}) : <p>Henüz ürün yok. İlk ürününü ekleyerek başlayabilirsin.</p>}</section>

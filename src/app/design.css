@@ -1,0 +1,290 @@
+/* ==========================================================
+   ARVO ARC — Tasarım sistemi
+   ==========================================================
+
+   Panelde üç ayrı kart dili, iki ayrı boşluk ölçeği ve anlam
+   taşımayan renkler vardı. Bu dosya tek bir dil kuruyor.
+
+   Kural: bu dosyadaki değişkenler dışında sabit değer
+   kullanılmıyor. Yeni bir sayfa yazarken buradaki sınıflar
+   yeterli olmalı; olmuyorsa buraya eklenir.
+   ========================================================== */
+
+:root{
+  /* --- Boşluk ölçeği ---------------------------------------
+     Dörtlü adımlar. Ara değer kullanılmıyor: tutarsız boşluk
+     panelin dağınık görünmesinin başlıca sebebiydi. */
+  --s1:4px;
+  --s2:8px;
+  --s3:12px;
+  --s4:16px;
+  --s5:24px;
+  --s6:32px;
+  --s7:48px;
+
+  /* --- Renk -----------------------------------------------
+     Renk anlam taşır: yeşil olumlu, sarı dikkat, kırmızı
+     sorun, gri nötr. Dekoratif renk yok. */
+  --c-ink:#14202b;
+  --c-ink-2:#3d4a56;
+  --c-ink-3:#77848f;
+
+  --c-bg:#f4f6f8;
+  --c-surface:#ffffff;
+  --c-surface-2:#fafbfc;
+
+  --c-line:#e4e9ee;
+  --c-line-2:#cfd7df;
+
+  --c-brand:#002045;
+  --c-accent:#6f9548;
+
+  --c-good:#2f7d4f;
+  --c-good-bg:#eef7f1;
+  --c-warn:#8a6a1f;
+  --c-warn-bg:#fbf5e8;
+  --c-bad:#a33b33;
+  --c-bad-bg:#fdf0ef;
+
+  /* --- Yükseklik -------------------------------------------
+     İki seviye yeterli: yüzey ve yüzen. Daha fazlası
+     hiyerarşiyi bulanıklaştırıyor. */
+  --e1:0 1px 2px rgba(20,32,43,.05);
+  --e2:0 4px 16px rgba(20,32,43,.08);
+
+  /* --- Yarıçap --------------------------------------------- */
+  --r1:8px;
+  --r2:12px;
+  --r3:999px;
+
+  /* --- Yazı ------------------------------------------------
+     Beş boy. Her boyun bir işi var. */
+  --t-micro:10px;   /* etiket, üst başlık */
+  --t-sm:12px;      /* tablo, yardımcı metin */
+  --t-base:13px;    /* gövde */
+  --t-lg:16px;      /* kart başlığı */
+  --t-xl:22px;      /* sayfa başlığı */
+  --t-num:26px;     /* ölçüm rakamı */
+
+  /* --- Geçiş ----------------------------------------------
+     Tek eğri, iki süre. Akıcılık tutarlılıktan gelir. */
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --fast:140ms;
+  --slow:240ms;
+}
+
+/* ==========================================================
+   Kart — tek dil
+   ========================================================== */
+
+/*
+  Panelde üç farklı kart görünümü vardı: çizgili metrik şeridi,
+  renkli kenarlıklı özet kutuları, gölgeli liste kartları.
+  Hepsi tek sınıfa indirildi.
+*/
+.ac{
+  background:var(--c-surface);
+  border:1px solid var(--c-line);
+  border-radius:var(--r2);
+  box-shadow:var(--e1);
+}
+
+.ac-pad{padding:var(--s5)}
+.ac-pad-sm{padding:var(--s4)}
+
+/* Kart başlığı: sol başlık, sağ eylem. */
+.ac-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:var(--s4);
+  margin-bottom:var(--s4);
+}
+
+.ac-head h3{
+  margin:0;
+  font-size:var(--t-lg);
+  font-weight:700;
+  letter-spacing:-.01em;
+  color:var(--c-ink);
+}
+
+.ac-head p{
+  margin:var(--s1) 0 0;
+  font-size:var(--t-sm);
+  color:var(--c-ink-3);
+}
+
+.ac-head a{
+  font-size:var(--t-sm);
+  font-weight:600;
+  color:var(--c-ink-2);
+  text-decoration:none;
+  white-space:nowrap;
+  transition:color var(--fast) var(--ease);
+}
+
+.ac-head a:hover{color:var(--c-accent)}
+
+/* ==========================================================
+   Ölçüm şeridi
+   ========================================================== */
+
+/*
+  Rakam öne, etiket geriye. Öncesinde ikisi benzer ağırlıktaydı
+  ve göz hangisine bakacağını bilmiyordu.
+*/
+.ac-metrics{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:1px;
+  background:var(--c-line);
+  border:1px solid var(--c-line);
+  border-radius:var(--r2);
+  overflow:hidden;
+}
+
+.ac-metric{
+  padding:var(--s4) var(--s5);
+  background:var(--c-surface);
+}
+
+.ac-metric > span{
+  display:block;
+  font-size:var(--t-micro);
+  font-weight:700;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--c-ink-3);
+}
+
+.ac-metric > strong{
+  display:block;
+  margin:var(--s2) 0 var(--s1);
+  font-size:var(--t-num);
+  font-weight:750;
+  letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;
+  color:var(--c-ink);
+}
+
+.ac-metric > small{
+  font-size:var(--t-sm);
+  color:var(--c-ink-3);
+}
+
+/* Anlamlı vurgu: yalnızca dikkat gerektiren rakamda. */
+.ac-metric[data-tone="warn"] > strong{color:var(--c-warn)}
+.ac-metric[data-tone="bad"] > strong{color:var(--c-bad)}
+.ac-metric[data-tone="good"] > strong{color:var(--c-good)}
+
+/* ==========================================================
+   Sayfa üst şeridi
+   ========================================================== */
+
+.ac-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:var(--s5);
+  flex-wrap:wrap;
+  padding:var(--s5) 0 var(--s4);
+}
+
+.ac-bar h1{
+  margin:0;
+  font-size:var(--t-xl);
+  font-weight:750;
+  letter-spacing:-.02em;
+  color:var(--c-ink);
+}
+
+.ac-bar p{
+  margin:var(--s1) 0 0;
+  font-size:var(--t-sm);
+  color:var(--c-ink-3);
+}
+
+.ac-bar-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:var(--s2);
+}
+
+/* ==========================================================
+   Düğme
+   ========================================================== */
+
+.ac-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:var(--s2);
+  padding:9px var(--s4);
+  border:1px solid var(--c-line-2);
+  border-radius:var(--r3);
+  background:var(--c-surface);
+  color:var(--c-ink-2);
+  font-size:var(--t-sm);
+  font-weight:600;
+  text-decoration:none;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:
+    border-color var(--fast) var(--ease),
+    background-color var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+
+.ac-btn:hover{
+  border-color:var(--c-accent);
+  color:var(--c-accent);
+}
+
+.ac-btn-primary{
+  border-color:var(--c-brand);
+  background:var(--c-brand);
+  color:#fff;
+}
+
+.ac-btn-primary:hover{
+  border-color:var(--c-brand);
+  background:#00305f;
+  color:#fff;
+}
+
+/* ==========================================================
+   Rozet
+   ========================================================== */
+
+.ac-tag{
+  display:inline-flex;
+  align-items:center;
+  padding:3px var(--s2);
+  border-radius:var(--r3);
+  background:var(--c-good-bg);
+  color:var(--c-good);
+  font-size:var(--t-micro);
+  font-weight:700;
+  font-style:normal;
+  white-space:nowrap;
+}
+
+.ac-tag[data-tone="warn"]{background:var(--c-warn-bg);color:var(--c-warn)}
+.ac-tag[data-tone="bad"]{background:var(--c-bad-bg);color:var(--c-bad)}
+.ac-tag[data-tone="muted"]{background:var(--c-surface-2);color:var(--c-ink-3)}
+
+/* ==========================================================
+   Hareket
+   ========================================================== */
+
+/*
+  "Akıcı" hissi tutarlılıktan gelir: tek eğri, iki süre.
+  Farklı sayfalarda farklı hızlar sistemin dağınık
+  hissettirmesinin sebebiydi.
+*/
+.ac-lift{transition:transform var(--slow) var(--ease),box-shadow var(--slow) var(--ease)}
+.ac-lift:hover{transform:translateY(-2px);box-shadow:var(--e2)}
+
+@media (prefers-reduced-motion:reduce){
+  .ac-lift,.ac-lift:hover{transform:none;transition:none}
+}
