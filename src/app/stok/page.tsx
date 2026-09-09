@@ -45,6 +45,8 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
     {count:zeroCount},
     {count:lowCount},
     {count:unavailableCount},
+    {count:variantCount},
+    {data:stockSum},
   ]=await Promise.all([
     listQuery,
     supabase.from("arc_inventory_movements").select("id,variant_id,kind,quantity,note,created_at").eq("organization_id",organization.id).order("created_at",{ascending:false}).limit(20),
@@ -52,6 +54,13 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
     supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).eq("stock",0),
     supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).gt("stock",0).lte("stock",lowStockThreshold),
     supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).lte("stock",0).eq("allow_backorder",false),
+    supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id),
+    /*
+      Toplam adet veritabanında toplanıyor. Listelenen 100 kaydı
+      toplamak yanlış rakam veriyordu; 15.740 varyantın tamamı
+      belleğe alınamaz.
+    */
+    supabase.rpc("arc_total_stock_units"),
   ]);
 
   if(variantsError)throw new Error(variantsError.message);
@@ -78,7 +87,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
     <section className="subhead"><div><small>OPERASYON · CANLI</small><h2>Stok Yönetimi</h2><p>Negatif stok desteklenir. Stoksuz satış açık varyantlar eksi stoka düşebilir; tüm değişiklikler hareket bazında kaydedilir.</p></div><a href="/api/disari-aktar/stok" style={{padding:"12px 16px",background:"var(--ink)",color:"white"}}>CSV indir ↓</a></section>
     {params.updated === "1" && <section className="card" style={{padding:16,marginBottom:20}}><strong>Stok hareketi kaydedildi.</strong></section>}
     {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>İşlem tamamlanamadı: {params.error}</strong></section>}
-    <section className="metrics"><article><span>TOPLAM STOK</span><strong>{visibleVariants.length}</strong><small>{variants?.length??0} varyant</small></article><article><span>NEGATİF</span><strong>{negative.length}</strong><small>Tedarik gerekli</small></article><article><span>STOK SIFIR</span><strong>{zero.length}</strong><small>Satış politikası kontrolü</small></article><article><span>DÜŞÜK STOK</span><strong>{low.length}</strong><small>1–{lowStockThreshold} adet arası</small></article></section>
+    <section className="metrics"><article><span>TOPLAM STOK</span><strong>{(typeof stockSum==="number"?stockSum:0).toLocaleString("tr-TR")}</strong><small>{(variantCount??0).toLocaleString("tr-TR")} varyant</small></article><article><span>NEGATİF</span><strong>{negative.length}</strong><small>Tedarik gerekli</small></article><article><span>STOK SIFIR</span><strong>{zero.length}</strong><small>Satış politikası kontrolü</small></article><article><span>DÜŞÜK STOK</span><strong>{low.length}</strong><small>1–{lowStockThreshold} adet arası</small></article></section>
     <section className="card" style={{padding:20,marginBottom:20}}><form style={{display:"grid",gridTemplateColumns:"minmax(220px,1fr) 190px auto auto",gap:10,alignItems:"end"}}><label>Stokta ara<input name="q" defaultValue={params.q??""} placeholder="Ürün adı veya SKU" style={{display:"block",width:"100%",padding:12,marginTop:6}}/></label><label>Stok durumu<select name="filter" defaultValue={stockFilter} style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="all">Tüm varyantlar</option><option value="negative">Negatif stok</option><option value="zero">Stok sıfır</option><option value="low">Düşük stok (1–5)</option><option value="available">Stokta var</option><option value="backorder">Stoksuz satış açık</option></select></label><button type="submit" style={{padding:12}}>Filtrele</button>{(params.q||stockFilter!=="all")&&<a href="/stok" style={{padding:12}}>Temizle</a>}</form></section>
     {(negative.length > 0 || unavailable.length > 0) && <section className="notice"><b>{negative.length + unavailable.length}</b><h3>Stok aksiyonu gerekiyor</h3><p>{negative.length} varyant negatif stokta; {unavailable.length} varyantta stok yok ve stoksuz satış kapalı.</p></section>}
 
