@@ -5,11 +5,20 @@ import { orderStatusOptions } from "@/lib/commerce-labels";
 const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0});
 const monthLabel=new Intl.DateTimeFormat("tr-TR",{month:"short",year:"2-digit"});
 
+/* Tarih render dışında hesaplanır; render sırasında saf
+   olmayan çağrı yapılmamalı. */
+const yearAgo=new Date(Date.now()-365*24*60*60*1000).toISOString();
+
 export default async function Analytics(){
   const {supabase,organization}=await requireTenant();
   const [{data:orders,error:ordersError},{data:items,error:itemsError}]=await Promise.all([
-    supabase.from("arc_orders").select("id,status,payment_status,total,currency,created_at").eq("organization_id",organization.id).order("created_at"),
-    supabase.from("arc_order_items").select("order_id,product_name,sku,quantity,total").eq("organization_id",organization.id)
+    /*
+      Son 12 aylık siparişler. Sınırsız çekmek katalog
+      büyüdükçe sorun olur ve Supabase 1000 satırda keser;
+      analitik rakamları sessizce yanlış çıkardı.
+    */
+    supabase.from("arc_orders").select("id,status,payment_status,total,currency,created_at").eq("organization_id",organization.id).gte("created_at",yearAgo).order("created_at",{ascending:false}).limit(5000).order("created_at"),
+    supabase.from("arc_order_items").select("order_id,product_name,sku,quantity,total").eq("organization_id",organization.id).limit(5000)
   ]);
   if(ordersError)throw new Error(ordersError.message);if(itemsError)throw new Error(itemsError.message);
   const allOrders=orders??[];const completed=allOrders.filter(order=>!["cancelled","refunded"].includes(order.status));

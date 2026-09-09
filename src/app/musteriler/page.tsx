@@ -7,7 +7,9 @@ type Customer={key:string;name:string;email:string;orders:number;spent:number;la
 
 export default async function Customers({searchParams}:{searchParams:Promise<{q?:string}>}){
   const query=await searchParams;const {supabase,organization}=await requireTenant();
-  const {data:orders,error}=await supabase.from("arc_orders").select("id,customer_name,customer_email,total,currency,created_at,status").eq("organization_id",organization.id).order("created_at",{ascending:false});
+  const {data:orders,error}=await /* Sınırsız çekim Supabase tarafından 1000 satırda kesiliyor
+     ve müşteri toplamları eksik çıkıyordu. */
+  supabase.from("arc_orders").select("id,customer_name,customer_email,total,currency,created_at,status").eq("organization_id",organization.id).limit(5000).order("created_at",{ascending:false});
   if(error)throw new Error(error.message);
 
   const grouped=new Map<string,Customer>();
