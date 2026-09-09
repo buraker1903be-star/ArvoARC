@@ -103,7 +103,60 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
     {/* Filtre şeridi. Etiketler kaldırıldı: yer tutucu metin
         zaten ne aranacağını söylüyor ve şerit tek satıra
         sığıyor. */}
-    <section className="ac ac-pad-sm"><form className="ac-filter"><input name="q" defaultValue={params.q??""} placeholder="Sipariş no, müşteri veya e-posta"/><select name="filter" defaultValue={statusFilter}><option value="all">Tüm durumlar</option><option value="pending">Bekliyor</option><option value="confirmed">Onaylandı</option><option value="processing">Hazırlanıyor</option><option value="fulfilled">Tamamlandı</option><option value="cancelled">İptal</option><option value="refunded">İade</option></select><button className="ac-btn ac-btn-primary" type="submit">Filtrele</button>{(params.q||statusFilter!=="all")&&<Link className="ac-btn" href="/siparisler">Temizle</Link>}</form></section>
+    {/*
+      Durum filtreleri düğme olarak: açılır liste tek tıkla
+      filtrelemeye izin vermiyordu, seçip "Filtrele" demek
+      gerekiyordu. İade sayfasıyla aynı dil.
+    */}
+    <nav className="ac-filter">
+      {[
+        ["all", "Tümü"],
+        ["pending", "Bekliyor"],
+        ["confirmed", "Onaylandı"],
+        ["processing", "Hazırlanıyor"],
+        ["fulfilled", "Tamamlandı"],
+        ["cancelled", "İptal"],
+        ["refunded", "İade"],
+      ].map(([key, label]) => (
+        <Link
+          key={key}
+          className="ac-btn"
+          href={key === "all" ? "/siparisler" : `/siparisler?filter=${key}`}
+          style={
+            statusFilter === key
+              ? { borderColor: "var(--c-accent)", color: "var(--c-accent)" }
+              : undefined
+          }
+        >
+          {label}
+        </Link>
+      ))}
+    </nav>
+
+    {/* Arama ayrı: filtre düğmeleriyle birlikte kullanılıyor. */}
+    <section className="ac ac-pad-sm">
+      <form className="ac-filter">
+        {statusFilter !== "all" ? (
+          <input type="hidden" name="filter" value={statusFilter} />
+        ) : null}
+        <input
+          name="q"
+          defaultValue={params.q ?? ""}
+          placeholder="Sipariş no, müşteri veya e-posta"
+        />
+        <button className="ac-btn ac-btn-primary" type="submit">
+          Ara
+        </button>
+        {params.q ? (
+          <Link
+            className="ac-btn"
+            href={statusFilter === "all" ? "/siparisler" : `/siparisler?filter=${statusFilter}`}
+          >
+            Temizle
+          </Link>
+        ) : null}
+      </form>
+    </section>
     <section className="ac table">
       <div className="ac-head ac-pad-sm" style={{marginBottom:0}}>
         <div>
