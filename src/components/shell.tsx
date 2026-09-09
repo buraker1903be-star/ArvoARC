@@ -22,7 +22,10 @@ const navigation=[
   ["stock","Stok Yönetimi","/stok","▤"],
   ["orders","Siparişler","/siparisler","▧"],
   ["customers","Müşteriler","/musteriler","◎"],
-  ["returns","İade Talepleri","/iadeler","↩"],
+  /*
+    İade talepleri Siparişler sayfasına sekme olarak taşındı:
+    iade siparişin bir aşaması, ayrı menü öğesi akışı bölüyordu.
+  */
   ["analytics","Satış Analitiği","/analitik","↗"],
   ["import","Veri Aktarımı","/veri-aktarimi","⇄"],
   ["suppliers","Tedarikçiler","/tedarikci","◎"],

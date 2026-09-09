@@ -17,7 +17,7 @@ export async function resolveReturn(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
 
   if (!["owner", "admin"].includes(membership.role)) {
-    redirect("/iadeler?error=forbidden");
+    redirect("/siparisler/iadeler?error=forbidden");
   }
 
   const id = String(formData.get("request_id") ?? "");
@@ -25,7 +25,7 @@ export async function resolveReturn(formData: FormData) {
   const note = String(formData.get("note") ?? "").trim().slice(0, 500);
 
   if (!id || !["onayla", "reddet", "iade-et"].includes(decision)) {
-    redirect("/iadeler?error=invalid");
+    redirect("/siparisler/iadeler?error=invalid");
   }
 
   const { data: request } = await supabase
@@ -35,16 +35,16 @@ export async function resolveReturn(formData: FormData) {
     .eq("id", id)
     .single();
 
-  if (!request) redirect("/iadeler?error=not-found");
+  if (!request) redirect("/siparisler/iadeler?error=not-found");
   /*
     Onay ve ret yalnızca bekleyen talepte; para iadesi yalnızca
     onaylanmış talepte yapılabiliyor.
   */
   if (decision === "iade-et" && request.status !== "onaylandi") {
-    redirect("/iadeler?error=not-approved");
+    redirect("/siparisler/iadeler?error=not-approved");
   }
   if (decision !== "iade-et" && request.status !== "beklemede") {
-    redirect("/iadeler?error=already-resolved");
+    redirect("/siparisler/iadeler?error=already-resolved");
   }
 
   const order = (Array.isArray(request.arc_orders)
@@ -57,7 +57,7 @@ export async function resolveReturn(formData: FormData) {
     metadata: Record<string, unknown> | null;
   } | null;
 
-  if (!order) redirect("/iadeler?error=not-found");
+  if (!order) redirect("/siparisler/iadeler?error=not-found");
 
   /* --- Ret --- */
   if (decision === "reddet") {
@@ -85,8 +85,8 @@ export async function resolveReturn(formData: FormData) {
       }
     }
 
-    revalidatePath("/iadeler");
-    redirect("/iadeler?ok=reddedildi");
+    revalidatePath("/siparisler/iadeler");
+    redirect("/siparisler/iadeler?ok=reddedildi");
   }
 
   /* --- Onay: para henüz iade edilmiyor --- */
@@ -122,8 +122,8 @@ export async function resolveReturn(formData: FormData) {
       }
     }
 
-    revalidatePath("/iadeler");
-    redirect("/iadeler?ok=onaylandi&filter=onaylandi");
+    revalidatePath("/siparisler/iadeler");
+    redirect("/siparisler/iadeler?ok=onaylandi&filter=onaylandi");
   }
 
   /* --- Ürün teslim alındı: PayTR iadesi --- */
@@ -143,7 +143,7 @@ export async function resolveReturn(formData: FormData) {
     custom > 0 ? Math.round(custom * 100) : itemsTotal || order.total;
 
   if (amountKurus <= 0 || amountKurus > order.total) {
-    redirect("/iadeler?error=invalid-amount");
+    redirect("/siparisler/iadeler?error=invalid-amount");
   }
 
   const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
@@ -156,16 +156,25 @@ export async function resolveReturn(formData: FormData) {
 
   if (!result.ok) {
     console.error("İade başarısız:", order.order_number, result.message);
-    redirect("/iadeler?error=refund-failed");
+    redirect("/siparisler/iadeler?error=refund-failed");
   }
 
   const tamIade = amountKurus >= order.total;
+
+  /*
+    Test siparişinin iadesinde gerçek para hareketi olmuyor.
+    Notta belirtiliyor ki panelde "iade edildi" görüp PayTR'da
+    bulamama karışıklığı yaşanmasın.
+  */
+  const testNote = result.isTest
+    ? "TEST siparişi — gerçek para iadesi yapılmadı."
+    : null;
 
   await supabase
     .from("arc_return_requests")
     .update({
       status: "tamamlandi",
-      status_note: note || null,
+      status_note: [note, testNote].filter(Boolean).join(" · ") || null,
       refund_amount: amountKurus,
       refund_reference: result.reference ?? null,
       resolved_at: new Date().toISOString(),
@@ -204,6 +213,6 @@ export async function resolveReturn(formData: FormData) {
     }
   }
 
-  revalidatePath("/iadeler");
-  redirect("/iadeler?ok=tamamlandi");
+  revalidatePath("/siparisler/iadeler");
+  redirect("/siparisler/iadeler?ok=tamamlandi");
 }

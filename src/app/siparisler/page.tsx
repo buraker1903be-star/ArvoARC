@@ -52,6 +52,14 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
   if (productsError) throw new Error(productsError.message);
 
   const visibleOrders=orders??[];
+
+  /* Sekmede rozet olarak gösteriliyor: bekleyen iade gözden
+     kaçmasın. */
+  const {count:pendingReturns}=await supabase
+    .from("arc_return_requests")
+    .select("id",{count:"exact",head:true})
+    .eq("organization_id",organization.id)
+    .eq("status","beklemede");
   const productById=new Map((products??[]).map(product=>[product.id,product]));
   const variantOptions = (variants ?? []).map((variant) => {
     const product = productById.get(variant.product_id);
@@ -65,6 +73,18 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
         <p>{visibleOrders.length} kayıt · {organization.name}</p>
       </div>
       <div className="ac-bar-actions">
+        {/*
+          İade talepleri ayrı bir menü öğesiydi. İade siparişin
+          bir aşaması; aynı sayfada sekme olarak durması akışı
+          bölmüyor.
+        */}
+        <Link className="ac-btn" href="/siparisler" style={{borderColor:"var(--c-accent)",color:"var(--c-accent)"}}>
+          Siparişler
+        </Link>
+        <Link className="ac-btn" href="/siparisler/iadeler">
+          İade talepleri
+          {(pendingReturns??0) > 0 ? <em className="ac-tag" data-tone="warn" style={{marginLeft:"var(--s2)"}}>{pendingReturns}</em> : null}
+        </Link>
         <a className="ac-btn" href="/api/disari-aktar/siparisler">CSV indir</a>
       </div>
     </section>

@@ -59,16 +59,26 @@ export default async function ReturnsPage({
 
   return (
     <Shell
-      active="returns"
+      active="orders"
       tenantName={organization.name}
       tenantPlan={organization.plan_code}
     >
       <section className="ac-bar">
         <div>
-          <h1>İade Talepleri</h1>
-          <p>{pendingCount ?? 0} talep bekliyor.</p>
+          <h1>Siparişler</h1>
+          <p>{pendingCount ?? 0} iade talebi bekliyor.</p>
         </div>
         <nav className="ac-bar-actions">
+          <Link className="ac-btn" href="/siparisler">
+            Siparişler
+          </Link>
+          <Link
+            className="ac-btn"
+            href="/siparisler/iadeler"
+            style={{ borderColor: "var(--c-accent)", color: "var(--c-accent)" }}
+          >
+            İade talepleri
+          </Link>
           {[
             ["beklemede", "Bekleyenler"],
             ["onaylandi", "Ürün bekleniyor"],
@@ -78,7 +88,7 @@ export default async function ReturnsPage({
             <Link
               key={key}
               className="ac-btn"
-              href={`/iadeler?filter=${key}`}
+              href={`/siparisler/iadeler?filter=${key}`}
               style={
                 filter === key
                   ? { borderColor: "var(--c-accent)", color: "var(--c-accent)" }
@@ -95,7 +105,9 @@ export default async function ReturnsPage({
         {params.ok && (
           <section className="ac ac-pad-sm">
             <strong>
-              {params.ok === "tamamlandi"
+              {params.ok === "test-iade"
+                ? "İade kaydedildi ancak bu bir TEST siparişiydi: PayTR'da gerçek para hareketi olmadı."
+                : params.ok === "tamamlandi"
                 ? "İade tamamlandı ve müşteriye bildirildi."
                 : params.ok === "onaylandi"
                   ? "Talep onaylandı. Müşteri ürünü gönderdiğinde iadeyi tamamlayın."
