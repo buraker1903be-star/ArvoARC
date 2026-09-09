@@ -58,7 +58,15 @@ export async function refundPayment({
     paytr_token: token,
   });
 
-  if (referenceNo) body.set("reference_no", referenceNo.slice(0, 64));
+  /*
+    Referans numarası yalnızca harf ve rakam içerebiliyor;
+    PayTR tire ve alt çizgiyi reddediyor. Çağıran taraf
+    unutabileceği için temizlik burada yapılıyor.
+  */
+  if (referenceNo) {
+    const clean = referenceNo.replace(/[^A-Za-z0-9]/g, "").slice(0, 64);
+    if (clean) body.set("reference_no", clean);
+  }
 
   try {
     const response = await fetch("https://www.paytr.com/odeme/iade", {

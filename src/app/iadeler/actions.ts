@@ -151,7 +151,7 @@ export async function resolveReturn(formData: FormData) {
   const result = await refundPayment({
     merchantOid,
     amountKurus,
-    referenceNo: `ARC-IADE-${id.slice(0, 8)}`,
+    referenceNo: `ARCIADE${id.replace(/-/g, "").slice(0, 12)}`,
   });
 
   if (!result.ok) {

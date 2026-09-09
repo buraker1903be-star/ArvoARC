@@ -171,7 +171,7 @@ export async function refundOrder(formData: FormData) {
   const result = await refundPayment({
     merchantOid,
     amountKurus,
-    referenceNo: `ARC-${orderId.slice(0, 8)}`,
+    referenceNo: `ARC${orderId.replace(/-/g, "").slice(0, 12)}`,
   });
 
   if (!result.ok) {
