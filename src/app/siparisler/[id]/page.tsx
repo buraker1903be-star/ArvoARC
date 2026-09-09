@@ -8,7 +8,7 @@ import { orderStatusLabel, orderStatusOptions, paymentStatusLabel, paymentStatus
 const money=(value:number,currency:string)=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:currency||"TRY"}).format(value/100);
 
 type Address={name?:string;address1?:string;address2?:string;city?:string;province?:string;zip?:string;country?:string;phone?:string};
-type OrderMeta={billing?:Address;shipping_address?:Address;payment_method?:string;payment_reference?:string;notes?:string;tags?:string;historical_import?:boolean;shipping_carrier?:string;tracking_number?:string;tracking_url?:string;internal_note?:string};
+type OrderMeta={discount?:number;billing?:Address;shipping_address?:Address;payment_method?:string;payment_reference?:string;notes?:string;tags?:string;historical_import?:boolean;shipping_carrier?:string;tracking_number?:string;tracking_url?:string;internal_note?:string};
 
 function AddressCard({title,address}:{title:string;address?:Address}){
   const lines=[address?.name,address?.address1,address?.address2,[address?.zip,address?.city].filter(Boolean).join(" "),address?.province,address?.country,address?.phone].filter(Boolean);
@@ -23,8 +23,48 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     supabase.from("arc_order_items").select("id,product_name,sku,quantity,unit_price,total").eq("organization_id",organization.id).eq("order_id",id).order("product_name"),
     supabase.from("arc_order_events").select("id,event_type,event_data,created_by,created_at").eq("organization_id",organization.id).eq("order_id",id).order("created_at",{ascending:false}).limit(50)
   ]);
+  const canManage=["owner","admin","manager"].includes(membership.role);
+  const meta=(order?.metadata??{}) as OrderMeta;
   if(error)throw new Error(error.message);if(itemsError)throw new Error(itemsError.message);if(eventsError)throw new Error(eventsError.message);if(!order)notFound();
-  const canManage=["owner","admin","manager"].includes(membership.role);const meta=(order.metadata??{}) as OrderMeta;
+
+  /*
+    KDV dilimleri. Bir faturada farklı oranlar bir arada
+    bulunabiliyor: giyim %10, kozmetik %20. Fatura mevzuatı her
+    oranı ayrı matrah ve vergi satırı olarak göstermeyi
+    gerektiriyor.
+
+    Kalem SKU'sundan ürüne ulaşıp oranı okuyoruz.
+  */
+  const skus=[...new Set((items??[]).map(item=>item.sku).filter(Boolean))];
+  const {data:rateRows}=skus.length
+    ?await supabase.from("arc_product_variants").select("sku,arc_products(tax_rate)").eq("organization_id",organization.id).in("sku",skus)
+    :{data:[]};
+
+  const rateBySku=new Map<string,number>();
+  for(const row of (rateRows??[]) as unknown as Array<{sku:string;arc_products:{tax_rate:number|null}|{tax_rate:number|null}[]|null}>){
+    const product=Array.isArray(row.arc_products)?row.arc_products[0]:row.arc_products;
+    rateBySku.set(row.sku, product?.tax_rate ?? 20);
+  }
+
+  /* İndirim payı orantılı düşülür: müşteri indirimli tutarı
+     ödedi, matrah da o tutar üzerinden olmalı. */
+  const discount=Number(meta.discount??0);
+  const gross=(order.subtotal??0)+(order.shipping??0);
+  const factor=discount>0&&gross>0?1-discount/gross:1;
+
+  const brackets=new Map<number,{matrah:number;kdv:number}>();
+  const addBracket=(rate:number,grossAmount:number)=>{
+    const net=Math.round(grossAmount*factor);
+    const kdv=Math.round(net-net/(1+rate/100));
+    const current=brackets.get(rate)??{matrah:0,kdv:0};
+    brackets.set(rate,{matrah:current.matrah+(net-kdv),kdv:current.kdv+kdv});
+  };
+
+  for(const item of items??[]) addBracket(rateBySku.get(item.sku)??20,item.total);
+  /* Kargo genel orana tabidir. */
+  if((order.shipping??0)>0) addBracket(20,order.shipping);
+
+  const bracketList=[...brackets.entries()].sort((a,b)=>a[0]-b[0]);
   return <Shell active="orders" tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="ac-bar">
       <div>
@@ -46,6 +86,11 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     </section>
 
     <div className="ac-stack">
+
+    {/* Fatura ve teslimat bilgileri en başta: siparişi
+        hazırlarken ilk bakılan yer burası. */}
+    <section className="ac-split-even"><AddressCard title="FATURA ADRESİ" address={meta.billing}/><AddressCard title="TESLİMAT ADRESİ" address={meta.shipping_address}/></section>
+
     {query.saved&&<section className="ac ac-pad-sm"><strong>{query.saved==="fulfillment"?"Kargo ve operasyon bilgileri kaydedildi.":"Sipariş durumu güncellendi."}</strong></section>}
     {query.error&&<section className="ac ac-pad-sm"><strong>İşlem tamamlanamadı: {query.error}</strong></section>}
 
@@ -53,10 +98,21 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
       <section className="ac ac-pad">
         <div className="ac-head"><div><h3>Sipariş kalemleri</h3><p>{items?.length??0} kalem</p></div></div>
         <div style={{marginTop:16}}>{items?.map(item=><div key={item.id} style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:18,padding:"15px 0",borderTop:"1px solid rgba(0,0,0,.08)",alignItems:"center"}}><div><b>{item.product_name}</b><small style={{display:"block",marginTop:5}}>SKU: {item.sku}</small></div><span>{item.quantity} × {money(item.unit_price,order.currency)}</span><strong>{money(item.total,order.currency)}</strong></div>)}</div>
-        <div style={{marginTop:20,marginLeft:"auto",maxWidth:330,display:"grid",gap:9}}><span style={{display:"flex",justifyContent:"space-between"}}>Ara toplam <b>{money(order.subtotal,order.currency)}</b></span><span style={{display:"flex",justifyContent:"space-between"}}>Kargo <b>{money(order.shipping,order.currency)}</b></span><span style={{display:"flex",justifyContent:"space-between"}}>
-            {/* KDV fiyata dâhildir; toplamı artırmaz. */}
-            KDV (dâhil) <b>{money(order.tax,order.currency)}</b>
-          </span><strong style={{display:"flex",justifyContent:"space-between",fontSize:18,borderTop:"1px solid",paddingTop:12}}>Toplam <b>{money(order.total,order.currency)}</b></strong></div>
+        <div style={{marginTop:20,marginLeft:"auto",maxWidth:330,display:"grid",gap:9}}><span style={{display:"flex",justifyContent:"space-between"}}>Ara toplam <b>{money(order.subtotal,order.currency)}</b></span><span style={{display:"flex",justifyContent:"space-between"}}>Kargo <b>{money(order.shipping,order.currency)}</b></span>{/*
+            KDV dilimleri. Her oran ayrı matrah ve vergi satırı
+            olarak gösteriliyor; fatura mevzuatı bunu
+            gerektiriyor.
+          */}
+          {bracketList.map(([rate,v])=>(
+            <span key={rate} style={{display:"flex",justifyContent:"space-between"}}>
+              %{rate} matrah <b>{money(v.matrah,order.currency)}</b>
+            </span>
+          ))}
+          {bracketList.map(([rate,v])=>(
+            <span key={`k${rate}`} style={{display:"flex",justifyContent:"space-between"}}>
+              KDV %{rate} <b>{money(v.kdv,order.currency)}</b>
+            </span>
+          ))}<strong style={{display:"flex",justifyContent:"space-between",fontSize:18,borderTop:"1px solid",paddingTop:12}}>Toplam <b>{money(order.total,order.currency)}</b></strong></div>
       </section>
       <aside className="ac ac-pad">
         <div className="ac-head"><div><h3>Yönetim</h3><p>Durum ve kargo bilgileri.</p></div></div>
@@ -69,7 +125,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
       </aside>
     </div>
     <section className="ac ac-pad"><div className="ac-head"><div><h3>İşlem geçmişi</h3><p>Bu siparişte yapılan değişiklikler.</p></div><span>{events?.length??0} kayıt</span></div><div style={{marginTop:16}}>{events?.length?events.map(event=>{const data=(event.event_data??{}) as Record<string,string|null>;const title=event.event_type==="status_updated"?"Sipariş durumu güncellendi":"Kargo bilgileri güncellendi";const detail=event.event_type==="status_updated"?`${orderStatusLabel(data.old_status)} → ${orderStatusLabel(data.new_status)} · Ödeme: ${paymentStatusLabel(data.new_payment_status)}`:`${data.shipping_carrier||"Kargo firması yok"} · ${data.tracking_number||"Takip numarası yok"}`;return <div className="order" key={event.id}><i>✓</i><div><b>{title}</b><small>{detail}</small></div><span style={{textAlign:"right",fontSize:10}}>{new Date(event.created_at).toLocaleString("tr-TR")}<small style={{display:"block"}}>{event.created_by?"Yetkili kullanıcı":"Sistem"}</small></span></div>}):<p>Henüz kayıtlı sipariş işlemi yok.</p>}</div></section>
-    <section className="ac-split-even"><AddressCard title="FATURA ADRESİ" address={meta.billing}/><AddressCard title="TESLİMAT ADRESİ" address={meta.shipping_address}/></section>
+
     </div>
   </Shell>;
 }
