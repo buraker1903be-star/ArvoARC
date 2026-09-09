@@ -386,3 +386,67 @@
   padding:var(--s4) var(--s5);
   border-bottom:1px solid var(--c-line);
 }
+
+/* ==========================================================
+   Düzen — iki sütun
+   ========================================================== */
+
+/*
+  Ana içerik ve yan panel. Yan panel dar kalıyor: içindeki
+  formlar okunabilirliğini kaybetmesin.
+*/
+.ac-split{
+  display:grid;
+  grid-template-columns:minmax(0,1.6fr) minmax(300px,.7fr);
+  gap:var(--s5);
+  align-items:start;
+}
+
+/* Eşit iki sütun: adres kartları gibi. */
+.ac-split-even{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:var(--s5);
+}
+
+@media (max-width:1000px){
+  .ac-split,.ac-split-even{grid-template-columns:1fr}
+}
+
+/* ==========================================================
+   Form alanı
+   ========================================================== */
+
+/*
+  Tek girdi stili. Öncesinde her alan kendi satır içi stilini
+  taşıyordu: dolgu ve kenarlık sayfadan sayfaya değişiyordu.
+*/
+.ac-input{
+  display:block;
+  width:100%;
+  margin-top:var(--s2);
+  padding:10px var(--s3);
+  border:1px solid var(--c-line-2);
+  border-radius:var(--r1);
+  background:var(--c-surface);
+  font-family:inherit;
+  font-size:var(--t-base);
+  color:var(--c-ink);
+  transition:border-color var(--fast) var(--ease);
+}
+
+.ac-input:focus{
+  outline:none;
+  border-color:var(--c-accent);
+}
+
+textarea.ac-input{resize:vertical;line-height:1.55}
+
+/* Alan etiketi. */
+.ac ac-pad label,
+.ac-pad > form label{
+  display:block;
+  font-size:var(--t-sm);
+  font-weight:600;
+  color:var(--c-ink-2);
+}
