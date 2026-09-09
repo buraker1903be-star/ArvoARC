@@ -24,6 +24,9 @@ export async function updateSupplier(formData: FormData) {
   /* Ek hizmet bedeli: paketleme, kalite kontrol, etiket gibi
      tedarikçi hizmetlerinin ürün başına maliyeti. */
   const service = Number(formData.get("service_fee") ?? 0);
+  /* Stok tamponu: tedarikçi stoğu bu değerin altına düşerse
+     ürün satışa kapanır. */
+  const buffer = Number(formData.get("stock_buffer") ?? 5);
   const publishDirectly = formData.get("publish_directly") === "on";
 
   if (!code) redirect("/tedarikci?error=missing-code");
@@ -44,6 +47,9 @@ export async function updateSupplier(formData: FormData) {
   }
   if (!Number.isFinite(service) || service < 0 || service > 10000) {
     redirect("/tedarikci?error=invalid-service");
+  }
+  if (!Number.isInteger(buffer) || buffer < 0 || buffer > 100) {
+    redirect("/tedarikci?error=invalid-buffer");
   }
 
   const { error } = await supabase

@@ -187,6 +187,19 @@ export default async function SuppliersPage({
                   </label>
 
                   <label>
+                    Stok tamponu (adet)
+                    <input
+                      name="stock_buffer"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      defaultValue={supplier.stock_buffer ?? 5}
+                      className="ac-input"
+                    />
+                  </label>
+
+                  <label>
                     Yuvarlama (kuruş)
                     <input
                       name="round_to_kurus"
@@ -247,8 +260,22 @@ export default async function SuppliersPage({
                 <p
                   style={{
                     margin: "6px 0 0",
-                    fontSize: 12,
-                    color: "#7c8177",
+                    fontSize: "var(--t-sm)",
+                    color: "var(--c-ink-3)",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  Tedarikçi stoğu tampon değerin altına düştüğünde ürün
+                  satışa kapanır ve vitrinde &quot;Tükendi&quot; görünür.
+                  Siz siparişi iletene kadar tükenme riskine karşı
+                  güvenlik payıdır.
+                </p>
+
+                <p
+                  style={{
+                    margin: "6px 0 0",
+                    fontSize: "var(--t-sm)",
+                    color: "var(--c-ink-3)",
                     lineHeight: 1.7,
                   }}
                 >
