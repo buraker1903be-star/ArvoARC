@@ -2,13 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
-import { updateFulfillmentDetails, updateOrderStatus } from "./actions";
+import { updateFulfillmentDetails, updateOrderStatus , refundOrder } from "./actions";
 import { orderStatusLabel, orderStatusOptions, paymentStatusLabel, paymentStatusOptions, sourceLabel } from "@/lib/commerce-labels";
 
 const money=(value:number,currency:string)=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:currency||"TRY"}).format(value/100);
 
 type Address={name?:string;address1?:string;address2?:string;city?:string;province?:string;zip?:string;country?:string;phone?:string};
-type OrderMeta={discount?:number;coupon_code?:string;billing?:Address;shipping_address?:Address;payment_method?:string;payment_reference?:string;notes?:string;tags?:string;historical_import?:boolean;shipping_carrier?:string;tracking_number?:string;tracking_url?:string;internal_note?:string};
+type OrderMeta={discount?:number;coupon_code?:string;refunded_at?:string;refunded_amount?:number;refund_reference?:string;billing?:Address;shipping_address?:Address;payment_method?:string;payment_reference?:string;notes?:string;tags?:string;historical_import?:boolean;shipping_carrier?:string;tracking_number?:string;tracking_url?:string;internal_note?:string};
 
 function AddressCard({title,address}:{title:string;address?:Address}){
   const lines=[address?.name,address?.address1,address?.address2,[address?.zip,address?.city].filter(Boolean).join(" "),address?.province,address?.country,address?.phone].filter(Boolean);
@@ -153,8 +153,15 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         hazırlarken ilk bakılan yer burası. */}
     <section className="ac-split-even"><AddressCard title="FATURA ADRESİ" address={meta.billing}/><AddressCard title="TESLİMAT ADRESİ" address={meta.shipping_address}/></section>
 
-    {query.saved&&<section className="ac ac-pad-sm"><strong>{query.saved==="fulfillment"?"Kargo ve operasyon bilgileri kaydedildi.":"Sipariş durumu güncellendi."}</strong></section>}
-    {query.error&&<section className="ac ac-pad-sm"><strong>İşlem tamamlanamadı: {query.error}</strong></section>}
+    {query.saved&&<section className="ac ac-pad-sm"><strong>{query.saved==="fulfillment"?"Kargo ve operasyon bilgileri kaydedildi.":query.saved==="refund"?"İade tamamlandı.":"Sipariş durumu güncellendi."}</strong></section>}
+    {query.error&&<section className="ac ac-pad-sm"><strong>
+      {query.error==="not-paid"?"Bu sipariş ödenmediği için iade edilemez."
+      :query.error==="already-refunded"?"Bu sipariş zaten iade edilmiş."
+      :query.error==="invalid-amount"?"İade tutarı sipariş tutarını aşamaz."
+      :query.error==="refund-failed"?"PayTR iade talebini reddetti. Ayrıntı için sunucu günlüklerine bakın."
+      :query.error==="refund-recorded-failed"?"İade yapıldı ancak sipariş kaydı güncellenemedi. PayTR panelinden doğrulayın; tekrar iade denemeyin."
+      :`İşlem tamamlanamadı: ${query.error}`}
+    </strong></section>}
 
     {/* Sipariş kalemleri tam genişlikte: on sütunlu fatura
         dökümü yan panelle birlikte sığmıyordu. */}
@@ -233,6 +240,54 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         {meta.tracking_url&&<p style={{marginTop:"var(--s3)"}}><a href={meta.tracking_url} target="_blank" rel="noreferrer">Kargo takibini aç ↗</a></p>}
       </div>
     </section>
+
+    {/*
+      İade. Ayrı bir kartta ve yalnızca ödenmiş siparişte
+      görünüyor: parasal işlem, yanlışlıkla tıklanmamalı.
+    */}
+    {order.payment_status === "paid" && !meta.refunded_at && ["owner","admin"].includes(membership.role) ? (
+      <section className="ac ac-pad">
+        <div className="ac-head">
+          <div>
+            <h3>İade</h3>
+            <p>Tutar PayTR üzerinden müşterinin kartına iade edilir.</p>
+          </div>
+        </div>
+
+        <form action={refundOrder} style={{display:"grid",gap:"var(--s3)",maxWidth:360}}>
+          <input type="hidden" name="order_id" value={order.id}/>
+          <label>
+            İade tutarı (₺)
+            <input
+              name="amount"
+              type="number"
+              min="0"
+              step="0.01"
+              max={(order.total/100).toFixed(2)}
+              placeholder={`Tamamı: ${(order.total/100).toFixed(2)}`}
+              className="ac-input"
+            />
+          </label>
+          <p style={{margin:0,fontSize:"var(--t-sm)",color:"var(--c-ink-3)",lineHeight:1.6}}>
+            Boş bırakırsanız siparişin tamamı iade edilir. Bu işlem geri
+            alınamaz.
+          </p>
+          <button className="ac-btn" type="submit" style={{borderColor:"var(--c-bad)",color:"var(--c-bad)"}}>
+            İadeyi başlat
+          </button>
+        </form>
+      </section>
+    ) : null}
+
+    {meta.refunded_at ? (
+      <section className="ac ac-pad-sm">
+        <strong>
+          İade edildi ·{" "}
+          {money(Number(meta.refunded_amount ?? 0), order.currency)} ·{" "}
+          {new Date(String(meta.refunded_at)).toLocaleString("tr-TR")}
+        </strong>
+      </section>
+    ) : null}
 
     <section className="ac ac-pad"><div className="ac-head"><div><h3>İşlem geçmişi</h3><p>Bu siparişte yapılan değişiklikler.</p></div><span>{events?.length??0} kayıt</span></div><div style={{marginTop:16}}>{events?.length?events.map(event=>{const data=(event.event_data??{}) as Record<string,string|null>;const title=event.event_type==="status_updated"?"Sipariş durumu güncellendi":"Kargo bilgileri güncellendi";const detail=event.event_type==="status_updated"?`${orderStatusLabel(data.old_status)} → ${orderStatusLabel(data.new_status)} · Ödeme: ${paymentStatusLabel(data.new_payment_status)}`:`${data.shipping_carrier||"Kargo firması yok"} · ${data.tracking_number||"Takip numarası yok"}`;return <div className="order" key={event.id}><i>✓</i><div><b>{title}</b><small>{detail}</small></div><span style={{textAlign:"right",fontSize:10}}>{new Date(event.created_at).toLocaleString("tr-TR")}<small style={{display:"block"}}>{event.created_by?"Yetkili kullanıcı":"Sistem"}</small></span></div>}):<p>Henüz kayıtlı sipariş işlemi yok.</p>}</div></section>
 

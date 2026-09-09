@@ -347,3 +347,79 @@ export function statusUpdateEmail(
 </html>`,
   };
 }
+
+/**
+ * İade kararı bildirimi.
+ *
+ * Onayda tutar ve süre bilgisi, rette gerekçe. Müşteri
+ * talebinin ne olduğunu öğrenmek için aramak zorunda
+ * kalmamalı.
+ */
+export function returnDecisionEmail({
+  approved,
+  orderNumber,
+  customerName,
+  amount,
+  note,
+}: {
+  approved: boolean;
+  orderNumber: string;
+  customerName: string;
+  amount?: number;
+  note?: string;
+}) {
+  const title = approved
+    ? "İade talebiniz onaylandı"
+    : "İade talebiniz hakkında";
+
+  const body = approved
+    ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.65;color:#5a5f54;">
+         ${escapeHtml(orderNumber)} numaralı siparişiniz için iade talebiniz
+         onaylandı${amount ? ` ve <strong>${money(amount)}</strong> tutarında iade işlemi başlatıldı` : ""}.
+       </p>
+       <p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
+         Tutarın kartınıza yansıma süresi bankanıza bağlıdır; genellikle
+         birkaç iş günü sürer.
+       </p>`
+    : `<p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
+         ${escapeHtml(orderNumber)} numaralı siparişiniz için iade talebiniz
+         değerlendirildi ve karşılanamadı.
+       </p>`;
+
+  const noteBlock = note
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+              style="margin-top:18px;background:#faf9f5;border-radius:10px;">
+         <tr><td style="padding:14px 16px;font-size:13px;line-height:1.7;color:#5a5f54;">
+           ${escapeHtml(note)}
+         </td></tr>
+       </table>`
+    : "";
+
+  return {
+    subject: `${title} · ${orderNumber}`,
+    html: `<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:24px 12px;background:#f4f3ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;">
+    <tr><td style="padding:32px 28px;">
+      <img src="https://arvoculture.com/arvoculture-logo-transparent.png"
+           alt="ArvoCulture" width="150" height="18"
+           style="display:block;width:150px;height:auto;margin:0 0 22px;border:0;">
+      <h1 style="margin:0 0 10px;font-size:22px;line-height:1.3;color:#10120f;font-weight:600;">
+        ${escapeHtml(title)}
+      </h1>
+      <p style="margin:0 0 14px;font-size:14px;color:#5a5f54;">
+        Merhaba ${escapeHtml(customerName)},
+      </p>
+      ${body}
+      ${noteBlock}
+      <p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#8b8f85;">
+        Sorularınız için bu e-postayı yanıtlayabilirsiniz.
+      </p>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+  };
+}

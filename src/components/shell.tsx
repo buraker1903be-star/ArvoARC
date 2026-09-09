@@ -22,6 +22,7 @@ const navigation=[
   ["stock","Stok Yönetimi","/stok","▤"],
   ["orders","Siparişler","/siparisler","▧"],
   ["customers","Müşteriler","/musteriler","◎"],
+  ["returns","İade Talepleri","/iadeler","↩"],
   ["analytics","Satış Analitiği","/analitik","↗"],
   ["import","Veri Aktarımı","/veri-aktarimi","⇄"],
   ["suppliers","Tedarikçiler","/tedarikci","◎"],

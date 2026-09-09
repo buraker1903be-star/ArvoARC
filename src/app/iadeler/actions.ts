@@ -1,0 +1,163 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { requireTenant } from "@/lib/tenant";
+import { refundPayment } from "@/lib/paytr/refund";
+import { sendEmail } from "@/lib/email/resend";
+import { returnDecisionEmail } from "@/lib/email/order-confirmation";
+
+/**
+ * İade talebini sonuçlandırır.
+ *
+ * Onay PayTR iadesini tetikler; para gerçekten iade edilir.
+ * Bu yüzden yalnızca sahip ve yönetici yapabiliyor.
+ */
+export async function resolveReturn(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+
+  if (!["owner", "admin"].includes(membership.role)) {
+    redirect("/iadeler?error=forbidden");
+  }
+
+  const id = String(formData.get("request_id") ?? "");
+  const decision = String(formData.get("decision") ?? "");
+  const note = String(formData.get("note") ?? "").trim().slice(0, 500);
+
+  if (!id || !["onayla", "reddet"].includes(decision)) {
+    redirect("/iadeler?error=invalid");
+  }
+
+  const { data: request } = await supabase
+    .from("arc_return_requests")
+    .select("id,order_id,items,status,arc_orders(order_number,total,customer_name,customer_email,metadata)")
+    .eq("organization_id", organization.id)
+    .eq("id", id)
+    .single();
+
+  if (!request) redirect("/iadeler?error=not-found");
+  if (request.status !== "beklemede") redirect("/iadeler?error=already-resolved");
+
+  const order = (Array.isArray(request.arc_orders)
+    ? request.arc_orders[0]
+    : request.arc_orders) as {
+    order_number: string;
+    total: number;
+    customer_name: string | null;
+    customer_email: string | null;
+    metadata: Record<string, unknown> | null;
+  } | null;
+
+  if (!order) redirect("/iadeler?error=not-found");
+
+  /* --- Ret --- */
+  if (decision === "reddet") {
+    await supabase
+      .from("arc_return_requests")
+      .update({
+        status: "reddedildi",
+        status_note: note || null,
+        resolved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (order.customer_email) {
+      try {
+        const mail = returnDecisionEmail({
+          approved: false,
+          orderNumber: order.order_number,
+          customerName: order.customer_name || "değerli müşterimiz",
+          note,
+        });
+        await sendEmail({ to: order.customer_email, ...mail });
+      } catch (mailError) {
+        console.error("İade ret bildirimi gönderilemedi:", mailError);
+      }
+    }
+
+    revalidatePath("/iadeler");
+    redirect("/iadeler?ok=reddedildi");
+  }
+
+  /* --- Onay: PayTR iadesi --- */
+
+  /*
+    Tutar seçilen kalemlerden hesaplanıyor. Formdan gelen
+    değere güvenmiyoruz: parasal işlem.
+  */
+  const items = (request.items ?? []) as Array<{ total?: number }>;
+  const itemsTotal = items.reduce(
+    (sum, item) => sum + Number(item.total ?? 0),
+    0,
+  );
+
+  const custom = Number(formData.get("amount") ?? 0);
+  const amountKurus =
+    custom > 0 ? Math.round(custom * 100) : itemsTotal || order.total;
+
+  if (amountKurus <= 0 || amountKurus > order.total) {
+    redirect("/iadeler?error=invalid-amount");
+  }
+
+  const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
+
+  const result = await refundPayment({
+    merchantOid,
+    amountKurus,
+    referenceNo: `ARC-IADE-${id.slice(0, 8)}`,
+  });
+
+  if (!result.ok) {
+    console.error("İade başarısız:", order.order_number, result.message);
+    redirect("/iadeler?error=refund-failed");
+  }
+
+  const tamIade = amountKurus >= order.total;
+
+  await supabase
+    .from("arc_return_requests")
+    .update({
+      status: "tamamlandi",
+      status_note: note || null,
+      refund_amount: amountKurus,
+      refund_reference: result.reference ?? null,
+      resolved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  await supabase
+    .from("arc_orders")
+    .update({
+      payment_status: tamIade ? "refunded" : "paid",
+      status: tamIade ? "refunded" : undefined,
+      metadata: {
+        ...(order.metadata ?? {}),
+        refunded_at: new Date().toISOString(),
+        refunded_amount: amountKurus,
+        refund_reference: result.reference ?? null,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", organization.id)
+    .eq("id", request.order_id);
+
+  if (order.customer_email) {
+    try {
+      const mail = returnDecisionEmail({
+        approved: true,
+        orderNumber: order.order_number,
+        customerName: order.customer_name || "değerli müşterimiz",
+        amount: amountKurus,
+        note,
+      });
+      await sendEmail({ to: order.customer_email, ...mail });
+    } catch (mailError) {
+      console.error("İade onay bildirimi gönderilemedi:", mailError);
+    }
+  }
+
+  revalidatePath("/iadeler");
+  redirect("/iadeler?ok=tamamlandi");
+}
