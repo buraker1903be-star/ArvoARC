@@ -161,9 +161,26 @@ async function runSync(mode: "tam" | "stok") {
     Stok modunda parça daha büyük: ürün ve görsel yazılmadığı
     için tur başına iş daha az.
   */
-  const size = mode === "tam" ? BATCH : BATCH * 3;
+  /*
+    Stok modunda parça çok daha büyük: güncelleme tek sorguda
+    yapıldığı için 500 ürün bile saniyeler sürüyor.
+
+    3.273 ürün 500'lük parçalarla 7 turda bitiyor; 10 dakikada
+    bir tetiklemeyle katalog yaklaşık 70 dakikada tam turluyor.
+    Öncesinde bu süre 5 saatti.
+  */
+  const size = mode === "tam" ? BATCH : 500;
   const start = rule.sync_cursor ?? 0;
   const slice = products.slice(start, start + size);
+
+  /* Stok modunda biriken güncellemeler; parça sonunda tek
+     sorguda uygulanır. */
+  const stockUpdates: Array<{
+    sku: string;
+    stock: number;
+    cost: number;
+    price: number;
+  }> = [];
 
   const stats = {
     toplam: products.length,
@@ -367,25 +384,21 @@ async function runSync(mode: "tam" | "stok") {
           stats.yeniVaryant += rows.length;
         } else {
           /*
-            Stok modunda kayıt silinmez; yalnızca stok, maliyet ve
-            fiyat güncellenir. Silip yeniden eklemek gereksiz iş
-            yapıyor ve tedarikçinin aynı barkodu farklı ürünlerde
-            göndermesi durumunda benzersizlik hatası üretiyordu.
+            Stok modunda kayıtlar biriktirilip parça sonunda tek
+            sorguda güncellenir.
+
+            Öncesinde her varyant için ayrı bir UPDATE
+            gönderiliyordu: 120 ürün yaklaşık 500 ağ turu
+            demekti ve parça boyutunu büyütmek süre sınırına
+            dayanma riski taşıyordu.
           */
           for (const row of rows) {
-            const { error: updateError } = await supabase
-              .from("arc_product_variants")
-              .update({
-                stock: row.stock,
-                cost_price: row.cost_price,
-                price: row.price,
-                updated_at: row.updated_at,
-              })
-              .eq("organization_id", orgId)
-              .eq("supplier_sku", row.supplier_sku);
-
-            if (updateError) throw updateError;
-            stats.guncellenenVaryant += 1;
+            stockUpdates.push({
+              sku: row.supplier_sku,
+              stock: row.stock,
+              cost: row.cost_price,
+              price: row.price,
+            });
           }
         }
       }
@@ -410,6 +423,39 @@ async function runSync(mode: "tam" | "stok") {
 
   const next = start + slice.length;
   const bitti = next >= products.length;
+
+  /*
+    Aktarım bittiğinde ürünleri koleksiyonlara bağla. Bu olmadan
+    tedarikçi ürünleri menüde görünmüyor; yalnızca arama ve
+    "tüm ürünler" üzerinden erişilebiliyorlar.
+
+    Fonksiyon mükerrer bağlantı oluşturmuyor, her turda güvenle
+    çağrılabilir.
+  */
+  /* Biriken stok güncellemeleri tek sorguda uygulanır. */
+  if (mode !== "tam" && stockUpdates.length > 0) {
+    const { data: updated, error: bulkError } = await supabase.rpc(
+      "arc_bulk_update_supplier_stock",
+      { p_supplier: "tarzyeri", p_rows: stockUpdates },
+    );
+
+    if (bulkError) {
+      return NextResponse.json(
+        { error: "stok_guncellenemedi", detail: bulkError.message },
+        { status: 500 },
+      );
+    }
+
+    stats.guncellenenVaryant = Number(updated ?? 0);
+  }
+
+  if (bitti) {
+    const { error: catError } = await supabase.rpc(
+      "arc_categorize_supplier_products",
+      { p_supplier: "tarzyeri" },
+    );
+    if (catError) console.error("Kategorileme hatası:", catError);
+  }
 
   await supabase
     .from("arc_suppliers")
