@@ -90,20 +90,33 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     total:number;
   };
 
+  /*
+    Birim fiyatlar KDV HARİÇ gösteriliyor; e-fatura standardı
+    böyle. Toplam sütunu KDV dâhil kalıyor — müşterinin ödediği
+    tutar o.
+
+    Kayıtlı fiyatlar KDV dâhil olduğu için hariç tutar
+    hesaplanıyor: 310,90 dâhil → 259,08 hariç.
+  */
+  const exVat=(gross:number,rate:number)=>Math.round(gross/(1+rate/100));
+
   const buildLine=(name:string,sku:string,quantity:number,unit:number,grossTotal:number,rate:number):Line=>{
     const discountAmount=Math.round(grossTotal*discountRate);
-    const net=grossTotal-discountAmount;
-    const vat=Math.round(net-net/(1+rate/100));
+    const paid=grossTotal-discountAmount;
+    const vat=Math.round(paid-paid/(1+rate/100));
+    const netTotal=paid-vat;
     return {
       name,
       sku,
       quantity,
-      unit,
-      discountAmount,
-      netUnit:quantity>0?Math.round(net/quantity):net,
+      /* KDV hariç birim fiyat. */
+      unit:exVat(unit,rate),
+      /* İndirim de hariç tutar üzerinden gösteriliyor. */
+      discountAmount:exVat(discountAmount,rate),
+      netUnit:quantity>0?Math.round(netTotal/quantity):netTotal,
       rate,
       vat,
-      total:net,
+      total:paid,
     };
   };
 
@@ -156,13 +169,13 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           <div className="ac-line ac-line-head">
             <span>ÜRÜN / SKU</span>
             <span>ADET</span>
-            <span>BİRİM</span>
+            <span>BİRİM (HARİÇ)</span>
             <span>İND. %</span>
             <span>İNDİRİM</span>
-            <span>İND. BİRİM</span>
+            <span>İND. BİRİM (HARİÇ)</span>
             <span>KDV %</span>
             <span>KDV</span>
-            <span>TOPLAM</span>
+            <span>TOPLAM (DÂHİL)</span>
           </div>
 
           {lines.map((line,index)=>(
