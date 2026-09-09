@@ -70,17 +70,39 @@ export default async function Operations(){
   const totalActions=(openCount??0)+(paymentCount??0)+(criticalCount??0)+(lowCount??0)+missingImages.length;
 
   return <Shell active="operations" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>OPERASYON · AKSİYON MERKEZİ</small><h2>Operasyon Merkezi</h2><p>Sipariş, ödeme, stok ve katalog için aksiyon gerektiren kayıtların tek görünümü.</p></div></section>
-    <section className="metrics"><article><span>TOPLAM AKSİYON</span><strong>{totalActions}</strong><small>Kontrol bekleyen</small></article><article><span>AÇIK SİPARİŞ</span><strong>{openCount??0}</strong><small>Bekliyor veya hazırlanıyor</small></article><article><span>STOK UYARISI</span><strong>{(criticalCount??0)+(lowCount??0)}</strong><small>Kritik ve düşük stok</small></article><article><span>GÖRSEL EKSİĞİ</span><strong>{missingImages.length}</strong><small>Aktif ürün</small></article></section>
-
-    <section className="grid">
-      <article className="card"><div className="head"><div><small>SİPARİŞ</small><h3>Açık siparişler</h3></div><Link href="/siparisler?filter=processing">Tüm siparişler →</Link></div>{(openOrders??[]).slice(0,8).map(order=><Link prefetch={false} className="order" href={`/siparisler/${order.id}`} key={order.id}><i>▧</i><div><b>{order.order_number} · {order.customer_name||"Müşteri"}</b><small>{orderStatusLabel(order.status)} · {new Date(order.created_at).toLocaleDateString("tr-TR")}</small></div><strong>{money.format(order.total/100)}</strong></Link>)}{!(openOrders??[]).length&&<p>Açık sipariş bulunmuyor.</p>}</article>
-      <article className="card"><div className="head"><div><small>ÖDEME</small><h3>Ödeme kontrolü</h3></div><Link href="/siparisler">Siparişlere git →</Link></div>{(paymentPending??[]).slice(0,8).map(order=><Link prefetch={false} className="order" href={`/siparisler/${order.id}`} key={order.id}><i>₺</i><div><b>{order.order_number}</b><small>{paymentStatusLabel(order.payment_status)}</small></div><strong>{money.format(order.total/100)}</strong></Link>)}{!(paymentPending??[]).length&&<p>Ödeme bekleyen sipariş bulunmuyor.</p>}</article>
+    <section className="ac-bar">
+      <div>
+        <h1>Operasyon Merkezi</h1>
+        <p>Aksiyon gerektiren kayıtların tek görünümü.</p>
+      </div>
     </section>
 
-    <section className="grid" style={{marginTop:20}}>
-      <article className="card"><div className="head"><div><small>STOK</small><h3>Kritik stoklar</h3></div><Link href="/stok?filter=negative">Stok yönetimi →</Link></div>{stockVariants.slice(0,10).map(variant=><div className="order" key={variant.id}><i>!</i><div><b>{productMap.get(variant.product_id)?.name??"Ürün"}</b><small>{variant.sku} · {variant.allow_backorder?"Stoksuz satış açık":"Stok zorunlu"}</small></div><strong>{variant.stock}</strong></div>)}{!stockVariants.length&&<p>Stok uyarısı bulunmuyor.</p>}</article>
-      <article className="card"><div className="head"><div><small>KATALOG</small><h3>Görseli eksik ürünler</h3></div><Link href="/urunler">Ürünlere git →</Link></div>{missingImages.slice(0,10).map(product=><Link className="order" href={`/urunler/${product.id}`} key={product.id}><i>◇</i><div><b>{product.name}</b><small>{product.source==="shopify"?"Shopify aktarımı":"ARC Native"}</small></div><strong>Görsel ekle</strong></Link>)}{!missingImages.length&&<p>Aktif ürünlerde görsel eksiği bulunmuyor.</p>}</article>
+    <div className="ac-stack">
+    {/* Renk anlamlı: sıfır olan sayaç nötr, dolu olan dikkat. */}
+    <section className="ac-metrics">
+      <article className="ac-metric" data-tone={totalActions>0?"warn":undefined}>
+        <span>TOPLAM AKSİYON</span><strong>{totalActions}</strong><small>Kontrol bekleyen</small>
+      </article>
+      <article className="ac-metric" data-tone={(openCount??0)>0?"warn":undefined}>
+        <span>AÇIK SİPARİŞ</span><strong>{openCount??0}</strong><small>Bekliyor veya hazırlanıyor</small>
+      </article>
+      <article className="ac-metric" data-tone={(criticalCount??0)>0?"bad":(lowCount??0)>0?"warn":undefined}>
+        <span>STOK UYARISI</span><strong>{(criticalCount??0)+(lowCount??0)}</strong><small>Kritik ve düşük stok</small>
+      </article>
+      <article className="ac-metric" data-tone={missingImages.length>0?"warn":undefined}>
+        <span>GÖRSEL EKSİĞİ</span><strong>{missingImages.length}</strong><small>Aktif ürün</small>
+      </article>
     </section>
+
+    <section className="ac-split-even">
+      <article className="ac ac-pad"><div className="ac-head"><div><h3>Açık siparişler</h3><p>Hazırlanmayı bekleyenler.</p></div><Link href="/siparisler?filter=processing">Tüm siparişler →</Link></div>{(openOrders??[]).slice(0,8).map(order=><Link prefetch={false} className="order" href={`/siparisler/${order.id}`} key={order.id}><i>▧</i><div><b>{order.order_number} · {order.customer_name||"Müşteri"}</b><small>{orderStatusLabel(order.status)} · {new Date(order.created_at).toLocaleDateString("tr-TR")}</small></div><strong>{money.format(order.total/100)}</strong></Link>)}{!(openOrders??[]).length&&<p>Açık sipariş bulunmuyor.</p>}</article>
+      <article className="ac ac-pad"><div className="ac-head"><div><h3>Ödeme kontrolü</h3><p>Ödemesi tamamlanmamış siparişler.</p></div><Link href="/siparisler">Siparişlere git →</Link></div>{(paymentPending??[]).slice(0,8).map(order=><Link prefetch={false} className="order" href={`/siparisler/${order.id}`} key={order.id}><i>₺</i><div><b>{order.order_number}</b><small>{paymentStatusLabel(order.payment_status)}</small></div><strong>{money.format(order.total/100)}</strong></Link>)}{!(paymentPending??[]).length&&<p>Ödeme bekleyen sipariş bulunmuyor.</p>}</article>
+    </section>
+
+    <section className="ac-split-even">
+      <article className="ac ac-pad"><div className="ac-head"><div><h3>Kritik stoklar</h3><p>Tükenen ve azalan varyantlar.</p></div><Link href="/stok?filter=negative">Stok yönetimi →</Link></div>{stockVariants.slice(0,10).map(variant=><div className="order" key={variant.id}><i>!</i><div><b>{productMap.get(variant.product_id)?.name??"Ürün"}</b><small>{variant.sku} · {variant.allow_backorder?"Stoksuz satış açık":"Stok zorunlu"}</small></div><strong>{variant.stock}</strong></div>)}{!stockVariants.length&&<p>Stok uyarısı bulunmuyor.</p>}</article>
+      <article className="ac ac-pad"><div className="ac-head"><div><h3>Görseli eksik ürünler</h3><p>Aktif ama görselsiz.</p></div><Link href="/urunler">Ürünlere git →</Link></div>{missingImages.slice(0,10).map(product=><Link className="order" href={`/urunler/${product.id}`} key={product.id}><i>◇</i><div><b>{product.name}</b><small>{product.source==="shopify"?"Shopify aktarımı":"ARC Native"}</small></div><strong>Görsel ekle</strong></Link>)}{!missingImages.length&&<p>Aktif ürünlerde görsel eksiği bulunmuyor.</p>}</article>
+    </section>
+    </div>
   </Shell>;
 }
