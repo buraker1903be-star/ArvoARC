@@ -1,4 +1,29 @@
 import {Shell} from "@/components/shell";import {requireTenant} from "@/lib/tenant";import {publishTheme,saveThemeDraft} from "./actions";import {ThemeEditor} from "./theme-editor";
 type Theme=Record<string,string|number|boolean|undefined>;
 const defaults:Theme={announcement:"2.000 TL üzeri ücretsiz kargo • İlk alışverişe ARVO10",hero_eyebrow:"ARVOCULTURE · APPAREL & BEAUTY",hero_title:"Seçtiğin şey,",hero_emphasis:"senin hikâyen.",hero_description:"Tarzını, bakımını ve gündelik ritüellerini tek bir kültürde buluşturan özgün seçkiler.",primary_cta_label:"Giyimi keşfet",primary_cta_href:"/koleksiyon/giyim",secondary_cta_label:"Bakımı keşfet",secondary_cta_href:"/koleksiyon/bakim",featured_eyebrow:"ÖNE ÇIKANLAR",featured_title:"Şimdi keşfet.",campaign_title:"İlk seçimine özel.",campaign_description:"İlk siparişinde ARVO10 koduyla %10 indirim.",manifest_title:"İki dünya. Tek yaşam kültürü.",manifest_description:"Giydiğin parçadan günlük bakım ritüeline kadar her seçim, kendini anlatma biçimindir.",apparel_title:"Kendini giy.",apparel_description:"Zamansız parçalar. Özgün duruşlar.",beauty_title:"Kendine iyi bak.",beauty_description:"Günlük ritüelin için seçilmiş bakım.",trust_one:"Seçilmiş ürünler",trust_two:"Güvenli ödeme",trust_three:"Özenli paketleme",trust_four:"Kolay iade",footer_tagline:"Giyim, bakım ve gündelik ritüeller için seçilmiş bir yaşam kültürü.",show_manifest:true,show_worlds:true,show_featured:true,show_campaign:true,show_values:true,order_manifest:20,order_worlds:30,order_featured:40,order_campaign:50,order_values:60,show_vendor:true,show_badges:true,show_quick_add:true,products_per_row:4,primary_color:"#111210",accent_color:"#D9FF43",background_color:"#F5F2EC",typography:"editorial",hero_style:"editorial-orbs",header_layout:"centered",sticky_header:true,show_search:true,show_account:true,product_card_style:"editorial",product_image_ratio:"portrait"};
-export default async function Page(){const {supabase,organization,membership}=await requireTenant();const[{data:rows,error},{data:settings}]=await Promise.all([supabase.from("arc_store_themes").select("mode,config").eq("organization_id",organization.id),supabase.from("arc_store_settings").select("storefront_url").eq("organization_id",organization.id).maybeSingle()]);if(error)throw new Error(error.message);const draft=rows?.find(x=>x.mode==="draft"),can=["owner","admin","manager"].includes(membership.role),config={...defaults,...((draft?.config??{}) as Theme)},store=settings?.storefront_url??"https://arvoculture.com";return <Shell active="theme" tenantName={organization.name} tenantPlan={organization.plan_code}><section className="subhead"><div><small>MAĞAZA · GÖRSEL EDİTÖR</small><h2>Mağaza Tasarımı</h2><p>Bölümleri doğrudan gerçek mağaza üzerinde düzenleyin.</p></div>{can?<form action={publishTheme}><button>Canlıya yayınla</button></form>:null}</section>{can?<form action={saveThemeDraft}><ThemeEditor initial={config} store={store}/></form>:<section className="card">Temayı değiştirmek için yönetici yetkisi gerekir.</section>}</Shell>}
+export default async function Page(){const {supabase,organization,membership}=await requireTenant();const[{data:rows,error},{data:settings}]=await Promise.all([supabase.from("arc_store_themes").select("mode,config").eq("organization_id",organization.id),supabase.from("arc_store_settings").select("storefront_url").eq("organization_id",organization.id).maybeSingle()]);if(error)throw new Error(error.message);const draft=rows?.find(x=>x.mode==="draft"),can=["owner","admin","manager"].includes(membership.role),config={...defaults,...((draft?.config??{}) as Theme)},store=previewUrl(settings?.storefront_url);return <Shell active="theme" tenantName={organization.name} tenantPlan={organization.plan_code}><section className="subhead"><div><small>MAĞAZA · GÖRSEL EDİTÖR</small><h2>Mağaza Tasarımı</h2><p>Bölümleri doğrudan gerçek mağaza üzerinde düzenleyin.</p></div>{can?<form action={publishTheme}><button>Canlıya yayınla</button></form>:null}</section>{can?<form action={saveThemeDraft}><ThemeEditor initial={config} store={store}/></form>:<section className="card">Temayı değiştirmek için yönetici yetkisi gerekir.</section>}</Shell>}
+
+/**
+ * Önizleme adresi.
+ *
+ * `storefront_url` ayarında eski bir Vercel dağıtımı kalabiliyor;
+ * o dağıtım silindiğinde önizleme 404 veriyor ve editör tamamen
+ * kullanılamaz hâle geliyordu.
+ *
+ * Geçersiz ya da eski `.vercel.app` adresleri yerine alan adı
+ * kullanılıyor.
+ */
+function previewUrl(value: string | null | undefined) {
+  const fallback = "https://arvoculture.com";
+  if (!value) return fallback;
+
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return fallback;
+    // Dağıtım adresleri kalıcı değil; alan adı tercih edilir.
+    if (url.hostname.endsWith(".vercel.app")) return fallback;
+    return url.toString();
+  } catch {
+    return fallback;
+  }
+}
