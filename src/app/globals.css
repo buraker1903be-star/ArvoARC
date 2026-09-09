@@ -658,3 +658,33 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 .product-card-margin strong[data-loss="true"] {
   color: #c62d24;
 }
+
+/* ---------- Sipariş listesinde hızlı eylem --------------- */
+
+/*
+  Sipariş akışı doğrusal: onaylandı → hazırlanıyor → kargoya
+  verildi. Listeden tek tıkla ilerletmek, her siparişi açıp
+  kaydetmekten çok daha hızlı.
+
+  Sipariş satırına altıncı sütun eklendi; başlık satırı da
+  aynı düzeni kullandığı için orada boş kalıyor.
+*/
+.table .row{grid-template-columns:2fr 1fr .7fr .8fr .9fr auto}
+
+.quick-action{
+  padding:8px 14px;
+  border:1px solid #d9e9d0;
+  border-radius:999px;
+  background:#fff;
+  color:#3f6e32;
+  font-size:10px;
+  font-weight:750;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:background-color .16s ease,border-color .16s ease;
+}
+
+.quick-action:hover{background:#edf6e8;border-color:#3f6e32}
+
+/* Satırın tamamı bağlantı; düğme tıklaması ona karışmasın. */
+.table .row form{display:flex;justify-content:flex-end;padding:8px}

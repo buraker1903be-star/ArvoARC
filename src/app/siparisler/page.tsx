@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
 import { OrderForm } from "./order-form";
+import { quickStatus } from "./actions";
 import { orderStatusLabel, paymentStatusLabel, sourceLabel } from "@/lib/commerce-labels";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
@@ -67,7 +68,34 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
 
     <section className="card table"><div className="head"><div><small>SİPARİŞ AKIŞI</small><h3>{visibleOrders.length} sipariş</h3></div><span>{organization.name}</span></div>
       <div className="row th"><span>SİPARİŞ</span><span>MÜŞTERİ</span><span>KAYNAK</span><span>TUTAR</span><span>DURUM</span></div>
-      {visibleOrders.length ? visibleOrders.map(order=><Link prefetch={false} href={`/siparisler/${order.id}`} className="row" key={order.id} style={{textDecoration:"none",color:"inherit"}}><span><b>{order.order_number}</b></span><span>{order.customer_name || order.customer_email || "Misafir"}</span><span>{sourceLabel(order.source)}</span><span>{money.format(order.total/100)}</span><span><em>{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</em></span></Link>) : <div style={{padding:24}}><strong>Arama kriterine uygun sipariş bulunamadı.</strong><p>İlk manuel siparişi oluşturabilir veya Veri Aktarımı ekranından eski Shopify sipariş arşivinizi yükleyebilirsiniz.</p></div>}
+      {visibleOrders.length ? visibleOrders.map(order=>{
+        /*
+          Bir sonraki adım. Sipariş akışı doğrusal: onaylandı →
+          hazırlanıyor → kargoya verildi. Listeden tek tıkla
+          ilerletmek, detaya girip kaydetmekten çok daha hızlı.
+        */
+        const next=order.status==="pending"?{key:"confirmed",label:"Onayla"}
+          :order.status==="confirmed"?{key:"processing",label:"Hazırlanıyor"}
+          :order.status==="processing"?{key:"fulfilled",label:"Kargoya ver"}
+          :null;
+
+        return <div className="row" key={order.id} style={{alignItems:"center"}}>
+          <Link prefetch={false} href={`/siparisler/${order.id}`} style={{textDecoration:"none",color:"inherit",display:"contents"}}>
+            <span><b>{order.order_number}</b></span>
+            <span>{order.customer_name || order.customer_email || "Misafir"}</span>
+            <span>{sourceLabel(order.source)}</span>
+            <span>{money.format(order.total/100)}</span>
+            <span><em>{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</em></span>
+          </Link>
+          {canManage&&next?(
+            <form action={quickStatus} style={{margin:0}}>
+              <input type="hidden" name="order_id" value={order.id}/>
+              <input type="hidden" name="status" value={next.key}/>
+              <button type="submit" className="quick-action">{next.label} →</button>
+            </form>
+          ):<span/>}
+        </div>;
+      }) : <div style={{padding:24}}><strong>Arama kriterine uygun sipariş bulunamadı.</strong><p>İlk manuel siparişi oluşturabilir veya Veri Aktarımı ekranından eski Shopify sipariş arşivinizi yükleyebilirsiniz.</p></div>}
     </section>
   </Shell>;
 }
