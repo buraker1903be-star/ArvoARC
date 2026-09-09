@@ -1,3 +1,4 @@
+import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
 import { updateSupplier, resetCursor } from "./actions";
 
@@ -31,15 +32,27 @@ export default async function SuppliersPage({
 
   if (error) throw new Error(error.message);
 
+  /*
+    Sayfa Shell içinde değildi: sol menü görünmüyordu ve
+    kullanıcı buraya girince gezinmeyi kaybediyordu.
+  */
   return (
-    <main style={{ padding: 24 }}>
-      <h1 style={{ marginBottom: 4 }}>Tedarikçiler</h1>
-      <p style={{ color: "#7c8177", marginBottom: 24 }}>
-        Fiyat kuralları ve aktarım durumu.
-      </p>
+    <Shell
+      active="suppliers"
+      tenantName={organization.name}
+      tenantPlan={organization.plan_code}
+    >
+      <section className="ac-bar">
+        <div>
+          <h1>Tedarikçiler</h1>
+          <p>Fiyat kuralları ve aktarım durumu.</p>
+        </div>
+      </section>
 
-      {params.ok === "saved" && (
-        <p style={{ color: "#1f7a4d", marginBottom: 16 }}>Ayarlar kaydedildi.</p>
+      <div className="ac-stack">
+
+      {params.ok==="saved"&&(
+        <p className="ac ac-pad-sm" style={{color:"var(--c-good)"}}>Ayarlar kaydedildi.</p>
       )}
       {params.ok === "reset" && (
         <p style={{ color: "#1f7a4d", marginBottom: 16 }}>
@@ -72,12 +85,7 @@ export default async function SuppliersPage({
         return (
           <section
             key={supplier.id}
-            style={{
-              padding: 24,
-              marginBottom: 20,
-              border: "1px solid rgba(0,0,0,.08)",
-              borderRadius: 14,
-            }}
+            className="ac ac-pad"
           >
             <div
               style={{
@@ -96,13 +104,13 @@ export default async function SuppliersPage({
             {/* Aktarım durumu */}
             <div
               style={{
-                padding: 16,
-                marginBottom: 20,
-                background: "#faf9f5",
-                borderRadius: 10,
-                fontSize: 13,
-                lineHeight: 1.8,
-                color: "#5a5f54",
+                padding:"var(--s4)",
+                marginBottom:"var(--s5)",
+                background:"var(--c-surface-2)",
+                borderRadius:"var(--r1)",
+                fontSize:"var(--t-sm)",
+                lineHeight:1.8,
+                color:"var(--c-ink-2)",
               }}
             >
               Katalog: <strong>{total || "—"}</strong> ürün
@@ -149,12 +157,7 @@ export default async function SuppliersPage({
                       step="1"
                       defaultValue={supplier.margin_percent ?? 40}
                       required
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: 10,
-                        marginTop: 5,
-                      }}
+                      className="ac-input"
                     />
                   </label>
 
@@ -167,12 +170,7 @@ export default async function SuppliersPage({
                       step="0.01"
                       defaultValue={((supplier.shipping_markup ?? 0) / 100).toFixed(2)}
                       required
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: 10,
-                        marginTop: 5,
-                      }}
+                      className="ac-input"
                     />
                   </label>
 
@@ -186,12 +184,7 @@ export default async function SuppliersPage({
                       step="1"
                       defaultValue={supplier.round_to_kurus ?? 90}
                       required
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: 10,
-                        marginTop: 5,
-                      }}
+                      className="ac-input"
                     />
                   </label>
 
@@ -211,9 +204,7 @@ export default async function SuppliersPage({
                     Yeni ürünler doğrudan yayınlansın (kapalıysa taslak gelir)
                   </label>
 
-                  <button type="submit" style={{ padding: 12 }}>
-                    Kaydet
-                  </button>
+                  <button className="ac-btn ac-btn-primary" type="submit">Kaydet</button>
                 </form>
 
                 <p
@@ -258,13 +249,7 @@ export default async function SuppliersPage({
                   <input type="hidden" name="code" value={supplier.code} />
                   <button
                     type="submit"
-                    style={{
-                      padding: "10px 16px",
-                      background: "none",
-                      border: "1px solid rgba(0,0,0,.14)",
-                      borderRadius: 999,
-                      cursor: "pointer",
-                    }}
+                    className="ac-btn"
                   >
                     Aktarım imlecini sıfırla
                   </button>
@@ -278,7 +263,8 @@ export default async function SuppliersPage({
           </section>
         );
       })}
-    </main>
+      </div>
+    </Shell>
   );
 }
 

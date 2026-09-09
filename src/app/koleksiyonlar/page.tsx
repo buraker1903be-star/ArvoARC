@@ -25,14 +25,21 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
   const mappedProducts=new Set((memberships??[]).map(item=>item.product_id)).size;
 
   return <Shell active="collections" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>KATALOG YAPISI · CANLI</small><h2>Koleksiyonlar</h2><p>Ürünleri mağazada birlikte sergilemek, SEO bağlantıları oluşturmak ve kampanya grupları hazırlamak için koleksiyonları yönetin.</p></div></section>
-    <section className="metrics"><article><span>TOPLAM KOLEKSİYON</span><strong>{collections?.length??0}</strong><small>Tüm durumlar</small></article><article><span>AKTİF</span><strong>{activeCount}</strong><small>Mağazada yayınlanabilir</small></article><article><span>EŞLENEN ÜRÜN</span><strong>{mappedProducts}</strong><small>En az bir koleksiyonda</small></article><article><span>SHOPIFY KAYNAKLI</span><strong>{collections?.filter(item=>item.source==="shopify").length??0}</strong><small>Ürün türünden eşlendi</small></article></section>
-    {query.error?<section className="card" style={{padding:16,marginBottom:20}}><strong>Koleksiyon işlemi tamamlanamadı: {query.error}</strong></section>:null}
+    <section className="ac-bar">
+      <div>
+        <h1>Koleksiyonlar</h1>
+        <p>Ürünleri mağazada birlikte sergilemek için gruplar.</p>
+      </div>
+    </section>
+
+    <div className="ac-stack">
+    <section className="ac-metrics"><article className="ac-metric"><span>TOPLAM KOLEKSİYON</span><strong>{collections?.length??0}</strong><small>Tüm durumlar</small></article><article className="ac-metric"><span>AKTİF</span><strong>{activeCount}</strong><small>Mağazada yayınlanabilir</small></article><article className="ac-metric"><span>EŞLENEN ÜRÜN</span><strong>{mappedProducts}</strong><small>En az bir koleksiyonda</small></article><article className="ac-metric"><span>SHOPIFY KAYNAKLI</span><strong>{collections?.filter(item=>item.source==="shopify").length??0}</strong><small>Ürün türünden eşlendi</small></article></section>
+    {query.error?<section className="ac ac-pad-sm"><strong>Koleksiyon işlemi tamamlanamadı: {query.error}</strong></section>:null}
     {/*
       Kart ızgarası yerine tablo: 122 koleksiyon kart düzeninde
       çok uzun bir sayfa yapıyor ve karşılaştırma zorlaşıyordu.
     */}
-    <section className="card table">
+    <section className="ac table">
       <div className="head"><div><small>KOLEKSİYONLAR</small><h3>{collections?.length??0} koleksiyon</h3></div><span>{organization.name}</span></div>
       <div className="row collection-row th"><span>KOLEKSİYON</span><span>BAĞLANTI</span><span>KAYNAK</span><span>ÜRÜN</span><span>DURUM</span></div>
       {(collections??[]).map((collection)=><Link href={`/koleksiyonlar/${collection.id}`} className="row collection-row" key={collection.id} style={{textDecoration:"none",color:"inherit"}}>
@@ -46,5 +53,6 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
     </section>
 
     {canManage?<details className="card collection-create"><summary>+ Yeni koleksiyon oluştur</summary><form action={createCollection}><label>Koleksiyon adı<input name="title" required maxLength={160} placeholder="Örn. En Çok Satanlar"/></label><label>Bağlantı adı<input name="slug" maxLength={160} placeholder="en-cok-satanlar"/></label><button type="submit">Koleksiyon oluştur</button></form></details>:null}
+    </div>
   </Shell>;
 }

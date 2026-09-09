@@ -52,8 +52,15 @@ const months=Array.from({length:6},(_,index)=>{const date=new Date(Date.UTC(now.
   const statusCounts=new Map<string,number>();for(const order of allOrders)statusCounts.set(order.status,(statusCounts.get(order.status)??0)+1);
 
   return <Shell active="analytics" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>RAPORLAMA · CANLI</small><h2>Satış Analitiği</h2><p>Gerçek siparişlerden hesaplanan satış, ürün ve sipariş performansı.</p></div></section>
-    <section className="metrics"><article><span>NET CİRO</span><strong>{money.format(revenue/100)}</strong><small>İptal ve iadeler hariç</small></article><article><span>SİPARİŞ</span><strong>{completed.length}</strong><small>Geçerli sipariş</small></article><article><span>ORTALAMA SEPET</span><strong>{money.format(average/100)}</strong><small>Sipariş başına</small></article><article><span>İADE</span><strong>{money.format(refunded/100)}</strong><small>İade edilen siparişler</small></article></section>
+    <section className="ac-bar">
+      <div>
+        <h1>Satış Analitiği</h1>
+        <p>Gerçek siparişlerden hesaplanan performans.</p>
+      </div>
+    </section>
+
+    <div className="ac-stack">
+    <section className="ac-metrics"><article className="ac-metric"><span>NET CİRO</span><strong>{money.format(revenue/100)}</strong><small>İptal ve iadeler hariç</small></article><article className="ac-metric"><span>SİPARİŞ</span><strong>{completed.length}</strong><small>Geçerli sipariş</small></article><article className="ac-metric"><span>ORTALAMA SEPET</span><strong>{money.format(average/100)}</strong><small>Sipariş başına</small></article><article className="ac-metric"><span>İADE</span><strong>{money.format(refunded/100)}</strong><small>İade edilen siparişler</small></article></section>
     <section className="period-comparison" aria-label="Son 30 gün karşılaştırması"><div className="period-comparison-title"><div><small>DÖNEM KARŞILAŞTIRMASI</small><h3>Son 30 gün</h3></div><span>Önceki 30 güne göre</span></div><div className="period-comparison-grid">{comparisons.map(item=><article key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small className={item.change>0?"up":item.change<0?"down":"neutral"}>{item.change>0?"↑":item.change<0?"↓":"→"} %{Math.abs(item.change)}</small></article>)}</div></section>
     <section className="grid">
       <article className="card"><div className="head"><div><small>SON 6 AY</small><h3>Aylık satış</h3></div><span>{money.format(revenue/100)}</span></div><div className="bars" style={{height:230}}>{months.map(month=><i key={month.key} title={`${monthLabel.format(month.date)} · ${money.format(month.revenue/100)} · ${month.orders} sipariş`} style={{height:`${Math.max(5,Math.round(month.revenue/maxMonth*100))}%`}}/>)}</div><div className="labels">{months.map(month=><span key={month.key}>{monthLabel.format(month.date)}</span>)}</div></article>
@@ -62,5 +69,6 @@ const months=Array.from({length:6},(_,index)=>{const date=new Date(Date.UTC(now.
     <section className="card" style={{marginTop:20}}><div className="head"><div><small>ÜRÜN PERFORMANSI</small><h3>En çok satan ürünler</h3></div><span>Ciroya göre ilk 10</span></div>
       <div style={{display:"grid",gap:14,marginTop:18}}>{topProducts.length?topProducts.map((product,index)=><div key={product.sku||product.name} style={{display:"grid",gridTemplateColumns:"32px minmax(180px,1.5fr) minmax(180px,2fr) 80px 120px",gap:12,alignItems:"center"}}><b>{index+1}</b><span><b style={{display:"block"}}>{product.name}</b><small>{product.sku}</small></span><div style={{height:9,background:"#eef0eb"}}><i style={{display:"block",height:"100%",width:`${product.revenue/maxProduct*100}%`,background:"var(--navy)"}}/></div><span>{product.quantity} adet</span><strong>{money.format(product.revenue/100)}</strong></div>):<p>Analiz için henüz sipariş kalemi bulunmuyor.</p>}</div>
     </section>
+    </div>
   </Shell>;
 }

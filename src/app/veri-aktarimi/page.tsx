@@ -16,13 +16,20 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   const canManage = ["owner", "admin", "manager"].includes(membership.role);
 
   return <Shell active="import" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>VERİ TAŞIMA</small><h2>Shopify Geçişi</h2><p>Shopify yalnızca eski veri kaynağıdır. Aktarım sonrasında ArvoARC bağımsız çalışır.</p></div></section>
-    {params.imported && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.imported} aktif ürün aktarıldı. Hata: {params.errors ?? "0"}</strong></section>}
-    {params.orders && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.orders} eski sipariş aktarıldı. Hata: {params.orderErrors ?? "0"}. Atlanan satır: {params.orderSkipped ?? "0"}</strong></section>}
-    {params.images && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.images} ürünün görselleri ARC Storage’a taşındı. Hata: {params.imageErrors ?? "0"}. Kalan: {params.remaining ?? "0"}</strong></section>}
-    {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>Aktarım başlatılamadı: {params.error}</strong></section>}
+    <section className="ac-bar">
+      <div>
+        <h1>Veri Aktarımı</h1>
+        <p>Shopify arşivinden içe aktarma.</p>
+      </div>
+    </section>
 
-    <section className="card" style={{padding:24,marginBottom:24}}>
+    <div className="ac-stack">
+    {params.imported && <section className="ac ac-pad-sm"><strong>{params.imported} aktif ürün aktarıldı. Hata: {params.errors ?? "0"}</strong></section>}
+    {params.orders && <section className="ac ac-pad-sm"><strong>{params.orders} eski sipariş aktarıldı. Hata: {params.orderErrors ?? "0"}. Atlanan satır: {params.orderSkipped ?? "0"}</strong></section>}
+    {params.images && <section className="ac ac-pad-sm"><strong>{params.images} ürünün görselleri ARC Storage’a taşındı. Hata: {params.imageErrors ?? "0"}. Kalan: {params.remaining ?? "0"}</strong></section>}
+    {params.error && <section className="ac ac-pad-sm"><strong>Aktarım başlatılamadı: {params.error}</strong></section>}
+
+    <section className="ac ac-pad">
       <div className="head"><div><small>ÜRÜN AKTARIM POLİTİKASI</small><h3>Yalnızca aktif ürünler</h3></div><span>Tek seferlik migration</span></div>
       <p>Importer yalnızca Shopify CSV içinde <b>Status = active</b> olan ürünleri kabul eder. Draft ve archived ürünler atlanır. Varyantlar, fiyatlar ve ürün seçenekleri korunur; stok 0 başlar ve stoksuz satış varsayılan olarak açıktır.</p>
       {canManage && <form action={importActiveProducts} style={{display:"flex",gap:12,alignItems:"end",marginTop:20,flexWrap:"wrap"}}>
@@ -30,7 +37,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
         <button type="submit" style={{padding:12}}>Aktif ürünleri aktar</button>
       </form>}
     </section>
-    <section className="card" style={{padding:24,marginBottom:24}}>
+    <section className="ac ac-pad">
       <div className="head"><div><small>GEÇMİŞ SİPARİŞLER</small><h3>Shopify sipariş arşivini aktar</h3></div><span>Stok etkilemez</span></div>
       <p>Shopify Orders CSV dosyasındaki eski siparişleri, müşteri bilgilerini ve sipariş kalemlerini aktarır. Tarihsel kayıt olduğu için mevcut stok miktarlarından yeniden düşüm yapılmaz.</p>
       {canManage && <form action={importHistoricalOrders} style={{display:"flex",gap:12,alignItems:"end",marginTop:20,flexWrap:"wrap"}}>
@@ -38,7 +45,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
         <button type="submit" style={{padding:12}}>Eski siparişleri aktar</button>
       </form>}
     </section>
-    <section className="card" style={{padding:24,marginBottom:24}}>
+    <section className="ac ac-pad">
       <div className="head"><div><small>GÖRSEL BAĞIMSIZLAŞTIRMA</small><h3>Shopify CDN bağını kaldır</h3></div><span>Supabase Storage</span></div>
       <p>Mevcut Shopify ürün görsellerini güvenli biçimde ARC depolamasına kopyalar. İşlem zaman aşımını önlemek için her çalıştırmada 5 ürünü taşır.</p>
       {canManage&&<form action={migrateShopifyImages}><button type="submit" style={{padding:12}}>Sonraki görsel grubunu taşı</button></form>}
@@ -47,5 +54,6 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
       <div className="row th"><span>DOSYA</span><span>TÜR</span><span>AKTARILAN</span><span>ATLANAN</span><span>DURUM</span></div>
       {batches?.length ? batches.map((batch)=><div className="row" key={batch.id}><span><b>{batch.file_name ?? "Shopify CSV"}</b></span><span>{importKindLabel(batch.kind)}</span><span>{batch.imported_rows}/{batch.total_rows}</span><span>{batch.skipped_rows + batch.error_rows}</span><span><em>{importStatusLabel(batch.status)}</em></span></div>) : <div style={{padding:24}}><strong>Henüz kayıtlı aktarım yok.</strong><p>İlk aktif ürün kataloğu aktarımı bu ekranda görünecek.</p></div>}
     </section>
+    </div>
   </Shell>;
 }

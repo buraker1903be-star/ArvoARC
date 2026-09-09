@@ -49,7 +49,14 @@ export default async function DiscountsPage({searchParams}:{searchParams:Promise
   const automaticCount=activeRules.filter(rule=>!rule.code).length;
 
   return <Shell active="discounts" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>KAMPANYA MOTORU · CANLI</small><h2>İndirimler</h2><p>Ürün indirimi, kupon kodu, sepet tutarı kampanyası ve ücretsiz kargo kurallarını tek merkezden yönetin.</p></div></section>
+    <section className="ac-bar">
+      <div>
+        <h1>İndirimler</h1>
+        <p>Ürün indirimi, kupon ve kargo kuralları.</p>
+      </div>
+    </section>
+
+    <div className="ac-stack">
 
     {(params.created||params.saved||params.deleted)&&<section className="card discount-flash"><strong>{params.created?"İndirim paketi oluşturuldu.":params.deleted?"İndirim paketi silindi.":"İndirim durumu güncellendi."}</strong></section>}
     {params.error&&<section className="card discount-flash error"><strong>İşlem tamamlanamadı: {params.error}</strong></section>}
@@ -118,5 +125,6 @@ export default async function DiscountsPage({searchParams}:{searchParams:Promise
         })}
       </div>:<div className="card product-empty"><strong>Aktif ürün indirimi bulunmuyor.</strong><p>Ürün varyantına satış fiyatından yüksek karşılaştırma fiyatı girerek ürün indirimi oluşturabilirsiniz.</p></div>}
     </section>
+    </div>
   </Shell>;
 }

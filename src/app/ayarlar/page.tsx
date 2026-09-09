@@ -14,7 +14,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
   const domainStatus=settings?.domain_status??"not_configured";
   const panelDomainStatus=settings?.panel_domain_status??"not_configured";
   return <Shell active="settings" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>ARVO ARC · KİRACI AYARLARI</small><h2>Marka ve alan adları</h2><p>Yönetim paneli ile müşterilerin gördüğü mağaza birbirinden bağımsız alan adlarıyla çalışır.</p></div></section>
+    <section className="ac-bar"><div><h1>Mağaza Ayarları</h1><p>Marka kimliği, alan adları ve mağaza tercihleri.</p></div></section>
     {query.saved&&<section className="card settings-flash"><strong>Mağaza ayarları kaydedildi.</strong></section>}
     {query.error&&<section className="card settings-flash error"><strong>Ayarlar kaydedilemedi: {query.error}</strong></section>}
 
