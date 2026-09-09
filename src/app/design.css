@@ -74,6 +74,27 @@
 }
 
 /* ==========================================================
+   Dikey ritim
+   ==========================================================
+
+   Bölümler arası boşluk tek yerden yönetiliyor. Öncesinde her
+   bölüm kendi kenar boşluğunu taşıyordu ve aralıklar tutarsızdı:
+   bazı yerlerde bitişik, bazı yerlerde çok açık.
+   ========================================================== */
+
+.ac-stack > * + *{
+  margin-top:var(--s5);
+}
+
+/* Kart içi bölüm ayrımı. */
+.ac-divider{
+  height:1px;
+  margin:var(--s5) 0;
+  background:var(--c-line);
+  border:0;
+}
+
+/* ==========================================================
    Kart — tek dil
    ========================================================== */
 
@@ -193,7 +214,8 @@
   justify-content:space-between;
   gap:var(--s5);
   flex-wrap:wrap;
-  padding:var(--s5) 0 var(--s4);
+  /* Üstte nefes, altta ölçüm şeridine geçiş. */
+  padding:var(--s5) 0 var(--s5);
 }
 
 .ac-bar h1{
