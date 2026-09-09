@@ -8,7 +8,17 @@ const navigation=[
   ["products","Ürünler","/urunler","◇"],
   ["collections","Koleksiyonlar","/koleksiyonlar","◫"],
   ["discounts","İndirimler","/indirimler","%"],
-  ["theme","Tema Düzenleyici","/tema","◩"],
+  /*
+    Tema Düzenleyici menüden gizlendi.
+
+    Vitrinin tasarımı kodla yapılıyor; bu ekranın yaptığı tek
+    şey bölüm sırasını değiştirmek ve birkaç metin alanını
+    düzenlemek. Tek kiracılı kullanımda karşılığı yok.
+
+    Sayfa duruyor — /tema adresinden erişilebilir. Panel çok
+    kiracılı bir ürüne dönüşürse burası yeniden açılmalı ve
+    ekran baştan tasarlanmalı: müşteri kod yazamaz.
+  */
   ["stock","Stok Yönetimi","/stok","▤"],
   ["orders","Siparişler","/siparisler","▧"],
   ["customers","Müşteriler","/musteriler","◎"],
