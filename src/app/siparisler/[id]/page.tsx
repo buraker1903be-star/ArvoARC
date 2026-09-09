@@ -143,7 +143,8 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     {query.saved&&<section className="ac ac-pad-sm"><strong>{query.saved==="fulfillment"?"Kargo ve operasyon bilgileri kaydedildi.":"Sipariş durumu güncellendi."}</strong></section>}
     {query.error&&<section className="ac ac-pad-sm"><strong>İşlem tamamlanamadı: {query.error}</strong></section>}
 
-    <div className="ac-split">
+    {/* Sipariş kalemleri tam genişlikte: on sütunlu fatura
+        dökümü yan panelle birlikte sığmıyordu. */}
       <section className="ac ac-pad">
         <div className="ac-head"><div><h3>Sipariş kalemleri</h3><p>{items?.length??0} kalem</p></div></div>
         {/*
@@ -153,8 +154,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         */}
         <div className="ac-lines">
           <div className="ac-line ac-line-head">
-            <span>ÜRÜN</span>
-            <span>SKU</span>
+            <span>ÜRÜN / SKU</span>
             <span>ADET</span>
             <span>BİRİM</span>
             <span>İND. %</span>
@@ -167,8 +167,10 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
 
           {lines.map((line,index)=>(
             <div className="ac-line" key={`${line.sku}-${index}`}>
-              <span><b>{line.name}</b></span>
-              <span className="ac-dim">{line.sku}</span>
+              <span>
+                <b>{line.name}</b>
+                <span className="ac-dim">{line.sku}</span>
+              </span>
               <span>{line.quantity}</span>
               <span>{money(line.unit,order.currency)}</span>
               <span>{discountRate>0?`%${(discountRate*100).toFixed(1)}`:"—"}</span>
@@ -193,16 +195,32 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           {meta.coupon_code?<span>İndirim kodu <b>{meta.coupon_code}</b></span>:null}
         </div>
       </section>
-      <aside className="ac ac-pad">
-        <div className="ac-head"><div><h3>Yönetim</h3><p>Durum ve kargo bilgileri.</p></div></div>
-        {canManage?<form action={updateOrderStatus} style={{display:"grid",gap:14,marginTop:16}}><input type="hidden" name="order_id" value={order.id}/><label>Sipariş durumu<select name="status" defaultValue={order.status} className="ac-input">{orderStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>Ödeme durumu<select name="payment_status" defaultValue={order.payment_status} className="ac-input">{paymentStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><button className="ac-btn ac-btn-primary" type="submit">Durumu kaydet</button></form>:<p>{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</p>}
-        <div style={{marginTop:24,borderTop:"1px solid rgba(0,0,0,.08)",paddingTop:18}}><small>MÜŞTERİ</small><p><b>{order.customer_name||"İsimsiz müşteri"}</b><br/>{order.customer_email||"E-posta yok"}</p>{meta.payment_method&&<p><b>Ödeme:</b> {meta.payment_method}</p>}{meta.notes&&<p><b>Müşteri notu:</b> {meta.notes}</p>}</div>
-        <div style={{marginTop:24,borderTop:"1px solid rgba(0,0,0,.08)",paddingTop:18}}><small>KARGO VE OPERASYON</small>
-          {canManage?<form action={updateFulfillmentDetails} style={{display:"grid",gap:12,marginTop:14}}><input type="hidden" name="order_id" value={order.id}/><label>Kargo firması<input name="shipping_carrier" defaultValue={meta.shipping_carrier??""} maxLength={100} className="ac-input"/></label><label>Takip numarası<input name="tracking_number" defaultValue={meta.tracking_number??""} maxLength={160} className="ac-input"/></label><label>Takip bağlantısı<input name="tracking_url" type="url" defaultValue={meta.tracking_url??""} placeholder="https://..." className="ac-input"/></label><label>İç operasyon notu<textarea name="internal_note" defaultValue={meta.internal_note??""} maxLength={1000} rows={4} className="ac-input"/></label><button className="ac-btn ac-btn-primary" type="submit">Kargo bilgilerini kaydet</button></form>:<p>{meta.shipping_carrier||"Kargo firması yok"} · {meta.tracking_number||"Takip numarası yok"}</p>}
-          {meta.tracking_url&&<p><a href={meta.tracking_url} target="_blank" rel="noreferrer">Kargo takibini aç ↗</a></p>}
+
+    {/*
+      Yönetim ve kargo yan yana iki kart. Öncesinde tek sütunda
+      alt alta dizilmişti ve takip numarası girmek için en aşağı
+      inmek gerekiyordu.
+    */}
+    <section className="ac-split-even">
+      <div className="ac ac-pad">
+        <div className="ac-head"><div><h3>Sipariş durumu</h3><p>Akıştaki konumu ve ödeme durumu.</p></div></div>
+        {canManage?<form action={updateOrderStatus} style={{display:"grid",gap:"var(--s3)"}}><input type="hidden" name="order_id" value={order.id}/><label>Sipariş durumu<select name="status" defaultValue={order.status} className="ac-input">{orderStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>Ödeme durumu<select name="payment_status" defaultValue={order.payment_status} className="ac-input">{paymentStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><button className="ac-btn ac-btn-primary" type="submit">Durumu kaydet</button></form>:<p>{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</p>}
+
+        <hr className="ac-divider"/>
+        <div>
+          <p style={{margin:0,fontSize:"var(--t-micro)",fontWeight:700,letterSpacing:".12em",color:"var(--c-ink-3)"}}>MÜŞTERİ</p>
+          <p style={{margin:"var(--s2) 0 0"}}><b>{order.customer_name||"İsimsiz müşteri"}</b><br/>{order.customer_email||"E-posta yok"}</p>
+          {meta.notes&&<p><b>Müşteri notu:</b> {meta.notes}</p>}
         </div>
-      </aside>
-    </div>
+      </div>
+
+      <div className="ac ac-pad">
+        <div className="ac-head"><div><h3>Kargo ve operasyon</h3><p>Takip numarası girildiğinde müşteriye e-posta gider.</p></div></div>
+        {canManage?<form action={updateFulfillmentDetails} style={{display:"grid",gap:"var(--s3)"}}><input type="hidden" name="order_id" value={order.id}/><label>Kargo firması<input name="shipping_carrier" defaultValue={meta.shipping_carrier??""} maxLength={100} className="ac-input"/></label><label>Takip numarası<input name="tracking_number" defaultValue={meta.tracking_number??""} maxLength={160} className="ac-input"/></label><label>Takip bağlantısı<input name="tracking_url" type="url" defaultValue={meta.tracking_url??""} placeholder="https://..." className="ac-input"/></label><label>İç operasyon notu<textarea name="internal_note" defaultValue={meta.internal_note??""} maxLength={1000} rows={3} className="ac-input"/></label><button className="ac-btn ac-btn-primary" type="submit">Kargo bilgilerini kaydet</button></form>:<p>{meta.shipping_carrier||"Kargo firması yok"} · {meta.tracking_number||"Takip numarası yok"}</p>}
+        {meta.tracking_url&&<p style={{marginTop:"var(--s3)"}}><a href={meta.tracking_url} target="_blank" rel="noreferrer">Kargo takibini aç ↗</a></p>}
+      </div>
+    </section>
+
     <section className="ac ac-pad"><div className="ac-head"><div><h3>İşlem geçmişi</h3><p>Bu siparişte yapılan değişiklikler.</p></div><span>{events?.length??0} kayıt</span></div><div style={{marginTop:16}}>{events?.length?events.map(event=>{const data=(event.event_data??{}) as Record<string,string|null>;const title=event.event_type==="status_updated"?"Sipariş durumu güncellendi":"Kargo bilgileri güncellendi";const detail=event.event_type==="status_updated"?`${orderStatusLabel(data.old_status)} → ${orderStatusLabel(data.new_status)} · Ödeme: ${paymentStatusLabel(data.new_payment_status)}`:`${data.shipping_carrier||"Kargo firması yok"} · ${data.tracking_number||"Takip numarası yok"}`;return <div className="order" key={event.id}><i>✓</i><div><b>{title}</b><small>{detail}</small></div><span style={{textAlign:"right",fontSize:10}}>{new Date(event.created_at).toLocaleString("tr-TR")}<small style={{display:"block"}}>{event.created_by?"Yetkili kullanıcı":"Sistem"}</small></span></div>}):<p>Henüz kayıtlı sipariş işlemi yok.</p>}</div></section>
 
     </div>
