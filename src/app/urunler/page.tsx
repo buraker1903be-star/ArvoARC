@@ -51,16 +51,34 @@ export default async function Products({ searchParams }: { searchParams: Promise
     list.push(variant);
     variantsByProduct.set(variant.product_id,list);
   }
-  const firstImagePaths=visibleProducts.flatMap(product=>{
+  /*
+    Görsel adresleri iki türlü saklanıyor:
+
+    - Kendi ürünlerimiz: ARC deposundaki göreli yol. İmzalı
+      bağlantı üretilmesi gerekiyor.
+    - Tedarikçi ürünleri: tedarikçi CDN'inin tam adresi. Doğrudan
+      kullanılıyor.
+
+    Öncesinde hepsi depoda aranıyordu; tedarikçi ürünlerinin
+    görselleri bu yüzden listede hiç görünmüyordu.
+  */
+  const isRemote=(path:string)=>path.startsWith("http");
+
+  const storedPaths=visibleProducts.flatMap(product=>{
     const path=((product.metadata??{}) as ProductMeta).image_paths?.[0];
-    return path?[path]:[];
+    return path&&!isRemote(path)?[path]:[];
   });
-  const signedImageUrls=await createProductImageUrls(supabase,firstImagePaths);
-  const signedByPath=new Map(firstImagePaths.map((path,index)=>[path,signedImageUrls[index]]));
+
+  const signedImageUrls=await createProductImageUrls(supabase,storedPaths);
+  const signedByPath=new Map(storedPaths.map((path,index)=>[path,signedImageUrls[index]]));
+
   const productImages=new Map(visibleProducts.map(product=>{
     const meta=(product.metadata??{}) as ProductMeta;
     const path=meta.image_paths?.[0];
-    return [product.id,(path?signedByPath.get(path):undefined)??meta.images?.[0]] as const;
+    const resolved=path
+      ? isRemote(path) ? path : signedByPath.get(path)
+      : undefined;
+    return [product.id,resolved??meta.images?.[0]] as const;
   }));
 
   return <Shell active="products" tenantName={organization.name} tenantPlan={organization.plan_code}>
