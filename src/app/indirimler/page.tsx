@@ -20,8 +20,17 @@ export default async function DiscountsPage({searchParams}:{searchParams:Promise
   const params=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const [{data:products,error:productError},{data:variants,error:variantError},{data:rules,error:rulesError}]=await Promise.all([
-    supabase.from("arc_products").select("id,name,status,metadata").eq("organization_id",organization.id),
-    supabase.from("arc_product_variants").select("id,product_id,title,sku,price,compare_at_price,currency,stock").eq("organization_id",organization.id).order("updated_at",{ascending:false}),
+    supabase.from("arc_products").select("id,name,status,metadata").is("supplier",null).limit(500).eq("organization_id",organization.id),
+    supabase./*
+      İndirim tanımlarken kullanılan varyant listesi.
+
+      15.365 varyantın tamamı çekiliyordu; Supabase 1000'de
+      kestiği için listede ürünlerin çoğu yoktu. Tedarikçi
+      ürünlerine tekil indirim tanımlanmıyor (fiyatları
+      kuraldan hesaplanıyor), o yüzden yalnızca kendi
+      ürünlerimiz listeleniyor.
+    */
+    from("arc_product_variants").select("id,product_id,title,sku,price,compare_at_price,currency,stock").is("supplier",null).limit(500).eq("organization_id",organization.id).order("updated_at",{ascending:false}),
     supabase.from("arc_discounts").select("id,name,code,discount_type,value,minimum_subtotal,usage_limit,usage_count,per_customer_limit,starts_at,ends_at,status,combinable,metadata,created_at").eq("organization_id",organization.id).order("created_at",{ascending:false})
   ]);
   if(productError)throw new Error(productError.message);

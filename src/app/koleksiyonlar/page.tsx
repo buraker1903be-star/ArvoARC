@@ -10,7 +10,12 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
   const {supabase,organization,membership}=await requireTenant();
   const [{data:collections,error},{data:memberships,error:membershipError}]=await Promise.all([
     supabase.from("arc_collections").select("id,title,slug,description,status,source,seo_title,metadata,created_at").eq("organization_id",organization.id).order("title"),
-    supabase.from("arc_collection_products").select("collection_id,product_id").eq("organization_id",organization.id)
+    supabase./*
+      Koleksiyon-ürün bağlantıları. Otomatik kategorilemeden
+      sonra 6.500'ü aştı ve Supabase 1000 satırda kesiyordu:
+      koleksiyonların ürün sayıları eksik görünüyordu.
+    */
+    from("arc_collection_products").select("collection_id,product_id").limit(20000).eq("organization_id",organization.id)
   ]);
   if(error)throw new Error(error.message);if(membershipError)throw new Error(membershipError.message);
   const canManage=["owner","admin","manager"].includes(membership.role);

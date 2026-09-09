@@ -9,18 +9,48 @@ const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY
 export default async function Orders({ searchParams }: { searchParams: Promise<{ error?: string; created?: string; q?: string; filter?: string }> }) {
   const params = await searchParams;
   const { supabase, organization, membership } = await requireTenant();
-  const [{ data: orders, error: ordersError }, { data: variants, error: variantsError }, { data: products, error: productsError }] = await Promise.all([
-    supabase.from("arc_orders").select("id,order_number,source,status,payment_status,customer_name,customer_email,total,currency,created_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(50),
-    supabase.from("arc_product_variants").select("id,product_id,sku,price,stock,allow_backorder").eq("organization_id", organization.id).order("sku"),
-    supabase.from("arc_products").select("id,name,status").eq("organization_id", organization.id),
+  const canManage = ["owner", "admin", "manager"].includes(membership.role);
+  const search=(params.q??"").trim();
+  const statusFilter=["pending","confirmed","processing","fulfilled","cancelled","refunded"].includes(params.filter??"")?params.filter:"all";
+
+  /*
+    Filtreleme veritabanına taşındı.
+
+    Öncesinde son 50 sipariş çekilip bellekte süzülüyordu: "iptal
+    edilenler" filtresi yalnızca en yeni 50 sipariş içinde arama
+    yapıyordu ve daha eski iptaller hiç görünmüyordu.
+  */
+  let ordersQuery=supabase.from("arc_orders").select("id,order_number,source,status,payment_status,customer_name,customer_email,total,currency,created_at").eq("organization_id",organization.id).order("created_at",{ascending:false}).limit(50);
+  if(statusFilter!=="all")ordersQuery=ordersQuery.eq("status",statusFilter);
+  if(search)ordersQuery=ordersQuery.or(`order_number.ilike.%${search}%,customer_name.ilike.%${search}%,customer_email.ilike.%${search}%`);
+
+  /*
+    Manuel sipariş için varyant listesi.
+
+    Öncesinde 15.365 varyantın tamamı çekiliyordu; hem sayfa
+    ağırdı hem de Supabase 1000 satırda kestiği için açılır
+    listede ürünlerin çoğu yoktu.
+
+    Artık yalnızca kendi ürünlerimiz listeleniyor: manuel sipariş
+    tedarikçi kataloğu için kullanılmıyor, telefonla gelen LR
+    siparişleri için var.
+  */
+  const [{ data: orders, error: ordersError }, { data: variants, error: variantsError }] = await Promise.all([
+    ordersQuery,
+    supabase.from("arc_product_variants").select("id,product_id,sku,price,stock,allow_backorder").eq("organization_id",organization.id).is("supplier",null).order("sku").limit(500),
   ]);
+
   if (ordersError) throw new Error(ordersError.message);
   if (variantsError) throw new Error(variantsError.message);
+
+  /* Ürün adları yalnızca listelenen varyantlar için. */
+  const variantProductIds=[...new Set((variants??[]).map(v=>v.product_id))];
+  const {data:products,error:productsError}=variantProductIds.length
+    ?await supabase.from("arc_products").select("id,name,status").in("id",variantProductIds)
+    :{data:[],error:null};
   if (productsError) throw new Error(productsError.message);
-  const canManage = ["owner", "admin", "manager"].includes(membership.role);
-  const search=(params.q??"").trim().toLocaleLowerCase("tr-TR");
-  const statusFilter=["pending","confirmed","processing","fulfilled","cancelled","refunded"].includes(params.filter??"")?params.filter:"all";
-  const visibleOrders=(orders??[]).filter(order=>(statusFilter==="all"||order.status===statusFilter)&&(!search||[order.order_number,order.customer_name,order.customer_email].some(value=>(value??"").toLocaleLowerCase("tr-TR").includes(search))));
+
+  const visibleOrders=orders??[];
   const productById=new Map((products??[]).map(product=>[product.id,product]));
   const variantOptions = (variants ?? []).map((variant) => {
     const product = productById.get(variant.product_id);
