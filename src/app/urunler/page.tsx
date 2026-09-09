@@ -129,11 +129,11 @@ export default async function Products({ searchParams }: { searchParams: Promise
 
     <section className="product-catalog">
       <div className="product-catalog-head"><div><small>KATALOG</small><h3>{search?visibleProducts.length:(filteredCount??0)} ürün</h3></div><span>{organization.name}</span></div>
-      {visibleProducts.length ? <div className="product-card-grid">{visibleProducts.map((product,index)=>{
+      {visibleProducts.length ? <div className="table">
+        <div className="row product-row th"><span/><span>ÜRÜN</span><span>MARKA</span><span>FİYAT</span><span>ALIŞ / KÂR</span><span>DURUM</span></div>{visibleProducts.map((product,index)=>{
         const pv=variantsByProduct.get(product.id)??[];
         const prices=pv.map(variant=>variant.price);
         const totalStock=pv.reduce((sum,variant)=>sum+variant.stock,0);
-        const backorder=pv.some(variant=>variant.allow_backorder);
         const meta=(product.metadata??{}) as ProductMeta;
         const image=productImages.get(product.id);
         const minPrice=prices.length?Math.min(...prices):0;
@@ -163,36 +163,46 @@ export default async function Products({ searchParams }: { searchParams: Promise
         // en kötü senaryoyu göstermek daha güvenli.
         const profit=costs.length&&prices.length?minPrice-maxCost:0;
         const margin=costs.length&&maxCost>0?Math.round((profit/maxCost)*100):0;
-        const stockTone=totalStock<0?"danger":totalStock<=5?"low":"healthy";
-        return <Link prefetch={false} href={`/urunler/${product.id}`} className="product-card" key={product.id}>
-          <div className="product-card-media">
-            {image?<Image src={image} alt={product.name} width={720} height={720} sizes="(max-width:640px) 100vw, (max-width:1100px) 50vw, 25vw" priority={index<4} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div className="product-card-placeholder"><span>ARVO ARC</span><b>{product.name.slice(0,2).toUpperCase()}</b></div>}
-            <em className={`product-status ${product.status}`}>{productStatusLabel(product.status)}</em>
-            <span className="product-card-badges">
-              {bestSellerIds.has(product.id)?<span className="catalog-badge bestseller">Çok Satan</span>:null}
-              {maxDiscount>0?<span className="discount-badge">-%{maxDiscount}</span>:null}
-              {meta.badge&&meta.badge.toLocaleLowerCase("tr-TR")!=="çok satan"?<span className={`catalog-badge ${meta.badge_tone??"green"}`}>{meta.badge}</span>:null}
-            </span>
-            <span className="product-source">{meta.vendor||(product.source==="shopify"?"Shopify arşivi":"ARVO ARC")}</span>
-          </div>
-          <div className="product-card-body">
-            <div className="product-card-title"><small>{meta.type||"Katalog ürünü"}</small><h3>{product.name}</h3></div>
-            <div className="product-card-price"><strong>{priceLabel}</strong><span>{compareLabel?<><s>{compareLabel}</s> · </>:null}{pv.length} varyant</span></div>
-            {costLabel?(
-              <div className="product-card-margin">
-                <span>Alış {costLabel}</span>
-                <strong data-loss={profit<=0?"true":undefined}>
-                  {profit>0?`+${money.format(profit/100)}`:money.format(profit/100)}
-                  {" · "}%{margin}
-                </strong>
-              </div>
-            ):null}
-            <div className="product-card-stats">
-              <span><small>SKU</small><b>{pv[0]?.sku??"—"}</b></span>
-              <span><small>TOPLAM STOK</small><b className={stockTone}>{totalStock}</b></span>
-            </div>
-            <div className="product-card-footer"><span>{backorder?"Stoksuz satış açık":"Stok kontrollü"}</span><b>Düzenle →</b></div>
-          </div>
+        return <Link prefetch={false} href={`/urunler/${product.id}`} className="row product-row" key={product.id} style={{textDecoration:"none",color:"inherit"}}>
+          {/*
+            Küçük görsel: benzer adlı ürünleri ayırt etmek için.
+            Metin listede hangisinin ne olduğunu anlamak zor.
+          */}
+          <span className="product-thumb">
+            {image
+              ?<Image src={image} alt="" width={68} height={68} sizes="34px" priority={index<8}/>
+              :<b>{product.name.slice(0,2).toLocaleUpperCase("tr-TR")}</b>}
+          </span>
+
+          <span>
+            <b>{product.name}</b>
+            <small className="muted"> · {pv.length} varyant</small>
+          </span>
+
+          <span className="muted">{meta.vendor||"—"}</span>
+
+          <span>
+            <b>{priceLabel}</b>
+            {compareLabel?<small className="muted"> <s>{compareLabel}</s></small>:null}
+          </span>
+
+          <span>
+            {costLabel
+              ?<><small className="muted">{costLabel}</small>{" "}
+                 <b className="profit" data-loss={profit<=0?"true":undefined}>
+                   {profit>0?`+${money.format(profit/100)}`:money.format(profit/100)} · %{margin}
+                 </b></>
+              :<small className="muted">—</small>}
+          </span>
+
+          <span>
+            <em data-tone={product.status==="active"?undefined:product.status==="draft"?"warn":"muted"}>
+              {productStatusLabel(product.status)}
+            </em>
+            {bestSellerIds.has(product.id)?<small className="muted"> · Çok satan</small>:null}
+            {maxDiscount>0?<small className="muted"> · -%{maxDiscount}</small>:null}
+            <small className="muted"> · {totalStock} adet</small>
+          </span>
         </Link>;
       })}</div> : <div className="card product-empty"><strong>Arama kriterine uygun ürün bulunamadı.</strong><p>Filtreleri temizleyerek tüm kataloğu görüntüleyebilirsiniz.</p></div>}
       {!search&&totalPages>1&&<nav className="catalog-pagination" aria-label="Ürün sayfaları"><span>{currentPage}. sayfa / {totalPages}</span><div>{currentPage>1&&<Link prefetch={false} href={pageHref(currentPage-1)}>← Önceki</Link>}{currentPage<totalPages&&<Link prefetch={false} href={pageHref(currentPage+1)}>Sonraki →</Link>}</div></nav>}

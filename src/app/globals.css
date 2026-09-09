@@ -121,18 +121,36 @@ a.order:hover{padding-left:8px;padding-right:8px;background:var(--surface-soft)}
 
 .table{margin-top:22px;padding:24px 0 0;overflow:hidden}
 .table>.head{padding:0 24px 18px}
-.table>.row{padding-left:24px;padding-right:24px}
+.table>.row{padding-left:20px;padding-right:20px}
 .table>div:not(.head):not(.row){margin-left:24px;margin-right:24px}
-.row{display:grid;grid-template-columns:2.2fr 1fr .7fr .8fr .9fr;align-items:center;min-height:67px;padding:0 2px;border-top:1px solid #e8ece6;color:#314138;font-size:11px}
+/*
+  Tablo satırı.
+
+  Yükseklik 67px'ten 42px'e indirildi: panel bir operasyon
+  ekranı, ekranda ne kadar çok kayıt görünürse tarama o kadar
+  hızlı. Ferahlık vitrinde doğru tercih; burada yoğunluk.
+*/
+.row{display:grid;grid-template-columns:2.2fr 1fr .7fr .8fr .9fr;align-items:center;min-height:42px;padding:0 2px;border-top:1px solid #eef1ec;color:#314138;font-size:11px}
+
+/* Zebra deseni: göz satırı yatayda kaybetmesin. */
+.table>.row:not(.th):nth-child(even){background:#fbfcfa}
+.table>.row:not(.th):nth-child(even):hover{background:#f4f8f2}
 a.row:hover,.row:not(.th):hover{background:#f8faf7}
-.row>span{min-width:0;padding:8px}
+.row>span{min-width:0;padding:6px 8px}
+
+/* Sütun ayırıcı: göz satırı takip ederken kaymaz. */
+.row>span+span{box-shadow:inset 1px 0 0 #f0f3ee}
 .row>span:first-child{display:flex;align-items:center;gap:12px}
 .row b{font-weight:750}
 .row small{color:#7b887f}
-.th{min-height:39px;color:#7f8b83;font-size:8px;font-weight:750;letter-spacing:.1em}
+/*
+  Başlık satırı yapışkan: uzun listelerde aşağı kaydırırken
+  sütun adları yukarıda kalır.
+*/
+.th{position:sticky;top:0;z-index:2;min-height:34px;background:#fff;color:#7f8b83;font-size:8px;font-weight:750;letter-spacing:.1em;box-shadow:0 1px 0 #e8ece6}
 .swatch{width:38px;height:42px;flex:0 0 auto;border-radius:9px;display:grid;place-items:center;background:#dce6ef;color:#274763;font-size:10px;font-weight:800;font-style:normal}
 .s1{background:#e6eaf0}.s2{background:#d5e2cc}.s3{background:#e8dfbd}.s4{background:#dce5ee}
-.row em{display:inline-flex;width:max-content;border:1px solid #d9e9d0;border-radius:999px;background:#edf6e8;color:#3f6e32;padding:6px 9px;font-size:8px;font-weight:750;font-style:normal;text-transform:capitalize}
+.row em{display:inline-flex;width:max-content;border:1px solid #d9e9d0;border-radius:999px;background:#edf6e8;color:#3f6e32;padding:4px 9px;font-size:8px;font-weight:750;font-style:normal;text-transform:capitalize}
 
 .notice{max-width:none;padding:27px 30px;margin-bottom:22px;border:1px solid #e4d7ad;border-radius:var(--radius);background:linear-gradient(135deg,#fffdf7,#f7f5e9);box-shadow:var(--shadow-sm)}
 .notice>b{float:left;margin-right:18px;color:#a47b1f;font-size:48px;line-height:1;font-weight:760}
@@ -712,3 +730,37 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 .row em[data-tone="muted"]{
   border-color:#e2e6e0;background:#f5f7f4;color:#6b756e;
 }
+
+/* ---------- Ürün listesi tablosu ------------------------- */
+
+/*
+  Ürünler kart ızgarası yerine tablo. 3.264 ürünlük bir
+  katalogda kart düzeni sayfayı çok uzatıyor ve karşılaştırma
+  yapmayı zorlaştırıyordu.
+
+  Satır başında küçük bir görsel: ürün adı benzer olan
+  varyantları ayırt etmek için. Metin listede hangisinin ne
+  olduğunu anlamak zor.
+*/
+.product-row{grid-template-columns:44px 2.4fr 1fr .9fr 1fr .9fr}
+
+.product-thumb{
+  width:34px;height:34px;flex:0 0 auto;
+  border-radius:7px;overflow:hidden;
+  background:#f2f4f0;
+  display:grid;place-items:center;
+}
+
+.product-thumb img{width:100%;height:100%;object-fit:cover}
+
+/* Görseli olmayan üründe ürün adının baş harfi. */
+.product-thumb b{font-size:12px;font-weight:700;color:#b6bdb4}
+
+.product-row .muted{color:#7b887f}
+
+.product-row .profit{
+  font-variant-numeric:tabular-nums;
+  color:#1f7a4d;font-weight:700;
+}
+
+.product-row .profit[data-loss="true"]{color:#c62d24}
