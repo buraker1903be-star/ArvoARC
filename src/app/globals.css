@@ -669,7 +669,12 @@ a.is-pending-link{pointer-events:none;opacity:.68}
   Sipariş satırına altıncı sütun eklendi; başlık satırı da
   aynı düzeni kullandığı için orada boş kalıyor.
 */
-.table .row{grid-template-columns:2fr 1fr .7fr .8fr .9fr auto}
+/*
+  Eylem sütunu sabit genişlikte. `auto` bırakıldığında düğmesi
+  olmayan satırlarda sütun daralıyor ve diğer hücreler kayıyordu;
+  liste hizasız görünüyordu.
+*/
+.table .row{grid-template-columns:2fr 1fr .7fr .8fr .9fr 150px}
 
 .quick-action{
   padding:8px 14px;
@@ -688,3 +693,22 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 
 /* Satırın tamamı bağlantı; düğme tıklaması ona karışmasın. */
 .table .row form{display:flex;justify-content:flex-end;padding:8px}
+
+/* ---------- Durum rozeti renkleri ------------------------ */
+
+/*
+  Rozet varsayılan olarak yeşildi: iptal edilmiş sipariş de
+  "başarılı" gibi görünüyor ve göz taramasında yanıltıyordu.
+  Durum kategorisine göre renk veriliyor.
+*/
+.row em[data-tone="warn"]{
+  border-color:#f0e2c4;background:#fbf5e8;color:#8a6a1f;
+}
+
+.row em[data-tone="danger"]{
+  border-color:#f2d9d7;background:#fdf0ef;color:#a33b33;
+}
+
+.row em[data-tone="muted"]{
+  border-color:#e2e6e0;background:#f5f7f4;color:#6b756e;
+}

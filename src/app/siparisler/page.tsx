@@ -85,7 +85,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
             <span>{order.customer_name || order.customer_email || "Misafir"}</span>
             <span>{sourceLabel(order.source)}</span>
             <span>{money.format(order.total/100)}</span>
-            <span><em>{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</em></span>
+            <span><em data-tone={statusTone(order.status,order.payment_status)}>{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</em></span>
           </Link>
           {canManage&&next?(
             <form action={quickStatus} style={{margin:0}}>
@@ -98,4 +98,20 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
       }) : <div style={{padding:24}}><strong>Arama kriterine uygun sipariş bulunamadı.</strong><p>İlk manuel siparişi oluşturabilir veya Veri Aktarımı ekranından eski Shopify sipariş arşivinizi yükleyebilirsiniz.</p></div>}
     </section>
   </Shell>;
+}
+
+/**
+ * Durum rozetinin rengi.
+ *
+ * Hepsi yeşil olduğunda iptal edilmiş sipariş de "başarılı" gibi
+ * görünüyor ve listeyi tararken sorunlu kayıtlar gözden
+ * kaçıyordu.
+ */
+function statusTone(status: string, paymentStatus: string) {
+  if (["cancelled", "refunded"].includes(status)) return "danger";
+  if (["failed"].includes(paymentStatus)) return "danger";
+  if (["pending", "authorized"].includes(paymentStatus)) return "warn";
+  if (status === "pending") return "warn";
+  if (status === "fulfilled") return "muted";
+  return undefined;
 }
