@@ -209,7 +209,15 @@ async function runSync(mode: "tam" | "stok") {
     slug: string;
   }> = [];
 
-  for (let page = 0; page < 50; page += 1) {
+  /*
+    Stok modunda ürün listesi hiç okunmuyor.
+
+    Toplu güncelleme varyantları doğrudan `supplier_sku`
+    üzerinden eşleştiriyor; ürün kimliğine ihtiyaç yok. 3.269
+    ürünü dört sayfada çekmek gereksiz iş yapıyordu ve
+    veritabanı zaman aşımına giriyordu.
+  */
+  for (let page = 0; mode === "tam" && page < 50; page += 1) {
     const from = page * 1000;
     const { data, error } = await supabase
       .from("arc_products")
@@ -240,6 +248,38 @@ async function runSync(mode: "tam" | "stok") {
     }
 
     try {
+      /*
+        Stok modunda ürün kaydına dokunulmuyor: yalnızca varyant
+        stok ve fiyatları biriktirilip parça sonunda tek sorguda
+        uygulanıyor.
+
+        Ürün listesi de okunmuyor; toplu güncelleme varyantları
+        doğrudan `supplier_sku` üzerinden eşleştiriyor. 3.269
+        ürünü her turda çekmek zaman aşımına yol açıyordu.
+      */
+      if (mode !== "tam") {
+        const stockPrice = salePrice(
+          product.costPrice,
+          rule.margin_percent,
+          rule.shipping_markup,
+          rule.round_to_kurus,
+        );
+
+        const seenSkus = new Set<string>();
+        for (const variant of product.variants) {
+          if (seenSkus.has(variant.sku)) continue;
+          seenSkus.add(variant.sku);
+          stockUpdates.push({
+            sku: variant.sku,
+            stock: variant.quantity,
+            cost: product.costPrice,
+            price: stockPrice,
+          });
+        }
+
+        continue;
+      }
+
       const known = byCode.get(product.productCode);
       let productId = known?.id as string | undefined;
 
