@@ -58,12 +58,17 @@ details[open]>summary::after{content:"−"}
 .tenant div{min-width:0;display:flex;flex-direction:column}
 .tenant b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:750}
 .tenant small{margin-top:3px;color:#91a3b5;font-size:8px;font-weight:650;letter-spacing:.08em;text-transform:uppercase}
-.shell nav{display:flex;flex-direction:column;gap:5px;overflow:auto;padding-right:2px}
-.shell nav a{min-height:43px;padding:10px 12px;border:1px solid transparent;border-radius:10px;display:flex;gap:12px;align-items:center;color:#b1c0cd;font-size:11px;font-weight:650}
-.shell nav a i{width:22px;height:22px;display:grid;place-items:center;border-radius:7px;background:rgba(255,255,255,.045);font-size:11px;font-style:normal;color:#90a5b6}
-.shell nav a:hover{color:#fff;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.06);transform:translateX(2px)}
-.shell nav a.active{color:#fff;background:linear-gradient(90deg,rgba(111,149,72,.28),rgba(111,149,72,.12));border-color:rgba(216,243,106,.13);box-shadow:inset 3px 0 var(--lime)}
-.shell nav a.active i{background:var(--green);color:#fff}
+/*
+  Yalnızca sol menü. Öncesinde `.shell nav` yazılıydı ve sayfa
+  içindeki her `nav` etiketini de yakalıyordu: sekmeler ve
+  filtreler dikey diziliyordu.
+*/
+.shell>aside nav{display:flex;flex-direction:column;gap:5px;overflow:auto;padding-right:2px}
+.shell>aside nav a{min-height:43px;padding:10px 12px;border:1px solid transparent;border-radius:10px;display:flex;gap:12px;align-items:center;color:#b1c0cd;font-size:11px;font-weight:650}
+.shell>aside nav a i{width:22px;height:22px;display:grid;place-items:center;border-radius:7px;background:rgba(255,255,255,.045);font-size:11px;font-style:normal;color:#90a5b6}
+.shell>aside nav a:hover{color:#fff;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.06);transform:translateX(2px)}
+.shell>aside nav a.active{color:#fff;background:linear-gradient(90deg,rgba(111,149,72,.28),rgba(111,149,72,.12));border-color:rgba(216,243,106,.13);box-shadow:inset 3px 0 var(--lime)}
+.shell>aside nav a.active i{background:var(--green);color:#fff}
 .powered{margin-top:auto;padding:22px 10px 0;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column}
 .powered small{font-size:7px;color:#7f96a9;letter-spacing:.22em}
 .powered b{margin:5px 0 3px;color:#dce7ef;font-size:12px;letter-spacing:.16em}
@@ -202,7 +207,7 @@ a.row:hover,.row:not(.th):hover{background:#f8faf7}
   .shell>aside{height:auto;position:relative;padding:20px}
   .brand{width:210px;margin-bottom:16px}
   .tenant{margin-bottom:14px}
-  .shell nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:none}
+  .shell>aside nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:none}
   .powered{display:none}
   .shell>main{padding:0 18px 42px}
   .topbar{height:auto;min-height:74px;padding:14px 0;position:relative;gap:14px}
@@ -221,7 +226,7 @@ a.row:hover,.row:not(.th):hover{background:#f8faf7}
 }
 @media(max-width:560px){
   body{font-size:13px}
-  .shell nav{grid-template-columns:1fr}
+  .shell>aside nav{grid-template-columns:1fr}
   .shell nav a{min-height:40px}
   .metrics{grid-template-columns:1fr}
   .metrics article{border-right:0!important;border-bottom:1px solid var(--line)}
