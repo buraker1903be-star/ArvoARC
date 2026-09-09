@@ -8,7 +8,7 @@ import { orderStatusLabel, orderStatusOptions, paymentStatusLabel, paymentStatus
 const money=(value:number,currency:string)=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:currency||"TRY"}).format(value/100);
 
 type Address={name?:string;address1?:string;address2?:string;city?:string;province?:string;zip?:string;country?:string;phone?:string};
-type OrderMeta={discount?:number;billing?:Address;shipping_address?:Address;payment_method?:string;payment_reference?:string;notes?:string;tags?:string;historical_import?:boolean;shipping_carrier?:string;tracking_number?:string;tracking_url?:string;internal_note?:string};
+type OrderMeta={discount?:number;coupon_code?:string;billing?:Address;shipping_address?:Address;payment_method?:string;payment_reference?:string;notes?:string;tags?:string;historical_import?:boolean;shipping_carrier?:string;tracking_number?:string;tracking_url?:string;internal_note?:string};
 
 function AddressCard({title,address}:{title:string;address?:Address}){
   const lines=[address?.name,address?.address1,address?.address2,[address?.zip,address?.city].filter(Boolean).join(" "),address?.province,address?.country,address?.phone].filter(Boolean);
@@ -65,6 +65,55 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   if((order.shipping??0)>0) addBracket(20,order.shipping);
 
   const bracketList=[...brackets.entries()].sort((a,b)=>a[0]-b[0]);
+
+  /*
+    Fatura satırları.
+
+    Her satır kendi indirim payını ve KDV'sini taşıyor. İndirim
+    toplam üzerinden orantılı dağıtılıyor: hangi kaleme ait
+    olduğu kayıtlı değil.
+
+    Kargo da bir satır: ayrı gösterilmesi fatura düzeninin
+    gereği.
+  */
+  const discountRate=gross>0?discount/gross:0;
+
+  type Line={
+    name:string;
+    sku:string;
+    quantity:number;
+    unit:number;
+    discountAmount:number;
+    netUnit:number;
+    rate:number;
+    vat:number;
+    total:number;
+  };
+
+  const buildLine=(name:string,sku:string,quantity:number,unit:number,grossTotal:number,rate:number):Line=>{
+    const discountAmount=Math.round(grossTotal*discountRate);
+    const net=grossTotal-discountAmount;
+    const vat=Math.round(net-net/(1+rate/100));
+    return {
+      name,
+      sku,
+      quantity,
+      unit,
+      discountAmount,
+      netUnit:quantity>0?Math.round(net/quantity):net,
+      rate,
+      vat,
+      total:net,
+    };
+  };
+
+  const lines:Line[]=(items??[]).map(item=>
+    buildLine(item.product_name,item.sku,item.quantity,item.unit_price,item.total,rateBySku.get(item.sku)??20)
+  );
+
+  if((order.shipping??0)>0){
+    lines.push(buildLine("Kargo bedeli","—",1,order.shipping,order.shipping,20));
+  }
   return <Shell active="orders" tenantName={organization.name} tenantPlan={organization.plan_code}>
     <section className="ac-bar">
       <div>
@@ -97,22 +146,52 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     <div className="ac-split">
       <section className="ac ac-pad">
         <div className="ac-head"><div><h3>Sipariş kalemleri</h3><p>{items?.length??0} kalem</p></div></div>
-        <div style={{marginTop:16}}>{items?.map(item=><div key={item.id} style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:18,padding:"15px 0",borderTop:"1px solid rgba(0,0,0,.08)",alignItems:"center"}}><div><b>{item.product_name}</b><small style={{display:"block",marginTop:5}}>SKU: {item.sku}</small></div><span>{item.quantity} × {money(item.unit_price,order.currency)}</span><strong>{money(item.total,order.currency)}</strong></div>)}</div>
-        <div style={{marginTop:20,marginLeft:"auto",maxWidth:330,display:"grid",gap:9}}><span style={{display:"flex",justifyContent:"space-between"}}>Ara toplam <b>{money(order.subtotal,order.currency)}</b></span><span style={{display:"flex",justifyContent:"space-between"}}>Kargo <b>{money(order.shipping,order.currency)}</b></span>{/*
-            KDV dilimleri. Her oran ayrı matrah ve vergi satırı
-            olarak gösteriliyor; fatura mevzuatı bunu
-            gerektiriyor.
-          */}
+        {/*
+          Fatura düzeni. Her satırda birim fiyat, indirim, KDV
+          oranı ve tutarı ayrı ayrı; fatura keserken doğrudan
+          kullanılabilir.
+        */}
+        <div className="ac-lines">
+          <div className="ac-line ac-line-head">
+            <span>ÜRÜN</span>
+            <span>SKU</span>
+            <span>ADET</span>
+            <span>BİRİM</span>
+            <span>İND. %</span>
+            <span>İNDİRİM</span>
+            <span>İND. BİRİM</span>
+            <span>KDV %</span>
+            <span>KDV</span>
+            <span>TOPLAM</span>
+          </div>
+
+          {lines.map((line,index)=>(
+            <div className="ac-line" key={`${line.sku}-${index}`}>
+              <span><b>{line.name}</b></span>
+              <span className="ac-dim">{line.sku}</span>
+              <span>{line.quantity}</span>
+              <span>{money(line.unit,order.currency)}</span>
+              <span>{discountRate>0?`%${(discountRate*100).toFixed(1)}`:"—"}</span>
+              <span>{line.discountAmount>0?`−${money(line.discountAmount,order.currency)}`:"—"}</span>
+              <span>{money(line.netUnit,order.currency)}</span>
+              <span>%{line.rate}</span>
+              <span>{money(line.vat,order.currency)}</span>
+              <span><b>{money(line.total,order.currency)}</b></span>
+            </div>
+          ))}
+        </div>
+
+        <div className="ac-totals">
           {bracketList.map(([rate,v])=>(
-            <span key={rate} style={{display:"flex",justifyContent:"space-between"}}>
-              %{rate} matrah <b>{money(v.matrah,order.currency)}</b>
-            </span>
+            <span key={rate}>%{rate} matrah <b>{money(v.matrah,order.currency)}</b></span>
           ))}
           {bracketList.map(([rate,v])=>(
-            <span key={`k${rate}`} style={{display:"flex",justifyContent:"space-between"}}>
-              KDV %{rate} <b>{money(v.kdv,order.currency)}</b>
-            </span>
-          ))}<strong style={{display:"flex",justifyContent:"space-between",fontSize:18,borderTop:"1px solid",paddingTop:12}}>Toplam <b>{money(order.total,order.currency)}</b></strong></div>
+            <span key={`k${rate}`}>KDV %{rate} <b>{money(v.kdv,order.currency)}</b></span>
+          ))}
+          <strong>Toplam tutar <b>{money(order.total,order.currency)}</b></strong>
+          <span>Ödeme türü <b>{meta.payment_method??"Kredi kartı"}</b></span>
+          {meta.coupon_code?<span>İndirim kodu <b>{meta.coupon_code}</b></span>:null}
+        </div>
       </section>
       <aside className="ac ac-pad">
         <div className="ac-head"><div><h3>Yönetim</h3><p>Durum ve kargo bilgileri.</p></div></div>

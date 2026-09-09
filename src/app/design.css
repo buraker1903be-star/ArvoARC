@@ -450,3 +450,84 @@ textarea.ac-input{resize:vertical;line-height:1.55}
   font-weight:600;
   color:var(--c-ink-2);
 }
+
+/* ==========================================================
+   Fatura satırları
+   ========================================================== */
+
+/*
+  Her satırda birim fiyat, indirim, KDV oranı ve tutarı ayrı
+  sütunlarda. Fatura keserken doğrudan kullanılabilecek bir
+  döküm.
+*/
+.ac-lines{
+  margin-top:var(--s4);
+  overflow-x:auto;
+}
+
+.ac-line{
+  display:grid;
+  grid-template-columns:
+    minmax(180px,2fr)   /* ürün */
+    minmax(140px,1fr)   /* sku */
+    52px                /* adet */
+    minmax(90px,.8fr)   /* birim */
+    64px                /* indirim % */
+    minmax(90px,.8fr)   /* indirim tutarı */
+    minmax(90px,.8fr)   /* indirimli birim */
+    58px                /* kdv % */
+    minmax(84px,.8fr)   /* kdv */
+    minmax(96px,.9fr);  /* toplam */
+  gap:var(--s3);
+  align-items:center;
+  padding:var(--s3) 0;
+  border-top:1px solid var(--c-line);
+  font-size:var(--t-sm);
+  font-variant-numeric:tabular-nums;
+  min-width:960px;
+}
+
+/* Sayısal sütunlar sağa yaslı: rakamlar hizalı okunsun. */
+.ac-line > span:nth-child(n+3){text-align:right}
+
+.ac-line-head{
+  border-top:0;
+  padding-top:0;
+  font-size:var(--t-micro);
+  font-weight:700;
+  letter-spacing:.08em;
+  color:var(--c-ink-3);
+}
+
+.ac-line .ac-dim{color:var(--c-ink-3);font-size:var(--t-micro)}
+
+/* ---------- Toplamlar ------------------------------------ */
+
+.ac-totals{
+  display:grid;
+  gap:var(--s2);
+  margin-top:var(--s5);
+  margin-left:auto;
+  max-width:340px;
+  padding-top:var(--s4);
+  border-top:1px solid var(--c-line);
+  font-size:var(--t-base);
+  font-variant-numeric:tabular-nums;
+}
+
+.ac-totals > span,
+.ac-totals > strong{
+  display:flex;
+  justify-content:space-between;
+  gap:var(--s4);
+}
+
+.ac-totals > span{color:var(--c-ink-2)}
+
+.ac-totals > strong{
+  margin-top:var(--s2);
+  padding-top:var(--s3);
+  border-top:1px solid var(--c-line);
+  font-size:var(--t-lg);
+  color:var(--c-ink);
+}
