@@ -1,6 +1,6 @@
 "use client";
 
-import {usePathname} from "next/navigation";
+import {usePathname,useSearchParams} from "next/navigation";
 import {useEffect,useState} from "react";
 
 function pendingLabel(button:HTMLButtonElement){
@@ -14,7 +14,17 @@ function pendingLabel(button:HTMLButtonElement){
 
 export function InteractionFeedback(){
   const pathname=usePathname();
+  const searchParams=useSearchParams();
   const [feedback,setFeedback]=useState({message:"",path:""});
+
+  /*
+    Gösterge yalnızca yol değiştiğinde kapanıyordu. Filtre
+    düğmeleri aynı sayfaya gidiyor ve yalnızca sorgu parametresi
+    değişiyor; gösterge açık kalıyordu.
+
+    Adres tamamı (yol + sorgu) izleniyor.
+  */
+  const location=`${pathname}?${searchParams.toString()}`;
 
   useEffect(()=>{
     const markButton=(button:HTMLButtonElement,label:string)=>{
@@ -30,7 +40,7 @@ export function InteractionFeedback(){
         const submitter=event.submitter instanceof HTMLButtonElement?event.submitter:null;
         const label=submitter?pendingLabel(submitter):"İşlem tamamlanıyor…";
         if(submitter)markButton(submitter,label);
-        setFeedback({message:label,path:pathname});
+        setFeedback({message:label,path:location});
       },0);
     };
     const onClick=(event:MouseEvent)=>{
@@ -41,7 +51,7 @@ export function InteractionFeedback(){
         const url=new URL(anchor.href,window.location.href);
         if(url.origin===window.location.origin&&url.href!==window.location.href){
           anchor.classList.add("is-pending-link");
-          setFeedback({message:"Sayfa yükleniyor…",path:pathname});
+          setFeedback({message:"Sayfa yükleniyor…",path:location});
         }
         return;
       }
@@ -59,9 +69,19 @@ export function InteractionFeedback(){
     document.addEventListener("submit",onSubmit);
     document.addEventListener("click",onClick);
     return()=>{document.removeEventListener("submit",onSubmit);document.removeEventListener("click",onClick)};
-  },[pathname]);
+  },[location]);
 
-  const message=feedback.path===pathname?feedback.message:"";
+  /*
+    Güvenlik zamanlayıcısı: bir sebeple adres değişmezse
+    gösterge sonsuza kadar kalmasın.
+  */
+  useEffect(()=>{
+    if(!feedback.message)return;
+    const timer=window.setTimeout(()=>setFeedback({message:"",path:""}),8000);
+    return()=>window.clearTimeout(timer);
+  },[feedback.message,feedback.path]);
+
+  const message=feedback.path===location?feedback.message:"";
   return <div className={`global-progress ${message?"visible":""}`} role="status" aria-live="polite" aria-hidden={!message}>
     <span className="global-spinner" aria-hidden="true"/><b>{message}</b><small>İşleminiz güvenle tamamlanıyor.</small>
   </div>;
