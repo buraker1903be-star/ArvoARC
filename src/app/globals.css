@@ -806,3 +806,92 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 .table .row.collection-row{
   grid-template-columns:minmax(0,2.4fr) 1.6fr .7fr .5fr .9fr;
 }
+
+/* ==========================================================
+   Sayfa üst şeridi
+   ========================================================== */
+
+/*
+  Sayfa kimliği, dönem ve hızlı işlemler tek satırda.
+
+  Öncesinde başlık bloğu 52px dolgu ve 54px yazı boyutuyla
+  ekranın üçte birini kaplıyordu; kısayollar da beş ayrı kart
+  hâlinde alt alta diziliyordu. Panelin işi veriyi göstermek,
+  rakamlar ilk ekranda olmalı.
+*/
+.page-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  flex-wrap:wrap;
+  padding:20px 0 18px;
+}
+
+.page-bar h2{
+  margin:0;
+  font-size:22px;
+  font-weight:750;
+  letter-spacing:-.02em;
+  color:var(--ink);
+}
+
+.page-bar p{
+  margin:3px 0 0;
+  font-size:11px;
+  color:var(--muted);
+}
+
+/* Hızlı işlemler: kart yerine hap. Beş kart yerine tek satır. */
+.page-bar-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+
+.page-bar-actions a{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:8px 14px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:rgba(255,255,255,.86);
+  color:var(--ink-2);
+  font-size:11px;
+  font-weight:650;
+  text-decoration:none;
+  transition:border-color .16s ease,background .16s ease,color .16s ease;
+}
+
+.page-bar-actions a:hover{
+  border-color:var(--green);
+  background:#fff;
+  color:var(--green-dark);
+}
+
+.page-bar-actions i{
+  font-style:normal;
+  font-size:12px;
+  opacity:.6;
+}
+
+/* ---------- Ölçüm kartları ------------------------------- */
+
+/*
+  Rakam öne çıksın, etiket geriye çekilsin. Öncesinde etiket ve
+  rakam benzer ağırlıktaydı ve göz hangisine bakacağını
+  bilmiyordu.
+*/
+.metrics strong{
+  font-size:26px;
+  font-weight:760;
+  letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;
+  color:var(--ink);
+}
+
+.metrics small{
+  font-size:10px;
+  color:var(--muted);
+}

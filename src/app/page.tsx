@@ -97,8 +97,26 @@ export default async function Dashboard() {
     :{data:[]};
   const variantByProduct=new Map((recentVariants??[]).map(variant=>[variant.product_id,variant]));
   return <Shell tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="intro"><div><p>ARVO ARC · CANLI</p><h2>Mağaza operasyonun <em>tek merkezde.</em></h2><span>{organization.name} için Supabase commerce verileri.</span></div><span>Son 30 gün</span></section>
-    <nav className="quick-actions" aria-label="Hızlı işlemler">{quickActions.map((action)=><Link href={action.href} className="quick-action" key={action.label}><i aria-hidden="true">{action.icon}</i><span><b>{action.label}</b><small>{action.detail}</small></span></Link>)}</nav>
+    {/*
+      Üst şerit: sayfa kimliği ve hızlı işlemler tek satırda.
+      Dev başlık ekranın üçte birini yiyordu ve panelde asıl
+      gösterilmesi gereken veri katlanmanın altında kalıyordu.
+    */}
+    <section className="page-bar">
+      <div>
+        <h2>Genel Bakış</h2>
+        <p>{organization.name} · son 30 gün</p>
+      </div>
+      <nav className="page-bar-actions" aria-label="Hızlı işlemler">
+        {quickActions.map((action)=>(
+          <Link href={action.href} key={action.label}>
+            <i aria-hidden="true">{action.icon}</i>
+            {action.label}
+          </Link>
+        ))}
+      </nav>
+    </section>
+
     <section className="metrics">{metrics.map(([label,value,change])=><article key={label}><span>{label}</span><strong>{value}</strong><small>{change}</small></article>)}</section>
     <section className="action-center" aria-labelledby="action-center-title">
       <div className="action-center-head"><div><small>BUGÜNÜN ÖNCELİKLERİ</small><h3 id="action-center-title">Operasyon özeti</h3></div><Link href="/operasyon">Operasyon merkezini aç →</Link></div>
