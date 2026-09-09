@@ -59,6 +59,17 @@ export async function POST(request: Request) {
   const couponCode = body.couponCode ? String(body.couponCode).trim() : null;
   const items = Array.isArray(body.items) ? (body.items as Item[]) : [];
 
+  /*
+    Banka havalesi. Sipariş oluşuyor ama PayTR'a gidilmiyor;
+    ödeme beklemede kalıyor ve havale geldiğinde panelden
+    onaylanıyor.
+
+    İndirim tutarına vitrinden gelen değere güvenilmiyor:
+    oran sunucuda uygulanıyor.
+  */
+  const isTransfer = body.paymentMethod === "havale";
+  const TRANSFER_DISCOUNT_PERCENT = 3;
+
   if (!email || !name || items.length === 0) {
     return NextResponse.json({ error: "invalid" }, { status: 422, headers });
   }
@@ -100,6 +111,40 @@ export async function POST(request: Request) {
 
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0";
+
+  /*
+    Havale siparişinde PayTR adımı atlanıyor. İndirim sipariş
+    üstverisine yazılıyor; panelde ve faturada görünüyor.
+  */
+  if (isTransfer) {
+    const discount = Math.round(
+      (order.total * TRANSFER_DISCOUNT_PERCENT) / 100,
+    );
+
+    await supabase
+      .from("arc_orders")
+      .update({
+        total: order.total - discount,
+        payment_status: "pending",
+        status: "pending",
+        metadata: {
+          payment_method: "Banka havalesi / EFT",
+          transfer_discount: discount,
+          transfer_discount_percent: TRANSFER_DISCOUNT_PERCENT,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order.order_id);
+
+    return NextResponse.json(
+      {
+        orderNumber: order.order_number,
+        total: order.total - discount,
+        paymentMethod: "havale",
+      },
+      { headers },
+    );
+  }
 
   // PayTR sepet formatı: [[ad, birim fiyat, adet], ...]
   const basket = Buffer.from(
