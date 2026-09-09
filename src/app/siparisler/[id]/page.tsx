@@ -53,7 +53,10 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
       <section className="ac ac-pad">
         <div className="ac-head"><div><h3>Sipariş kalemleri</h3><p>{items?.length??0} kalem</p></div></div>
         <div style={{marginTop:16}}>{items?.map(item=><div key={item.id} style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:18,padding:"15px 0",borderTop:"1px solid rgba(0,0,0,.08)",alignItems:"center"}}><div><b>{item.product_name}</b><small style={{display:"block",marginTop:5}}>SKU: {item.sku}</small></div><span>{item.quantity} × {money(item.unit_price,order.currency)}</span><strong>{money(item.total,order.currency)}</strong></div>)}</div>
-        <div style={{marginTop:20,marginLeft:"auto",maxWidth:330,display:"grid",gap:9}}><span style={{display:"flex",justifyContent:"space-between"}}>Ara toplam <b>{money(order.subtotal,order.currency)}</b></span><span style={{display:"flex",justifyContent:"space-between"}}>Kargo <b>{money(order.shipping,order.currency)}</b></span><span style={{display:"flex",justifyContent:"space-between"}}>Vergi <b>{money(order.tax,order.currency)}</b></span><strong style={{display:"flex",justifyContent:"space-between",fontSize:18,borderTop:"1px solid",paddingTop:12}}>Toplam <b>{money(order.total,order.currency)}</b></strong></div>
+        <div style={{marginTop:20,marginLeft:"auto",maxWidth:330,display:"grid",gap:9}}><span style={{display:"flex",justifyContent:"space-between"}}>Ara toplam <b>{money(order.subtotal,order.currency)}</b></span><span style={{display:"flex",justifyContent:"space-between"}}>Kargo <b>{money(order.shipping,order.currency)}</b></span><span style={{display:"flex",justifyContent:"space-between"}}>
+            {/* KDV fiyata dâhildir; toplamı artırmaz. */}
+            KDV (dâhil) <b>{money(order.tax,order.currency)}</b>
+          </span><strong style={{display:"flex",justifyContent:"space-between",fontSize:18,borderTop:"1px solid",paddingTop:12}}>Toplam <b>{money(order.total,order.currency)}</b></strong></div>
       </section>
       <aside className="ac ac-pad">
         <div className="ac-head"><div><h3>Yönetim</h3><p>Durum ve kargo bilgileri.</p></div></div>
