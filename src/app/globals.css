@@ -789,3 +789,8 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 
 /* Görsel hücresinde boşluk olmasın. */
 .product-row>span.product-thumb{padding:4px}
+
+/* Koleksiyon satırı. */
+.table .row.collection-row{
+  grid-template-columns:minmax(0,2.4fr) 1.6fr .7fr .5fr .9fr;
+}

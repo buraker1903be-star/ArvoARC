@@ -86,65 +86,6 @@ export default async function Products({ searchParams }: { searchParams: Promise
     {params.created === "1" && <section className="card" style={{padding:16,marginBottom:20}}><strong>Ürün başarıyla oluşturuldu.</strong></section>}
     {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>{errorMessages[params.error] ?? `Ürün işlemi tamamlanamadı (${params.error}).`}</strong></section>}
     <section className="card" style={{padding:20,marginBottom:20}}><form style={{display:"grid",gridTemplateColumns:"minmax(220px,1fr) 180px auto auto",gap:10,alignItems:"end"}}><label>Katalogda ara<input name="q" defaultValue={params.q??""} placeholder="Ürün, marka, tür veya etiket" style={{display:"block",width:"100%",padding:12,marginTop:6}}/></label><label>Durum<select name="filter" defaultValue={statusFilter} style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="all">Tüm ürünler</option><option value="active">Aktif</option><option value="draft">Taslak</option><option value="archived">Arşivlenmiş</option></select></label><button type="submit" style={{padding:12}}>Filtrele</button>{(params.q||statusFilter!=="all")&&<Link href="/urunler" style={{padding:12}}>Temizle</Link>}</form></section>
-    {canManage && <details className="card" style={{padding:24,marginBottom:24}}><summary style={{cursor:"pointer",fontWeight:800}}>+ Yeni ürün oluştur</summary><form action={createProduct} style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:14,marginTop:20}}>
-      <label>Ürün adı<input name="name" required maxLength={200} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><label>SKU<input name="sku" required maxLength={80} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label>
-      <label>Satış fiyatı (₺)<input name="price" type="number" min="0" step="0.01" required style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><label>Karşılaştırma fiyatı (₺)<input name="compare_at_price" type="number" min="0" step="0.01" placeholder="İndirim yoksa boş" style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><label>Başlangıç stoku<input name="stock" type="number" step="1" required defaultValue="0" style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label>
-      <label>Durum<select name="status" defaultValue="draft" style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="draft">Taslak</option><option value="active">Aktif</option></select></label><label style={{display:"flex",alignItems:"center",gap:10}}><input name="allow_backorder" type="checkbox" defaultChecked /> Stok yokken satışa devam et</label>
-      <label style={{gridColumn:"1 / -1"}}>Açıklama<textarea name="description" rows={4} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><button type="submit" style={{padding:12}}>Ürün oluştur</button>
-    </form></details>}
-
-      {canManage?(
-        <details className="panel-card" style={{marginBottom:16}}>
-          <summary style={{cursor:"pointer",fontWeight:600}}>
-            Toplu durum değişikliği
-          </summary>
-
-          <p style={{margin:"12px 0",fontSize:13,color:"#7c8177",lineHeight:1.6}}>
-            Tedarikçiden gelen ürünleri tek tek yayınlamak yerine
-            topluca açıp kapatabilirsiniz. En az bir filtre
-            seçmelisiniz; filtresiz işlem tüm katalogu değiştirir
-            ve geri alması zordur.
-          </p>
-
-          <form action={bulkUpdateStatus} style={{display:"grid",gap:12,maxWidth:520}}>
-            <label>
-              Tedarikçi
-              <select name="supplier" style={{display:"block",width:"100%",padding:12,marginTop:6}}>
-                <option value="">Seçiniz</option>
-                <option value="tarzyeri">Tarzyeri</option>
-              </select>
-            </label>
-
-            <label>
-              Koleksiyon (isteğe bağlı, slug)
-              <input name="collection" placeholder="ornek: erkek-t-shirt"
-                     style={{display:"block",width:"100%",padding:12,marginTop:6}} />
-            </label>
-
-            <label>
-              Yalnızca şu durumdakiler
-              <select name="current_status" style={{display:"block",width:"100%",padding:12,marginTop:6}}>
-                <option value="">Hepsi</option>
-                <option value="draft">Taslak</option>
-                <option value="active">Yayında</option>
-                <option value="archived">Arşiv</option>
-              </select>
-            </label>
-
-            <label>
-              Yeni durum
-              <select name="status" required style={{display:"block",width:"100%",padding:12,marginTop:6}}>
-                <option value="active">Yayında</option>
-                <option value="draft">Taslak</option>
-                <option value="archived">Arşiv</option>
-              </select>
-            </label>
-
-            <button type="submit" className="button">Uygula</button>
-          </form>
-        </details>
-      ):null}
-
     <section className="product-catalog">
       <div className="product-catalog-head"><div><small>KATALOG</small><h3>{search?visibleProducts.length:(filteredCount??0)} ürün</h3></div><span>{organization.name}</span></div>
       {visibleProducts.length ? <div className="table">
@@ -225,5 +166,64 @@ export default async function Products({ searchParams }: { searchParams: Promise
       })}</div> : <div className="card product-empty"><strong>Arama kriterine uygun ürün bulunamadı.</strong><p>Filtreleri temizleyerek tüm kataloğu görüntüleyebilirsiniz.</p></div>}
       {!search&&totalPages>1&&<nav className="catalog-pagination" aria-label="Ürün sayfaları"><span>{currentPage}. sayfa / {totalPages}</span><div>{currentPage>1&&<Link prefetch={false} href={pageHref(currentPage-1)}>← Önceki</Link>}{currentPage<totalPages&&<Link prefetch={false} href={pageHref(currentPage+1)}>Sonraki →</Link>}</div></nav>}
     </section>
+
+    {canManage && <details className="card" style={{padding:24,marginBottom:24}}><summary style={{cursor:"pointer",fontWeight:800}}>+ Yeni ürün oluştur</summary><form action={createProduct} style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:14,marginTop:20}}>
+      <label>Ürün adı<input name="name" required maxLength={200} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><label>SKU<input name="sku" required maxLength={80} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label>
+      <label>Satış fiyatı (₺)<input name="price" type="number" min="0" step="0.01" required style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><label>Karşılaştırma fiyatı (₺)<input name="compare_at_price" type="number" min="0" step="0.01" placeholder="İndirim yoksa boş" style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><label>Başlangıç stoku<input name="stock" type="number" step="1" required defaultValue="0" style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label>
+      <label>Durum<select name="status" defaultValue="draft" style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="draft">Taslak</option><option value="active">Aktif</option></select></label><label style={{display:"flex",alignItems:"center",gap:10}}><input name="allow_backorder" type="checkbox" defaultChecked /> Stok yokken satışa devam et</label>
+      <label style={{gridColumn:"1 / -1"}}>Açıklama<textarea name="description" rows={4} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><button type="submit" style={{padding:12}}>Ürün oluştur</button>
+    </form></details>}
+
+      {canManage?(
+        <details className="panel-card" style={{marginBottom:16}}>
+          <summary style={{cursor:"pointer",fontWeight:600}}>
+            Toplu durum değişikliği
+          </summary>
+
+          <p style={{margin:"12px 0",fontSize:13,color:"#7c8177",lineHeight:1.6}}>
+            Tedarikçiden gelen ürünleri tek tek yayınlamak yerine
+            topluca açıp kapatabilirsiniz. En az bir filtre
+            seçmelisiniz; filtresiz işlem tüm katalogu değiştirir
+            ve geri alması zordur.
+          </p>
+
+          <form action={bulkUpdateStatus} style={{display:"grid",gap:12,maxWidth:520}}>
+            <label>
+              Tedarikçi
+              <select name="supplier" style={{display:"block",width:"100%",padding:12,marginTop:6}}>
+                <option value="">Seçiniz</option>
+                <option value="tarzyeri">Tarzyeri</option>
+              </select>
+            </label>
+
+            <label>
+              Koleksiyon (isteğe bağlı, slug)
+              <input name="collection" placeholder="ornek: erkek-t-shirt"
+                     style={{display:"block",width:"100%",padding:12,marginTop:6}} />
+            </label>
+
+            <label>
+              Yalnızca şu durumdakiler
+              <select name="current_status" style={{display:"block",width:"100%",padding:12,marginTop:6}}>
+                <option value="">Hepsi</option>
+                <option value="draft">Taslak</option>
+                <option value="active">Yayında</option>
+                <option value="archived">Arşiv</option>
+              </select>
+            </label>
+
+            <label>
+              Yeni durum
+              <select name="status" required style={{display:"block",width:"100%",padding:12,marginTop:6}}>
+                <option value="active">Yayında</option>
+                <option value="draft">Taslak</option>
+                <option value="archived">Arşiv</option>
+              </select>
+            </label>
+
+            <button type="submit" className="button">Uygula</button>
+          </form>
+        </details>
+      ):null}
   </Shell>;
 }

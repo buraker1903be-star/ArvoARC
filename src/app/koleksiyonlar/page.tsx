@@ -28,13 +28,23 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
     <section className="subhead"><div><small>KATALOG YAPISI · CANLI</small><h2>Koleksiyonlar</h2><p>Ürünleri mağazada birlikte sergilemek, SEO bağlantıları oluşturmak ve kampanya grupları hazırlamak için koleksiyonları yönetin.</p></div></section>
     <section className="metrics"><article><span>TOPLAM KOLEKSİYON</span><strong>{collections?.length??0}</strong><small>Tüm durumlar</small></article><article><span>AKTİF</span><strong>{activeCount}</strong><small>Mağazada yayınlanabilir</small></article><article><span>EŞLENEN ÜRÜN</span><strong>{mappedProducts}</strong><small>En az bir koleksiyonda</small></article><article><span>SHOPIFY KAYNAKLI</span><strong>{collections?.filter(item=>item.source==="shopify").length??0}</strong><small>Ürün türünden eşlendi</small></article></section>
     {query.error?<section className="card" style={{padding:16,marginBottom:20}}><strong>Koleksiyon işlemi tamamlanamadı: {query.error}</strong></section>:null}
-    {canManage?<details className="card collection-create"><summary>+ Yeni koleksiyon oluştur</summary><form action={createCollection}><label>Koleksiyon adı<input name="title" required maxLength={160} placeholder="Örn. En Çok Satanlar"/></label><label>Bağlantı adı<input name="slug" maxLength={160} placeholder="en-cok-satanlar"/></label><button type="submit">Koleksiyon oluştur</button></form></details>:null}
-    <section className="collection-grid">
-      {(collections??[]).map((collection,index)=><Link href={`/koleksiyonlar/${collection.id}`} className="collection-card" key={collection.id}>
-        <div className={`collection-cover tone-${index%5}`}><span>{collection.source==="shopify"?"SHOPIFY EŞLEMESİ":"ARVO ARC"}</span><b>{collection.title.split(" ").map((word:string)=>word[0]).join("").slice(0,3).toUpperCase()}</b><em>{statusLabels[collection.status]??collection.status}</em></div>
-        <div className="collection-card-body"><small>arvoculture.com/koleksiyon/{collection.slug}</small><h3>{collection.title}</h3><p>{collection.description||collection.seo_title||"Koleksiyon açıklaması henüz eklenmemiş."}</p><div><span>{counts.get(collection.id)??0} ürün</span><b>Yönet →</b></div></div>
+    {/*
+      Kart ızgarası yerine tablo: 122 koleksiyon kart düzeninde
+      çok uzun bir sayfa yapıyor ve karşılaştırma zorlaşıyordu.
+    */}
+    <section className="card table">
+      <div className="head"><div><small>KOLEKSİYONLAR</small><h3>{collections?.length??0} koleksiyon</h3></div><span>{organization.name}</span></div>
+      <div className="row collection-row th"><span>KOLEKSİYON</span><span>BAĞLANTI</span><span>KAYNAK</span><span>ÜRÜN</span><span>DURUM</span></div>
+      {(collections??[]).map((collection)=><Link href={`/koleksiyonlar/${collection.id}`} className="row collection-row" key={collection.id} style={{textDecoration:"none",color:"inherit"}}>
+        <span><b>{collection.title}</b></span>
+        <span className="muted">/{collection.slug}</span>
+        <span className="muted">{collection.source==="shopify"?"Shopify":"ARC"}</span>
+        <span><b>{counts.get(collection.id)??0}</b></span>
+        <span><em data-tone={collection.status==="active"?undefined:"muted"}>{statusLabels[collection.status]??collection.status}</em></span>
       </Link>)}
-      {!collections?.length?<div className="card product-empty"><strong>Henüz koleksiyon bulunmuyor.</strong><p>İlk koleksiyonunuzu oluşturarak ürünleri gruplandırmaya başlayın.</p></div>:null}
+      {!collections?.length?<div style={{padding:24}}><strong>Henüz koleksiyon bulunmuyor.</strong><p>İlk koleksiyonunuzu oluşturarak ürünleri gruplandırmaya başlayın.</p></div>:null}
     </section>
+
+    {canManage?<details className="card collection-create"><summary>+ Yeni koleksiyon oluştur</summary><form action={createCollection}><label>Koleksiyon adı<input name="title" required maxLength={160} placeholder="Örn. En Çok Satanlar"/></label><label>Bağlantı adı<input name="slug" maxLength={160} placeholder="en-cok-satanlar"/></label><button type="submit">Koleksiyon oluştur</button></form></details>:null}
   </Shell>;
 }
