@@ -15,7 +15,7 @@ import { paytrConfig } from "@/lib/paytr/config";
  * burada yapılıyor.
  */
 export type RefundResult =
-  | { ok: true; amount: number; reference?: string }
+  | { ok: true; amount: number; reference?: string; isTest: boolean }
   | { ok: false; message: string };
 
 export async function refundPayment({
@@ -90,10 +90,19 @@ export async function refundPayment({
       };
     }
 
+    /*
+      `is_test` PayTR'ın test modunda oluşturulmuş bir siparişi
+      iade ettiğimizi söylüyor. Gerçek para hareketi olmuyor ve
+      PayTR panelinde görünmüyor.
+
+      Bu bilgi çağıran tarafa iletiliyor: panelde uyarı
+      gösterilebilsin, gerçek iade sanılmasın.
+    */
     return {
       ok: true,
       amount: Math.round(Number(data.return_amount ?? returnAmount) * 100),
       reference: data.reference_no,
+      isTest: Number(data.is_test ?? 0) === 1,
     };
   } catch (error) {
     console.error("PayTR iade isteği başarısız:", error);
