@@ -182,6 +182,11 @@
    Sayfa üst şeridi
    ========================================================== */
 
+/*
+  `.subhead` kuralları hâlâ diğer sayfalarda kullanıldığı için
+  duruyor; bu şerit onlardan bağımsız çalışmalı. Özgüllük
+  yeterli olmayan yerlerde açık değer veriliyor.
+*/
 .ac-bar{
   display:flex;
   align-items:center;
@@ -207,8 +212,19 @@
 
 .ac-bar-actions{
   display:flex;
+  flex-direction:row;
+  align-items:center;
   flex-wrap:wrap;
   gap:var(--s2);
+  /* Eski ızgara kuralları bu şeridi dikey diziyordu. */
+  grid-template-columns:none;
+}
+
+.ac-bar-actions > a{
+  /* Metin rengi soluk kalıyordu: eski kart stili miras
+     bırakıyordu. Açıkça tanımlanıyor. */
+  color:var(--c-ink-2);
+  opacity:1;
 }
 
 /* ==========================================================
