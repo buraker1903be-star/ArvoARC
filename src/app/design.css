@@ -326,3 +326,63 @@
 @media (prefers-reduced-motion:reduce){
   .ac-lift,.ac-lift:hover{transform:none;transition:none}
 }
+
+/* ==========================================================
+   Filtre şeridi
+   ========================================================== */
+
+/*
+  Arama, durum ve düğmeler tek satırda. Öncesinde her alanın
+  üstünde etiket vardı ve şerit iki satıra çıkıyordu; yer
+  tutucu metin zaten ne aranacağını söylüyor.
+*/
+.ac-filter{
+  display:flex;
+  align-items:center;
+  gap:var(--s2);
+  flex-wrap:wrap;
+}
+
+.ac-filter input,
+.ac-filter select{
+  height:38px;
+  padding:0 var(--s3);
+  border:1px solid var(--c-line-2);
+  border-radius:var(--r1);
+  background:var(--c-surface);
+  font-size:var(--t-base);
+  color:var(--c-ink);
+  transition:border-color var(--fast) var(--ease);
+}
+
+.ac-filter input{
+  flex:1 1 240px;
+  min-width:0;
+}
+
+.ac-filter select{flex:0 0 180px}
+
+.ac-filter input:focus,
+.ac-filter select:focus{
+  outline:none;
+  border-color:var(--c-accent);
+}
+
+.ac-filter input::placeholder{color:var(--c-ink-3)}
+
+.ac-filter .ac-btn{height:38px}
+
+/* ==========================================================
+   Tablo kartı
+   ========================================================== */
+
+/*
+  Tablo kart içinde: kenarlar kartın kenarlarına yaslanıyor,
+  başlık bloğu kendi dolgusunu taşıyor.
+*/
+.ac.table{padding:0;overflow:hidden}
+
+.ac.table .ac-head{
+  padding:var(--s4) var(--s5);
+  border-bottom:1px solid var(--c-line);
+}

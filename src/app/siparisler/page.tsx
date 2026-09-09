@@ -59,12 +59,31 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
   });
 
   return <Shell active="orders" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>OPERASYON · CANLI</small><h2>Siparişler</h2><p>Çok kalemli sipariş, sipariş satırları ve stok hareketleri tek transaction içinde işlenir. Stoksuz satış açık varyantlar negatif stoka düşebilir.</p></div><a href="/api/disari-aktar/siparisler" style={{padding:"12px 16px",background:"var(--ink)",color:"white"}}>CSV indir ↓</a></section>
-    {params.created && <section className="card" style={{padding:16,marginBottom:20}}><strong>{params.created} siparişi oluşturuldu.</strong></section>}
-    {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>Sipariş oluşturulamadı: {params.error}</strong></section>}
+    <section className="ac-bar">
+      <div>
+        <h1>Siparişler</h1>
+        <p>{visibleOrders.length} kayıt · {organization.name}</p>
+      </div>
+      <div className="ac-bar-actions">
+        <a className="ac-btn" href="/api/disari-aktar/siparisler">CSV indir</a>
+      </div>
+    </section>
 
-    <section className="card" style={{padding:20,marginBottom:20}}><form style={{display:"grid",gridTemplateColumns:"minmax(220px,1fr) 190px auto auto",gap:10,alignItems:"end"}}><label>Siparişlerde ara<input name="q" defaultValue={params.q??""} placeholder="Sipariş no, müşteri veya e-posta" style={{display:"block",width:"100%",padding:12,marginTop:6}}/></label><label>Durum<select name="filter" defaultValue={statusFilter} style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="all">Tüm durumlar</option><option value="pending">Bekliyor</option><option value="confirmed">Onaylandı</option><option value="processing">Hazırlanıyor</option><option value="fulfilled">Tamamlandı</option><option value="cancelled">İptal</option><option value="refunded">İade</option></select></label><button type="submit" style={{padding:12}}>Filtrele</button>{(params.q||statusFilter!=="all")&&<Link href="/siparisler" style={{padding:12}}>Temizle</Link>}</form></section>
-    <section className="card table"><div className="head"><div><small>SİPARİŞ AKIŞI</small><h3>{visibleOrders.length} sipariş</h3></div><span>{organization.name}</span></div>
+    <div className="ac-stack">
+    {params.created&&<section className="ac ac-pad-sm"><strong>{params.created} siparişi oluşturuldu.</strong></section>}
+    {params.error&&<section className="ac ac-pad-sm"><strong>Sipariş oluşturulamadı: {params.error}</strong></section>}
+
+    {/* Filtre şeridi. Etiketler kaldırıldı: yer tutucu metin
+        zaten ne aranacağını söylüyor ve şerit tek satıra
+        sığıyor. */}
+    <section className="ac ac-pad-sm"><form className="ac-filter"><input name="q" defaultValue={params.q??""} placeholder="Sipariş no, müşteri veya e-posta"/><select name="filter" defaultValue={statusFilter}><option value="all">Tüm durumlar</option><option value="pending">Bekliyor</option><option value="confirmed">Onaylandı</option><option value="processing">Hazırlanıyor</option><option value="fulfilled">Tamamlandı</option><option value="cancelled">İptal</option><option value="refunded">İade</option></select><button className="ac-btn ac-btn-primary" type="submit">Filtrele</button>{(params.q||statusFilter!=="all")&&<Link className="ac-btn" href="/siparisler">Temizle</Link>}</form></section>
+    <section className="ac table">
+      <div className="ac-head ac-pad-sm" style={{marginBottom:0}}>
+        <div>
+          <h3>Sipariş akışı</h3>
+          <p>Satıra tıklayarak detayı açın.</p>
+        </div>
+      </div>
       <div className="row th"><span>SİPARİŞ</span><span>MÜŞTERİ</span><span>KAYNAK</span><span>TUTAR</span><span>DURUM</span></div>
       {visibleOrders.length ? visibleOrders.map(order=>{
         /*
@@ -97,9 +116,10 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
     </section>
     {/* Manuel sipariş listenin altında: günlük iş listeye
         bakmak, form ara sıra kullanılıyor. */}
-    {canManage&&<details className="card" style={{padding:24,marginTop:24}}>
+    {canManage&&<details className="ac ac-pad">
       <summary style={{cursor:"pointer",fontWeight:800}}>+ Manuel sipariş oluştur</summary><div className="head"><div><small>MANUEL SİPARİŞ</small><h3>Yeni sipariş</h3></div><span>ARC Native · Çok kalemli</span></div><OrderForm variants={variantOptions} />
     </details>}
+    </div>
   </Shell>;
 }
 
