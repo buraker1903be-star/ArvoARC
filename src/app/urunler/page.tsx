@@ -82,12 +82,28 @@ export default async function Products({ searchParams }: { searchParams: Promise
   }));
 
   return <Shell active="products" tenantName={organization.name} tenantPlan={organization.plan_code}>
-    <section className="subhead"><div><small>KATALOG · CANLI</small><h2>Ürünler</h2><p>{activeProductCount??0} aktif katalog ürünü · {totalProductCount??0} toplam ürün · {totalVariantCount??0} varyant. Stoksuz satış açık varyantlarda satış stok sıfırın altına inse de devam eder.</p></div></section>
-    {params.created === "1" && <section className="card" style={{padding:16,marginBottom:20}}><strong>Ürün başarıyla oluşturuldu.</strong></section>}
-    {params.error && <section className="card" style={{padding:16,marginBottom:20}}><strong>{errorMessages[params.error] ?? `Ürün işlemi tamamlanamadı (${params.error}).`}</strong></section>}
-    <section className="card" style={{padding:20,marginBottom:20}}><form style={{display:"grid",gridTemplateColumns:"minmax(220px,1fr) 180px auto auto",gap:10,alignItems:"end"}}><label>Katalogda ara<input name="q" defaultValue={params.q??""} placeholder="Ürün, marka, tür veya etiket" style={{display:"block",width:"100%",padding:12,marginTop:6}}/></label><label>Durum<select name="filter" defaultValue={statusFilter} style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="all">Tüm ürünler</option><option value="active">Aktif</option><option value="draft">Taslak</option><option value="archived">Arşivlenmiş</option></select></label><button type="submit" style={{padding:12}}>Filtrele</button>{(params.q||statusFilter!=="all")&&<Link href="/urunler" style={{padding:12}}>Temizle</Link>}</form></section>
-    <section className="product-catalog">
-      <div className="product-catalog-head"><div><small>KATALOG</small><h3>{search?visibleProducts.length:(filteredCount??0)} ürün</h3></div><span>{organization.name}</span></div>
+    <section className="ac-bar">
+      <div>
+        <h1>Ürünler</h1>
+        <p>
+          {(activeProductCount??0).toLocaleString("tr-TR")} aktif ·{" "}
+          {(totalProductCount??0).toLocaleString("tr-TR")} toplam ·{" "}
+          {(totalVariantCount??0).toLocaleString("tr-TR")} varyant
+        </p>
+      </div>
+    </section>
+
+    <div className="ac-stack">
+    {params.created==="1"&&<section className="ac ac-pad-sm"><strong>Ürün başarıyla oluşturuldu.</strong></section>}
+    {params.error&&<section className="ac ac-pad-sm"><strong>{errorMessages[params.error] ?? `Ürün işlemi tamamlanamadı (${params.error}).`}</strong></section>}
+    <section className="ac ac-pad-sm"><form className="ac-filter"><input name="q" defaultValue={params.q??""} placeholder="Ürün, marka, tür veya etiket"/><select name="filter" defaultValue={statusFilter}><option value="all">Tüm ürünler</option><option value="active">Aktif</option><option value="draft">Taslak</option><option value="archived">Arşivlenmiş</option></select><button className="ac-btn ac-btn-primary" type="submit">Filtrele</button>{(params.q||statusFilter!=="all")&&<Link className="ac-btn" href="/urunler">Temizle</Link>}</form></section>
+    <section className="ac table">
+      <div className="ac-head">
+        <div>
+          <h3>Katalog</h3>
+          <p>{(search?visibleProducts.length:(filteredCount??0)).toLocaleString("tr-TR")} ürün · satıra tıklayarak düzenleyin</p>
+        </div>
+      </div>
       {visibleProducts.length ? <div className="table">
         <div className="row product-row th"><span/><span>ÜRÜN</span><span>MARKA</span><span>FİYAT</span><span>ALIŞ / KÂR</span><span>DURUM</span></div>{visibleProducts.map((product,index)=>{
         const pv=variantsByProduct.get(product.id)??[];
@@ -167,7 +183,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
       {!search&&totalPages>1&&<nav className="catalog-pagination" aria-label="Ürün sayfaları"><span>{currentPage}. sayfa / {totalPages}</span><div>{currentPage>1&&<Link prefetch={false} href={pageHref(currentPage-1)}>← Önceki</Link>}{currentPage<totalPages&&<Link prefetch={false} href={pageHref(currentPage+1)}>Sonraki →</Link>}</div></nav>}
     </section>
 
-    {canManage && <details className="card" style={{padding:24,marginBottom:24}}><summary style={{cursor:"pointer",fontWeight:800}}>+ Yeni ürün oluştur</summary><form action={createProduct} style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:14,marginTop:20}}>
+    {canManage&&<details className="ac ac-pad"><summary style={{cursor:"pointer",fontWeight:800}}>+ Yeni ürün oluştur</summary><form action={createProduct} style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:14,marginTop:20}}>
       <label>Ürün adı<input name="name" required maxLength={200} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><label>SKU<input name="sku" required maxLength={80} style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label>
       <label>Satış fiyatı (₺)<input name="price" type="number" min="0" step="0.01" required style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><label>Karşılaştırma fiyatı (₺)<input name="compare_at_price" type="number" min="0" step="0.01" placeholder="İndirim yoksa boş" style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label><label>Başlangıç stoku<input name="stock" type="number" step="1" required defaultValue="0" style={{display:"block",width:"100%",padding:12,marginTop:6}} /></label>
       <label>Durum<select name="status" defaultValue="draft" style={{display:"block",width:"100%",padding:12,marginTop:6}}><option value="draft">Taslak</option><option value="active">Aktif</option></select></label><label style={{display:"flex",alignItems:"center",gap:10}}><input name="allow_backorder" type="checkbox" defaultChecked /> Stok yokken satışa devam et</label>
@@ -175,7 +191,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
     </form></details>}
 
       {canManage?(
-        <details className="panel-card" style={{marginBottom:16}}>
+        <details className="ac ac-pad">
           <summary style={{cursor:"pointer",fontWeight:600}}>
             Toplu durum değişikliği
           </summary>
@@ -225,5 +241,6 @@ export default async function Products({ searchParams }: { searchParams: Promise
           </form>
         </details>
       ):null}
+    </div>
   </Shell>;
 }

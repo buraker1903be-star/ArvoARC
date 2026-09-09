@@ -540,3 +540,34 @@ textarea.ac-input{resize:vertical;line-height:1.55}
   font-size:var(--t-lg);
   color:var(--c-ink);
 }
+
+/* ==========================================================
+   Tablo satırları — sistem sürümü
+   ========================================================== */
+
+/*
+  Eski `.row` kuralları globals.css'te duruyor ve diğer sayfalar
+  onları kullanıyor. Burada tabloların kart içindeki
+  görünümü düzeltiliyor: kenarlar kartın kenarlarına yaslanıyor.
+*/
+.ac.table .row{
+  padding-left:var(--s5);
+  padding-right:var(--s5);
+  border-top-color:var(--c-line);
+}
+
+.ac.table .row.th{
+  background:var(--c-surface-2);
+  color:var(--c-ink-3);
+  border-top:0;
+}
+
+.ac.table .row:not(.th):hover{background:var(--c-surface-2)}
+
+/* Katalog boş durumu. */
+.ac.table .product-empty,
+.ac.table > p{
+  padding:var(--s6) var(--s5);
+  color:var(--c-ink-3);
+  text-align:center;
+}
