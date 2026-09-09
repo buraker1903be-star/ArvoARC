@@ -9,8 +9,13 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
   const {supabase,organization,membership}=await requireTenant();
   const [{data:collection,error},{data:products,error:productsError},{data:memberships,error:membershipError}]=await Promise.all([
     supabase.from("arc_collections").select("id,title,slug,description,status,source,seo_title,seo_description,metadata").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
-    supabase.from("arc_products").select("id,name,status,source,metadata").eq("organization_id",organization.id).neq("status","archived").order("name"),
-    supabase.from("arc_collection_products").select("product_id,position").eq("organization_id",organization.id).eq("collection_id",id).order("position")
+    supabase./*
+      Ürün seçici. Tüm katalog (3.264) yerine son eklenen 300
+      ürün: liste zaten 1000 satırda kesiliyordu ve o kadar
+      uzun bir açılır menü kullanılabilir değil.
+    */
+    from("arc_products").select("id,name,status,source,metadata").order("updated_at",{ascending:false}).limit(300).eq("organization_id",organization.id).neq("status","archived").order("name"),
+    supabase.from("arc_collection_products").select("product_id,position").limit(5000).eq("organization_id",organization.id).eq("collection_id",id).order("position")
   ]);
   if(error)throw new Error(error.message);if(productsError)throw new Error(productsError.message);if(membershipError)throw new Error(membershipError.message);if(!collection)notFound();
   const canManage=["owner","admin","manager"].includes(membership.role);
