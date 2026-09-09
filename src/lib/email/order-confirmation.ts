@@ -262,3 +262,88 @@ export function shippingNoticeHtml({
 </body>
 </html>`;
 }
+
+/**
+ * Sipariş durumu bildirimi.
+ *
+ * Yalnızca müşteriyi ilgilendiren durumlarda gönderilir.
+ * "Beklemede" ya da "onaylandı" gibi ara durumlar için e-posta
+ * atmak gereksiz gürültü yaratır ve müşteri sonraki
+ * bildirimleri de görmezden gelmeye başlar.
+ */
+const STATUS_MESSAGES: Record<string, { title: string; body: string }> = {
+  shipped: {
+    title: "Siparişiniz kargoda",
+    body: "Siparişiniz kargoya teslim edildi. Takip bilgileri kısa süre içinde sistemde görünür olacak.",
+  },
+  delivered: {
+    title: "Siparişiniz teslim edildi",
+    body: "Siparişiniz teslim edildi. Ürünlerinizi beğendiğinizi umuyoruz; bir sorun olursa bu e-postayı yanıtlayabilirsiniz.",
+  },
+  cancelled: {
+    title: "Siparişiniz iptal edildi",
+    body: "Siparişiniz iptal edildi. Ödemeniz alınmışsa, tutar en geç on dört gün içinde ödeme yaptığınız yönteme iade edilir.",
+  },
+  refunded: {
+    title: "İadeniz tamamlandı",
+    body: "İade işleminiz tamamlandı. Tutarın kartınıza yansıma süresi bankanıza bağlıdır.",
+  },
+};
+
+export function statusUpdateEmail(
+  status: string,
+  orderNumber: string,
+  customerName: string,
+) {
+  const message = STATUS_MESSAGES[status];
+  // Bildirim gerektirmeyen durumda e-posta üretilmez.
+  if (!message) return null;
+
+  return {
+    subject: `${message.title} · ${orderNumber}`,
+    html: `<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:24px 12px;background:#f4f3ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;">
+    <tr>
+      <td style="padding:32px 28px;">
+        <img src="https://arvoculture.com/arvoculture-logo-transparent.png"
+             alt="ArvoCulture" width="150" height="18"
+             style="display:block;width:150px;height:auto;margin:0 0 22px;border:0;">
+
+        <h1 style="margin:0 0 10px;font-size:22px;line-height:1.3;color:#10120f;font-weight:600;">
+          ${escapeHtml(message.title)}
+        </h1>
+        <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#5a5f54;">
+          Merhaba ${escapeHtml(customerName)},
+        </p>
+        <p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
+          ${escapeHtml(message.body)}
+        </p>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+               style="margin-top:20px;background:#faf9f5;border-radius:10px;">
+          <tr>
+            <td style="padding:14px 16px;font-size:13px;color:#5a5f54;">
+              Sipariş numaranız
+              <strong style="color:#10120f;"> ${escapeHtml(orderNumber)}</strong>
+            </td>
+          </tr>
+        </table>
+
+        <a href="https://arvoculture.com/hesap"
+           style="display:inline-block;margin:20px 0 0;padding:13px 26px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
+          Siparişimi görüntüle
+        </a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="max-width:520px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
+    ARVOCULTURE GROUP TEKNOLOJİ SANAYİ VE TİCARET LTD. ŞTİ.
+  </p>
+</body>
+</html>`,
+  };
+}

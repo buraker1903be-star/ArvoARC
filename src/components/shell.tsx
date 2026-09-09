@@ -14,6 +14,7 @@ const navigation=[
   ["customers","Müşteriler","/musteriler","◎"],
   ["analytics","Satış Analitiği","/analitik","↗"],
   ["import","Veri Aktarımı","/veri-aktarimi","⇄"],
+  ["suppliers","Tedarikçiler","/tedarikci","◎"],
   ["settings","Mağaza Ayarları","/ayarlar","⚙"],
 ] as const;
 
