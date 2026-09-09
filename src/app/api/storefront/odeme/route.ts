@@ -76,6 +76,32 @@ export async function POST(request: Request) {
 
   const supabase = createServiceClient();
 
+  /*
+    Kupon son bir kez doğrulanıyor. Sepette geçerliyken ödeme
+    anında dolmuş olabilir: son kullanım hakkını başka bir
+    müşteri almış olabilir ya da müşteri aynı kodu ikinci kez
+    kullanıyor olabilir.
+
+    Sessizce yok saymak yerine hata döndürülüyor; müşteri
+    beklediğinden fazla ödeme yapmasın.
+  */
+  if (couponCode) {
+    const { data: check } = await supabase.rpc("check_arvoculture_coupon", {
+      p_code: couponCode,
+      p_subtotal: 0,
+      p_email: email,
+    });
+
+    const row = Array.isArray(check) ? check[0] : check;
+
+    if (row && row.valid === false) {
+      return NextResponse.json(
+        { couponRejected: row.message ?? "İndirim kodu geçerli değil." },
+        { status: 422, headers },
+      );
+    }
+  }
+
   // --- 1. Sipariş oluştur (tutar sunucuda hesaplanır) --------
   const { data, error } = await supabase.rpc(
     "create_arvoculture_storefront_order",
