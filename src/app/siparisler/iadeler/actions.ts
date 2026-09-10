@@ -30,7 +30,7 @@ export async function resolveReturn(formData: FormData) {
 
   const { data: request } = await supabase
     .from("arc_return_requests")
-    .select("id,order_id,items,status,arc_orders(order_number,total,customer_name,customer_email,metadata)")
+    .select("id,order_id,items,status,arc_orders(order_number,status,total,customer_name,customer_email,metadata)")
     .eq("organization_id", organization.id)
     .eq("id", id)
     .single();
@@ -51,6 +51,7 @@ export async function resolveReturn(formData: FormData) {
     ? request.arc_orders[0]
     : request.arc_orders) as {
     order_number: string;
+    status: string;
     total: number;
     customer_name: string | null;
     customer_email: string | null;
@@ -182,11 +183,22 @@ export async function resolveReturn(formData: FormData) {
     })
     .eq("id", id);
 
+  /*
+    Sipariş detayındaki iade akışıyla aynı kural: iade edilen
+    sipariş akıştan çıkar, kargoya verilmemişse iptal sayılır.
+    İki akış aynı siparişi farklı duruma bırakmamalı.
+
+    `undefined` bırakmak da riskliydi: alanın gönderilmemesi
+    Supabase istemcisinin `JSON.stringify` davranışına
+    güveniyordu; durum artık her zaman açıkça yazılıyor.
+  */
+  const kargolandi = order.status === "fulfilled";
+
   await supabase
     .from("arc_orders")
     .update({
-      payment_status: tamIade ? "refunded" : "paid",
-      status: tamIade ? "refunded" : undefined,
+      payment_status: tamIade ? "refunded" : "partially_refunded",
+      status: tamIade ? "refunded" : kargolandi ? order.status : "cancelled",
       metadata: {
         ...(order.metadata ?? {}),
         refunded_at: new Date().toISOString(),

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
 import { updateFulfillmentDetails, updateOrderStatus , refundOrder } from "./actions";
-import { orderStatusLabel, orderStatusOptions, paymentStatusLabel, paymentStatusOptions, sourceLabel } from "@/lib/commerce-labels";
+import { orderBadge, orderStatusLabel, orderStatusOptions, paymentStatusLabel, paymentStatusOptions, sourceLabel } from "@/lib/commerce-labels";
 
 const money=(value:number,currency:string)=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:currency||"TRY"}).format(value/100);
 
@@ -141,8 +141,10 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         </p>
       </div>
       <div className="ac-bar-actions">
-        <em className="ac-tag" data-tone={["cancelled","refunded"].includes(order.status)?"bad":order.payment_status==="paid"?undefined:"warn"}>
-          {orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}
+        {/* Rozet listeyle aynı yerden üretiliyor: iki ekran
+            aynı siparişe farklı isim vermesin. */}
+        <em className="ac-tag" data-tone={orderBadge(order.status,order.payment_status).tone}>
+          {orderBadge(order.status,order.payment_status).label}
         </em>
       </div>
     </section>

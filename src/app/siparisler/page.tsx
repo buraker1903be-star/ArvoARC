@@ -3,11 +3,11 @@ import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
 import { OrderForm } from "./order-form";
 import { quickStatus } from "./actions";
-import { orderStatusLabel, paymentStatusLabel, sourceLabel } from "@/lib/commerce-labels";
+import { orderBadge, isOrderClosed, sourceLabel } from "@/lib/commerce-labels";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 
-export default async function Orders({ searchParams }: { searchParams: Promise<{ error?: string; created?: string; q?: string; filter?: string }> }) {
+export default async function Orders({ searchParams }: { searchParams: Promise<{ error?: string; created?: string; ok?: string; q?: string; filter?: string }> }) {
   const params = await searchParams;
   const { supabase, organization, membership } = await requireTenant();
   const canManage = ["owner", "admin", "manager"].includes(membership.role);
@@ -98,7 +98,17 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
 
     <div className="ac-stack">
     {params.created&&<section className="ac ac-pad-sm"><strong>{params.created} siparişi oluşturuldu.</strong></section>}
-    {params.error&&<section className="ac ac-pad-sm"><strong>Sipariş oluşturulamadı: {params.error}</strong></section>}
+    {/* Durum güncellemesi öncesinde sessizce geçiyordu: aksiyon
+        `?ok=status` ile dönüyor ama sayfa bunu hiç okumuyordu. */}
+    {params.ok==="status"&&<section className="ac ac-pad-sm"><strong>Sipariş durumu güncellendi.</strong></section>}
+    {params.error&&<section className="ac ac-pad-sm"><strong>
+      {params.error==="order-closed"?"Bu sipariş iade edildiği için akışta ilerletilemez."
+      :params.error==="order-not-found"?"Sipariş bulunamadı."
+      :params.error==="forbidden"?"Bu işlem için yetkiniz yok."
+      :params.error==="invalid-status"?"Geçersiz sipariş durumu."
+      :params.error==="invalid-order"?"Sipariş bilgileri eksik."
+      :`İşlem tamamlanamadı: ${params.error}`}
+    </strong></section>}
 
     {/* Filtre şeridi. Etiketler kaldırıldı: yer tutucu metin
         zaten ne aranacağını söylüyor ve şerit tek satıra
@@ -171,10 +181,19 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
           hazırlanıyor → kargoya verildi. Listeden tek tıkla
           ilerletmek, detaya girip kaydetmekten çok daha hızlı.
         */
-        const next=order.status==="pending"?{key:"confirmed",label:"Onayla"}
+        /*
+          İptal edilmiş ve iade edilmiş siparişte akış durur.
+          Öncesinde iade sonrası satır hâlâ "Onayla →" diyordu:
+          parası müşteriye geri gitmiş sipariş hazırlanmaya
+          davet ediliyordu.
+        */
+        const closed=isOrderClosed(order.status,order.payment_status);
+        const next=closed?null
+          :order.status==="pending"?{key:"confirmed",label:"Onayla"}
           :order.status==="confirmed"?{key:"processing",label:"Hazırlanıyor"}
           :order.status==="processing"?{key:"fulfilled",label:"Kargoya ver"}
           :null;
+        const badge=orderBadge(order.status,order.payment_status);
 
         return <div className="row" key={order.id} style={{alignItems:"center"}}>
           <Link prefetch={false} href={`/siparisler/${order.id}`} style={{textDecoration:"none",color:"inherit",display:"contents"}}>
@@ -182,7 +201,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
             <span>{order.customer_name || order.customer_email || "Misafir"}</span>
             <span>{sourceLabel(order.source)}</span>
             <span>{money.format(order.total/100)}</span>
-            <span><em data-tone={statusTone(order.status,order.payment_status)}>{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</em></span>
+            <span><em className="ac-tag" data-tone={badge.tone}>{badge.label}</em></span>
           </Link>
           {canManage&&next?(
             <form action={quickStatus} style={{margin:0}}>
@@ -201,20 +220,4 @@ export default async function Orders({ searchParams }: { searchParams: Promise<{
     </details>}
     </div>
   </Shell>;
-}
-
-/**
- * Durum rozetinin rengi.
- *
- * Hepsi yeşil olduğunda iptal edilmiş sipariş de "başarılı" gibi
- * görünüyor ve listeyi tararken sorunlu kayıtlar gözden
- * kaçıyordu.
- */
-function statusTone(status: string, paymentStatus: string) {
-  if (["cancelled", "refunded"].includes(status)) return "danger";
-  if (["failed"].includes(paymentStatus)) return "danger";
-  if (["pending", "authorized"].includes(paymentStatus)) return "warn";
-  if (status === "pending") return "warn";
-  if (status === "fulfilled") return "muted";
-  return undefined;
 }

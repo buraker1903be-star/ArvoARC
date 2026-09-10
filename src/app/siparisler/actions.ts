@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
 import { sendEmail } from "@/lib/email/resend";
 import { statusUpdateEmail } from "@/lib/email/order-confirmation";
+import { isOrderClosed } from "@/lib/commerce-labels";
 
 export async function createOrder(formData: FormData) {
   const { supabase, membership } = await requireTenant();
@@ -69,16 +70,34 @@ export async function quickStatus(formData: FormData) {
 
   const { data: order } = await supabase
     .from("arc_orders")
-    .select("payment_status,order_number,customer_name,customer_email")
+    .select("status,payment_status,order_number,customer_name,customer_email")
     .eq("organization_id", organization.id)
     .eq("id", orderId)
     .single();
+
+  /*
+    Kayıt okunamadıysa devam edilmiyor.
+
+    Öncesinde `order` null olsa bile RPC çağrılıyor ve ödeme
+    durumu `?? "pending"` ile geçiliyordu: okuma herhangi bir
+    nedenle boş dönerse ödenmiş siparişin ödeme durumu sessizce
+    "Ödeme bekliyor"a düşüyordu.
+  */
+  if (!order) redirect("/siparisler?error=order-not-found");
+
+  /*
+    Kapanmış sipariş akışta ilerletilemez. Düğme listede zaten
+    gizli; bu kontrol elle gönderilen isteğe karşı.
+  */
+  if (isOrderClosed(order.status, order.payment_status)) {
+    redirect("/siparisler?error=order-closed");
+  }
 
   const { error } = await supabase.rpc("arc_update_order_status", {
     p_order_id: orderId,
     p_status: status,
     // Ödeme durumu değiştirilmiyor.
-    p_payment_status: order?.payment_status ?? "pending",
+    p_payment_status: order.payment_status,
   });
 
   if (error) redirect("/siparisler?error=save-failed");

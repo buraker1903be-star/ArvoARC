@@ -59,3 +59,59 @@ export const inventoryKindLabel = (value?: string | null) => resolveLabel(labels
 
 export const orderStatusOptions = Object.entries(labels.order);
 export const paymentStatusOptions = Object.entries(labels.payment);
+
+/**
+ * Sipariş kapandı mı?
+ *
+ * Kapanmış sipariş akışta ilerlemez: iade edilmiş bir siparişi
+ * "Onayla" ya da "Kargoya ver" diye önermek, parası geri gitmiş
+ * ürünü göndermeye davet etmek demek.
+ *
+ * Kısmi iade de kapanma sayılıyor. Kısmi iade pratikte müşterinin
+ * siparişin bir kısmından vazgeçmesi; kalan kalemler gönderilecekse
+ * bu, sipariş detayından bilinçli olarak yapılmalı.
+ */
+export function isOrderClosed(status?: string | null, paymentStatus?: string | null) {
+  return (
+    status === "cancelled" ||
+    status === "refunded" ||
+    paymentStatus === "refunded" ||
+    paymentStatus === "partially_refunded"
+  );
+}
+
+/**
+ * Listede ve detayda gösterilen durum rozeti.
+ *
+ * Tek yerden üretiliyor: öncesinde liste `data-tone="danger"`
+ * kullanıyordu, detay `"bad"`. Tasarım sisteminde `danger` diye
+ * bir ton yok, dolayısıyla iptal edilmiş sipariş listede
+ * renksiz görünüyordu — yani gözden kaçması en kolay kayıt,
+ * en görünmez olanıydı.
+ */
+export function orderBadge(status?: string | null, paymentStatus?: string | null) {
+  /*
+    İade edilmiş sipariş tek kelimeyle "İptal edildi" yazıyor.
+    "İade · İade edildi" hem tekrar ediyordu hem de siparişin
+    kapandığını söylemiyordu.
+  */
+  if (status === "cancelled" || status === "refunded" || paymentStatus === "refunded") {
+    return { label: "İptal edildi", tone: "bad" as const };
+  }
+  if (paymentStatus === "partially_refunded") {
+    return { label: "Kısmi iade", tone: "bad" as const };
+  }
+  if (paymentStatus === "failed") {
+    return { label: "Ödeme başarısız", tone: "bad" as const };
+  }
+
+  const label = `${orderStatusLabel(status)} · ${paymentStatusLabel(paymentStatus)}`;
+
+  if (paymentStatus === "pending" || paymentStatus === "authorized" || status === "pending") {
+    return { label, tone: "warn" as const };
+  }
+  if (status === "fulfilled") {
+    return { label, tone: "muted" as const };
+  }
+  return { label, tone: undefined };
+}

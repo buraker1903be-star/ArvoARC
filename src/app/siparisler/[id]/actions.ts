@@ -140,14 +140,22 @@ export async function refundOrder(formData: FormData) {
 
   if (!order) redirect("/siparisler?error=invalid-order");
 
-  if (order.payment_status !== "paid") {
-    redirect(`/siparisler/${orderId}?error=not-paid`);
-  }
-
   const meta = (order.metadata ?? {}) as Record<string, unknown>;
 
+  /*
+    Önce "zaten iade edilmiş" kontrolü.
+
+    Kısmi iadeden sonra ödeme durumu artık "partially_refunded"
+    olduğu için sıralama ters olduğunda kullanıcı "Bu sipariş
+    ödenmediği için iade edilemez" gibi yanlış bir mesaj
+    görüyordu.
+  */
   if (meta.refunded_at) {
     redirect(`/siparisler/${orderId}?error=already-refunded`);
+  }
+
+  if (order.payment_status !== "paid") {
+    redirect(`/siparisler/${orderId}?error=not-paid`);
   }
 
   /*
@@ -181,11 +189,26 @@ export async function refundOrder(formData: FormData) {
 
   const tamIade = amountKurus >= (order.total ?? 0);
 
+  /*
+    İade edilen sipariş akıştan çıkar.
+
+    Öncesinde kısmi iadede `payment_status` "paid" bırakılıyor ve
+    durum hiç değişmiyordu: parası geri gitmiş sipariş listede
+    hâlâ "Bekliyor · Ödendi" görünüyor ve "Onayla →" düğmesiyle
+    hazırlanmaya davet ediliyordu.
+
+    Kargoya verilmemiş bir siparişin iadesi pratikte iptaldir;
+    kargoya verilmişse ürün yola çıkmış demektir, durumu
+    "Tamamlandı" kalır ve iade yalnızca ödeme tarafında görünür.
+  */
+  const kargolandi = order.status === "fulfilled";
+  const yeniDurum = tamIade ? "refunded" : kargolandi ? order.status : "cancelled";
+
   const { error } = await supabase
     .from("arc_orders")
     .update({
-      payment_status: tamIade ? "refunded" : "paid",
-      status: tamIade ? "refunded" : order.status,
+      payment_status: tamIade ? "refunded" : "partially_refunded",
+      status: yeniDurum,
       metadata: {
         ...meta,
         refunded_at: new Date().toISOString(),
