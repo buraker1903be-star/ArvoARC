@@ -6,6 +6,7 @@ import { requireTenant } from "@/lib/tenant";
 import { refundPayment } from "@/lib/paytr/refund";
 import { sendEmail } from "@/lib/email/resend";
 import { returnDecisionEmail } from "@/lib/email/order-confirmation";
+import { calculateRefund } from "@/lib/refund";
 
 /**
  * İade talebini sonuçlandırır.
@@ -30,7 +31,7 @@ export async function resolveReturn(formData: FormData) {
 
   const { data: request } = await supabase
     .from("arc_return_requests")
-    .select("id,order_id,items,status,arc_orders(order_number,status,total,customer_name,customer_email,metadata)")
+    .select("id,order_id,items,status,arc_orders(order_number,status,total,shipping,customer_name,customer_email,metadata)")
     .eq("organization_id", organization.id)
     .eq("id", id)
     .single();
@@ -53,6 +54,7 @@ export async function resolveReturn(formData: FormData) {
     order_number: string;
     status: string;
     total: number;
+    shipping: number | null;
     customer_name: string | null;
     customer_email: string | null;
     metadata: Record<string, unknown> | null;
@@ -139,11 +141,38 @@ export async function resolveReturn(formData: FormData) {
     0,
   );
 
-  const custom = Number(formData.get("amount") ?? 0);
-  const amountKurus =
-    custom > 0 ? Math.round(custom * 100) : itemsTotal || order.total;
+  /*
+    Kargo çıkmadıysa kargo bedeli de iadeye giriyor. Hesap
+    `calculateRefund` içinde; panel de aynı fonksiyondan okuyor,
+    ekranda yazan tutarla gönderilen tutar ayrışmasın.
+  */
+  const breakdown = calculateRefund({
+    itemsTotal,
+    orderTotal: order.total,
+    shipping: order.shipping,
+    orderStatus: order.status,
+  });
 
-  if (amountKurus <= 0 || amountKurus > order.total) {
+  /*
+    Elle girilen tutar.
+
+    `Number.isFinite` şart: "abc" ya da "1.234,56" gibi bir girdi
+    `NaN` üretiyor, `NaN > 0` da false olduğu için sessizce
+    varsayılan tutara düşülüyordu. Kullanıcı 50 ₺ yazdığını
+    sanırken siparişin tamamı iade edilebiliyordu.
+  */
+  const custom = Number(formData.get("amount") ?? 0);
+  const gecerliCustom = Number.isFinite(custom) && custom > 0;
+  const amountKurus = gecerliCustom
+    ? Math.round(custom * 100)
+    : breakdown.amount;
+
+  /*
+    Üst sınır artık siparişin tamamı değil, iade edilen kalemler
+    (ve varsa kargo bedeli). Öncesinde 50 ₺'lik tek bir kalemin
+    iadesinde 5.000 ₺'lik siparişin tamamı geçirilebiliyordu.
+  */
+  if (amountKurus <= 0 || amountKurus > breakdown.amount) {
     redirect("/siparisler/iadeler?error=invalid-amount");
   }
 

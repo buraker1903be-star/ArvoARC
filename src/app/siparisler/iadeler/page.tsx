@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { requireTenant } from "@/lib/tenant";
 import { resolveReturn } from "./actions";
+import { calculateRefund } from "@/lib/refund";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function ReturnsPage({
   const { data: requests, error } = await supabase
     .from("arc_return_requests")
     .select(
-      "id,items,reason,note,status,status_note,refund_amount,created_at,arc_orders(order_number,total,customer_name,customer_email)",
+      "id,items,reason,note,status,status_note,refund_amount,created_at,arc_orders(order_number,status,total,shipping,customer_name,customer_email)",
     )
     .eq("organization_id", organization.id)
     .eq("status", filter!)
@@ -134,7 +135,11 @@ export default async function ReturnsPage({
                   ? "Bu talep zaten sonuçlandırılmış."
                   : params.error === "forbidden"
                     ? "İade işlemi için yönetici yetkisi gerekiyor."
-                    : "İşlem tamamlanamadı."}
+                    : params.error === "invalid-amount"
+                      ? "İade tutarı, iade edilen kalemlerin (ve kargo çıkmadıysa kargo bedelinin) toplamını aşamaz."
+                      : params.error === "not-approved"
+                        ? "Para iadesi yalnızca onaylanmış talepte yapılabilir."
+                        : "İşlem tamamlanamadı."}
             </strong>
           </section>
         )}
@@ -154,7 +159,9 @@ export default async function ReturnsPage({
               : request.arc_orders
           ) as {
             order_number: string;
+            status: string;
             total: number;
+            shipping: number | null;
             customer_name: string | null;
             customer_email: string | null;
           } | null;
@@ -170,6 +177,14 @@ export default async function ReturnsPage({
             (sum, item) => sum + Number(item.total ?? 0),
             0,
           );
+
+          /* Tutar sunucudakiyle aynı fonksiyondan geliyor. */
+          const refund = calculateRefund({
+            itemsTotal,
+            orderTotal: order?.total ?? 0,
+            shipping: order?.shipping,
+            orderStatus: order?.status,
+          });
 
           const state = STATUS[request.status] ?? { label: request.status };
 
@@ -210,9 +225,27 @@ export default async function ReturnsPage({
 
               <p style={{ margin: "var(--s3) 0 0", fontSize: "var(--t-sm)", color: "var(--c-ink-3)" }}>
                 Kalem toplamı <strong>{money.format(itemsTotal / 100)}</strong>
+                {/*
+                  Kargo çıkmadıysa kargo bedeli de iadeye giriyor;
+                  bunu ayrı satır olarak göstermek gerekiyor,
+                  aksi hâlde tutar olduğundan yüksek görünüyor.
+                */}
+                {refund.shippingRefund > 0 ? (
+                  <>
+                    {" · "}Kargo bedeli{" "}
+                    <strong>{money.format(refund.shippingRefund / 100)}</strong>
+                  </>
+                ) : null}
                 {" · "}Sipariş toplamı{" "}
                 <strong>{money.format((order?.total ?? 0) / 100)}</strong>
               </p>
+
+              {refund.shippingRefund > 0 ? (
+                <p style={{ margin: "var(--s2) 0 0", fontSize: "var(--t-sm)", color: "var(--c-ink-3)", lineHeight: 1.6 }}>
+                  Kargo çıkmadığı için kargo bedeli de iade tutarına
+                  eklendi.
+                </p>
+              ) : null}
 
               {request.status === "tamamlandi" && request.refund_amount ? (
                 <p style={{ margin: "var(--s3) 0 0", color: "var(--c-good)" }}>
@@ -245,8 +278,12 @@ export default async function ReturnsPage({
                         type="number"
                         min="0"
                         step="0.01"
-                        max={((order?.total ?? 0) / 100).toFixed(2)}
-                        placeholder={`Kalem toplamı: ${(itemsTotal / 100).toFixed(2)}`}
+                        max={(refund.amount / 100).toFixed(2)}
+                        placeholder={
+                          refund.shippingRefund > 0
+                            ? `Kalem + kargo: ${(refund.amount / 100).toFixed(2)}`
+                            : `Kalem toplamı: ${(refund.amount / 100).toFixed(2)}`
+                        }
                         className="ac-input"
                       />
                     </label>

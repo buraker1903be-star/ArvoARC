@@ -273,6 +273,19 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           <p style={{margin:0,fontSize:"var(--t-sm)",color:"var(--c-ink-3)",lineHeight:1.6}}>
             Boş bırakırsanız siparişin tamamı iade edilir. Bu işlem geri
             alınamaz.
+            {/*
+              Kargo çıkmadıysa kargo bedeli de müşteriye geri gider;
+              tamamı zaten kargoyu içeriyor ama kısmi tutar yazan
+              kullanıcı bunu hesaba katmayı unutabiliyor.
+            */}
+            {order.status!=="fulfilled"&&(order.shipping??0)>0?(
+              <>
+                {" "}Kargo çıkmadığı için{" "}
+                <strong>{money(order.shipping,order.currency)}</strong>{" "}
+                kargo bedeli de iadeye dâhildir; kısmi tutar yazarken
+                bunu ekleyin.
+              </>
+            ):null}
           </p>
           <button className="ac-btn" type="submit" style={{borderColor:"var(--c-bad)",color:"var(--c-bad)"}}>
             İadeyi başlat

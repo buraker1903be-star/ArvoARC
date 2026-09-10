@@ -162,9 +162,17 @@ export async function refundOrder(formData: FormData) {
     Kısmi iade formdan gelebilir ama sipariş tutarını aşamaz.
     Boş bırakılırsa tam iade yapılır.
   */
+  /*
+    `Number.isFinite` kontrolü şart: "abc" ya da "1.234,56" gibi
+    bir girdi `NaN` üretiyor ve `NaN > 0` false olduğu için
+    sessizce tam iadeye düşülüyordu. Kullanıcı 50 ₺ yazdığını
+    sanırken siparişin tamamı iade edilebiliyordu.
+  */
   const requested = Number(formData.get("amount") ?? 0);
   const amountKurus =
-    requested > 0 ? Math.round(requested * 100) : (order.total ?? 0);
+    Number.isFinite(requested) && requested > 0
+      ? Math.round(requested * 100)
+      : (order.total ?? 0);
 
   if (amountKurus <= 0 || amountKurus > (order.total ?? 0)) {
     redirect(`/siparisler/${orderId}?error=invalid-amount`);
