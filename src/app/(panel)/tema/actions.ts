@@ -26,7 +26,12 @@ function sectionLayout(fd:FormData):ThemeSection[]{
   }catch{return["hero","manifest","worlds","featured","campaign","values","footer"].map((id,index)=>({id,type:id,enabled:true,order:(index+1)*10}));}
 }
 
-export async function saveThemeDraft(formData:FormData){
+/*
+  Taslak yazımı tek yerde. "Taslağı kaydet", "Kaydet ve yayınla" ve
+  görsel yükleme aynı formu gönderiyor; yayınlama ve yükleme eskiden
+  formdaki kaydedilmemiş değişiklikleri sessizce atıyordu.
+*/
+async function writeDraft(formData:FormData){
   const {supabase,user,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/tema?error=forbidden");
   const {data:current}=await supabase.from("arc_store_themes").select("version,config").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();
@@ -69,32 +74,10 @@ export async function saveThemeDraft(formData:FormData){
   if(!config.hero_title||!config.hero_description)redirect("/tema?error=required-fields");
   const {error}=await supabase.from("arc_store_themes").upsert({organization_id:organization.id,mode:"draft",version:current?.version??1,config,updated_by:user.id,updated_at:new Date().toISOString()},{onConflict:"organization_id,mode"});
   if(error)redirect(`/tema?error=${encodeURIComponent(error.code??error.message)}`);
-  revalidatePath("/tema");redirect("/tema?saved=draft");
 }
 
-
-const themeAssetTypes:Record<string,string>={"image/png":"png","image/jpeg":"jpg","image/webp":"webp","image/avif":"avif"};
-export async function uploadThemeAsset(formData:FormData){
-  const {supabase,user,organization,membership}=await requireTenant();
-  if(!roles.has(membership.role))redirect("/tema?error=forbidden");
-  const slot=["hero_image","campaign_image"].includes(text(formData,"slot",30))?text(formData,"slot",30):"";
-  const file=formData.get("file");
-  if(!slot||!(file instanceof File)||!file.size||file.size>8*1024*1024||!themeAssetTypes[file.type])redirect("/tema?error=invalid-theme-image");
-  const {data:draft,error:draftError}=await supabase.from("arc_store_themes").select("config,version").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();
-  if(draftError||!draft)redirect("/tema?error=draft-not-found");
-  const config=(draft.config??{}) as Record<string,unknown>;const oldPath=String(config[`${slot}_path`]??"");
-  const path=`${organization.id}/commerce/theme/${slot}-${Date.now()}.${themeAssetTypes[file.type]}`;
-  const {error:uploadError}=await supabase.storage.from("organization-assets").upload(path,await file.arrayBuffer(),{contentType:file.type,cacheControl:"31536000",upsert:false});
-  if(uploadError)redirect(`/tema?error=${encodeURIComponent(uploadError.message)}`);
-  const publicUrl=supabase.storage.from("organization-assets").getPublicUrl(path).data.publicUrl;
-  const next={...config,[`${slot}_path`]:path,[`${slot}_url`]:publicUrl};
-  const {error}=await supabase.from("arc_store_themes").update({config:next,updated_by:user.id,updated_at:new Date().toISOString()}).eq("organization_id",organization.id).eq("mode","draft");
-  if(error){await supabase.storage.from("organization-assets").remove([path]);redirect(`/tema?error=${encodeURIComponent(error.message)}`);}
-  if(oldPath&&oldPath.startsWith(`${organization.id}/`))await supabase.storage.from("organization-assets").remove([oldPath]);
-  revalidatePath("/tema");redirect(`/tema?saved=${slot}`);
-}
-
-export async function publishTheme(){
+/* Kayıtlı taslağı mağaza adı, logo ve favicon ile birlikte yayına alır. */
+async function publishDraft(){
   const {supabase,user,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/tema?error=forbidden");
   const [{data:draft,error:draftError},{data:published},{data:settings}]=await Promise.all([
@@ -109,5 +92,38 @@ export async function publishTheme(){
   const config={...(draft.config as Record<string,unknown>),store_name:settings?.store_name??organization.name,logo_url:logoUrl,favicon_url:faviconUrl};
   const {error}=await supabase.from("arc_store_themes").upsert({organization_id:organization.id,mode:"published",version:(published?.version??0)+1,config,updated_by:user.id,published_at:now,updated_at:now},{onConflict:"organization_id,mode"});
   if(error)redirect(`/tema?error=${encodeURIComponent(error.code??error.message)}`);
+}
+
+export async function saveThemeDraft(formData:FormData){
+  await writeDraft(formData);
+  revalidatePath("/tema");redirect("/tema?saved=draft");
+}
+
+export async function saveAndPublishTheme(formData:FormData){
+  await writeDraft(formData);
+  await publishDraft();
   revalidatePath("/tema");redirect("/tema?published=1");
+}
+
+const themeAssetTypes:Record<string,string>={"image/png":"png","image/jpeg":"jpg","image/webp":"webp","image/avif":"avif"};
+export async function uploadThemeAsset(formData:FormData){
+  /* Editörden gelirken önce formdaki değişiklikler kaydedilir; dosya hatalı olsa bile emek kaybolmaz. */
+  if(formData.has("section_layout_json"))await writeDraft(formData);
+  const {supabase,user,organization,membership}=await requireTenant();
+  if(!roles.has(membership.role))redirect("/tema?error=forbidden");
+  const slot=["hero_image","campaign_image"].includes(text(formData,"slot",30))?text(formData,"slot",30):"";
+  const file=formData.get("file");
+  if(!slot||!(file instanceof File)||!file.size||file.size>4*1024*1024||!themeAssetTypes[file.type])redirect("/tema?error=invalid-theme-image");
+  const {data:draft,error:draftError}=await supabase.from("arc_store_themes").select("config,version").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();
+  if(draftError||!draft)redirect("/tema?error=draft-not-found");
+  const config=(draft.config??{}) as Record<string,unknown>;const oldPath=String(config[`${slot}_path`]??"");
+  const path=`${organization.id}/commerce/theme/${slot}-${Date.now()}.${themeAssetTypes[file.type]}`;
+  const {error:uploadError}=await supabase.storage.from("organization-assets").upload(path,await file.arrayBuffer(),{contentType:file.type,cacheControl:"31536000",upsert:false});
+  if(uploadError)redirect(`/tema?error=${encodeURIComponent(uploadError.message)}`);
+  const publicUrl=supabase.storage.from("organization-assets").getPublicUrl(path).data.publicUrl;
+  const next={...config,[`${slot}_path`]:path,[`${slot}_url`]:publicUrl};
+  const {error}=await supabase.from("arc_store_themes").update({config:next,updated_by:user.id,updated_at:new Date().toISOString()}).eq("organization_id",organization.id).eq("mode","draft");
+  if(error){await supabase.storage.from("organization-assets").remove([path]);redirect(`/tema?error=${encodeURIComponent(error.message)}`);}
+  if(oldPath&&oldPath.startsWith(`${organization.id}/`))await supabase.storage.from("organization-assets").remove([oldPath]);
+  revalidatePath("/tema");redirect(`/tema?saved=${slot}`);
 }

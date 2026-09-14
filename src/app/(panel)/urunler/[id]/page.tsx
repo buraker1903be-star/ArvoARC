@@ -34,7 +34,7 @@ const ERRORS:Record<string,string>={
   "23505":"Bu SKU veya ürün bağlantısı başka bir kayıtta kullanılıyor.",
   "invalid-images":"Tek seferde en fazla 5 görsel seçin.",
   "max-8-images":"Bir üründe en fazla 8 görsel olabilir.",
-  "invalid-image-file":"Yalnızca JPG, PNG, WEBP, GIF veya AVIF; dosya başına en fazla 10 MB.",
+  "invalid-image-file":"Yalnızca JPG, PNG, WEBP, GIF veya AVIF; dosya başına en fazla 4 MB.",
   "invalid-image-path":"Geçersiz görsel.",
   "image-not-found":"Görsel bulunamadı.",
 };
@@ -128,7 +128,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
             <form action={uploadProductImages} className="product-upload">
               <input type="hidden" name="product_id" value={product.id}/>
               <label>Görsel ekle<input name="images" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple required/></label>
-              <small>Tek seferde en fazla 5 dosya, ürün başına 8 görsel, dosya başına 10 MB.</small>
+              <small>Tek seferde en fazla 5 dosya ve toplam 4 MB; ürün başına 8 görsel.</small>
               <button className="ac-btn" type="submit">Görselleri yükle</button>
             </form>
           ):null}

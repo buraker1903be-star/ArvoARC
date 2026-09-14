@@ -146,7 +146,7 @@ export async function updateVariant(formData: FormData) {
 
 
 const imageTypes:Record<string,string>={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif","image/avif":"avif"};
-const maxImageBytes=10*1024*1024;
+const maxImageBytes=4*1024*1024;
 type ProductMetadata={image_paths?:string[];images?:string[];[key:string]:unknown};
 
 export async function uploadProductImages(formData:FormData){
