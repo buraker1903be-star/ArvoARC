@@ -73,7 +73,8 @@ export async function uploadBrandAsset(formData:FormData){
   if(uploadError)redirect(`/ayarlar?error=${encodeURIComponent(uploadError.message)}`);
   const {error:updateError}=await supabase.from("arc_store_settings").update({[column]:path,updated_at:new Date().toISOString()}).eq("organization_id",organization.id);
   if(updateError){await supabase.storage.from("organization-assets").remove([path]);redirect(`/ayarlar?error=${encodeURIComponent(updateError.message)}`);}
-  if(oldPath)await supabase.storage.from("organization-assets").remove([oldPath]);
+  /* Eski dosya yalnızca mağazanın kendi klasöründeyse silinir (kaldırma işlemindeki kuralla aynı). */
+  if(oldPath&&oldPath.startsWith(`${organization.id}/`))await supabase.storage.from("organization-assets").remove([oldPath]);
   revalidatePath("/ayarlar");redirect(`/ayarlar?saved=${kind}`);
 }
 

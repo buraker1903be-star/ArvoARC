@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
 import { copyShopifyImages } from "@/lib/product-images";
+import { fetchAllRows } from "@/lib/fetch-all";
+import { parseMoneyToCents } from "@/lib/money";
 
 type Row = Record<string,string>;
 
@@ -75,17 +77,31 @@ type ProductMetadata={
   [key:string]:unknown;
 };
 
+/*
+  Taşınmamış ürünler veritabanında süzülür. Öncesinde sırasız ilk
+  250 Shopify ürünü çekilip içinde aranıyordu: bu 250'si taşınınca
+  kalanlar hiç işlenmiyor, ekranda "kalan 0" yazıyordu.
+
+  Denenen ürüne deneme zamanı yazılır ve sıralama ona göre yapılır;
+  hata veren ürün her turda başa gelip ilerlemeyi kilitlemez.
+*/
+const UNMIGRATED="metadata->>images_migrated.is.null,metadata->>images_migrated.neq.true";
+
 export async function migrateShopifyImages(){
   const {supabase,organization,membership}=await requireTenant();
   if(!["owner","admin","manager"].includes(membership.role)) redirect("/veri-aktarimi?error=forbidden");
 
-  const {data:products,error}=await supabase.from("arc_products").select("id,metadata").eq("organization_id",organization.id).eq("source","shopify").limit(250);
-  if(error)redirect(`/veri-aktarimi?error=${encodeURIComponent(error.message)}`);
+  const [{data:products,error},{count:pendingCount,error:countError}]=await Promise.all([
+    supabase.from("arc_products").select("id,metadata").eq("organization_id",organization.id).eq("source","shopify").or(UNMIGRATED)
+      .order("metadata->>image_migration_attempted_at",{ascending:true,nullsFirst:true}).order("id").limit(5),
+    supabase.from("arc_products").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).eq("source","shopify").or(UNMIGRATED),
+  ]);
+  if(error||countError)redirect(`/veri-aktarimi?error=${encodeURIComponent((error??countError)?.message??"images")}`);
 
-  const pending=(products??[]).filter(product=>!((product.metadata??{}) as ProductMetadata).images_migrated).slice(0,5);
+  const pending=products??[];
   let migrated=0,failed=0;
   for(const product of pending){
-    const metadata=(product.metadata??{}) as ProductMetadata;
+    const metadata={...((product.metadata??{}) as ProductMetadata),image_migration_attempted_at:new Date().toISOString()};
     const sources=metadata.shopify_image_sources?.length
       ? metadata.shopify_image_sources
       : (metadata.images??[]).filter(source=>{try{return new URL(source).hostname==="cdn.shopify.com";}catch{return false;}});
@@ -100,17 +116,11 @@ export async function migrateShopifyImages(){
   }
 
   revalidatePath("/urunler");revalidatePath("/veri-aktarimi");
-  redirect(`/veri-aktarimi?images=${migrated}&imageErrors=${failed}&remaining=${Math.max(0,(products?.filter(product=>!((product.metadata??{}) as ProductMetadata).images_migrated).length??0)-pending.length)}`);
+  redirect(`/veri-aktarimi?images=${migrated}&imageErrors=${failed}&remaining=${Math.max(0,(pendingCount??0)-migrated)}`);
 }
 
-
-function moneyToCents(value:string|undefined){
-  const raw=(value??"").trim().replace(/\s/g,"");
-  if(!raw)return 0;
-  const normalized=raw.includes(",")&&raw.includes(".")?raw.replace(/,/g,""):raw.replace(",",".");
-  const amount=Number(normalized.replace(/[^0-9.-]/g,""));
-  return Number.isFinite(amount)?Math.max(0,Math.round(amount*100)):0;
-}
+/* Türkçe ve İngilizce biçimli tutarlar (bkz. lib/money). */
+const moneyToCents=parseMoneyToCents;
 
 function historicalOrderStatus(row:Row){
   const financial=(row["Financial Status"]??"").trim().toLowerCase();
@@ -155,8 +165,16 @@ export async function importHistoricalOrders(formData:FormData){
   }).select("id").single();
   if(batchError)redirect(`/veri-aktarimi?error=${encodeURIComponent(batchError.message)}`);
 
-  const {data:variants}=await supabase.from("arc_product_variants").select("id,sku").eq("organization_id",organization.id);
-  const variantBySku=new Map((variants??[]).filter(v=>v.sku).map(v=>[v.sku.trim().toLowerCase(),v.id]));
+  /*
+    SKU eşlemesi için tüm varyantlar sayfalanarak okunur. Tek istekte
+    Supabase 1000 satırda kesiyordu; kataloğun geri kalanındaki
+    SKU'lar geçmiş siparişlere bağlanmıyordu.
+  */
+  let variants:{id:string;sku:string|null}[]=[];
+  try{
+    ({rows:variants}=await fetchAllRows<{id:string;sku:string|null}>((from,to)=>supabase.from("arc_product_variants").select("id,sku").eq("organization_id",organization.id).order("id").range(from,to) as unknown as PromiseLike<{data:{id:string;sku:string|null}[]|null;error:{message:string}|null}>,100_000));
+  }catch(error){redirect(`/veri-aktarimi?error=${encodeURIComponent(error instanceof Error?error.message:"variants")}`);}
+  const variantBySku=new Map(variants.filter((v):v is {id:string;sku:string}=>Boolean(v.sku)).map(v=>[v.sku.trim().toLowerCase(),v.id]));
   let imported=0,errors=0;
 
   for(const [key,group] of groups){
