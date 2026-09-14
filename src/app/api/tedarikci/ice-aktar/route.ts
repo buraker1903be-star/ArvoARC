@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { fetchTarzyeri, parseDetail, slugify } from "@/lib/supplier/tarzyeri";
@@ -76,11 +77,18 @@ function serviceClient() {
  * <CRON_SECRET>` başlığı gönderir. Elle tetikleme için POST
  * kullanılır; ikisi de aynı işi yapar.
  */
-export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  const header = request.headers.get("authorization");
+/** Zamanlama saldırısına kapalı anahtar karşılaştırması. */
+function sameSecret(provided: string | null | undefined, secret: string | undefined) {
+  if (!secret || !provided) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(secret);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
-  if (!cronSecret || header !== `Bearer ${cronSecret}`) {
+const bearer = (request: Request) => request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? null;
+
+export async function GET(request: Request) {
+  if (!sameSecret(bearer(request), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
   }
 
@@ -90,13 +98,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Basit koruma: uç nokta herkese açık olmamalı.
-  const secret = process.env.SUPPLIER_SYNC_SECRET;
-  const provided =
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-    new URL(request.url).searchParams.get("anahtar");
-
-  if (!secret || provided !== secret) {
+  /*
+    Anahtar yalnızca Authorization başlığıyla kabul edilir.
+    Öncesinde adreste (?anahtar=) de geçilebiliyordu; adresler
+    sunucu ve vekil günlüklerine düştüğü için anahtar sızabilirdi.
+  */
+  if (!sameSecret(bearer(request), process.env.SUPPLIER_SYNC_SECRET)) {
     return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
   }
 

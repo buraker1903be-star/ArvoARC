@@ -166,7 +166,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
         <h1>Siparişler</h1>
         <p>{counts.all.toLocaleString("tr-TR")} sipariş · {periodLabel}{search ? ` · “${search}”` : ""}</p>
       </div>
-      <OrdersTabs active="orders" pendingReturns={pendingReturns} />
+      <OrdersTabs active="orders" pendingReturns={pendingReturns} canExport={canManage} />
     </section>
 
     <div className="ac-stack">

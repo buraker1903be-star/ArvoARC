@@ -14,7 +14,9 @@ const date=new Intl.DateTimeFormat("tr-TR",{day:"2-digit",month:"2-digit",year:"
   (loadCustomers): net harcama iptal ve iadeler hariç.
 */
 export async function GET(){
-  const {supabase,organization}=await requireTenant();
+  const {supabase,organization,membership}=await requireTenant();
+  /* Müşteri e-postaları kişisel veri: dosya yalnızca yöneticilere. */
+  if(!["owner","admin","manager"].includes(membership.role))return new Response("Bu raporu yalnızca mağaza yöneticileri indirebilir.",{status:403});
   let result:Awaited<ReturnType<typeof loadCustomers>>;
   try{result=await loadCustomers(supabase,organization.id);}
   catch{return new Response("Rapor oluşturulamadı",{status:500});}

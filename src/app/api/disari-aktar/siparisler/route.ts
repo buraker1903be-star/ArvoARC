@@ -18,7 +18,9 @@ type OrderRow={id:string;order_number:string;source:string|null;status:string;pa
   arasında satır kaybını ve tekrarını önler.
 */
 export async function GET(){
-  const {supabase,organization}=await requireTenant();
+  const {supabase,organization,membership}=await requireTenant();
+  /* Müşteri adı ve e-postası içeren dosya yalnızca yöneticilere. */
+  if(!["owner","admin","manager"].includes(membership.role))return new Response("Bu raporu yalnızca mağaza yöneticileri indirebilir.",{status:403});
   let orders:OrderRow[];
   try{
     ({rows:orders}=await fetchAllRows<OrderRow>((from,to)=>supabase.from("arc_orders").select("id,order_number,source,status,payment_status,customer_name,customer_email,currency,subtotal,tax,shipping,total,created_at").eq("organization_id",organization.id).order("created_at",{ascending:false}).order("id").range(from,to) as unknown as PromiseLike<{data:OrderRow[]|null;error:{message:string}|null}>,100_000));

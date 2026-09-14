@@ -49,7 +49,8 @@ const initials = (name: string) => name.split(/\s+/).filter(Boolean).map((part) 
 
 export default async function Customers({ searchParams }: { searchParams: Promise<{ q?: string; segment?: string; sort?: string; page?: string }> }) {
   const params = await searchParams;
-  const { supabase, organization } = await requireTenant();
+  const { supabase, organization, membership } = await requireTenant();
+  const canManage = ["owner", "admin", "manager"].includes(membership.role);
   const now = currentTime();
 
   const search = (params.q ?? "").trim().slice(0, 80);
@@ -81,7 +82,7 @@ export default async function Customers({ searchParams }: { searchParams: Promis
         <p>{customers.length.toLocaleString("tr-TR")} müşteri · {orderCount.toLocaleString("tr-TR")} siparişten oluşturuldu</p>
       </div>
       <div className="ac-bar-actions">
-        <a className="ac-btn" href="/api/disari-aktar/musteriler"><Icon name="download" size={15} />CSV indir</a>
+        {canManage ? <a className="ac-btn" href="/api/disari-aktar/musteriler"><Icon name="download" size={15} />CSV indir</a> : null}
       </div>
     </section>
 

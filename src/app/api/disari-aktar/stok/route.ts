@@ -18,7 +18,8 @@ type Page<T>=PromiseLike<{data:T[]|null;error:{message:string}|null}>;
   adsız yazılıyordu. İkincil sıralama (id) sayfa kaymasını önler.
 */
 export async function GET(){
-  const {supabase,organization}=await requireTenant();
+  const {supabase,organization,membership}=await requireTenant();
+  if(!["owner","admin","manager"].includes(membership.role))return new Response("Bu raporu yalnızca mağaza yöneticileri indirebilir.",{status:403});
   let variants:VariantRow[];let products:ProductRow[];
   try{
     const [variantResult,productResult]=await Promise.all([

@@ -139,7 +139,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
         <p>Tüm değişiklikler hareket olarak kaydedilir.</p>
       </div>
       <div className="ac-bar-actions">
-        <a className="ac-btn" href="/api/disari-aktar/stok"><Icon name="download" size={15} />CSV indir</a>
+        {canManage ? <a className="ac-btn" href="/api/disari-aktar/stok"><Icon name="download" size={15} />CSV indir</a> : null}
       </div>
     </section>
 
