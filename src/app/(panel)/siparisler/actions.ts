@@ -7,31 +7,13 @@ import { sendEmail } from "@/lib/email/resend";
 import { statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { isOrderClosed } from "@/lib/commerce-labels";
 import { nextOrderStep } from "@/lib/order-flow";
+import { backUrl } from "@/lib/back-url";
 
 const MANAGERS = ["owner", "admin", "manager"];
-const RESULT_KEYS = ["ok", "error", "created", "saved", "updated", "skipped"];
 
-/*
-  İşlemden sonra kullanıcı geldiği yere döner: filtre, arama,
-  dönem ve sayfa korunur. Öncesinde listeden "Onayla →" demek
-  filtreyi sıfırlayıp ilk sayfaya atıyordu.
-
-  Adres formdan geldiği için doğrulanıyor: yalnızca /siparisler
-  altına dönülebilir, başka bir siteye yönlendirme yapılamaz.
-*/
-function backTo(formData: FormData, result: Record<string, string>) {
-  const base = "https://arc.invalid";
-  let url: URL;
-  try {
-    url = new URL(String(formData.get("back") ?? "") || "/siparisler", base);
-  } catch {
-    url = new URL("/siparisler", base);
-  }
-  if (url.origin !== base || !/^\/siparisler(\/[A-Za-z0-9-]+)?$/.test(url.pathname)) url = new URL("/siparisler", base);
-  for (const key of RESULT_KEYS) url.searchParams.delete(key);
-  for (const [key, value] of Object.entries(result)) url.searchParams.set(key, value);
-  return `${url.pathname}${url.search}`;
-}
+/* İşlemden sonra kullanıcı geldiği yere döner: listeden "Onayla →"
+   demek filtreyi sıfırlayıp ilk sayfaya atıyordu. */
+const backTo = (formData: FormData, result: Record<string, string>) => backUrl(formData.get("back"), "/siparisler", result);
 
 const fromDetail = (formData: FormData) =>
   /^\/siparisler\/(?!iadeler$)[A-Za-z0-9-]+$/.test(String(formData.get("back") ?? "").split("?")[0]);

@@ -79,7 +79,7 @@ export default async function PanelLayout({ children }: Readonly<{ children: Rea
               <a className="panel-quick-action" href="/magaza" target="_blank" rel="noreferrer">
                 <span className="panel-quick-icon"><Icon name="external" size={14} /></span><b>Mağazayı görüntüle</b>
               </a>
-              <Link prefetch={false} className="panel-quick-action" href="/urunler">
+              <Link prefetch={false} className="panel-quick-action" href="/urunler?yeni=1#yeni-urun">
                 <span className="panel-quick-icon"><Icon name="plus" size={14} /></span><b>Yeni ürün</b>
               </Link>
             </div>
