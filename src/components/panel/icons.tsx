@@ -35,6 +35,7 @@ const paths = {
   info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>,
   printer: <><path d="M7 9V3h10v6" /><rect x="3" y="9" width="18" height="8" rx="2" /><path d="M7 14h10v7H7z" /></>,
   download: <><path d="M12 4v11M7 10l5 5 5-5" /><path d="M4 20h16" /></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7 8 6 8-6" /></>,
 } satisfies Record<string, React.ReactNode>;
 
 export type IconName = keyof typeof paths;

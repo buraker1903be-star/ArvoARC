@@ -13,6 +13,15 @@ export const orderFlow = [
   { key: "fulfilled", label: "Kargoya verildi" },
 ] as const;
 
+/*
+  Ciroya sayılan sipariş: iptal ve iade edilenler hariç. Analitik,
+  müşteri harcaması ve profil aynı tanımı kullanır; öncesinde
+  müşteri listesi iptal edilen siparişleri de harcamaya ekliyordu.
+*/
+export function countsAsRevenue(status?: string | null, paymentStatus?: string | null) {
+  return status !== "cancelled" && status !== "refunded" && paymentStatus !== "refunded";
+}
+
 /**
  * Bir sonraki adım. Kapanmış (iptal / iade) siparişte akış
  * durur: parası geri gitmiş sipariş hazırlanmaya davet edilmez.

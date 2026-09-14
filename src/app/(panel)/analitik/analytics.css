@@ -1,0 +1,69 @@
+/* ============================================================
+   SATIŞ ANALİTİĞİ
+   Renkler yalnızca panel.css paletinden.
+   ============================================================ */
+
+.an-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+.an-chart,.an-top{grid-column:span 2}
+.an-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
+.an-head h3{margin:0;color:var(--ink);font-size:17px;font-weight:700;letter-spacing:-.015em}
+.an-head p{margin:3px 0 0;color:var(--muted);font-size:13px}
+.an-stat{text-align:right}
+.an-stat strong{display:block;color:var(--ink);font-size:26px;font-weight:700;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.an-stat span{display:inline-block;margin-top:5px;color:var(--muted);font-size:12.5px}
+
+/* Değişim rozeti (ölçüm kartlarında) */
+.an-delta{display:inline-flex;align-items:center;gap:2px;margin-right:6px;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.an-delta[data-dir="good"]{background:var(--success-soft);color:var(--success)}
+.an-delta[data-dir="bad"]{background:var(--danger-soft);color:var(--danger)}
+
+/* Ciro grafiği */
+.an-bars{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));align-items:end;gap:6px;height:230px;padding-top:6px}
+.an-bar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%;min-width:0}
+.an-bar-fill{width:100%;max-width:34px;height:var(--h,2%);min-height:3px;border-radius:7px 7px 4px 4px;background:linear-gradient(180deg,color-mix(in srgb,var(--brand-400) 70%,var(--surface)),var(--brand-500));transform-origin:bottom;animation:an-grow .8s var(--ease-spring) both}
+html[data-theme="dark"] .an-bar-fill{background:linear-gradient(180deg,var(--brand-300),var(--brand-400))}
+.an-bar.is-empty .an-bar-fill{background:var(--surface-2)}
+.an-bar.is-last .an-bar-fill{background:linear-gradient(180deg,var(--accent-300),var(--accent-500))}
+.an-bar small{color:var(--muted);font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.an-bar.is-last small{color:var(--accent-strong);font-weight:700}
+.an-bar-value{min-height:13px;color:var(--ink-soft);font-size:11px;font-weight:700;white-space:nowrap}
+/* Yoğun grafikte (30 gün) etiketler dönüşümlü: üst üste binmesin. */
+.an-bars[data-dense]{gap:4px}
+.an-bars[data-dense] .an-bar:nth-child(even):not(.is-last) small{visibility:hidden}
+@keyframes an-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+/* Dağılım çubukları */
+.an-dist{display:grid;gap:12px;margin:0;padding:0;list-style:none}
+.an-dist-top{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:13.5px}
+.an-dist-top span{color:var(--ink-soft)}
+.an-dist-top b{color:var(--ink);font-variant-numeric:tabular-nums}
+.an-track{height:8px;overflow:hidden;border-radius:999px;background:var(--surface-2)}
+.an-track i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--brand-500),var(--brand-400));transform-origin:left;animation:an-fill .9s var(--ease-spring) both}
+.an-track.is-gold i{background:linear-gradient(90deg,var(--accent-500),var(--accent-300))}
+@keyframes an-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* En çok satanlar */
+.an-top-list{display:grid;margin:0;padding:0;list-style:none}
+.an-top-list li{display:grid;grid-template-columns:28px minmax(0,1.6fr) minmax(120px,1.3fr) 80px 110px;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line-soft);font-size:13.5px;font-variant-numeric:tabular-nums}
+.an-top-list li:first-child{padding-top:0;border-top:0}
+.an-rank{display:grid;place-items:center;width:26px;height:26px;border-radius:8px;background:var(--surface-2);color:var(--muted);font-size:12px;font-weight:800}
+.an-top-list li:nth-child(-n+3) .an-rank{background:var(--accent-soft);color:var(--accent-strong)}
+.an-top-list span>b{display:block;overflow:hidden;color:var(--ink);font-weight:650;text-overflow:ellipsis;white-space:nowrap}
+.an-top-list span>small{display:block;color:var(--muted);font-size:12px}
+.an-top-list strong{color:var(--ink);text-align:right}
+.an-qty{color:var(--muted);text-align:right}
+.an-empty{margin:0;color:var(--muted);font-size:14px}
+
+@media(max-width:1180px){
+  .an-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .an-chart,.an-top{grid-column:1/-1}
+}
+@media(max-width:760px){
+  .an-grid{grid-template-columns:1fr}
+  .an-bars{height:170px;gap:3px}
+  .an-bar small,.an-bar-value{display:none}
+  .an-top-list li{grid-template-columns:26px minmax(0,1fr) auto}
+  .an-top-list .an-track,.an-top-list .an-qty{display:none}
+  .an-stat strong{font-size:22px}
+}
+@media(prefers-reduced-motion:reduce){.an-bar-fill,.an-track i{animation:none}}

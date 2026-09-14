@@ -1,0 +1,63 @@
+/* ============================================================
+   MÜŞTERİLER — liste ve profil
+   Satır görünümü panel.css'te (Veri listeleri).
+   ============================================================ */
+
+.cust-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.cust-toolbar .cust-search{flex:1 1 360px}
+.panel-root .ac-tag[data-tone="info"]{background:var(--info-soft);color:var(--info)}
+
+/* Liste */
+.customer-list .list-row{
+  grid-template-columns:38px minmax(200px,2fr) 100px minmax(130px,1fr) minmax(130px,1fr) minmax(160px,1.2fr);
+  grid-template-areas:"avatar name orders spent last tags";
+}
+.cl-avatar{grid-area:avatar;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:linear-gradient(160deg,var(--brand-400),var(--brand-700));color:#fff;font-size:12px;font-weight:700}
+.list-row.th .cl-avatar{height:auto;background:none}
+.cl-name{grid-area:name}
+.cl-orders{grid-area:orders}
+.cl-spent{grid-area:spent}
+.cl-last{grid-area:last}
+.cl-tags{grid-area:tags;display:flex;flex-wrap:wrap;gap:4px}
+
+/* Profil */
+.customer-back{display:inline-flex;align-items:center;gap:4px;margin-bottom:8px;color:var(--muted);font-size:13px;font-weight:600;text-decoration:none}
+.customer-back:hover{color:var(--accent)}
+.customer-head-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.customer-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,.75fr);gap:18px;align-items:start}
+.customer-side{position:sticky;top:92px;display:grid;gap:18px}
+.customer-orders .list-row{
+  grid-template-columns:minmax(140px,1.2fr) minmax(110px,.9fr) minmax(110px,.9fr) minmax(170px,1.3fr);
+  grid-template-areas:"main source amount status";
+}
+.co-main{grid-area:main}
+.co-source{grid-area:source;color:var(--muted)}
+.co-amount{grid-area:amount;font-weight:700}
+.co-status{grid-area:status}
+.customer-card h3{margin:0 0 12px;color:var(--ink);font-size:16px;font-weight:700;letter-spacing:-.01em}
+.customer-dl{display:grid;margin:0}
+.customer-dl>div{display:grid;gap:3px;padding:10px 0;border-top:1px solid var(--line-soft)}
+.customer-dl>div:first-child{padding-top:0;border-top:0}
+.customer-dl dt{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.customer-dl dd{margin:0;color:var(--ink);font-size:13.5px;line-height:1.5;overflow-wrap:anywhere}
+.customer-dl a{color:var(--accent);text-decoration:none}
+.customer-dl a:hover{text-decoration:underline}
+.customer-fav{display:grid;margin:0;padding:0;list-style:none}
+.customer-fav li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line-soft);font-size:13.5px}
+.customer-fav li:first-child{padding-top:0;border-top:0}
+.customer-fav b{display:block;overflow:hidden;color:var(--ink);font-weight:650;text-overflow:ellipsis;white-space:nowrap}
+.customer-fav small{display:block;color:var(--muted);font-size:12px}
+.customer-fav strong{color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+.customer-muted{margin:0;color:var(--muted);font-size:13.5px}
+
+@media(max-width:1100px){
+  .customer-layout{grid-template-columns:1fr}
+  .customer-side{position:static;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+}
+@media(max-width:900px){
+  .customer-list .list-row{grid-template-columns:36px minmax(0,1fr) auto;grid-template-areas:"avatar name spent" "avatar tags last";row-gap:4px;padding:12px 14px}
+  .cl-orders{display:none}
+  .cl-spent,.cl-last{justify-self:end;text-align:right}
+  .customer-orders .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amount" "source status";row-gap:4px;padding:12px 14px}
+  .co-amount,.co-status{justify-self:end;text-align:right}
+}
