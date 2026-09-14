@@ -42,6 +42,20 @@ export function OPTIONS(request: Request) {
 
 type Item = { sku: string; quantity: number; name?: string };
 
+/*
+  Sepet satırı doğrulaması: SKU dolu, adet 1–50 arası tam sayı.
+  Negatif ya da kesirli adet, veritabanı fonksiyonu ne yaparsa
+  yapsın buradan geçmez.
+*/
+function parseItem(raw: unknown): Item | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const sku = String(value.sku ?? "").trim();
+  const quantity = Number(value.quantity);
+  if (!sku || sku.length > 120 || !Number.isInteger(quantity) || quantity < 1 || quantity > 50) return null;
+  return { sku, quantity, name: typeof value.name === "string" ? value.name.slice(0, 120) : undefined };
+}
+
 export async function POST(request: Request) {
   const headers = corsHeaders(request.headers.get("origin"));
 
@@ -57,7 +71,10 @@ export async function POST(request: Request) {
   const phone = String(body.phone ?? "").trim();
   const address = body.address ?? {};
   const couponCode = body.couponCode ? String(body.couponCode).trim() : null;
-  const items = Array.isArray(body.items) ? (body.items as Item[]) : [];
+  const rawItems: unknown[] = Array.isArray(body.items) ? body.items : [];
+  const items = rawItems.map(parseItem).filter((item): item is Item => item !== null);
+  /* Vitrin notu gönderiyordu ama hiç kaydedilmiyordu. */
+  const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) : "";
 
   /*
     Banka havalesi. Sipariş oluşuyor ama PayTR'a gidilmiyor;
@@ -70,8 +87,15 @@ export async function POST(request: Request) {
   const isTransfer = body.paymentMethod === "havale";
   const TRANSFER_DISCOUNT_PERCENT = 3;
 
-  if (!email || !name || items.length === 0) {
+  if (!email || !name || rawItems.length === 0) {
     return NextResponse.json({ error: "invalid" }, { status: 422, headers });
+  }
+
+  if (rawItems.length > 50 || items.length !== rawItems.length) {
+    return NextResponse.json(
+      { error: "invalid_items", message: "Sepetinizdeki ürün adetleri geçersiz. Sepeti yenileyip tekrar deneyin." },
+      { status: 422, headers },
+    );
   }
 
   const supabase = createServiceClient();
@@ -132,6 +156,24 @@ export async function POST(request: Request) {
     total: number;
   };
 
+  /*
+    Sipariş üstverisine ekleme. Havale bilgisi metadata'yı baştan
+    yazıyordu: sipariş oluşurken kaydedilen teslimat adresi ve
+    kupon bilgisi siliniyor, panelde ve onay e-postasında adres
+    boş görünüyordu. Artık mevcut değerlerle birleşiyor.
+  */
+  const mergeMetadata = async (extra: Record<string, unknown>, fields: Record<string, unknown> = {}) => {
+    const { data: current } = await supabase.from("arc_orders").select("metadata").eq("id", order.order_id).single();
+    return supabase
+      .from("arc_orders")
+      .update({
+        ...fields,
+        metadata: { ...((current?.metadata ?? {}) as Record<string, unknown>), ...extra },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order.order_id);
+  };
+
   // --- 2. PayTR token iste -----------------------------------
   const config = paytrConfig();
 
@@ -147,29 +189,32 @@ export async function POST(request: Request) {
       (order.total * TRANSFER_DISCOUNT_PERCENT) / 100,
     );
 
-    await supabase
-      .from("arc_orders")
-      .update({
-        total: order.total - discount,
-        payment_status: "pending",
-        status: "pending",
-        metadata: {
-          payment_method: "Banka havalesi / EFT",
-          transfer_discount: discount,
-          transfer_discount_percent: TRANSFER_DISCOUNT_PERCENT,
-        },
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", order.order_id);
+    const { error: transferError } = await mergeMetadata(
+      {
+        payment_method: "Banka havalesi / EFT",
+        transfer_discount: discount,
+        transfer_discount_percent: TRANSFER_DISCOUNT_PERCENT,
+        ...(note ? { notes: note } : {}),
+      },
+      { total: order.total - discount, payment_status: "pending", status: "pending" },
+    );
+
+    /* Güncelleme olmadıysa indirim uygulanmadı; vitrine gerçek tutar döner. */
+    if (transferError) console.error("Havale indirimi kaydedilemedi:", transferError);
 
     return NextResponse.json(
       {
         orderNumber: order.order_number,
-        total: order.total - discount,
+        total: transferError ? order.total : order.total - discount,
         paymentMethod: "havale",
       },
       { headers },
     );
+  }
+
+  if (note) {
+    const { error: noteError } = await mergeMetadata({ notes: note });
+    if (noteError) console.error("Sipariş notu kaydedilemedi:", noteError);
   }
 
   // PayTR sepet formatı: [[ad, birim fiyat, adet], ...]
@@ -216,8 +261,9 @@ export async function POST(request: Request) {
     paytr_token: token,
     debug_on: config.testMode,
     timeout_limit: "30",
-    merchant_ok_url: `${config.storeUrl}/siparis/tamam?no=${order.order_number}`,
-    merchant_fail_url: `${config.storeUrl}/siparis/hata?no=${order.order_number}`,
+    /* Numaradaki "#" gibi karakterler adresi bölmesin. */
+    merchant_ok_url: `${config.storeUrl}/siparis/tamam?no=${encodeURIComponent(order.order_number)}`,
+    merchant_fail_url: `${config.storeUrl}/siparis/hata?no=${encodeURIComponent(order.order_number)}`,
     user_name: name,
     user_address: String((address as Record<string, unknown>).line ?? "-"),
     user_phone: phone || "-",

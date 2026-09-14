@@ -48,17 +48,31 @@ export async function POST(request: Request) {
     return new Response("PAYTR notification failed: bad hash", { status: 400 });
   }
 
+  // merchant_oid yalnızca harf ve rakamdan oluşur (odeme/route.ts).
+  if (!/^[A-Za-z0-9]{1,64}$/.test(merchantOid)) {
+    console.error("PayTR bildirimi: geçersiz merchant_oid", { merchantOid });
+    return new Response("OK");
+  }
+
   // --- 2. Siparişi bul --------------------------------------
-  // merchant_oid gönderilirken alfanümerik olmayan karakterler
-  // temizlendiği için burada aynı normalleştirmeyle aranır.
+  /*
+    merchant_oid, sipariş numarasındaki harf ve rakamlar. Önceden
+    sırasız 200 sipariş çekilip içinde aranıyordu: mağaza 200
+    siparişi geçince ödemesi alınmış sipariş bulunamıyor ve
+    "bekliyor"da kalıyordu. Artık karakterlerin arasına joker
+    konarak doğrudan aranıyor; eşleşme normalleştirilmiş numarayla
+    kesinleşiyor.
+  */
   try {
     const supabase = createServiceClient();
 
     const { data: orders, error: findError } = await supabase
       .from("arc_orders")
-      .select("id, order_number")
+      .select("id, order_number, payment_status")
       .eq("source", "native")
-      .limit(200);
+      .ilike("order_number", `%${merchantOid.split("").join("%")}%`)
+      .order("created_at", { ascending: false })
+      .limit(50);
 
     if (findError) throw findError;
 
@@ -68,6 +82,16 @@ export async function POST(request: Request) {
 
     if (!order) {
       console.error("PayTR bildirimi: sipariş bulunamadı", { merchantOid });
+      return new Response("OK");
+    }
+
+    /*
+      PayTR aynı bildirimi yineleyebilir. Sonuçlanmış sipariş yeniden
+      işlenmez: onay e-postası ikinci kez gitmez, ödenmiş sipariş
+      sonradan gelen başarısız bildirimle bozulmaz.
+    */
+    if (order.payment_status === "paid" || order.payment_status === "refunded") {
+      console.info("PayTR bildirimi: sipariş zaten sonuçlanmış", { merchantOid, paymentStatus: order.payment_status });
       return new Response("OK");
     }
 
