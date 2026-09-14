@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
+import { trLocalToIso } from "@/lib/tr-time";
 
 const allowedRoles=new Set(["owner","admin","manager"]);
 const clean=(formData:FormData,name:string,max:number)=>String(formData.get(name)??"").trim().slice(0,max);
-const cents=(value:FormDataEntryValue|null)=>Math.max(0,Math.round(Number(value??0)*100));
+/* Sayı olmayan girdi 0 sayılır; öncesinde NaN veritabanına gidiyordu. */
+const cents=(value:FormDataEntryValue|null)=>{const amount=Number(value??0);return Number.isFinite(amount)?Math.max(0,Math.round(amount*100)):0;};
 
 export async function createDiscount(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
@@ -29,11 +31,17 @@ export async function createDiscount(formData:FormData){
   const validValue=(type==="percentage"&&value>=1&&value<=100)||(type==="fixed_amount"&&value>0)||(type==="free_shipping"&&value===0);
   if(!name||!validType||!validValue)redirect("/indirimler?error=invalid-discount");
 
+  /* Tarihler Türkiye saati; geçersiz tarih artık hata ekranı açmıyor. */
+  const startsIso=startsAt?trLocalToIso(startsAt):null;
+  const endsIso=endsAt?trLocalToIso(endsAt):null;
+  if((startsAt&&!startsIso)||(endsAt&&!endsIso))redirect("/indirimler?error=invalid-date");
+  if(startsIso&&endsIso&&endsIso<=startsIso)redirect("/indirimler?error=invalid-range");
+
   const {error}=await supabase.from("arc_discounts").insert({
     organization_id:organization.id,name,code:code||null,discount_type:type,value,
     minimum_subtotal:minimumSubtotal,usage_limit:usageLimitRaw>0?Math.floor(usageLimitRaw):null,
     per_customer_limit:perCustomerRaw>0?Math.floor(perCustomerRaw):null,
-    starts_at:startsAt?new Date(startsAt).toISOString():null,ends_at:endsAt?new Date(endsAt).toISOString():null,
+    starts_at:startsIso,ends_at:endsIso,
     status,combinable,metadata:{badge:type==="free_shipping"?"Ücretsiz Kargo":type==="percentage"?`%${value} İndirim`:"Sepet İndirimi"}
   });
   if(error)redirect(`/indirimler?error=${encodeURIComponent(error.code??error.message)}`);

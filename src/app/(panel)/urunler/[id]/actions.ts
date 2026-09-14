@@ -108,7 +108,7 @@ export async function createVariant(formData:FormData){
   const compareAtPriceInput=Number(formData.get("compare_at_price")??0);
   const stock=Number(formData.get("stock")??0);
   const allowBackorder=formData.get("allow_backorder")==="on";
-  if(!productId||!sku||!Number.isFinite(priceInput)||priceInput<0||!Number.isFinite(compareAtPriceInput)||compareAtPriceInput<0||!Number.isInteger(stock))redirect(`/urunler/${productId}?error=invalid-variant`);
+  if(!productId||!sku||!Number.isFinite(priceInput)||priceInput<0||!Number.isFinite(compareAtPriceInput)||compareAtPriceInput<0||!Number.isInteger(stock)||stock<0)redirect(`/urunler/${productId}?error=invalid-variant`);
 
   const {data:product}=await supabase.from("arc_products").select("id").eq("organization_id",organization.id).eq("id",productId).maybeSingle();
   if(!product)redirect(`/urunler/${productId}?error=product-not-found`);

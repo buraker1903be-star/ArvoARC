@@ -13,6 +13,8 @@ const ERRORS:Record<string,string>={
   forbidden:"Bu işlem için yetkiniz yok.",
   "invalid-discount":"Kampanya adı, türü ve geçerli bir indirim değeri gerekli.",
   "23505":"Bu kupon kodu başka bir kampanyada kullanılıyor.",
+  "invalid-date":"Başlangıç veya bitiş tarihi geçersiz.",
+  "invalid-range":"Bitiş tarihi başlangıçtan sonra olmalı.",
 };
 
 function ruleValue(rule:{discount_type:string;value:number}){
@@ -84,8 +86,8 @@ export default async function DiscountsPage({searchParams}:{searchParams:Promise
               <label>Kupon kodu<input name="code" maxLength={40} placeholder="Örn. ARVO10"/></label>
               <label>Toplam kullanım limiti<input name="usage_limit" type="number" min="1" step="1" placeholder="Limitsiz"/></label>
               <label>Kişi başı kullanım<input name="per_customer_limit" type="number" min="1" step="1" placeholder="Limitsiz"/></label>
-              <label>Başlangıç<input name="starts_at" type="datetime-local"/></label>
-              <label>Bitiş<input name="ends_at" type="datetime-local"/></label>
+              <label>Başlangıç (Türkiye saati)<input name="starts_at" type="datetime-local"/></label>
+              <label>Bitiş (Türkiye saati)<input name="ends_at" type="datetime-local"/></label>
               <label className="check-inline"><input name="active" type="checkbox" defaultChecked/> Hemen aktif et</label>
               <label className="check-inline"><input name="combinable" type="checkbox"/> Diğer indirimlerle birleştirilebilir</label>
             </div>
