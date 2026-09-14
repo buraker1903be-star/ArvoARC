@@ -64,6 +64,11 @@ export function MobileNav({ tenantName, tenantInitials, roleName }: { tenantName
           <div><b>{tenantName}</b><small>{roleName}</small></div>
         </section>
 
+        <form action="/ara" className="mobile-drawer-search" role="search" onSubmit={close}>
+          <Icon name="search" size={16} />
+          <input name="q" placeholder="Sipariş, ürün, müşteri ara" aria-label="Panelde ara" autoComplete="off" maxLength={80} tabIndex={open ? 0 : -1} />
+        </form>
+
         <nav className="mobile-drawer-nav" aria-label="Mobil ana menü">
           {drawerItems.map((item) => {
             const active = isActive(pathname, item.href);

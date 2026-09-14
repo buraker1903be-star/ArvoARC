@@ -54,6 +54,7 @@ export function isActive(pathname: string, href: string) {
 const extraLabels: Record<string, string> = {
   "/siparisler/iadeler": "İade Talepleri",
   "/tema": "Mağaza Tasarımı",
+  "/ara": "Arama",
 };
 
 export function sectionLabel(pathname: string) {

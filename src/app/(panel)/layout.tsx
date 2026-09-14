@@ -9,6 +9,8 @@ import { PanelBreadcrumb } from "@/components/panel/panel-breadcrumb";
 import { PanelNavigation } from "@/components/panel/panel-navigation";
 import { SidebarToggle } from "@/components/panel/sidebar-toggle";
 import { ThemeToggle } from "@/components/panel/theme-toggle";
+import { TopbarSearch } from "@/components/panel/topbar-search";
+import { Suspense } from "react";
 import "./panel.css";
 import "./dashboard.css";
 
@@ -74,6 +76,7 @@ export default async function PanelLayout({ children }: Readonly<{ children: Rea
       <section className="panel-workspace">
         <header className="panel-topbar">
           <PanelBreadcrumb tenantName={organization.name} />
+          <Suspense fallback={<div className="panel-search" aria-hidden="true" />}><TopbarSearch /></Suspense>
           <div className="panel-top-actions">
             <div className="panel-quick-actions" aria-label="Hızlı erişim">
               <a className="panel-quick-action" href="/magaza" target="_blank" rel="noreferrer">
