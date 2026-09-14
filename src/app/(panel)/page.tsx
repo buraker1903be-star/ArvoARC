@@ -1,28 +1,53 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
+import { fetchAllRows } from "@/lib/fetch-all";
+import { countsAsRevenue } from "@/lib/order-flow";
+import { DAY, trDayStart } from "@/lib/tr-time";
 import { orderBadge, productStatusLabel } from "@/lib/commerce-labels";
 import { Icon, type IconName } from "@/components/panel/icons";
+import { Notice } from "@/components/panel/notice";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });
 const shortDate = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", timeZone: "Europe/Istanbul" });
+const dayOfMonth = new Intl.DateTimeFormat("tr-TR", { day: "numeric", timeZone: "Europe/Istanbul" });
 const longDate = new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Istanbul" });
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toLocaleUpperCase("tr-TR") || "M";
 }
 
+/* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
+function currentTime() {
+  return Date.now();
+}
+
 type Tone = "gold" | "info" | "brand" | "success" | "warning" | "danger" | "muted";
+type OrderRow = { id: string; order_number: string; customer_name: string | null; status: string; payment_status: string; total: number; currency: string; created_at: string };
 
 export default async function Dashboard() {
   const { supabase, organization } = await requireTenant();
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now);
-  thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 29);
-  thirtyDaysAgo.setUTCHours(0, 0, 0, 0);
+  const now = currentTime();
+  /* Bugün dahil son 30 gün, Türkiye saatine göre. */
+  const since = trDayStart(now) - 29 * DAY;
 
-  const [ordersResult, openOrderCountResult, productsResult, productCountResult, activeProductCountResult, variantCountResult, stockSumResult, negativeStockResult, lowStockResult] = await Promise.all([
-    supabase.from("arc_orders").select("id,order_number,customer_name,status,payment_status,total,currency,created_at").eq("organization_id", organization.id).gte("created_at", thirtyDaysAgo.toISOString()).order("created_at", { ascending: false }),
+  /*
+    Siparişler 1000'lik sayfalarla okunuyor: tek istekte Supabase
+    1000 satırda kesiyordu ve yoğun ayda satış ile sipariş sayısı
+    eksik çıkıyordu. Analitik ile aynı yöntem.
+  */
+  const ordersPromise = fetchAllRows<OrderRow>((from, to) =>
+    supabase
+      .from("arc_orders")
+      .select("id,order_number,customer_name,status,payment_status,total,currency,created_at")
+      .eq("organization_id", organization.id)
+      .gte("created_at", new Date(since).toISOString())
+      .order("created_at", { ascending: false })
+      .range(from, to) as unknown as PromiseLike<{ data: OrderRow[] | null; error: { message: string } | null }>,
+  );
+
+  const [{ rows: orders, truncated }, openOrderCountResult, productsResult, productCountResult, activeProductCountResult, variantCountResult, stockSumResult, negativeStockResult, lowStockResult] = await Promise.all([
+    ordersPromise,
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).in("status", ["pending", "confirmed", "processing"]),
     supabase.from("arc_products").select("id,name,slug,status,created_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(5),
     supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
@@ -38,45 +63,47 @@ export default async function Dashboard() {
     supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).gte("stock", 0).lte("stock", 5),
   ]);
 
-  if (ordersResult.error) throw new Error(ordersResult.error.message);
   if (openOrderCountResult.error) throw new Error(openOrderCountResult.error.message);
   if (productsResult.error) throw new Error(productsResult.error.message);
   if (productCountResult.error) throw new Error(productCountResult.error.message);
   if (activeProductCountResult.error) throw new Error(activeProductCountResult.error.message);
   if (variantCountResult.error) throw new Error(variantCountResult.error.message);
 
-  const orders = ordersResult.data ?? [];
   const products = productsResult.data ?? [];
-  const sales = orders.reduce((sum, order) => sum + order.total, 0);
+  /*
+    Satış yalnızca geçerli siparişlerden: iptal ve iade edilenler
+    de toplanıyordu, Genel Bakış ile Analitik farklı ciro gösteriyordu.
+  */
+  const paidOrders = orders.filter((order) => countsAsRevenue(order.status, order.payment_status));
+  const sales = paidOrders.reduce((sum, order) => sum + order.total, 0);
   /* Sayaçlar veritabanından; katalog belleğe alınmıyor. */
   const variantCount = variantCountResult.count ?? 0;
-  const stock = typeof stockSumResult.data === "number" ? stockSumResult.data : 0;
+  /* Toplam okunamazsa "0" yazmak stok bitmiş gibi gösterir. */
+  const stock = !stockSumResult.error && typeof stockSumResult.data === "number" ? stockSumResult.data : null;
   const negativeStockCount = negativeStockResult.count ?? 0;
   const lowStockCount = lowStockResult.count ?? 0;
   const openOrderCount = openOrderCountResult.count ?? 0;
   const recentOrders = orders.slice(0, 6);
 
-  const chartStart = new Date(now);
-  chartStart.setUTCHours(0, 0, 0, 0);
-  chartStart.setUTCDate(chartStart.getUTCDate() - 13);
+  const chartStart = trDayStart(now) - 13 * DAY;
   const dailySales = Array<number>(14).fill(0);
-  for (const order of orders) {
-    const day = Math.floor((new Date(order.created_at).getTime() - chartStart.getTime()) / 86_400_000);
+  for (const order of paidOrders) {
+    const day = Math.floor((Date.parse(order.created_at) - chartStart) / DAY);
     if (day >= 0 && day < 14) dailySales[day] += order.total;
   }
   const maxDailySales = Math.max(...dailySales, 1);
   const chartTotal = dailySales.reduce((sum, value) => sum + value, 0);
   const chartDays = dailySales.map((value, index) => {
-    const date = new Date(chartStart);
-    date.setUTCDate(chartStart.getUTCDate() + index);
-    return { value, day: date.getUTCDate(), label: shortDate.format(date) };
+    /* Günün ortası: biçimlendirici Türkiye saatinde doğru günü yazsın. */
+    const date = new Date(chartStart + index * DAY + DAY / 2);
+    return { value, day: dayOfMonth.format(date), label: shortDate.format(date) };
   });
 
   const widgets: { label: string; value: string; note: string; href: string; icon: IconName; tone: Tone }[] = [
-    { label: "Net satış", value: money.format(sales / 100), note: "Son 30 gün", href: "/analitik", icon: "lira", tone: "gold" },
+    { label: "Net satış", value: money.format(sales / 100), note: "Son 30 gün · iptal ve iadeler hariç", href: "/analitik?p=30", icon: "lira", tone: "gold" },
     { label: "Sipariş", value: orders.length.toLocaleString("tr-TR"), note: "Son 30 gün", href: "/siparisler", icon: "box", tone: "info" },
     { label: "Ürün", value: (productCountResult.count ?? 0).toLocaleString("tr-TR"), note: `${(activeProductCountResult.count ?? 0).toLocaleString("tr-TR")} aktif`, href: "/urunler", icon: "tag", tone: "brand" },
-    { label: "Stok", value: stock.toLocaleString("tr-TR"), note: `${variantCount.toLocaleString("tr-TR")} varyant`, href: "/stok", icon: "archive", tone: "success" },
+    { label: "Stok", value: stock === null ? "—" : stock.toLocaleString("tr-TR"), note: stock === null ? "Toplam okunamadı" : `${variantCount.toLocaleString("tr-TR")} varyant`, href: "/stok", icon: "archive", tone: "success" },
   ];
 
   /*
@@ -126,11 +153,15 @@ export default async function Dashboard() {
     <div className="dash">
       <section className="dash-hero">
         <div>
-          <span className="panel-kicker">{longDate.format(now).toLocaleUpperCase("tr-TR")}</span>
+          <span className="panel-kicker">{longDate.format(new Date(now)).toLocaleUpperCase("tr-TR")}</span>
           <h1>Genel Bakış</h1>
           <p>{organization.name} mağazasının satış, sipariş ve stok durumu.</p>
         </div>
       </section>
+
+      {truncated ? (
+        <Notice tone="warn" title="Özet kısmi">Son 30 günde 20.000’den fazla sipariş var; rakamlar en yeni 20.000 siparişten hesaplandı.</Notice>
+      ) : null}
 
       <section className="dash-widgets" aria-label="Özet">
         {widgets.map((widget) => (
@@ -152,7 +183,7 @@ export default async function Dashboard() {
             </div>
             <div className="dash-stat">
               <strong>{money.format(chartTotal / 100)}</strong>
-              <span>{orders.length ? "Gerçek sipariş toplamı" : "Henüz satış yok"}</span>
+              <span>{paidOrders.length ? "İptal ve iadeler hariç" : "Henüz satış yok"}</span>
             </div>
           </div>
           <div className="dash-bars" role="img" aria-label="Son 14 günlük satış grafiği">

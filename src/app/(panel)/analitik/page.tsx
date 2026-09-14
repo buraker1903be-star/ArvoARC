@@ -2,13 +2,12 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { countsAsRevenue } from "@/lib/order-flow";
+import { DAY, TR_OFFSET as TR, trDayStart } from "@/lib/tr-time";
 import { orderStatusOptions, sourceLabel } from "@/lib/commerce-labels";
 import { Notice } from "@/components/panel/notice";
 import "./analytics.css";
 
-const DAY = 86_400_000;
-/* Türkiye UTC+3 (yaz saati yok): gün ve ay sınırları Türkiye saatine göre. */
-const TR = 3 * 3_600_000;
+/* Gün ve ay sınırları Türkiye saatine göre (bkz. lib/tr-time). */
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });
 const dayMonth = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -24,7 +23,6 @@ type PeriodKey = (typeof PERIODS)[number][0];
 
 type Bucket = { start: number; end: number; label: string; revenue: number; orders: number };
 
-const trDayStart = (ms: number) => Math.floor((ms + TR) / DAY) * DAY - TR;
 const trMonthStart = (ms: number, offset: number) => {
   const local = new Date(ms + TR);
   return Date.UTC(local.getUTCFullYear(), local.getUTCMonth() + offset, 1) - TR;
