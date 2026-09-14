@@ -7,6 +7,7 @@ import { refundPayment } from "@/lib/paytr/refund";
 import { sendEmail } from "@/lib/email/resend";
 import { returnDecisionEmail } from "@/lib/email/order-confirmation";
 import { calculateRefund } from "@/lib/refund";
+import { isBankTransfer } from "@/lib/payment-method";
 
 /**
  * İade talebini sonuçlandırır.
@@ -31,7 +32,7 @@ export async function resolveReturn(formData: FormData) {
 
   const { data: request } = await supabase
     .from("arc_return_requests")
-    .select("id,order_id,items,status,arc_orders(order_number,status,total,shipping,customer_name,customer_email,metadata)")
+    .select("id,order_id,items,status,updated_at,arc_orders(order_number,status,payment_status,total,shipping,customer_name,customer_email,metadata)")
     .eq("organization_id", organization.id)
     .eq("id", id)
     .single();
@@ -53,6 +54,7 @@ export async function resolveReturn(formData: FormData) {
     : request.arc_orders) as {
     order_number: string;
     status: string;
+    payment_status: string | null;
     total: number;
     shipping: number | null;
     customer_name: string | null;
@@ -63,8 +65,14 @@ export async function resolveReturn(formData: FormData) {
   if (!order) redirect("/siparisler/iadeler?error=not-found");
 
   /* --- Ret --- */
+  /*
+    Ret ve onay yalnızca hâlâ bekleyen talepte yazılır ve sonucu
+    kontrol edilir. Öncesinde kayıt başarısız olsa da müşteriye
+    karar e-postası gidiyordu; iki sekmeden verilen iki karar da
+    üst üste yazılabiliyordu.
+  */
   if (decision === "reddet") {
-    await supabase
+    const { data: rejected, error: rejectError } = await supabase
       .from("arc_return_requests")
       .update({
         status: "reddedildi",
@@ -72,7 +80,13 @@ export async function resolveReturn(formData: FormData) {
         resolved_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", id);
+      .eq("organization_id", organization.id)
+      .eq("id", id)
+      .eq("status", "beklemede")
+      .select("id");
+
+    if (rejectError) redirect("/siparisler/iadeler?error=save-failed");
+    if (!rejected?.length) redirect("/siparisler/iadeler?error=already-resolved");
 
     if (order.customer_email) {
       try {
@@ -102,14 +116,20 @@ export async function resolveReturn(formData: FormData) {
     hasarlı gelirse elimizde bir şey kalmıyordu.
   */
   if (decision === "onayla") {
-    await supabase
+    const { data: approved, error: approveError } = await supabase
       .from("arc_return_requests")
       .update({
         status: "onaylandi",
         status_note: note || null,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", id);
+      .eq("organization_id", organization.id)
+      .eq("id", id)
+      .eq("status", "beklemede")
+      .select("id");
+
+    if (approveError) redirect("/siparisler/iadeler?error=save-failed");
+    if (!approved?.length) redirect("/siparisler/iadeler?error=already-resolved");
 
     if (order.customer_email) {
       try {
@@ -130,6 +150,21 @@ export async function resolveReturn(formData: FormData) {
   }
 
   /* --- Ürün teslim alındı: PayTR iadesi --- */
+
+  /*
+    Siparişin ödeme durumu kontrol edilir. Öncesinde bu akış daha
+    önce yapılmış iadeye bakmıyordu: sipariş detayından tam iade
+    edilmiş sipariş buradan ikinci kez iade edilebiliyordu.
+  */
+  const orderMeta = (order.metadata ?? {}) as Record<string, unknown>;
+  if (isBankTransfer(orderMeta)) redirect("/siparisler/iadeler?error=transfer-order");
+  if (order.payment_status === "refunded") redirect("/siparisler/iadeler?error=already-refunded");
+  if (order.payment_status !== "paid" && order.payment_status !== "partially_refunded") {
+    redirect("/siparisler/iadeler?error=not-paid");
+  }
+  /* Aynı siparişe birden çok talep olabilir; iade edilen tutar birikir. */
+  const alreadyRefunded = Math.max(0, Number(orderMeta.refunded_amount ?? 0) || 0);
+  const remaining = Math.max(0, order.total - alreadyRefunded);
 
   /*
     Tutar seçilen kalemlerden hesaplanıyor. Formdan gelen
@@ -172,9 +207,26 @@ export async function resolveReturn(formData: FormData) {
     (ve varsa kargo bedeli). Öncesinde 50 ₺'lik tek bir kalemin
     iadesinde 5.000 ₺'lik siparişin tamamı geçirilebiliyordu.
   */
+  if (amountKurus > remaining) {
+    redirect("/siparisler/iadeler?error=over-remaining");
+  }
   if (amountKurus <= 0 || amountKurus > breakdown.amount) {
     redirect("/siparisler/iadeler?error=invalid-amount");
   }
+
+  /*
+    Talep kilitlenir: çift tıklama ya da iki sekme aynı iadeyi iki
+    kez PayTR'a göndermesin. updated_at, okunduğu değerle hâlâ
+    aynıysa güncellenir; ikinci istek eşleşme bulamaz.
+  */
+  const claim = supabase
+    .from("arc_return_requests")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("organization_id", organization.id)
+    .eq("id", id)
+    .eq("status", "onaylandi");
+  const { data: claimed } = await (request.updated_at ? claim.eq("updated_at", request.updated_at) : claim.is("updated_at", null)).select("id");
+  if (!claimed?.length) redirect("/siparisler/iadeler?error=busy");
 
   const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
 
@@ -189,7 +241,8 @@ export async function resolveReturn(formData: FormData) {
     redirect("/siparisler/iadeler?error=refund-failed");
   }
 
-  const tamIade = amountKurus >= order.total;
+  const refundedTotal = alreadyRefunded + amountKurus;
+  const tamIade = refundedTotal >= order.total;
 
   /*
     Test siparişinin iadesinde gerçek para hareketi olmuyor.
@@ -200,7 +253,7 @@ export async function resolveReturn(formData: FormData) {
     ? "TEST siparişi — gerçek para iadesi yapılmadı."
     : null;
 
-  await supabase
+  const { error: requestError } = await supabase
     .from("arc_return_requests")
     .update({
       status: "tamamlandi",
@@ -210,6 +263,7 @@ export async function resolveReturn(formData: FormData) {
       resolved_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
+    .eq("organization_id", organization.id)
     .eq("id", id);
 
   /*
@@ -223,21 +277,30 @@ export async function resolveReturn(formData: FormData) {
   */
   const kargolandi = order.status === "fulfilled";
 
-  await supabase
+  const { error: orderError } = await supabase
     .from("arc_orders")
     .update({
       payment_status: tamIade ? "refunded" : "partially_refunded",
       status: tamIade ? "refunded" : kargolandi ? order.status : "cancelled",
       metadata: {
-        ...(order.metadata ?? {}),
+        ...orderMeta,
         refunded_at: new Date().toISOString(),
-        refunded_amount: amountKurus,
+        refunded_amount: refundedTotal,
         refund_reference: result.reference ?? null,
       },
       updated_at: new Date().toISOString(),
     })
     .eq("organization_id", organization.id)
     .eq("id", request.order_id);
+
+  /*
+    Para iade edildi ama kayıt güncellenemedi. Sessizce geçmek
+    tehlikeli: talep "onaylandı" kalırsa aynı iade tekrar denenebilir.
+  */
+  if (requestError || orderError) {
+    console.error("İADE YAPILDI AMA KAYIT GÜNCELLENEMEDİ:", order.order_number, amountKurus, requestError?.message, orderError?.message);
+    redirect("/siparisler/iadeler?error=refund-recorded-failed");
+  }
 
   if (order.customer_email) {
     try {

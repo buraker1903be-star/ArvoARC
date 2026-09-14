@@ -42,6 +42,13 @@ const ERRORS: Record<string, string> = {
   forbidden: "İade işlemi için yönetici yetkisi gerekiyor.",
   "invalid-amount": "İade tutarı, iade edilen kalemlerin (ve kargo çıkmadıysa kargo bedelinin) toplamını aşamaz.",
   "not-approved": "Para iadesi yalnızca onaylanmış talepte yapılabilir.",
+  "already-refunded": "Bu sipariş zaten tamamen iade edilmiş.",
+  "over-remaining": "Bu siparişte daha önce iade yapılmış; tutar, kalan iade edilebilir tutarı aşamaz.",
+  "not-paid": "Sipariş ödenmemiş; para iadesi yapılamaz.",
+  "transfer-order": "Havale siparişi PayTR'dan iade edilemez. Parayı bankadan iade edip siparişi elle kapatın.",
+  busy: "Bu talep için iade zaten işleniyor. Sayfayı yenileyip durumu kontrol edin.",
+  "save-failed": "Karar kaydedilemedi; müşteriye e-posta gönderilmedi. Tekrar deneyin.",
+  "refund-recorded-failed": "İade yapıldı ancak kayıt güncellenemedi. PayTR panelinden doğrulayın; tekrar iade denemeyin.",
 };
 
 /**

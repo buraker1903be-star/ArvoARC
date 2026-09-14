@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { sendEmail } from "@/lib/email/resend";
 import { shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { refundPayment } from "@/lib/paytr/refund";
+import { isBankTransfer } from "@/lib/payment-method";
 import { requireTenant } from "@/lib/tenant";
 
 const roles=new Set(["owner","admin","manager"]);
@@ -132,7 +133,7 @@ export async function refundOrder(formData: FormData) {
   const { data: order } = await supabase
     .from("arc_orders")
     .select(
-      "id,order_number,total,payment_status,status,metadata,customer_name,customer_email",
+      "id,order_number,total,payment_status,status,metadata,customer_name,customer_email,updated_at",
     )
     .eq("organization_id", organization.id)
     .eq("id", orderId)
@@ -156,6 +157,11 @@ export async function refundOrder(formData: FormData) {
 
   if (order.payment_status !== "paid") {
     redirect(`/siparisler/${orderId}?error=not-paid`);
+  }
+
+  /* Havale PayTR'dan geçmediği için PayTR'dan iade edilemez. */
+  if (isBankTransfer(meta)) {
+    redirect(`/siparisler/${orderId}?error=transfer-order`);
   }
 
   /*
@@ -183,6 +189,20 @@ export async function refundOrder(formData: FormData) {
     olmadan bekliyor; ödeme oluşturulurken de böyle gönderilmişti.
   */
   const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
+
+  /*
+    Sipariş kilitlenir: çift tıklama ya da iki sekme aynı iadeyi
+    iki kez PayTR'a göndermesin. updated_at okunduğu değerle hâlâ
+    aynıysa güncellenir; ikinci istek eşleşme bulamaz.
+  */
+  const claim = supabase
+    .from("arc_orders")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("organization_id", organization.id)
+    .eq("id", orderId)
+    .eq("payment_status", "paid");
+  const { data: claimed } = await (order.updated_at ? claim.eq("updated_at", order.updated_at) : claim.is("updated_at", null)).select("id");
+  if (!claimed?.length) redirect(`/siparisler/${orderId}?error=busy`);
 
   const result = await refundPayment({
     merchantOid,
