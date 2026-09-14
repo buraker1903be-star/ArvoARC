@@ -1,7 +1,43 @@
 import { requireTenant } from "@/lib/tenant";
+import { Notice } from "@/components/panel/notice";
 import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
+import "../catalog.css";
 
 const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending_dns:"DNS bekleniyor",verifying:"Doğrulanıyor",active:"Aktif",failed:"Bağlantı hatası"};
+
+const SAVED:Record<string,string>={
+  general:"Marka ayarları kaydedildi.",
+  payments:"Ödeme ayarları kaydedildi.",
+  logo:"Logo yüklendi.",
+  favicon:"Favicon yüklendi.",
+  "logo-removed":"Logo kaldırıldı.",
+  "favicon-removed":"Favicon kaldırıldı.",
+  "panel-domain":"Panel alan adı kaydedildi. DNS kaydını ekleyip doğrulayın.",
+  domain:"Mağaza alan adı kaydedildi.",
+  "panel-domain-verified":"Panel alan adı doğrulandı; güvenli bağlantı etkin.",
+  "storefront-domain-verified":"Mağaza alan adı doğrulandı; güvenli bağlantı etkin.",
+};
+const ERRORS:Record<string,string>={
+  forbidden:"Bu ayarları değiştirmek için yönetici yetkisi gerekir.",
+  "invalid-bank-transfer":"Havale için banka adı, hesap sahibi ve TR ile başlayan 26 haneli IBAN gerekli.",
+  "paytr-merchant-required":"PayTR’ı açmak için mağaza numarası gerekli.",
+  "invalid-installment":"Taksit sayısı 0 ile 12 arasında olmalı.",
+  "file-required":"Bir dosya seçin.",
+  "invalid-brand-file":"Dosya türü veya boyutu uygun değil.",
+  "settings-required":"Önce marka ayarlarını kaydedin.",
+  "invalid-asset":"Geçersiz dosya.",
+  "invalid-panel-domain":"Geçerli bir alan adı girin (örn. app.markaniz.com).",
+  "panel-storefront-domain-conflict":"Panel ve mağaza aynı alan adını kullanamaz.",
+  "invalid-domain":"Geçerli bir alan adı girin (örn. markaniz.com).",
+  "invalid-subdomain":"Alt alan adı yalnızca küçük harf, rakam ve tire içerebilir.",
+  "domain-required":"Alt alan adı veya özel alan adı girin.",
+  "panel-domain-required":"Önce panel alan adını kaydedin.",
+};
+/* DNS kaydı henüz yayılmadıysa hata değil, bekleme durumu. */
+const PENDING:Record<string,string>={
+  "panel-dns-not-ready":"Panel DNS kaydı henüz görünmüyor. Kaydın yayılması birkaç dakika sürebilir; sonra tekrar doğrulayın.",
+  "storefront-dns-not-ready":"Mağaza DNS kaydı henüz görünmüyor. Kaydın yayılması birkaç dakika sürebilir; sonra tekrar doğrulayın.",
+};
 
 export default async function Settings({searchParams}:{searchParams:Promise<{saved?:string;error?:string}>}){
   const query=await searchParams;const {supabase,organization,membership}=await requireTenant();
@@ -13,9 +49,12 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
   const domainStatus=settings?.domain_status??"not_configured";
   const panelDomainStatus=settings?.panel_domain_status??"not_configured";
   return <>
-    <section className="ac-bar"><div><h1>Mağaza Ayarları</h1><p>Marka kimliği, alan adları ve mağaza tercihleri.</p></div></section>
-    {query.saved&&<section className="card settings-flash"><strong>Mağaza ayarları kaydedildi.</strong></section>}
-    {query.error&&<section className="card settings-flash error"><strong>Ayarlar kaydedilemedi: {query.error}</strong></section>}
+    <section className="ac-bar"><div><h1>Mağaza Ayarları</h1><p>Marka kimliği, alan adları ve ödeme yöntemleri.</p></div></section>
+
+    <div className="ac-stack">
+    {query.saved?<Notice title={SAVED[query.saved]??"Mağaza ayarları kaydedildi."}/>:null}
+    {query.error&&PENDING[query.error]?<Notice tone="warn" title="DNS doğrulaması bekliyor">{PENDING[query.error]}</Notice>:null}
+    {query.error&&!PENDING[query.error]?<Notice tone="error" title="Ayarlar kaydedilemedi">{ERRORS[query.error]??query.error}</Notice>:null}
 
     <div className="settings-layout">
       <section className="card settings-section">
@@ -36,13 +75,13 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
         {canManage?<form action={updateStoreSettings} className="settings-form">
           <label>Mağaza adı<input name="store_name" defaultValue={settings?.store_name??organization.name} required maxLength={160}/></label>
           <label>Yayınlanan mağaza<span className="readonly-field">{settings?.storefront_url??"Henüz tanımlanmadı"}</span></label>
-          <label>Ana marka rengi<span className="color-input"><input name="primary_color" type="color" defaultValue={settings?.primary_color??"#002045"}/><input value={settings?.primary_color??"#002045"} readOnly/></span></label>
-          <label>Vurgu rengi<span className="color-input"><input name="accent_color" type="color" defaultValue={settings?.accent_color??"#6f9548"}/><input value={settings?.accent_color??"#6f9548"} readOnly/></span></label>
+          <label>Ana marka rengi<span className="color-input"><input name="primary_color" type="color" defaultValue={settings?.primary_color??"#002045"}/><input value={settings?.primary_color??"#002045"} readOnly aria-label="Ana marka rengi kodu"/></span></label>
+          <label>Vurgu rengi<span className="color-input"><input name="accent_color" type="color" defaultValue={settings?.accent_color??"#6f9548"}/><input value={settings?.accent_color??"#6f9548"} readOnly aria-label="Vurgu rengi kodu"/></span></label>
           <label>Para birimi<select name="currency" defaultValue={settings?.currency??"TRY"}><option value="TRY">TRY · Türk Lirası</option><option value="USD">USD · ABD Doları</option><option value="EUR">EUR · Euro</option></select></label>
           <label>Dil / bölge<select name="locale" defaultValue={settings?.locale??"tr-TR"}><option value="tr-TR">Türkçe · Türkiye</option><option value="en-US">English · United States</option></select></label>
           <label>Düşük stok eşiği<input name="low_stock_threshold" type="number" min="0" max="10000" step="1" defaultValue={settings?.low_stock_threshold??5} required/></label>
           <button type="submit">Marka ayarlarını kaydet</button>
-        </form>:<p>Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
+        </form>:<p className="catalog-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
       </section>
 
       <section className="domain-stack">
@@ -87,7 +126,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
       <div className="head"><div><small>ÖDEME ALTYAPISI</small><h3>Ödeme yöntemleri</h3><p>Her mağaza kendi havale hesabını ve PayTR mağaza numarasını yönetir.</p></div><span>GÜVENLİ YAPILANDIRMA</span></div>
       {canManage?<form action={updatePaymentSettings} className="payment-form">
         <article className="payment-method">
-          <div className="payment-title"><div><small>MANUEL ÖDEME</small><h4>Havale / EFT</h4></div><label className="switch-row"><input type="checkbox" name="bank_transfer_enabled" defaultChecked={settings?.bank_transfer_enabled}/><span>Etkin</span></label></div>
+          <div className="payment-title"><div><small>MANUEL ÖDEME</small><h4>Havale / EFT</h4></div><label className="check-inline"><input type="checkbox" name="bank_transfer_enabled" defaultChecked={settings?.bank_transfer_enabled}/><span>Etkin</span></label></div>
           <p>Sipariş sonrası müşteriye banka bilgilerini ve ödeme açıklamasını gösterir.</p>
           <div className="payment-fields">
             <label>Banka adı<input name="bank_name" defaultValue={settings?.bank_name??""} placeholder="Banka adı"/></label>
@@ -97,17 +136,18 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
           </div>
         </article>
         <article className="payment-method paytr-method">
-          <div className="payment-title"><div><small>KARTLA ÖDEME</small><h4>PayTR iFrame API</h4></div><label className="switch-row"><input type="checkbox" name="paytr_enabled" defaultChecked={settings?.paytr_enabled}/><span>Etkin</span></label></div>
+          <div className="payment-title"><div><small>KARTLA ÖDEME</small><h4>PayTR iFrame API</h4></div><label className="check-inline"><input type="checkbox" name="paytr_enabled" defaultChecked={settings?.paytr_enabled}/><span>Etkin</span></label></div>
           <p>Kart bilgileri ARVO ARC sunucularına gelmeden PayTR’ın güvenli ödeme ekranında işlenir.</p>
           <div className="payment-fields">
             <label className="wide">Mağaza numarası<input name="paytr_merchant_id" defaultValue={settings?.paytr_merchant_id??""} placeholder="PayTR merchant_id" autoComplete="off"/></label>
             <label>En yüksek taksit<select name="paytr_max_installment" defaultValue={settings?.paytr_max_installment??0}><option value="0">PayTR belirlesin</option>{[1,2,3,4,5,6,9,12].map(value=><option key={value} value={value}>{value} taksit</option>)}</select></label>
-            <div className="check-stack"><label><input type="checkbox" name="paytr_test_mode" defaultChecked={settings?.paytr_test_mode??true}/> Test modu</label><label><input type="checkbox" name="paytr_no_installment" defaultChecked={settings?.paytr_no_installment}/> Taksiti kapat</label></div>
+            <div className="check-stack"><label className="check-inline"><input type="checkbox" name="paytr_test_mode" defaultChecked={settings?.paytr_test_mode??true}/> Test modu</label><label className="check-inline"><input type="checkbox" name="paytr_no_installment" defaultChecked={settings?.paytr_no_installment}/> Taksiti kapat</label></div>
           </div>
           <div className="security-note"><b>Gizli anahtarlar panelde saklanmaz.</b><p>PAYTR_MERCHANT_KEY ve PAYTR_MERCHANT_SALT yalnızca mağazanın Vercel sunucu ortamına eklenir.</p><code>https://arvoculture.com/api/paytr/callback</code></div>
         </article>
         <button className="payment-save" type="submit">Ödeme ayarlarını kaydet</button>
-      </form>:<p>Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
+      </form>:<p className="catalog-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
     </section>
+    </div>
   </>;
 }

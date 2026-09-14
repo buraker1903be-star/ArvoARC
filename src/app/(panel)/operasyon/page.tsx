@@ -1,24 +1,33 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { orderStatusLabel, paymentStatusLabel } from "@/lib/commerce-labels";
+import { Icon, type IconName } from "@/components/panel/icons";
+import "../modules.css";
 
 type ProductMeta={image_paths?:string[];images?:string[];images_migrated?:boolean};
 const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"});
+const shortDate=new Intl.DateTimeFormat("tr-TR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Istanbul"});
+
+type Tone="info"|"gold"|"success"|"warning"|"danger"|"brand"|"muted";
+
+/* Aksiyon satırı: tonu anlam taşır (sarı dikkat, kırmızı sorun). */
+function ActionRow({href,icon,tone,title,detail,side}:{href:string;icon:IconName;tone:Tone;title:string;detail:string;side:React.ReactNode}){
+  return <Link prefetch={false} className="dash-row" data-tone={tone} href={href}>
+    <span className="dash-row-icon"><Icon name={icon} size={16}/></span>
+    <span className="dash-row-label"><span>{title}</span><small>{detail}</small></span>
+    {side}
+    <span className="dash-chevron"><Icon name="chevron" size={16}/></span>
+  </Link>;
+}
 
 export default async function Operations(){
   const {supabase,organization}=await requireTenant();
   /*
-    Sorgular sınırlandırıldı ve filtreler veritabanına taşındı.
-
-    Öncesinde tüm siparişler, tüm varyantlar (15.000+) ve tüm
-    ürünler (3.000+) çekilip bellekte süzülüyordu. İki sorun
-    vardı: sayfa çok yavaştı ve Supabase varsayılan olarak en
-    fazla 1000 satır döndürdüğü için sayılar SESSİZCE yanlıştı —
-    stok uyarısı 15.000 varyantın yalnızca ilk 1000'ine
-    bakıyordu.
-
-    Artık her liste kendi filtresiyle ve sınırıyla çekiliyor;
-    toplamlar ayrı sayım sorgularından geliyor.
+    Sorgular sınırlandırıldı ve filtreler veritabanında: her liste
+    kendi filtresiyle ve sınırıyla çekiliyor, toplamlar ayrı sayım
+    sorgularından geliyor. Öncesinde tüm siparişler ve 15.000+
+    varyant belleğe alınıyor, Supabase 1000 satırda kestiği için
+    sayılar sessizce yanlış çıkıyordu.
   */
   const {data:settings}=await supabase.from("arc_store_settings").select("low_stock_threshold").eq("organization_id",organization.id).maybeSingle();
   const threshold=settings?.low_stock_threshold??5;
@@ -40,10 +49,10 @@ export default async function Operations(){
     supabase.from("arc_orders").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).in("status",OPEN),
     supabase.from("arc_orders").select("id,order_number,status,payment_status,customer_name,total,created_at").eq("organization_id",organization.id).in("payment_status",PAYMENT).not("status","in","(cancelled,refunded)").order("created_at",{ascending:false}).limit(8),
     supabase.from("arc_orders").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).in("payment_status",PAYMENT).not("status","in","(cancelled,refunded)"),
-    // Kritik: stok sıfır ya da eksi ve stoksuz satış kapalı.
-    supabase.from("arc_product_variants").select("id,product_id,sku,stock,allow_backorder").eq("organization_id",organization.id).lte("stock",0).eq("allow_backorder",false).order("stock",{ascending:true}).limit(10),
+    // Kritik: stok sıfır ya da eksi ve stoksuz satış kapalı (mağazada satın alınamıyor).
+    supabase.from("arc_product_variants").select("id,product_id,sku,stock,allow_backorder").eq("organization_id",organization.id).lte("stock",0).eq("allow_backorder",false).order("stock",{ascending:true}).limit(8),
     supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).lte("stock",0).eq("allow_backorder",false),
-    supabase.from("arc_product_variants").select("id,product_id,sku,stock,allow_backorder").eq("organization_id",organization.id).gt("stock",0).lte("stock",threshold).order("stock",{ascending:true}).limit(10),
+    supabase.from("arc_product_variants").select("id,product_id,sku,stock,allow_backorder").eq("organization_id",organization.id).gt("stock",0).lte("stock",threshold).order("stock",{ascending:true}).limit(8),
     supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).gt("stock",0).lte("stock",threshold),
   ]);
 
@@ -51,57 +60,85 @@ export default async function Operations(){
 
   /* Yalnızca gösterilen varyantların ürün adları çekilir. */
   const stockVariants=[...(criticalStock??[]),...(lowStock??[])];
-  const stockProductIds=[...new Set(stockVariants.map(v=>v.product_id))];
-  const {data:stockProducts}=stockProductIds.length
-    ?await supabase.from("arc_products").select("id,name").in("id",stockProductIds)
-    :{data:[]};
+  const stockProductIds=[...new Set(stockVariants.map(variant=>variant.product_id))];
+  const {data:stockProducts}=stockProductIds.length?await supabase.from("arc_products").select("id,name").in("id",stockProductIds):{data:[]};
+  const productName=new Map((stockProducts??[]).map(product=>[product.id,product.name]));
 
   /*
-    Görseli eksik ürünler. Metadata içinde arama yapılamadığı
-    için son 200 aktif ürüne bakılıyor: tüm katalogu çekmek
-    3.264 satır demek ve zaten 1000'de kesiliyordu.
+    Görseli eksik ürünler. Metadata içinde arama yapılamadığı için
+    son güncellenen 200 aktif ürüne bakılıyor.
   */
   const {data:recentActive}=await supabase.from("arc_products").select("id,name,status,source,metadata").eq("organization_id",organization.id).eq("status","active").order("updated_at",{ascending:false}).limit(200);
-  const productMap=new Map((stockProducts??[]).map(product=>[product.id,product]));
   const missingImages=(recentActive??[]).filter(product=>{const meta=(product.metadata??{}) as ProductMeta;return !(meta.image_paths?.length)&&!(meta.images?.length);});
 
-  /* Sayaçlar veritabanından; listeler yalnızca ilk birkaç kayıt. */
-  const totalActions=(openCount??0)+(paymentCount??0)+(criticalCount??0)+(lowCount??0)+missingImages.length;
+  const stockAlerts=(criticalCount??0)+(lowCount??0);
+  const totalActions=(openCount??0)+(paymentCount??0)+stockAlerts+missingImages.length;
 
   return <>
     <section className="ac-bar">
       <div>
         <h1>Operasyon Merkezi</h1>
-        <p>Aksiyon gerektiren kayıtların tek görünümü.</p>
+        <p>{totalActions?`${totalActions.toLocaleString("tr-TR")} kayıt aksiyon bekliyor.`:"Her şey güncel; aksiyon bekleyen kayıt yok."}</p>
       </div>
     </section>
 
-    <div className="ac-stack">
-    {/* Renk anlamlı: sıfır olan sayaç nötr, dolu olan dikkat. */}
-    <section className="ac-metrics">
-      <article className="ac-metric" data-tone={totalActions>0?"warn":undefined}>
-        <span>TOPLAM AKSİYON</span><strong>{totalActions}</strong><small>Kontrol bekleyen</small>
-      </article>
-      <article className="ac-metric" data-tone={(openCount??0)>0?"warn":undefined}>
-        <span>AÇIK SİPARİŞ</span><strong>{openCount??0}</strong><small>Bekliyor veya hazırlanıyor</small>
-      </article>
-      <article className="ac-metric" data-tone={(criticalCount??0)>0?"bad":(lowCount??0)>0?"warn":undefined}>
-        <span>STOK UYARISI</span><strong>{(criticalCount??0)+(lowCount??0)}</strong><small>Kritik ve düşük stok</small>
-      </article>
-      <article className="ac-metric" data-tone={missingImages.length>0?"warn":undefined}>
-        <span>GÖRSEL EKSİĞİ</span><strong>{missingImages.length}</strong><small>Aktif ürün</small>
-      </article>
-    </section>
+    <div className="dash">
+      {/* Renk anlamlı: sıfır olan sayaç nötr, dolu olan dikkat. */}
+      <section className="ac-metrics" aria-label="Operasyon özeti">
+        <Link prefetch={false} className="ac-metric ac-lift" data-tone={(openCount??0)>0?"warn":undefined} href="/siparisler?filter=pending">
+          <span>Açık sipariş</span><strong>{(openCount??0).toLocaleString("tr-TR")}</strong><small>Bekliyor veya hazırlanıyor</small>
+        </Link>
+        <article className="ac-metric" data-tone={(paymentCount??0)>0?"warn":undefined}>
+          <span>Ödeme kontrolü</span><strong>{(paymentCount??0).toLocaleString("tr-TR")}</strong><small>Ödemesi tamamlanmamış</small>
+        </article>
+        <Link prefetch={false} className="ac-metric ac-lift" data-tone={(criticalCount??0)>0?"bad":(lowCount??0)>0?"warn":undefined} href={(criticalCount??0)>0?"/stok?filter=zero":"/stok?filter=low"}>
+          <span>Stok uyarısı</span><strong>{stockAlerts.toLocaleString("tr-TR")}</strong><small>{(criticalCount??0).toLocaleString("tr-TR")} satışa kapalı · {(lowCount??0).toLocaleString("tr-TR")} azalan</small>
+        </Link>
+        <article className="ac-metric" data-tone={missingImages.length>0?"warn":undefined}>
+          <span>Görsel eksiği</span><strong>{missingImages.length.toLocaleString("tr-TR")}</strong><small>Son güncellenen 200 aktif üründe</small>
+        </article>
+      </section>
 
-    <section className="ac-split-even">
-      <article className="ac ac-pad"><div className="ac-head"><div><h3>Açık siparişler</h3><p>Hazırlanmayı bekleyenler.</p></div><Link href="/siparisler?filter=processing">Tüm siparişler →</Link></div>{(openOrders??[]).slice(0,8).map(order=><Link prefetch={false} className="order" href={`/siparisler/${order.id}`} key={order.id}><i>▧</i><div><b>{order.order_number} · {order.customer_name||"Müşteri"}</b><small>{orderStatusLabel(order.status)} · {new Date(order.created_at).toLocaleDateString("tr-TR")}</small></div><strong>{money.format(order.total/100)}</strong></Link>)}{!(openOrders??[]).length&&<p>Açık sipariş bulunmuyor.</p>}</article>
-      <article className="ac ac-pad"><div className="ac-head"><div><h3>Ödeme kontrolü</h3><p>Ödemesi tamamlanmamış siparişler.</p></div><Link href="/siparisler">Siparişlere git →</Link></div>{(paymentPending??[]).slice(0,8).map(order=><Link prefetch={false} className="order" href={`/siparisler/${order.id}`} key={order.id}><i>₺</i><div><b>{order.order_number}</b><small>{paymentStatusLabel(order.payment_status)}</small></div><strong>{money.format(order.total/100)}</strong></Link>)}{!(paymentPending??[]).length&&<p>Ödeme bekleyen sipariş bulunmuyor.</p>}</article>
-    </section>
+      <div className="ops-grid">
+        <article className="dash-card">
+          <div className="dash-card-head">
+            <div><h2>Açık siparişler</h2><p>Onay ve hazırlık bekleyenler, en yeniden.</p></div>
+            <Link prefetch={false} className="dash-card-link" href="/siparisler?filter=pending">Siparişler <Icon name="chevron" size={15}/></Link>
+          </div>
+          {(openOrders??[]).length?<div className="dash-list">{(openOrders??[]).map(order=>(
+            <ActionRow key={order.id} href={`/siparisler/${order.id}`} icon="box" tone={order.status==="pending"?"warning":"info"} title={`${order.order_number} · ${order.customer_name||"Müşteri"}`} detail={`${orderStatusLabel(order.status)} · ${shortDate.format(new Date(order.created_at))}`} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>
+          ))}</div>:<p className="dash-empty">Açık sipariş bulunmuyor.</p>}
+        </article>
 
-    <section className="ac-split-even">
-      <article className="ac ac-pad"><div className="ac-head"><div><h3>Kritik stoklar</h3><p>Tükenen ve azalan varyantlar.</p></div><Link href="/stok?filter=negative">Stok yönetimi →</Link></div>{stockVariants.slice(0,10).map(variant=><div className="order" key={variant.id}><i>!</i><div><b>{productMap.get(variant.product_id)?.name??"Ürün"}</b><small>{variant.sku} · {variant.allow_backorder?"Stoksuz satış açık":"Stok zorunlu"}</small></div><strong>{variant.stock}</strong></div>)}{!stockVariants.length&&<p>Stok uyarısı bulunmuyor.</p>}</article>
-      <article className="ac ac-pad"><div className="ac-head"><div><h3>Görseli eksik ürünler</h3><p>Aktif ama görselsiz.</p></div><Link href="/urunler">Ürünlere git →</Link></div>{missingImages.slice(0,10).map(product=><Link className="order" href={`/urunler/${product.id}`} key={product.id}><i>◇</i><div><b>{product.name}</b><small>{product.source==="shopify"?"Shopify aktarımı":"ARC Native"}</small></div><strong>Görsel ekle</strong></Link>)}{!missingImages.length&&<p>Aktif ürünlerde görsel eksiği bulunmuyor.</p>}</article>
-    </section>
+        <article className="dash-card">
+          <div className="dash-card-head">
+            <div><h2>Ödeme kontrolü</h2><p>Ödeme bekleyen, onaylanmış ama tahsil edilmemiş veya başarısız.</p></div>
+          </div>
+          {(paymentPending??[]).length?<div className="dash-list">{(paymentPending??[]).map(order=>(
+            <ActionRow key={order.id} href={`/siparisler/${order.id}`} icon="lira" tone={order.payment_status==="failed"?"danger":"warning"} title={order.order_number} detail={`${paymentStatusLabel(order.payment_status)} · ${order.customer_name||"Müşteri"}`} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>
+          ))}</div>:<p className="dash-empty">Ödeme bekleyen sipariş bulunmuyor.</p>}
+        </article>
+
+        <article className="dash-card">
+          <div className="dash-card-head">
+            <div><h2>Kritik stoklar</h2><p>Satışa kapalı olanlar ve {threshold} adet altına düşenler.</p></div>
+            <Link prefetch={false} className="dash-card-link" href="/stok?filter=zero">Stok <Icon name="chevron" size={15}/></Link>
+          </div>
+          {stockVariants.length?<div className="dash-list">{stockVariants.map(variant=>(
+            <ActionRow key={variant.id} href={`/stok?q=${encodeURIComponent(variant.sku)}`} icon="alert" tone={variant.stock<=0?"danger":"warning"} title={productName.get(variant.product_id)??"Ürün"} detail={`${variant.sku} · ${variant.stock<=0?"mağazada satın alınamıyor":"azalıyor"}`} side={<span className="dash-row-count">{variant.stock}</span>}/>
+          ))}</div>:<p className="dash-empty">Stok uyarısı bulunmuyor.</p>}
+        </article>
+
+        <article className="dash-card">
+          <div className="dash-card-head">
+            <div><h2>Görseli eksik ürünler</h2><p>Yayında ama kapak görseli yok.</p></div>
+            <Link prefetch={false} className="dash-card-link" href="/urunler?filter=active">Ürünler <Icon name="chevron" size={15}/></Link>
+          </div>
+          {missingImages.length?<div className="dash-list">{missingImages.slice(0,8).map(product=>(
+            <ActionRow key={product.id} href={`/urunler/${product.id}`} icon="tag" tone="gold" title={product.name} detail={product.source==="shopify"?"Shopify aktarımı":"ARVO ARC"} side={<span className="ops-cta">Görsel ekle</span>}/>
+          ))}</div>:<p className="dash-empty">Aktif ürünlerde görsel eksiği bulunmuyor.</p>}
+        </article>
+      </div>
     </div>
   </>;
 }

@@ -1,0 +1,107 @@
+/* ============================================================
+   DİĞER MODÜLLER — operasyon, koleksiyonlar, indirimler,
+   tedarikçiler, veri aktarımı
+   Satır görünümü panel.css'te (Veri listeleri); renkler yalnızca
+   panel.css paletinden.
+   ============================================================ */
+
+.module-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.module-toolbar .module-search{flex:1 1 360px}
+.module-hint{margin:8px 0 0;color:var(--muted);font-size:12.5px;line-height:1.65}
+.section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}
+.section-title small{display:block;color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.18em}
+.section-title h3{margin:4px 0 0;color:var(--ink);font-size:20px;font-weight:650;letter-spacing:-.015em}
+.section-title a{color:var(--accent);font-size:13.5px;font-weight:650;text-decoration:none}
+
+/* ---------- Operasyon ---------- */
+.ops-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.ops-amount{color:var(--ink);font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ops-cta{color:var(--accent);font-size:13px;font-weight:650;white-space:nowrap}
+
+/* ---------- Koleksiyonlar ---------- */
+.collection-list .list-row{
+  grid-template-columns:minmax(220px,2fr) 110px 110px minmax(120px,.8fr);
+  grid-template-areas:"name source count status";
+}
+.col-name{grid-area:name}
+.col-source{grid-area:source;color:var(--muted)}
+.col-count{grid-area:count}
+.col-status{grid-area:status}
+
+/* Koleksiyon düzenleyici: ürün seçici */
+.picker-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px}
+.picker-toolbar input{flex:1 1 220px;min-width:0}
+.picker-group{margin:14px 0 6px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.14em}
+
+/* ---------- İndirimler ---------- */
+.discount-product-list .list-row{
+  grid-template-columns:minmax(220px,2fr) 120px 150px 90px 120px 90px;
+  grid-template-areas:"name old new rate badge edit";
+}
+.dl-name{grid-area:name}
+.dl-old{grid-area:old;color:var(--muted)}
+.dl-new{grid-area:new}
+.dl-rate{grid-area:rate}
+.dl-badge{grid-area:badge}
+.dl-edit{grid-area:edit;display:flex;justify-content:flex-end}
+.dl-edit a{color:var(--accent);font-size:13px;font-weight:650;text-decoration:none}
+.dl-rate em{display:inline-flex;padding:3px 9px;border-radius:999px;background:var(--danger-soft);color:var(--danger);font-size:12px;font-style:normal;font-weight:800}
+
+/* Silme onayı: tarayıcı confirm() yerine satır içi, JavaScript gerektirmez */
+.confirm-inline>summary{list-style:none;cursor:pointer}
+.confirm-inline>summary::-webkit-details-marker{display:none}
+.confirm-inline>summary::after{display:none!important;content:none!important}
+.confirm-inline[open]>summary{opacity:.6}
+.confirm-inline-body{display:grid;gap:8px;margin-top:8px;padding:10px;border:1px solid color-mix(in srgb,var(--danger) 30%,var(--line));border-radius:12px;background:var(--danger-soft)}
+.confirm-inline-body span{color:var(--danger);font-size:12.5px;font-weight:650;line-height:1.45}
+.panel-root .discount-package-actions{flex-wrap:wrap;align-items:flex-start}
+.panel-root .discount-package-actions>*{flex:1 1 0;min-width:0}
+.panel-root .discount-package-actions .ac-btn{width:100%;justify-content:center;padding:8px 10px;font-size:12.5px}
+
+/* ---------- Tedarikçiler ---------- */
+.supplier-sync{display:grid;gap:10px;margin-bottom:20px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+.supplier-sync-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;font-size:13.5px}
+.supplier-sync-top span{color:var(--muted)}
+.supplier-sync-top b{color:var(--ink);font-variant-numeric:tabular-nums}
+.supplier-track{height:8px;overflow:hidden;border-radius:999px;background:var(--line)}
+.supplier-track i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent-500),var(--accent-300))}
+.supplier-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0}
+.supplier-facts dt{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.supplier-facts dd{margin:3px 0 0;color:var(--ink);font-size:13.5px;overflow-wrap:anywhere}
+.supplier-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:end}
+.supplier-form .is-wide{grid-column:1/-1}
+.supplier-preview{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:18px 0 0;padding:12px 14px;border:1px solid color-mix(in srgb,var(--accent-500) 30%,var(--line));border-radius:12px;background:var(--accent-soft);color:var(--ink-soft);font-size:13.5px}
+.supplier-preview strong{color:var(--accent-strong);font-size:15px}
+.supplier-reset{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
+.supplier-reset form{margin:0}
+.supplier-reset .module-hint{flex:1 1 280px;margin:0}
+
+/* ---------- Veri aktarımı ---------- */
+.import-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}
+.panel-root .import-card{display:flex;flex-direction:column;gap:12px}
+.import-card .ac-head{margin-bottom:0}
+.import-card p{margin:0;color:var(--ink-soft);font-size:13.5px;line-height:1.6}
+.import-form{display:grid;gap:10px;margin-top:auto;padding:12px;border:1px dashed var(--line-strong);border-radius:12px;background:var(--surface-2)}
+.panel-root .import-form input[type=file]{margin:0;padding:8px;background:var(--surface-raised);font-size:13px}
+.import-list .list-row{
+  grid-template-columns:minmax(200px,2fr) 110px 120px 100px minmax(120px,.8fr) 130px;
+  grid-template-areas:"file kind imported skipped status date";
+}
+.il-file{grid-area:file}
+.il-kind{grid-area:kind;color:var(--muted)}
+.il-imported{grid-area:imported}
+.il-skipped{grid-area:skipped}
+.il-status{grid-area:status}
+.il-date{grid-area:date;color:var(--muted);font-size:12.5px}
+
+@media(max-width:1100px){.import-grid{grid-template-columns:1fr}}
+@media(max-width:900px){
+  .ops-grid{grid-template-columns:1fr}
+  .collection-list .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name status" "source count";row-gap:4px;padding:12px 14px}
+  .col-count,.col-status{justify-self:end;text-align:right}
+  .discount-product-list .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name rate" "new edit" "old badge";row-gap:4px;padding:12px 14px}
+  .dl-rate,.dl-badge{justify-self:end}
+  .supplier-form,.supplier-facts{grid-template-columns:1fr}
+  .import-list .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"file status" "kind imported" "date skipped";row-gap:4px;padding:12px 14px}
+  .il-status,.il-imported,.il-skipped{justify-self:end;text-align:right}
+}
