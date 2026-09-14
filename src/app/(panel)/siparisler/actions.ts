@@ -6,10 +6,39 @@ import { requireTenant } from "@/lib/tenant";
 import { sendEmail } from "@/lib/email/resend";
 import { statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { isOrderClosed } from "@/lib/commerce-labels";
+import { nextOrderStep } from "@/lib/order-flow";
+
+const MANAGERS = ["owner", "admin", "manager"];
+const RESULT_KEYS = ["ok", "error", "created", "saved", "updated", "skipped"];
+
+/*
+  İşlemden sonra kullanıcı geldiği yere döner: filtre, arama,
+  dönem ve sayfa korunur. Öncesinde listeden "Onayla →" demek
+  filtreyi sıfırlayıp ilk sayfaya atıyordu.
+
+  Adres formdan geldiği için doğrulanıyor: yalnızca /siparisler
+  altına dönülebilir, başka bir siteye yönlendirme yapılamaz.
+*/
+function backTo(formData: FormData, result: Record<string, string>) {
+  const base = "https://arc.invalid";
+  let url: URL;
+  try {
+    url = new URL(String(formData.get("back") ?? "") || "/siparisler", base);
+  } catch {
+    url = new URL("/siparisler", base);
+  }
+  if (url.origin !== base || !/^\/siparisler(\/[A-Za-z0-9-]+)?$/.test(url.pathname)) url = new URL("/siparisler", base);
+  for (const key of RESULT_KEYS) url.searchParams.delete(key);
+  for (const [key, value] of Object.entries(result)) url.searchParams.set(key, value);
+  return `${url.pathname}${url.search}`;
+}
+
+const fromDetail = (formData: FormData) =>
+  /^\/siparisler\/(?!iadeler$)[A-Za-z0-9-]+$/.test(String(formData.get("back") ?? "").split("?")[0]);
 
 export async function createOrder(formData: FormData) {
   const { supabase, membership } = await requireTenant();
-  if (!["owner", "admin", "manager"].includes(membership.role)) redirect("/siparisler?error=forbidden");
+  if (!MANAGERS.includes(membership.role)) redirect("/siparisler?error=forbidden");
 
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const customerEmail = String(formData.get("customer_email") ?? "").trim();
@@ -37,8 +66,19 @@ export async function createOrder(formData: FormData) {
   redirect(`/siparisler?created=${encodeURIComponent(orderNumber)}`);
 }
 
+/* Müşteri bildirimi; gönderim hatası durum güncellemesini geçersiz kılmaz. */
+async function notifyStatus(order: { order_number: string; customer_name: string | null; customer_email: string | null }, status: string) {
+  if (!order.customer_email) return;
+  try {
+    const mail = statusUpdateEmail(status, order.order_number, order.customer_name || "değerli müşterimiz");
+    if (mail) await sendEmail({ to: order.customer_email, ...mail });
+  } catch (mailError) {
+    console.error("Durum bildirimi gönderilemedi:", order.order_number, mailError);
+  }
+}
+
 /**
- * Listeden hızlı durum değişikliği.
+ * Listeden (veya detay başlığından) hızlı durum değişikliği.
  *
  * Sipariş detayına girmeden bir sonraki adıma geçirmek için.
  * Günde on sipariş geldiğinde her birini açıp kapatmak otuz
@@ -50,23 +90,13 @@ export async function createOrder(formData: FormData) {
 export async function quickStatus(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
 
-  if (!["owner", "admin", "manager"].includes(membership.role)) {
-    redirect("/siparisler?error=forbidden");
-  }
+  if (!MANAGERS.includes(membership.role)) redirect(backTo(formData, { error: "forbidden" }));
 
   const orderId = String(formData.get("order_id") ?? "");
   const status = String(formData.get("status") ?? "");
+  const allowed = new Set(["confirmed", "processing", "fulfilled", "cancelled"]);
 
-  const allowed = new Set([
-    "confirmed",
-    "processing",
-    "fulfilled",
-    "cancelled",
-  ]);
-
-  if (!orderId || !allowed.has(status)) {
-    redirect("/siparisler?error=invalid-status");
-  }
+  if (!orderId || !allowed.has(status)) redirect(backTo(formData, { error: "invalid-status" }));
 
   const { data: order } = await supabase
     .from("arc_orders")
@@ -76,22 +106,16 @@ export async function quickStatus(formData: FormData) {
     .single();
 
   /*
-    Kayıt okunamadıysa devam edilmiyor.
-
-    Öncesinde `order` null olsa bile RPC çağrılıyor ve ödeme
-    durumu `?? "pending"` ile geçiliyordu: okuma herhangi bir
-    nedenle boş dönerse ödenmiş siparişin ödeme durumu sessizce
-    "Ödeme bekliyor"a düşüyordu.
+    Kayıt okunamadıysa devam edilmiyor. Öncesinde `order` null
+    olsa bile RPC çağrılıyor ve ödeme durumu `?? "pending"` ile
+    geçiliyordu: ödenmiş siparişin ödeme durumu sessizce
+    "Ödeme bekliyor"a düşebiliyordu.
   */
-  if (!order) redirect("/siparisler?error=order-not-found");
+  if (!order) redirect(backTo(formData, { error: "order-not-found" }));
 
-  /*
-    Kapanmış sipariş akışta ilerletilemez. Düğme listede zaten
-    gizli; bu kontrol elle gönderilen isteğe karşı.
-  */
-  if (isOrderClosed(order.status, order.payment_status)) {
-    redirect("/siparisler?error=order-closed");
-  }
+  /* Kapanmış sipariş akışta ilerletilemez. Düğme zaten gizli;
+     bu kontrol elle gönderilen isteğe karşı. */
+  if (isOrderClosed(order.status, order.payment_status)) redirect(backTo(formData, { error: "order-closed" }));
 
   const { error } = await supabase.rpc("arc_update_order_status", {
     p_order_id: orderId,
@@ -100,22 +124,58 @@ export async function quickStatus(formData: FormData) {
     p_payment_status: order.payment_status,
   });
 
-  if (error) redirect("/siparisler?error=save-failed");
+  if (error) redirect(backTo(formData, { error: "save-failed" }));
 
-  /* Müşteri bildirimi; hata siparişi etkilemez. */
-  if (order?.customer_email) {
-    try {
-      const mail = statusUpdateEmail(
-        status,
-        order.order_number,
-        order.customer_name || "değerli müşterimiz",
-      );
-      if (mail) await sendEmail({ to: order.customer_email, ...mail });
-    } catch (mailError) {
-      console.error("Durum bildirimi gönderilemedi:", mailError);
-    }
+  await notifyStatus(order, status);
+
+  revalidatePath("/");
+  revalidatePath("/siparisler");
+  revalidatePath(`/siparisler/${orderId}`);
+  redirect(backTo(formData, fromDetail(formData) ? { saved: "1" } : { ok: "status" }));
+}
+
+/**
+ * Toplu durum değişikliği.
+ *
+ * Yalnızca akıştaki bir sonraki adım uygulanır: "Kargoya ver"
+ * seçildiğinde yalnızca hazırlanan siparişler kargoya geçer,
+ * henüz onaylanmamış olanlar atlanır. Kapanmış (iptal / iade)
+ * siparişler hiçbir adıma geçmez. Kurallar hızlı işlemle aynı;
+ * uygunluk sunucuda yeniden hesaplanıyor, formdaki listeye
+ * güvenilmiyor.
+ */
+export async function bulkStatus(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  if (!MANAGERS.includes(membership.role)) redirect(backTo(formData, { error: "forbidden" }));
+
+  const status = String(formData.get("status") ?? "");
+  const ids = [...new Set(formData.getAll("order_id").map(String).filter(Boolean))].slice(0, 100);
+
+  if (!["confirmed", "processing", "fulfilled"].includes(status)) redirect(backTo(formData, { error: "invalid-status" }));
+  if (!ids.length) redirect(backTo(formData, { error: "bulk-empty" }));
+
+  const { data: orders, error } = await supabase
+    .from("arc_orders")
+    .select("id,status,payment_status,order_number,customer_name,customer_email")
+    .eq("organization_id", organization.id)
+    .in("id", ids);
+  if (error) redirect(backTo(formData, { error: "save-failed" }));
+
+  const eligible = (orders ?? []).filter((order) => nextOrderStep(order.status, order.payment_status)?.key === status);
+  const updated: typeof eligible = [];
+  for (const order of eligible) {
+    const { error: rpcError } = await supabase.rpc("arc_update_order_status", {
+      p_order_id: order.id,
+      p_status: status,
+      p_payment_status: order.payment_status,
+    });
+    if (rpcError) console.error("Toplu durum güncellenemedi:", order.order_number, rpcError.message);
+    else updated.push(order);
   }
 
+  await Promise.all(updated.map((order) => notifyStatus(order, status)));
+
+  revalidatePath("/");
   revalidatePath("/siparisler");
-  redirect("/siparisler?ok=status");
+  redirect(backTo(formData, { ok: "bulk", updated: String(updated.length), skipped: String(ids.length - updated.length) }));
 }

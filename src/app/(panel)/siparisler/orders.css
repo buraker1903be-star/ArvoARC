@@ -1,0 +1,183 @@
+/* ============================================================
+   SİPARİŞLER — liste, detay, iade talepleri
+   Renkler yalnızca panel.css paletinden.
+   ============================================================ */
+
+/* ---------- Araç şeridi: arama + dönem ---------- */
+.order-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.order-toolbar .order-search{flex:1 1 380px}
+
+/* ---------- Liste ---------- */
+/* clip: taşmayı kırpar ama kaydırma kabı oluşturmaz; toplu işlem
+   çubuğunun yapışkan konumu bu sayede çalışır. */
+.panel-root .ac.table.order-table{overflow:clip}
+.order-table-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0!important;border-bottom:1px solid var(--line)}
+
+.order-row{
+  position:relative;display:grid;align-items:center;gap:12px;min-height:58px;padding:9px 18px;
+  border-top:1px solid var(--line-soft);color:var(--ink);font-size:13.5px;font-variant-numeric:tabular-nums;
+  transition:background-color .14s ease;
+}
+.order-table[data-manage] .order-row{
+  grid-template-columns:24px minmax(140px,1fr) minmax(180px,1.5fr) 110px 120px minmax(170px,1.2fr) 150px;
+  grid-template-areas:"check main customer source amount status action";
+}
+.order-table:not([data-manage]) .order-row{
+  grid-template-columns:minmax(140px,1fr) minmax(180px,1.5fr) 110px 120px minmax(170px,1.2fr);
+  grid-template-areas:"main customer source amount status";
+}
+.order-row>*{min-width:0}
+.order-check{grid-area:check}
+.order-cell-main{grid-area:main}
+.order-cell-customer{grid-area:customer}
+.order-cell-source{grid-area:source;color:var(--muted)}
+.order-amount{grid-area:amount;font-weight:700}
+.order-status{grid-area:status}
+.order-action{grid-area:action;display:flex;justify-content:flex-end}
+.order-row :is(b,small){display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.order-row b{color:var(--ink);font-weight:650}
+.order-row small{margin-top:2px;color:var(--muted);font-size:12.5px}
+.order-row.th{min-height:40px;border-top:0;background:var(--surface-2);box-shadow:inset 0 -1px 0 var(--line);color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em}
+.order-row:not(.th):hover{background:color-mix(in srgb,var(--accent-100) 38%,var(--surface))}
+.order-row.is-selected,.order-row.is-selected:hover{background:color-mix(in srgb,var(--accent-100) 60%,var(--surface))}
+.order-row .ac-tag::before{content:"";width:6px;height:6px;flex:none;border-radius:50%;background:currentColor;opacity:.85}
+
+/* Satırın tamamı detay bağlantısı; kutucuk ve düğmeler üstte kalır. */
+.order-row-link{color:inherit;text-decoration:none}
+.order-row-link::after{content:"";position:absolute;inset:0}
+.order-row :is(.order-check,form){position:relative;z-index:1}
+.order-row form{margin:0}
+.order-check{display:grid;place-items:center;cursor:pointer}
+.panel-root .order-check input{width:17px;height:17px;margin:0;padding:0;box-shadow:none;accent-color:var(--accent-600);cursor:pointer}
+
+/* Toplu işlem çubuğu: seçim yapılınca tablonun üstünde yapışık. */
+.order-bulk-bar{
+  position:sticky;top:72px;z-index:5;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;
+  padding:10px 18px;border-bottom:1px solid color-mix(in srgb,var(--accent-500) 30%,var(--line));
+  background:color-mix(in srgb,var(--accent-100) 82%,var(--surface));
+  -webkit-backdrop-filter:saturate(160%) blur(14px);backdrop-filter:saturate(160%) blur(14px);
+}
+.order-bulk-bar>b{color:var(--accent-strong);font-size:13.5px}
+.order-bulk-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+.order-pagination{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface-2);color:var(--muted);font-size:13px}
+.order-pagination>div{display:flex;align-items:center;gap:8px}
+.order-page-number{min-width:56px;text-align:center;font-variant-numeric:tabular-nums}
+
+.order-empty{padding:40px 20px;text-align:center}
+.order-empty b{display:block;color:var(--ink);font-size:15px}
+.order-empty p{max-width:520px;margin:6px auto 0;color:var(--muted);font-size:13.5px;line-height:1.55}
+
+/* Manuel sipariş */
+.order-create>summary b{display:block;color:var(--ink);font-size:15px}
+.order-create>summary small{display:block;margin-top:2px;color:var(--muted);font-size:12.5px;font-weight:500}
+.order-manual-form{display:grid;gap:16px;margin-top:18px}
+.order-manual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.order-manual-lines{display:grid;gap:10px}
+.order-manual-line{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:10px;align-items:end}
+.order-manual-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+/* ---------- Detay ---------- */
+.order-back{display:inline-flex;align-items:center;gap:4px;margin-bottom:8px;color:var(--muted);font-size:13px;font-weight:600;text-decoration:none}
+.order-back:hover{color:var(--accent)}
+.order-head-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.order-head-actions form{margin:0}
+
+/* Akış göstergesi */
+.order-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;padding:0;list-style:none}
+.order-steps li{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 6px;text-align:center}
+.order-steps li::before{content:"";position:absolute;top:15px;right:50%;width:100%;height:2px;background:var(--line)}
+.order-steps li:first-child::before{display:none}
+.order-steps li:is(.is-done,.is-current)::before{background:var(--accent-500)}
+.order-step-dot{position:relative;z-index:1;display:grid;place-items:center;width:32px;height:32px;border:2px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);font-size:13px;font-weight:700}
+.is-done>.order-step-dot{border-color:var(--accent-500);background:var(--accent-500);color:#fff}
+.is-current>.order-step-dot{border-color:var(--accent-500);color:var(--accent-strong);box-shadow:0 0 0 5px color-mix(in srgb,var(--accent-500) 18%,transparent)}
+.order-steps b{color:var(--ink);font-size:13.5px;font-weight:650}
+.order-steps li:not(.is-done):not(.is-current) b{color:var(--muted)}
+.order-steps small{color:var(--muted);font-size:12px}
+.order-steps[data-closed] li:is(.is-done,.is-current)::before{background:var(--line-strong)}
+.order-steps[data-closed] .is-done>.order-step-dot{border-color:var(--line-strong);background:var(--line-strong);color:var(--surface)}
+
+.order-facts .ac-metric>strong{font-size:22px;overflow-wrap:anywhere}
+
+/* Müşteri ve adres kartları */
+.order-parties{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.panel-root .order-party{padding:18px 20px}
+.order-party>small{display:block;margin-bottom:10px;color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.18em}
+.order-party p{margin:3px 0;color:var(--ink-soft);font-size:13.5px;line-height:1.5;overflow-wrap:anywhere}
+.order-party p b{color:var(--ink)}
+.order-party a{color:var(--accent);text-decoration:none}
+.order-party a:hover{text-decoration:underline}
+.order-party .is-empty{color:var(--muted)}
+.order-party-note{margin-top:10px!important;padding-top:10px;border-top:1px solid var(--line-soft)}
+
+/* Formlar */
+.order-form-grid{display:grid;gap:12px}
+.order-form-grid.is-narrow{max-width:440px}
+.order-hint{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.order-hint.is-danger{color:var(--danger)}
+.order-track{margin:14px 0 0}
+
+/* İşlem geçmişi: zaman çizelgesi */
+.order-timeline{display:grid;margin:0;padding:0;list-style:none}
+.order-timeline li{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;padding:10px 0}
+.order-timeline li::before{content:"";position:absolute;left:10px;top:0;bottom:0;width:2px;background:var(--line)}
+.order-timeline li:first-child::before{top:18px}
+.order-timeline li:last-child::before{bottom:auto;height:18px}
+.order-timeline li:only-child::before{display:none}
+.order-timeline-dot{position:relative;z-index:1;width:12px;height:12px;margin:5px 0 0 5px;border-radius:50%;background:var(--accent-500);box-shadow:0 0 0 4px var(--surface)}
+.order-timeline-dot[data-kind="shipping"]{background:var(--info)}
+.order-timeline-dot[data-kind="refund"]{background:var(--danger)}
+.order-timeline-dot[data-kind="created"]{background:var(--brand-400)}
+.order-timeline b{display:block;color:var(--ink);font-size:13.5px;font-weight:650}
+.order-timeline small{display:block;margin-top:2px;color:var(--muted);font-size:12.5px}
+.order-timeline time{padding-top:1px;color:var(--muted);font-size:12px;white-space:nowrap}
+
+/* ---------- İade talepleri ---------- */
+.return-card .ac-head h3 a{color:var(--ink);font-size:inherit;text-decoration:none}
+.return-card .ac-head h3 a:hover{color:var(--accent)}
+.return-reason{margin:0;color:var(--ink-soft);font-size:14px}
+.return-reason b{color:var(--ink)}
+.return-lines{display:grid;margin-top:12px}
+.return-line{display:grid;grid-template-columns:minmax(0,1fr) 70px 130px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px;font-variant-numeric:tabular-nums}
+.return-line>span:nth-child(n+2){text-align:right}
+.return-line b{display:block;color:var(--ink);font-weight:650}
+.return-line small{display:block;color:var(--muted);font-size:12px}
+.return-line.is-head{padding:8px 0;border-bottom:1px solid var(--line);color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em}
+.return-sum{display:flex;flex-wrap:wrap;gap:6px 18px;margin:12px 0 6px;color:var(--muted);font-size:13px}
+.return-sum b{color:var(--ink)}
+.return-done{margin:12px 0 0;color:var(--success);font-weight:700}
+.return-note{margin:12px 0 0;color:var(--muted);font-size:13px}
+.return-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+/* ---------- Duyarlı ---------- */
+@media(max-width:1100px){
+  .order-parties{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .order-parties>:first-child{grid-column:1/-1}
+}
+@media(max-width:900px){
+  .order-row.th{display:none}
+  .order-table[data-manage] .order-row{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"check main amount" "check customer status" ". action action";row-gap:6px;padding:12px 14px}
+  .order-table:not([data-manage]) .order-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amount" "customer status";row-gap:6px;padding:12px 14px}
+  .order-cell-source{display:none}
+  .order-amount,.order-status{justify-self:end;text-align:right}
+  .order-action{justify-content:flex-start}
+  .order-action:empty{display:none}
+  .order-bulk-bar{top:calc(56px + env(safe-area-inset-top));padding:10px 14px}
+  .order-parties{grid-template-columns:1fr}
+  .order-manual-grid{grid-template-columns:1fr}
+}
+@media(max-width:620px){
+  .order-steps b{font-size:12px}
+  .order-steps small{display:none}
+  .order-manual-line{grid-template-columns:minmax(0,1fr) 80px}
+  .order-manual-line>button{grid-column:1/-1}
+  .order-pagination{justify-content:center}
+}
+
+/* Yazdırma: sipariş belgesi (müşteri, adresler, kalemler, toplamlar). */
+@media print{
+  .order-noprint{display:none!important}
+  .order-parties{grid-template-columns:repeat(3,1fr)}
+  .order-facts{display:none}
+}

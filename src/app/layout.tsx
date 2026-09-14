@@ -37,7 +37,7 @@ export const viewport:Viewport={
 const themeInit=`(function(){try{var t=localStorage.getItem("arvoarc.theme");if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.setAttribute("data-theme",t)}catch(e){}})()`;
 
 export default function Layout({children}:{children:React.ReactNode}){
-  return <html lang="tr" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{__html:themeInit}}/></head><body className={inter.variable}>{children}
+  return <html lang="tr" suppressHydrationWarning data-scroll-behavior="smooth"><head><script dangerouslySetInnerHTML={{__html:themeInit}}/></head><body className={inter.variable}>{children}
     {/*
       `useSearchParams` bir Suspense sınırı gerektiriyor; aksi
       hâlde tüm sayfa istemci tarafında yeniden çiziliyor.

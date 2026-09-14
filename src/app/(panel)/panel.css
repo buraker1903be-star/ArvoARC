@@ -325,6 +325,31 @@ html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{b
 .panel-root .danger-button,.panel-root .discount-package-actions .danger-button{border:1px solid color-mix(in srgb,var(--danger) 35%,var(--line));background:var(--danger-soft);box-shadow:none;color:var(--danger)}
 .panel-root .danger-button:hover{border-color:var(--danger);background:var(--danger);color:#fff}
 
+/* Bildirim şeridi: işlem sonuçları (?ok= / ?error= dönüşleri). */
+.panel-notice{
+  --tone:var(--success);--tone-soft:var(--success-soft);
+  display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+  border:1px solid color-mix(in srgb,var(--tone) 28%,var(--line));border-radius:14px;
+  background:color-mix(in srgb,var(--tone-soft) 75%,var(--surface));color:var(--ink);font-size:14px;line-height:1.5;
+}
+.panel-notice[data-tone="error"]{--tone:var(--danger);--tone-soft:var(--danger-soft)}
+.panel-notice[data-tone="warn"]{--tone:var(--warning);--tone-soft:var(--warning-soft)}
+.panel-notice[data-tone="info"]{--tone:var(--info);--tone-soft:var(--info-soft)}
+.panel-notice-icon{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--tone);color:#fff}
+.panel-notice>div{min-width:0;padding-top:2px}
+.panel-notice b{display:block;font-weight:700}
+.panel-notice p{margin:2px 0 0;color:var(--ink-soft)}
+
+/* Sayaç rozeti: sekme ve filtrelerde kayıt sayısı */
+.ac-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:6px;padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--muted);font-size:11.5px;font-style:normal;font-weight:700;font-variant-numeric:tabular-nums}
+[aria-current="page"]>.ac-count{background:var(--accent-soft);color:var(--accent-strong)}
+.ac-count[data-tone="warn"]{background:var(--warning-soft);color:var(--warning)}
+
+/* Tehlikeli ve pasif düğmeler */
+.panel-root .ac-btn-danger,.panel-root .ac-btn-danger:hover{border-color:color-mix(in srgb,var(--danger) 40%,var(--line));background:var(--danger-soft);color:var(--danger)}
+.panel-root .ac-btn-danger:hover{border-color:var(--danger)}
+.panel-root .ac-btn:disabled,.panel-root .ac-btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed;pointer-events:none;filter:saturate(.6)}
+
 /* İskelet ve hata */
 .panel-skeleton{display:flex;flex-direction:column;gap:16px}
 .skel{position:relative;overflow:hidden;border-radius:10px;background:linear-gradient(110deg,var(--surface-2) 25%,color-mix(in srgb,var(--surface) 72%,var(--line)) 45%,var(--surface-2) 65%);background-size:250% 100%;animation:panel-skeleton 1.35s ease-in-out infinite}
