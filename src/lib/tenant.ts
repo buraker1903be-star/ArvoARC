@@ -1,7 +1,12 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-export async function requireTenant() {
+/*
+  cache(): panel yerleşimi ve sayfa aynı istekte çağırıyor; oturum
+  doğrulaması ve kiracı sorgusu istek başına bir kez çalışır.
+*/
+export const requireTenant = cache(async function requireTenant() {
   const supabase = await createClient();
   const {data:claimsData,error:claimsError}=await supabase.auth.getClaims();
   const userId=typeof claimsData?.claims?.sub==="string"?claimsData.claims.sub:null;
@@ -16,4 +21,4 @@ export async function requireTenant() {
   }
   if(!tenant.commerce_enabled)redirect("/login?error=commerce-disabled");
   return {supabase,user:{id:userId},membership:{organization_id:organization.id,role:tenant.membership_role},organization};
-}
+});

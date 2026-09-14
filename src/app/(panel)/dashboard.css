@@ -1,0 +1,114 @@
+/* ============================================================
+   GENEL BAKIŞ — ArvoOS widget dili
+   Renkler yalnızca panel.css paletinden.
+   ============================================================ */
+
+.dash{--dash-ease:cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;gap:18px}
+
+/* Tonlar */
+.dash [data-tone]{--tone-bg:var(--surface-2);--tone-fg:var(--muted)}
+.dash [data-tone="info"]{--tone-bg:var(--info-soft);--tone-fg:var(--info)}
+.dash [data-tone="gold"]{--tone-bg:var(--accent-soft);--tone-fg:var(--accent-strong)}
+.dash [data-tone="success"]{--tone-bg:var(--success-soft);--tone-fg:var(--success)}
+.dash [data-tone="warning"]{--tone-bg:var(--warning-soft);--tone-fg:var(--warning)}
+.dash [data-tone="danger"]{--tone-bg:var(--danger-soft);--tone-fg:var(--danger)}
+.dash [data-tone="brand"]{--tone-bg:color-mix(in srgb,var(--brand-500) 14%,var(--surface));--tone-fg:var(--brand-600)}
+html[data-theme="dark"] .dash [data-tone="brand"]{--tone-fg:var(--brand-200)}
+
+/* ---------- Karşılama ---------- */
+.dash-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.dash-hero h1{margin:6px 0 0;color:var(--ink);font-size:clamp(28px,2.4vw,36px);font-weight:700;line-height:1.1;letter-spacing:-.028em}
+.dash-hero p{margin:8px 0 0;max-width:620px;color:var(--muted);font-size:15px;line-height:1.5}
+.dash-hero-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+/* ---------- Widget'lar ---------- */
+.dash-widgets{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.dash-widget{
+  position:relative;display:flex;flex-direction:column;gap:2px;min-height:140px;padding:16px 16px 14px;
+  border:1px solid var(--line);border-radius:22px;background:var(--surface);box-shadow:var(--shadow-sm);
+  color:var(--ink);text-decoration:none;overflow:hidden;
+  transition:transform .45s var(--dash-ease),box-shadow .3s ease,border-color .2s ease;
+}
+.dash-widget::after{content:"";position:absolute;inset:auto -30% -60% auto;width:140px;height:140px;border-radius:50%;background:var(--tone-bg);opacity:.55;pointer-events:none}
+.dash-widget-icon{display:grid;place-items:center;width:34px;height:34px;margin-bottom:12px;border-radius:11px;background:var(--tone-bg);color:var(--tone-fg)}
+.dash-widget small{position:relative;z-index:1;color:var(--muted);font-size:13px;font-weight:600}
+.dash-widget strong{position:relative;z-index:1;font-size:28px;font-weight:700;line-height:1.1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.dash-widget-note{position:relative;z-index:1;margin-top:2px;color:var(--muted);font-size:12.5px}
+@media(hover:hover) and (pointer:fine){
+  .dash-widget:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent-500) 32%,var(--line));box-shadow:var(--shadow-md)}
+}
+.dash-widget:active{transform:scale(.97)}
+
+/* ---------- Kartlar ---------- */
+.dash-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+.dash-card{display:flex;flex-direction:column;gap:14px;min-width:0;padding:20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.dash-chart,.dash-activity{grid-column:span 2}
+.dash-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.dash-card-head h2{margin:0;color:var(--ink);font-size:17px;font-weight:700;letter-spacing:-.015em}
+.dash-card-head p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.dash-card-link{display:inline-flex;align-items:center;gap:2px;align-self:flex-start;color:var(--accent);font-size:14px;font-weight:600;text-decoration:none;white-space:nowrap}
+.dash-card-link:hover{color:var(--accent-strong)}
+.dash-empty{margin:0;color:var(--muted);font-size:14px;line-height:1.55}
+.dash-chevron{flex:none;display:grid;color:var(--dim)}
+
+/* Grafik: son 14 gün */
+.dash-stat{text-align:right}
+.dash-stat strong{display:block;color:var(--ink);font-size:28px;font-weight:700;line-height:1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.dash-stat span{display:inline-block;margin-top:6px;color:var(--tone-fg);font-size:12.5px;font-weight:600}
+.dash-bars{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));align-items:end;gap:8px;height:200px;padding-top:6px}
+.dash-bar{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%;min-width:0}
+.dash-bar-fill{width:100%;max-width:30px;height:var(--h,4%);min-height:4px;border-radius:8px 8px 5px 5px;background:linear-gradient(180deg,color-mix(in srgb,var(--brand-400) 70%,var(--surface)),var(--brand-500));transform-origin:bottom;animation:dash-grow .8s var(--dash-ease) both}
+html[data-theme="dark"] .dash-bar-fill{background:linear-gradient(180deg,var(--brand-300),var(--brand-400))}
+.dash-bar.is-empty .dash-bar-fill{background:var(--surface-2)}
+.dash-bar.is-today .dash-bar-fill{background:linear-gradient(180deg,var(--accent-300),var(--accent-500))}
+.dash-bar small{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.dash-bar.is-today small{color:var(--accent-strong);font-weight:700}
+.dash-bar-value{min-height:13px;color:var(--ink-soft);font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dash-bar:nth-child(2) .dash-bar-fill{animation-delay:.03s}.dash-bar:nth-child(3) .dash-bar-fill{animation-delay:.06s}
+.dash-bar:nth-child(4) .dash-bar-fill{animation-delay:.09s}.dash-bar:nth-child(5) .dash-bar-fill{animation-delay:.12s}
+.dash-bar:nth-child(6) .dash-bar-fill{animation-delay:.15s}.dash-bar:nth-child(7) .dash-bar-fill{animation-delay:.18s}
+.dash-bar:nth-child(n+8) .dash-bar-fill{animation-delay:.21s}
+@keyframes dash-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+/* Aksiyon listesi (iOS gruplanmış liste) */
+.dash-list{display:flex;flex-direction:column;margin:0 -8px}
+.dash-row{position:relative;display:flex;align-items:center;gap:12px;min-height:54px;padding:8px;border-radius:12px;color:var(--ink);font-size:14.5px;text-decoration:none;transition:background-color .18s ease,transform .3s var(--dash-ease)}
+.dash-row+.dash-row::before{content:"";position:absolute;top:0;left:50px;right:8px;height:1px;background:var(--line-soft)}
+.dash-row:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+.dash-row:active{transform:scale(.985)}
+.dash-row-icon{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--tone-bg);color:var(--tone-fg)}
+.dash-row-label{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.dash-row-label small{color:var(--muted);font-size:12.5px}
+.dash-row-count{min-width:28px;height:24px;padding:0 8px;border-radius:999px;background:var(--tone-bg);color:var(--tone-fg);font-size:13px;font-weight:700;line-height:24px;text-align:center;font-variant-numeric:tabular-nums}
+.dash-row-count.is-zero{background:transparent;color:var(--dim);font-weight:600}
+
+/* Son siparişler / son ürünler */
+.dash-activity-list{display:flex;flex-direction:column;margin:0 -8px;padding:0;list-style:none}
+.dash-activity-list li{position:relative}
+.dash-activity-list li+li::before{content:"";position:absolute;top:0;left:54px;right:8px;height:1px;background:var(--line-soft)}
+.dash-activity-row{display:flex;align-items:center;gap:12px;padding:10px 8px;border-radius:12px;color:var(--ink);text-decoration:none;transition:background-color .18s ease}
+a.dash-activity-row:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+.dash-avatar{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:linear-gradient(160deg,var(--brand-400),var(--brand-700));color:var(--n-0);font-size:12px;font-weight:700;letter-spacing:.02em}
+.dash-avatar.is-product{border-radius:10px;background:var(--accent-soft);color:var(--accent-strong)}
+.dash-activity-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:14px;line-height:1.4}
+.dash-activity-body b{overflow:hidden;font-weight:650;text-overflow:ellipsis;white-space:nowrap}
+.dash-activity-body small{color:var(--muted);font-size:12.5px}
+.dash-activity-side{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-variant-numeric:tabular-nums}
+.dash-activity-side strong{color:var(--ink);font-size:14px;font-weight:700}
+
+@media(max-width:1180px){
+  .dash-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dash-chart,.dash-activity{grid-column:1/-1}
+}
+@media(max-width:760px){
+  .dash-grid{grid-template-columns:minmax(0,1fr)}
+  .dash-widgets{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .dash-widget{min-height:124px;padding:14px;border-radius:20px}
+  .dash-widget strong{font-size:22px;overflow-wrap:anywhere}
+  .dash-bars{gap:4px;height:170px}
+  .dash-bar-value{display:none}
+  .dash-card{padding:16px;border-radius:20px}
+  .dash-hero-actions{width:100%}
+  .dash-hero-actions>*{flex:1;justify-content:center}
+}
+@media(prefers-reduced-motion:reduce){.dash-bar-fill{animation:none}}
