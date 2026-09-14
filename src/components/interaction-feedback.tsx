@@ -55,8 +55,14 @@ export function InteractionFeedback(){
         }
         return;
       }
+      /*
+        Düz (type="button") düğmeler yalnızca data-pending taşıyorsa
+        işaretlenir. Öncesinde tema, zil, geri al, cihaz seçici gibi
+        anında çalışan her düğme 650 ms kilitlenip "Lütfen bekleyiniz…"
+        yazıyordu. Form gönderen düğmeler onSubmit'te işaretleniyor.
+      */
       const button=target.closest("button") as HTMLButtonElement|null;
-      if(!button||button.type==="submit"||button.disabled)return;
+      if(!button||button.type==="submit"||button.disabled||!button.hasAttribute("data-pending"))return;
       const label=pendingLabel(button);
       markButton(button,label);
       window.setTimeout(()=>{

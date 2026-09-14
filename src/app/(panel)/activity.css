@@ -1,0 +1,81 @@
+/*
+  Bildirim çekmecesi (components/panel/activity-drawer.tsx). ArvoOS
+  bildirim merkezinin ARC karşılığı: sağdan kayan yüzen kart, buzlu
+  arka plan; mobilde tam ekran. Renkler yalnızca panel jetonlarından.
+*/
+
+/* ---------- Zil ve rozet ---------- */
+.panel-root .act-trigger{position:relative}
+.panel-root .act-badge{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;display:grid;place-items:center;border:2px solid var(--bg);border-radius:var(--r-pill);background:var(--danger);color:#fff;font-size:10.5px;font-weight:750;line-height:1;font-variant-numeric:tabular-nums;animation:act-pop .5s var(--ease-spring)}
+@keyframes act-pop{0%{transform:scale(.4)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+/* ---------- Kabuk ---------- */
+html.activity-drawer-open body{overflow:hidden}
+.panel-root .act-root{position:fixed;inset:0;z-index:1500;pointer-events:none}
+.panel-root .act-root.is-open{pointer-events:auto}
+.panel-root .act-backdrop{position:absolute;inset:0;padding:0;border:0;border-radius:0;background:rgba(4,12,24,.3);box-shadow:none;opacity:0;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:opacity .35s ease;cursor:default}
+.panel-root .act-root.is-open .act-backdrop{opacity:1}
+.panel-root .act{position:absolute;top:10px;right:10px;bottom:10px;width:min(420px,calc(100vw - 20px));display:flex;flex-direction:column;min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:22px;background:var(--surface);color:var(--ink);box-shadow:0 30px 90px rgba(4,12,24,.35);transform:translateX(calc(100% + 24px));visibility:hidden;transition:transform .5s cubic-bezier(.32,.72,0,1),visibility 0s linear .5s}
+.panel-root .act-root.is-open .act{transform:none;visibility:visible;transition:transform .5s cubic-bezier(.32,.72,0,1),visibility 0s}
+@media (prefers-reduced-motion:reduce){.panel-root .act,.panel-root .act-root.is-open .act,.panel-root .act-backdrop{transition:none}}
+
+/* Ton: simge kutusu ve uyarı rengi */
+.panel-root .act [data-tone]{--tone-bg:var(--surface-2);--tone-fg:var(--muted)}
+.panel-root .act [data-tone="info"]{--tone-bg:var(--info-soft);--tone-fg:var(--info)}
+.panel-root .act [data-tone="gold"]{--tone-bg:var(--accent-soft);--tone-fg:var(--accent-strong)}
+.panel-root .act [data-tone="success"]{--tone-bg:var(--success-soft);--tone-fg:var(--success)}
+.panel-root .act [data-tone="warning"]{--tone-bg:var(--warning-soft);--tone-fg:var(--warning)}
+.panel-root .act [data-tone="danger"]{--tone-bg:var(--danger-soft);--tone-fg:var(--danger)}
+
+/* ---------- Başlık ---------- */
+.panel-root .act-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 14px 12px 20px;border-bottom:1px solid var(--line-soft)}
+.panel-root .act-head h2{margin:0;color:var(--ink);font-size:22px;font-weight:700;line-height:1.15;letter-spacing:-.02em}
+.panel-root .act-head p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.panel-root .act-close{flex:none;width:36px;height:36px;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:11px;background:var(--surface);box-shadow:none;color:var(--muted);cursor:pointer}
+.panel-root .act-close:hover{border-color:var(--line-strong);color:var(--ink)}
+
+/* ---------- Liste ---------- */
+.panel-root .act-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:8px 10px 16px}
+.panel-root .act-alerts{display:grid;gap:6px;padding:6px 2px 8px}
+.panel-root .act-alert{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--tone-fg) 26%,var(--line));border-radius:14px;background:var(--tone-bg);color:var(--ink);text-decoration:none;transition:border-color .15s}
+.panel-root .act-alert:hover{border-color:var(--tone-fg)}
+.panel-root .act-alert>b{flex:none;min-width:32px;height:32px;padding:0 7px;display:grid;place-items:center;border-radius:10px;background:var(--surface);color:var(--tone-fg);font-size:14px;font-weight:750;font-variant-numeric:tabular-nums}
+.panel-root .act-alert>span{flex:1;min-width:0;display:grid;gap:1px}
+.panel-root .act-alert strong{font-size:13.5px;font-weight:650}
+.panel-root .act-alert small{color:var(--muted);font-size:12px}
+.panel-root .act-alert>svg{flex:none;color:var(--dim)}
+
+.panel-root .act-day{margin:12px 10px 6px;color:var(--dim);font-size:12px;font-weight:650;letter-spacing:.02em}
+.panel-root .act-list{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.panel-root .act-main{display:flex;align-items:flex-start;gap:12px;padding:10px;border-radius:13px;color:var(--ink);text-decoration:none;transition:background .15s}
+.panel-root .act-main:hover{background:var(--surface-2)}
+.panel-root .act-main:focus-visible{outline:2px solid var(--accent-500);outline-offset:-2px}
+.panel-root .act-item.is-new .act-main{background:color-mix(in srgb,var(--accent-500) 8%,transparent)}
+.panel-root .act-icon{flex:none;width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:var(--tone-bg);color:var(--tone-fg)}
+.panel-root .act-body{flex:1;min-width:0;display:grid;gap:3px}
+.panel-root .act-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.panel-root .act-top b{min-width:0;overflow:hidden;color:var(--ink);font-size:13.5px;font-weight:650;text-overflow:ellipsis;white-space:nowrap}
+.panel-root .act-item.is-new .act-top b::before{content:"";display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:var(--accent-500);vertical-align:middle}
+.panel-root .act-top time{flex:none;color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
+.panel-root .act-body small{color:var(--muted);font-size:12.5px;line-height:1.45;overflow-wrap:anywhere}
+.panel-root .act-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.panel-root .act-empty{display:grid;justify-items:center;gap:8px;padding:48px 24px;color:var(--muted);text-align:center}
+.panel-root .act-empty .act-icon{width:44px;height:44px;border-radius:14px}
+.panel-root .act-empty h3{margin:6px 0 0;color:var(--ink);font-size:16px;font-weight:700}
+.panel-root .act-empty p{max-width:280px;margin:0;font-size:13px;line-height:1.5}
+
+.panel-root .act-skel{display:grid;gap:8px;padding:10px 4px}
+.panel-root .act-skel i{display:block;height:56px;border-radius:13px;background:linear-gradient(90deg,var(--surface-2) 25%,var(--line-soft) 50%,var(--surface-2) 75%);background-size:200% 100%;animation:act-shimmer 1.2s linear infinite}
+@keyframes act-shimmer{to{background-position:-200% 0}}
+
+/* ---------- Alt bilgi ---------- */
+.panel-root .act-foot{padding:12px 14px;border-top:1px solid var(--line-soft)}
+.panel-root .act-foot a{min-height:42px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:12px;background:var(--surface-2);color:var(--ink);font-size:13.5px;font-weight:650;text-decoration:none}
+.panel-root .act-foot a:hover{background:color-mix(in srgb,var(--accent-500) 10%,var(--surface-2))}
+
+@media (max-width:640px){
+  .panel-root .act{top:0;right:0;bottom:0;width:100vw;border:0;border-radius:0}
+  .panel-root .act-head{padding-top:max(18px,env(safe-area-inset-top))}
+  .panel-root .act-foot{padding-bottom:max(12px,env(safe-area-inset-bottom))}
+}

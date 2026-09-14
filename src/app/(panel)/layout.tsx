@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { signOut } from "@/app/auth/actions";
 import { requireTenant } from "@/lib/tenant";
+import { ActivityDrawer } from "@/components/panel/activity-drawer";
 import { Icon } from "@/components/panel/icons";
 import { MobileNav } from "@/components/panel/mobile-nav";
 import { NavProgress } from "@/components/panel/nav-progress";
@@ -11,8 +12,10 @@ import { SidebarToggle } from "@/components/panel/sidebar-toggle";
 import { ThemeToggle } from "@/components/panel/theme-toggle";
 import { TopbarSearch } from "@/components/panel/topbar-search";
 import { Suspense } from "react";
+import { activityUnread } from "./activity-actions";
 import "./panel.css";
 import "./dashboard.css";
+import "./activity.css";
 
 /*
   Panel kabuğu artık ortak yerleşim.
@@ -38,7 +41,7 @@ function initialsOf(name: string) {
 }
 
 export default async function PanelLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [{ organization, membership }, cookieStore] = await Promise.all([requireTenant(), cookies()]);
+  const [{ organization, membership }, cookieStore, unread] = await Promise.all([requireTenant(), cookies(), activityUnread()]);
   const navCollapsed = cookieStore.get("arc_nav")?.value === "collapsed";
   const initials = initialsOf(organization.name);
   const roleName = roleNames[membership.role] ?? "Ekip Üyesi";
@@ -86,6 +89,7 @@ export default async function PanelLayout({ children }: Readonly<{ children: Rea
                 <span className="panel-quick-icon"><Icon name="plus" size={14} /></span><b>Yeni ürün</b>
               </Link>
             </div>
+            <ActivityDrawer initialUnread={unread} />
             <ThemeToggle />
             <div className="panel-user">
               <span>{initials}</span>

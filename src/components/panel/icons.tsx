@@ -37,6 +37,7 @@ const paths = {
   download: <><path d="M12 4v11M7 10l5 5 5-5" /><path d="M4 20h16" /></>,
   search: <><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></>,
   mail: <><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7 8 6 8-6" /></>,
+  bell: <><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></>,
 } satisfies Record<string, React.ReactNode>;
 
 export type IconName = keyof typeof paths;
