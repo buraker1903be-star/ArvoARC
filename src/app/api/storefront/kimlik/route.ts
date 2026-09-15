@@ -2,6 +2,21 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { sendEmail } from "@/lib/email/resend";
 import { signupEmail, resetPasswordEmail } from "@/lib/email/auth-emails";
+import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+
+/*
+  E-posta bombardımanına karşı: IP başına 15 dakikada 10, aynı
+  adrese 15 dakikada 3 istek. Vitrin "too many" içeren hatayı
+  "Çok fazla deneme yapıldı" diye gösteriyor.
+*/
+const ipLimiter = createRateLimiter({ limit: 10, windowMs: 15 * 60_000 });
+const emailLimiter = createRateLimiter({ limit: 3, windowMs: 15 * 60_000 });
+
+const tooMany = (request: Request, retryAfterSeconds: number) =>
+  NextResponse.json(
+    { error: "too_many_requests" },
+    { status: 429, headers: { ...corsHeaders(request), "Retry-After": String(retryAfterSeconds) } },
+  );
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,6 +72,9 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const byIp = ipLimiter(clientIp(request));
+  if (!byIp.ok) return tooMany(request, byIp.retryAfterSeconds);
+
   let body: { islem?: string; email?: string; sifre?: string };
 
   try {
@@ -77,6 +95,9 @@ export async function POST(request: Request) {
       { status: 400, headers: corsHeaders(request) },
     );
   }
+
+  const byEmail = emailLimiter(email);
+  if (!byEmail.ok) return tooMany(request, byEmail.retryAfterSeconds);
 
   const CORS = corsHeaders(request);
   const supabase = createServiceClient();

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/paytr/service-client";
+import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+
+/* Kupon kodlarının deneme yanılmayla aranmasına karşı: IP başına 10 dakikada 30 deneme. */
+const couponLimiter = createRateLimiter({ limit: 30, windowMs: 10 * 60_000 });
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +39,14 @@ export async function OPTIONS(request: Request) {
 
 export async function POST(request: Request) {
   const headers = corsHeaders(request);
+
+  const limited = couponLimiter(clientIp(request));
+  if (!limited.ok) {
+    return NextResponse.json(
+      { valid: false, message: "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin.", discountAmount: 0 },
+      { status: 429, headers: { ...headers, "Retry-After": String(limited.retryAfterSeconds) } },
+    );
+  }
 
   let body: { code?: string; subtotal?: number; email?: string };
   try {

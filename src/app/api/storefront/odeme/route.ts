@@ -2,6 +2,10 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { paytrConfig } from "@/lib/paytr/config";
 import { createServiceClient } from "@/lib/paytr/service-client";
+import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+
+/* Sahte sipariş yığınına karşı: IP başına 10 dakikada 10 ödeme denemesi. */
+const orderLimiter = createRateLimiter({ limit: 10, windowMs: 10 * 60_000 });
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +62,14 @@ function parseItem(raw: unknown): Item | null {
 
 export async function POST(request: Request) {
   const headers = corsHeaders(request.headers.get("origin"));
+
+  const limited = orderLimiter(clientIp(request));
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: "rate_limited", message: "Çok fazla ödeme denemesi yapıldı. Birkaç dakika sonra tekrar deneyin." },
+      { status: 429, headers: { ...headers, "Retry-After": String(limited.retryAfterSeconds) } },
+    );
+  }
 
   let body: Record<string, unknown>;
   try {
