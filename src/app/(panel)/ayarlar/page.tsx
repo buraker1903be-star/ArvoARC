@@ -127,7 +127,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
       {canManage?<form action={updatePaymentSettings} className="payment-form">
         <article className="payment-method">
           <div className="payment-title"><div><small>MANUEL ÖDEME</small><h4>Havale / EFT</h4></div><label className="check-inline"><input type="checkbox" name="bank_transfer_enabled" defaultChecked={settings?.bank_transfer_enabled}/><span>Etkin</span></label></div>
-          <p>Sipariş sonrası müşteriye banka bilgilerini ve ödeme açıklamasını gösterir.</p>
+          <p>Sipariş sonrası müşteriye banka bilgilerini ve ödeme açıklamasını gösterir. Bu bilgiler havale siparişinde “Siparişiniz alındı” e-postasıyla da gönderilir; mağaza sayfasındaki IBAN ile aynı olmalı.</p>
           <div className="payment-fields">
             <label>Banka adı<input name="bank_name" defaultValue={settings?.bank_name??""} placeholder="Banka adı"/></label>
             <label>Hesap sahibi<input name="bank_account_holder" defaultValue={settings?.bank_account_holder??""} placeholder="Şirket veya kişi adı"/></label>
