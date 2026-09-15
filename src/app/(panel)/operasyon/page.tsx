@@ -5,7 +5,17 @@ import { isBankTransfer } from "@/lib/payment-method";
 import { Icon, type IconName } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
-import { confirmTransferPayment } from "../siparisler/actions";
+import { cancelTransferOrder, confirmTransferPayment } from "../siparisler/actions";
+
+/* Havale bu süreden uzun ödenmezse satır "süresi geçti" olarak işaretlenir. */
+const TRANSFER_STALE_HOURS=72;
+/* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
+function currentTime(){return Date.now();}
+/* "5 saattir", "2 gündür" */
+function waitingFor(createdAt:string,now:number){
+  const hours=Math.max(0,Math.floor((now-Date.parse(createdAt))/3_600_000));
+  return hours<24?`${hours} saattir`:`${Math.floor(hours/24)} gündür`;
+}
 import "../modules.css";
 
 const PAYMENT_ERRORS:Record<string,string>={
@@ -37,6 +47,7 @@ export default async function Operations({searchParams}:{searchParams:Promise<{o
   const params=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const canManage=["owner","admin","manager"].includes(membership.role);
+  const now=currentTime();
   /*
     Sorgular sınırlandırıldı ve filtreler veritabanında: her liste
     kendi filtresiyle ve sınırıyla çekiliyor, toplamlar ayrı sayım
@@ -98,7 +109,8 @@ export default async function Operations({searchParams}:{searchParams:Promise<{o
     </section>
 
     {params.ok==="payment"?<Notice title={`${params.order??"Sipariş"} için havale ödemesi onaylandı.`}>Sipariş onaylandı; müşterinin e-posta adresi varsa “Ödemeniz alındı” bildirimi gönderildi.</Notice>:null}
-    {params.error?<Notice tone="error" title="Ödeme onaylanamadı">{PAYMENT_ERRORS[params.error]??params.error}</Notice>:null}
+    {params.ok==="cancelled"?<Notice title={`${params.order??"Sipariş"} iptal edildi.`}>Müşterinin e-posta adresi varsa “Siparişiniz iptal edildi” bildirimi gönderildi.</Notice>:null}
+    {params.error?<Notice tone="error" title="İşlem tamamlanamadı">{PAYMENT_ERRORS[params.error]??params.error}</Notice>:null}
 
     <div className="dash">
       {/* Renk anlamlı: sıfır olan sayaç nötr, dolu olan dikkat. */}
@@ -134,7 +146,10 @@ export default async function Operations({searchParams}:{searchParams:Promise<{o
           </div>
           {(paymentPending??[]).length?<div className="dash-list">{(paymentPending??[]).map(order=>{
             const transfer=isBankTransfer(order.metadata);
-            const row=<ActionRow href={`/siparisler/${order.id}`} icon="lira" tone={order.payment_status==="failed"?"danger":"warning"} title={order.order_number} detail={`${paymentStatusLabel(order.payment_status)}${transfer?" · Havale":""} · ${order.customer_name||"Müşteri"}`} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>;
+            /* Havalede bekleme süresi görünür; 72 saati geçen satır kırmızı ve iptal edilebilir. */
+            const stale=transfer&&now-Date.parse(order.created_at)>TRANSFER_STALE_HOURS*3_600_000;
+            const waiting=transfer?` · ${waitingFor(order.created_at,now)} bekliyor${stale?" (süresi geçti)":""}`:"";
+            const row=<ActionRow href={`/siparisler/${order.id}`} icon="lira" tone={order.payment_status==="failed"||stale?"danger":"warning"} title={order.order_number} detail={`${paymentStatusLabel(order.payment_status)}${transfer?" · Havale":""}${waiting} · ${order.customer_name||"Müşteri"}`} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>;
             /* Havale ödemesi burada tek tıkla onaylanır; kart ödemesi PayTR bildirimiyle kapanır. */
             return transfer&&canManage&&order.payment_status!=="failed"?(
               <div className="ops-pay" key={order.id}>
@@ -144,6 +159,13 @@ export default async function Operations({searchParams}:{searchParams:Promise<{o
                   <input type="hidden" name="back" value="/operasyon"/>
                   <ConfirmSubmit className="ac-btn ops-pay-btn" message={`${order.order_number} için ${money.format(order.total/100)} havale ödemesi alındı olarak işaretlensin mi? Müşteriye “Ödemeniz alındı” e-postası gönderilir.`}>Ödeme alındı</ConfirmSubmit>
                 </form>
+                {stale?(
+                  <form action={cancelTransferOrder}>
+                    <input type="hidden" name="order_id" value={order.id}/>
+                    <input type="hidden" name="back" value="/operasyon"/>
+                    <ConfirmSubmit className="ac-btn ac-btn-danger ops-pay-btn" message={`${order.order_number} ${waitingFor(order.created_at,now)} ödenmedi. Sipariş iptal edilsin mi? Müşteriye “Siparişiniz iptal edildi” e-postası gönderilir.`}>İptal et</ConfirmSubmit>
+                  </form>
+                ):null}
               </div>
             ):<div key={order.id}>{row}</div>;
           })}</div>:<p className="dash-empty">Ödeme bekleyen sipariş bulunmuyor.</p>}

@@ -163,6 +163,48 @@ export async function confirmTransferPayment(formData: FormData) {
 }
 
 /**
+ * Ödenmeyen havale siparişini iptal eder (Operasyon Merkezi).
+ *
+ * Havale siparişi ödenmezse "ödeme bekliyor" durumunda süresiz
+ * kalıyordu. Yalnızca havalede, ödeme beklerken ve sipariş
+ * kapanmamışken çalışır; müşteriye "Siparişiniz iptal edildi" gider.
+ * Otomatik değil: kararı her seferinde bir yönetici verir.
+ */
+export async function cancelTransferOrder(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  const back = (result: Record<string, string>) => backUrl(formData.get("back"), "/operasyon", result);
+  if (!MANAGERS.includes(membership.role)) redirect(back({ error: "forbidden" }));
+
+  const orderId = String(formData.get("order_id") ?? "");
+  const { data: order } = await supabase
+    .from("arc_orders")
+    .select("status,payment_status,metadata,order_number,customer_name,customer_email")
+    .eq("organization_id", organization.id)
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (!order) redirect(back({ error: "order-not-found" }));
+  if (!isBankTransfer(order.metadata)) redirect(back({ error: "not-transfer" }));
+  if (order.payment_status === "paid") redirect(back({ error: "already-paid" }));
+  if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) redirect(back({ error: "order-closed" }));
+
+  const { error } = await supabase.rpc("arc_update_order_status", {
+    p_order_id: orderId,
+    p_status: "cancelled",
+    p_payment_status: order.payment_status,
+  });
+  if (error) redirect(back({ error: "save-failed" }));
+
+  await notifyStatus(order, "cancelled");
+
+  revalidatePath("/");
+  revalidatePath("/operasyon");
+  revalidatePath("/siparisler");
+  revalidatePath(`/siparisler/${orderId}`);
+  redirect(back({ ok: "cancelled", order: order.order_number }));
+}
+
+/**
  * Toplu durum değişikliği.
  *
  * Yalnızca akıştaki bir sonraki adım uygulanır: "Kargoya ver"
