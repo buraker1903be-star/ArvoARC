@@ -5,6 +5,7 @@ import { requireTenant } from "@/lib/tenant";
 import { inventoryKindLabel, orderBadge, orderStatusLabel } from "@/lib/commerce-labels";
 import { DAY } from "@/lib/tr-time";
 import { SEEN_COOKIE, type ActivityAlert, type ActivityFeed, type ActivityItem } from "@/lib/activity";
+import { TRANSFER_STALE_HOURS } from "@/lib/payment-method";
 
 /* Operasyon merkeziyle aynı ölçütler. */
 const PAYMENT = ["pending", "authorized", "failed"];
@@ -40,7 +41,7 @@ export async function loadActivity(): Promise<ActivityFeed> {
   const org = organization.id;
   const since = new Date(nowMs() - 7 * DAY).toISOString();
 
-  const [orders, events, returns, movements, negative, payment, pendingReturns] = await Promise.all([
+  const [orders, events, returns, movements, negative, payment, pendingReturns, staleTransfers] = await Promise.all([
     supabase.from("arc_orders").select("id,order_number,customer_name,total,status,payment_status,created_at").eq("organization_id", org).gte("created_at", since).order("created_at", { ascending: false }).limit(30),
     supabase.from("arc_order_events").select("id,order_id,event_type,event_data,created_at").eq("organization_id", org).gte("created_at", since).order("created_at", { ascending: false }).limit(30),
     supabase.from("arc_return_requests").select("id,status,reason,created_at,arc_orders(order_number,customer_name)").eq("organization_id", org).gte("created_at", since).order("created_at", { ascending: false }).limit(20),
@@ -48,6 +49,7 @@ export async function loadActivity(): Promise<ActivityFeed> {
     supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", org).lt("stock", 0),
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", org).in("payment_status", PAYMENT).not("status", "in", "(cancelled,refunded)"),
     supabase.from("arc_return_requests").select("id", { count: "exact", head: true }).eq("organization_id", org).eq("status", "beklemede"),
+    supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", org).in("payment_status", ["pending", "authorized"]).not("status", "in", "(cancelled,refunded)").ilike("metadata->>payment_method", "%havale%").lt("created_at", new Date(nowMs() - TRANSFER_STALE_HOURS * 3_600_000).toISOString()),
   ]);
 
   if (orders.error && events.error && returns.error && movements.error) {
@@ -119,6 +121,7 @@ export async function loadActivity(): Promise<ActivityFeed> {
     ...(negative.count ? [{ key: "negative", label: "Eksi stok", detail: "Varyant stokları sıfırın altında", count: negative.count, href: "/stok?filter=negative", tone: "danger" as const }] : []),
     ...(payment.count ? [{ key: "payment", label: "Ödeme bekleyen sipariş", detail: "Ödemesi tamamlanmamış", count: payment.count, href: "/operasyon", tone: "warning" as const }] : []),
     ...(pendingReturns.count ? [{ key: "returns", label: "Bekleyen iade talebi", detail: "Yanıt bekliyor", count: pendingReturns.count, href: "/siparisler/iadeler", tone: "warning" as const }] : []),
+    ...(staleTransfers.count ? [{ key: "stale-transfer", label: "Süresi geçen havale", detail: `${TRANSFER_STALE_HOURS} saattir ödenmemiş`, count: staleTransfers.count, href: "/operasyon", tone: "danger" as const }] : []),
   ];
 
   return { ok: true, items, alerts, loadedAt: nowMs() };

@@ -1,14 +1,12 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { orderStatusLabel, paymentStatusLabel } from "@/lib/commerce-labels";
-import { isBankTransfer } from "@/lib/payment-method";
+import { isBankTransfer, TRANSFER_STALE_HOURS } from "@/lib/payment-method";
 import { Icon, type IconName } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
 import { cancelTransferOrder, confirmTransferPayment } from "../siparisler/actions";
 
-/* Havale bu süreden uzun ödenmezse satır "süresi geçti" olarak işaretlenir. */
-const TRANSFER_STALE_HOURS=72;
 /* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
 function currentTime(){return Date.now();}
 /* "5 saattir", "2 gündür" */

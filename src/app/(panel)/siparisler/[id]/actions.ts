@@ -41,7 +41,9 @@ export async function updateOrderStatus(formData:FormData){
       const {data:order}=await supabase.from("arc_orders").select("order_number,customer_name,customer_email,metadata").eq("id",orderId).single();
       /* Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti. */
       const trackingSent=Boolean((order?.metadata as {tracking_number?:string}|null)?.tracking_number);
-      const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz",{trackingSent});
+      /* Ödenmemiş siparişin iptalinde iade vaadi yerine "tutar alınmadı" yazılır. */
+      const unpaid=!["paid","partially_refunded","refunded"].includes(paymentStatus);
+      const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz",{trackingSent,unpaid});
       if(order?.customer_email&&mail){
         await sendEmail({to:order.customer_email,...mail});
       }

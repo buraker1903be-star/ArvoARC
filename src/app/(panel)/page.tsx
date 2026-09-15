@@ -3,6 +3,7 @@ import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { countsAsRevenue } from "@/lib/order-flow";
 import { DAY, trDayStart } from "@/lib/tr-time";
+import { TRANSFER_STALE_HOURS } from "@/lib/payment-method";
 import { orderBadge, productStatusLabel } from "@/lib/commerce-labels";
 import { Icon, type IconName } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
@@ -46,7 +47,7 @@ export default async function Dashboard() {
       .range(from, to) as unknown as PromiseLike<{ data: OrderRow[] | null; error: { message: string } | null }>,
   );
 
-  const [{ rows: orders, truncated }, openOrderCountResult, productsResult, productCountResult, activeProductCountResult, variantCountResult, stockSumResult, negativeStockResult, lowStockResult] = await Promise.all([
+  const [{ rows: orders, truncated }, openOrderCountResult, productsResult, productCountResult, activeProductCountResult, variantCountResult, stockSumResult, negativeStockResult, lowStockResult, staleTransferResult] = await Promise.all([
     ordersPromise,
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).in("status", ["pending", "confirmed", "processing"]),
     supabase.from("arc_products").select("id,name,slug,status,created_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(5),
@@ -61,6 +62,8 @@ export default async function Dashboard() {
     supabase.rpc("arc_total_stock_units"),
     supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).lt("stock", 0),
     supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).gte("stock", 0).lte("stock", 5),
+    /* Süresi geçen havale: ödenmemiş, kapanmamış ve 72 saatten eski havale siparişleri. */
+    supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).in("payment_status", ["pending", "authorized"]).not("status", "in", "(cancelled,refunded)").ilike("metadata->>payment_method", "%havale%").lt("created_at", new Date(now - TRANSFER_STALE_HOURS * 3_600_000).toISOString()),
   ]);
 
   if (openOrderCountResult.error) throw new Error(openOrderCountResult.error.message);
@@ -135,6 +138,10 @@ export default async function Dashboard() {
       icon: "archive",
       tone: lowStockCount ? "warning" : "muted",
     },
+    /* Yalnızca varsa gösterilir: Operasyon'dan onaylanır ya da iptal edilir. */
+    ...((staleTransferResult.count ?? 0) > 0
+      ? [{ label: "Süresi geçen havale", value: staleTransferResult.count ?? 0, detail: `${TRANSFER_STALE_HOURS} saattir ödenmemiş; onaylayın ya da iptal edin`, href: "/operasyon", icon: "lira" as IconName, tone: "danger" as Tone }]
+      : []),
   ];
 
   /* Son eklenen ürünlerin varyantları yalnızca o beş ürün için

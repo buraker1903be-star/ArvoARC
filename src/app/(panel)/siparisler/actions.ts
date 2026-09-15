@@ -51,12 +51,14 @@ export async function createOrder(formData: FormData) {
 }
 
 /* Müşteri bildirimi; gönderim hatası durum güncellemesini geçersiz kılmaz. */
-async function notifyStatus(order: { order_number: string; customer_name: string | null; customer_email: string | null; metadata?: unknown }, status: string) {
+async function notifyStatus(order: { order_number: string; customer_name: string | null; customer_email: string | null; metadata?: unknown; payment_status?: string | null }, status: string) {
   if (!order.customer_email) return;
   try {
     /* Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti. */
     const trackingSent = Boolean((order.metadata as { tracking_number?: string } | null)?.tracking_number);
-    const mail = statusUpdateEmail(status, order.order_number, order.customer_name || "değerli müşterimiz", { trackingSent });
+    /* Ödenmemiş siparişin iptalinde iade vaadi yerine "tutar alınmadı" yazılır. */
+    const unpaid = Boolean(order.payment_status) && !["paid", "partially_refunded", "refunded"].includes(order.payment_status ?? "");
+    const mail = statusUpdateEmail(status, order.order_number, order.customer_name || "değerli müşterimiz", { trackingSent, unpaid });
     if (mail) await sendEmail({ to: order.customer_email, ...mail });
   } catch (mailError) {
     console.error("Durum bildirimi gönderilemedi:", order.order_number, mailError);

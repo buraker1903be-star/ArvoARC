@@ -436,13 +436,19 @@ const STATUS_MESSAGES: Record<string, { title: string; body: string }> = {
   },
 };
 
+/* Ödenmemiş sipariş iptali: iade vaadi yersiz, müşteriden tutar alınmadı. */
+const UNPAID_CANCELLED = {
+  title: "Siparişiniz iptal edildi",
+  body: "Ödemeniz ulaşmadığı için siparişiniz iptal edildi. Sizden herhangi bir tutar tahsil edilmedi; dilediğiniz zaman yeniden sipariş verebilirsiniz.",
+};
+
 export function statusUpdateEmail(
   status: string,
   orderNumber: string,
   customerName: string,
-  options: { trackingSent?: boolean } = {},
+  options: { trackingSent?: boolean; unpaid?: boolean } = {},
 ) {
-  const message = STATUS_MESSAGES[status];
+  const message = status === "cancelled" && options.unpaid ? UNPAID_CANCELLED : STATUS_MESSAGES[status];
   // Bildirim gerektirmeyen durumda e-posta üretilmez.
   if (!message) return null;
   // Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti; ikincisi gürültü.

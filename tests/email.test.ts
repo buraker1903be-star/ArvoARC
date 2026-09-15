@@ -49,6 +49,20 @@ test("iptal ve iade bildirilir; takip seçeneği onları etkilemez", () => {
   assert.equal(statusUpdateEmail("refunded", "#AC-1", "Elif")?.subject, "İadeniz tamamlandı · #AC-1");
 });
 
+test("ödenmemiş siparişin iptalinde iade vaadi yok", () => {
+  const unpaid = statusUpdateEmail("cancelled", "#AC-1", "Elif", { unpaid: true });
+  assert.equal(unpaid?.subject, "Siparişiniz iptal edildi · #AC-1");
+  assert.ok(unpaid?.html.includes("herhangi bir tutar tahsil edilmedi"));
+  assert.ok(!unpaid?.html.includes("iade edilir"));
+});
+
+test("ödenmiş siparişin iptalinde iade bilgisi korunur", () => {
+  const paid = statusUpdateEmail("cancelled", "#AC-1", "Elif", { unpaid: false });
+  assert.ok(paid?.html.includes("iade edilir"));
+  // unpaid yalnızca iptali etkiler
+  assert.equal(statusUpdateEmail("fulfilled", "#AC-1", "Elif", { unpaid: true })?.subject, "Siparişiniz kargoya verildi · #AC-1");
+});
+
 test("ara durumlar e-posta üretmez", () => {
   for (const status of ["pending", "confirmed", "processing", "shipped", "delivered"]) {
     assert.equal(statusUpdateEmail(status, "#AC-1", "Elif"), null, status);
