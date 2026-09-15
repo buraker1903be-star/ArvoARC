@@ -40,7 +40,7 @@ const ERRORS: Record<string, string> = {
   "refund-failed": "PayTR iadeyi reddetti. Sipariş numarası ve tutarı kontrol edin.",
   "already-resolved": "Bu talep zaten sonuçlandırılmış.",
   forbidden: "İade işlemi için yönetici yetkisi gerekiyor.",
-  "invalid-amount": "İade tutarı, iade edilen kalemlerin (ve kargo çıkmadıysa kargo bedelinin) toplamını aşamaz.",
+  "invalid-amount": "Geçerli bir iade tutarı girin: sıfırdan büyük olmalı ve iade edilen kalemlerin (kargo çıkmadıysa kargo bedeli dahil) toplamını aşmamalı. Hesaplanan tutar için alanı boş bırakın.",
   "not-approved": "Para iadesi yalnızca onaylanmış talepte yapılabilir.",
   "already-refunded": "Bu sipariş zaten tamamen iade edilmiş.",
   "over-remaining": "Bu siparişte daha önce iade yapılmış; tutar, kalan iade edilebilir tutarı aşamaz.",

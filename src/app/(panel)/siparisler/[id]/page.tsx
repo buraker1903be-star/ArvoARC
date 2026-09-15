@@ -27,7 +27,7 @@ type OrderMeta={discount?:number;coupon_code?:string;refunded_at?:string;refunde
 const ERRORS:Record<string,string>={
   "not-paid":"Bu sipariş ödenmediği için iade edilemez.",
   "already-refunded":"Bu sipariş zaten iade edilmiş.",
-  "invalid-amount":"İade tutarı sipariş tutarını aşamaz.",
+  "invalid-amount":"Geçerli bir iade tutarı girin: sıfırdan büyük olmalı ve sipariş tutarını aşmamalı. Tamamını iade etmek için alanı boş bırakın.",
   "refund-failed":"PayTR iade talebini reddetti. Ayrıntı için sunucu günlüklerine bakın.",
   "refund-recorded-failed":"İade yapıldı ancak sipariş kaydı güncellenemedi. PayTR panelinden doğrulayın; tekrar iade denemeyin.",
   "transfer-order":"Havale siparişi PayTR'dan iade edilemez. Parayı bankadan iade edip siparişi elle kapatın.",
@@ -41,6 +41,7 @@ const ERRORS:Record<string,string>={
   "save-failed":"Durum kaydedilemedi, tekrar deneyin.",
   "not-transfer":"Bu sipariş havale ile verilmemiş; kart ödemeleri PayTR bildirimiyle kapanır.",
   "already-paid":"Bu siparişin ödemesi zaten onaylanmış.",
+  "in-progress":"Bu sipariş az önce başka bir sekmeden ya da kullanıcı tarafından güncellendi. Sayfayı yenileyip tekrar deneyin.",
 };
 
 function AddressCard({title,address}:{title:string;address?:Address}){

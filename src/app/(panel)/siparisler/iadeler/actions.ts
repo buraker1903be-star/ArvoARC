@@ -8,6 +8,7 @@ import { sendEmail } from "@/lib/email/resend";
 import { returnDecisionEmail } from "@/lib/email/order-confirmation";
 import { calculateRefund } from "@/lib/refund";
 import { isBankTransfer } from "@/lib/payment-method";
+import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock";
 
 /**
  * İade talebini sonuçlandırır.
@@ -32,7 +33,7 @@ export async function resolveReturn(formData: FormData) {
 
   const { data: request } = await supabase
     .from("arc_return_requests")
-    .select("id,order_id,items,status,updated_at,arc_orders(order_number,status,payment_status,total,shipping,customer_name,customer_email,metadata)")
+    .select("id,order_id,items,status,updated_at,arc_orders(order_number,status,payment_status,total,shipping,customer_name,customer_email,metadata,updated_at)")
     .eq("organization_id", organization.id)
     .eq("id", id)
     .single();
@@ -60,6 +61,7 @@ export async function resolveReturn(formData: FormData) {
     customer_name: string | null;
     customer_email: string | null;
     metadata: Record<string, unknown> | null;
+    updated_at: string | null;
   } | null;
 
   if (!order) redirect("/siparisler/iadeler?error=not-found");
@@ -196,11 +198,13 @@ export async function resolveReturn(formData: FormData) {
     varsayılan tutara düşülüyordu. Kullanıcı 50 ₺ yazdığını
     sanırken siparişin tamamı iade edilebiliyordu.
   */
-  const custom = Number(formData.get("amount") ?? 0);
-  const gecerliCustom = Number.isFinite(custom) && custom > 0;
-  const amountKurus = gecerliCustom
-    ? Math.round(custom * 100)
-    : breakdown.amount;
+  /* Yalnızca boş alan "hesaplanan tutar" demek; "0", eksi ya da sayı olmayan girdi reddedilir. */
+  const rawAmount = String(formData.get("amount") ?? "").trim();
+  const custom = Number(rawAmount.replace(",", "."));
+  if (rawAmount && (!Number.isFinite(custom) || custom <= 0)) {
+    redirect("/siparisler/iadeler?error=invalid-amount");
+  }
+  const amountKurus = rawAmount ? Math.round(custom * 100) : breakdown.amount;
 
   /*
     Üst sınır artık siparişin tamamı değil, iade edilen kalemler
@@ -215,18 +219,14 @@ export async function resolveReturn(formData: FormData) {
   }
 
   /*
-    Talep kilitlenir: çift tıklama ya da iki sekme aynı iadeyi iki
-    kez PayTR'a göndermesin. updated_at, okunduğu değerle hâlâ
-    aynıysa güncellenir; ikinci istek eşleşme bulamaz.
+    Sipariş kilitlenir (talep değil): aynı talebin çift gönderimi de,
+    aynı siparişe ait iki talebin aynı anda işlenmesi de durur. Kilit
+    okunduğu andaki updated_at'e koşullu olduğu için yukarıda okunan
+    "önceden iade edilen" tutar kilit süresince geçerli kalır; iki
+    talep toplamda ödenenden fazlasını iade edemez (bkz. lib/order-lock).
   */
-  const claim = supabase
-    .from("arc_return_requests")
-    .update({ updated_at: new Date().toISOString() })
-    .eq("organization_id", organization.id)
-    .eq("id", id)
-    .eq("status", "onaylandi");
-  const { data: claimed } = await (request.updated_at ? claim.eq("updated_at", request.updated_at) : claim.is("updated_at", null)).select("id");
-  if (!claimed?.length) redirect("/siparisler/iadeler?error=busy");
+  const lockedMeta = await claimOrderLock(supabase, organization.id, { id: request.order_id, updated_at: order.updated_at, metadata: order.metadata }, "refund_lock");
+  if (!lockedMeta) redirect("/siparisler/iadeler?error=busy");
 
   const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
 
@@ -237,6 +237,7 @@ export async function resolveReturn(formData: FormData) {
   });
 
   if (!result.ok) {
+    await releaseOrderLock(supabase, organization.id, request.order_id, lockedMeta, "refund_lock");
     console.error("İade başarısız:", order.order_number, result.message);
     redirect("/siparisler/iadeler?error=refund-failed");
   }
@@ -283,7 +284,7 @@ export async function resolveReturn(formData: FormData) {
       payment_status: tamIade ? "refunded" : "partially_refunded",
       status: tamIade ? "refunded" : kargolandi ? order.status : "cancelled",
       metadata: {
-        ...orderMeta,
+        ...withoutLock(lockedMeta, "refund_lock"),
         refunded_at: new Date().toISOString(),
         refunded_amount: refundedTotal,
         refund_reference: result.reference ?? null,

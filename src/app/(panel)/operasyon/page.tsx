@@ -23,6 +23,7 @@ const PAYMENT_ERRORS:Record<string,string>={
   "already-paid":"Bu siparişin ödemesi zaten onaylanmış.",
   "order-closed":"Sipariş kapanmış ya da ödemesi başarısız; detaydan kontrol edin.",
   "save-failed":"Ödeme kaydedilemedi. Tekrar deneyin.",
+  "in-progress":"Bu sipariş az önce başka bir sekmeden ya da kullanıcı tarafından güncellendi. Sayfayı yenileyip tekrar deneyin.",
 };
 
 type ProductMeta={image_paths?:string[];images?:string[];images_migrated?:boolean};

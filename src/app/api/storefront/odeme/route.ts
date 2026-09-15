@@ -248,11 +248,17 @@ export async function POST(request: Request) {
     if (transferError) console.error("Havale indirimi kaydedilemedi:", transferError);
     const payable = transferError ? order.total : order.total - discount;
 
-    /* Gönderim hatası siparişi bozmaz: sipariş oluştu, müşteri sonuç sayfasında bilgileri görüyor. */
-    try {
-      await sendTransferConfirmation(supabase, order, email, name, payable, transferError ? 0 : discount);
-    } catch (mailError) {
-      console.error("Havale e-postası gönderilemedi:", order.order_number, mailError);
+    /*
+      Havale kaydı yazılamadıysa e-posta gönderilmez: sipariş havale
+      olarak tanınmadığı için panelden onaylanamaz, müşteriye IBAN
+      göndermek yanıltıcı olur. Gönderim hatası siparişi bozmaz.
+    */
+    if (!transferError) {
+      try {
+        await sendTransferConfirmation(supabase, order, email, name, payable, discount);
+      } catch (mailError) {
+        console.error("Havale e-postası gönderilemedi:", order.order_number, mailError);
+      }
     }
 
     return NextResponse.json(
@@ -265,10 +271,13 @@ export async function POST(request: Request) {
     );
   }
 
-  if (note) {
-    const { error: noteError } = await mergeMetadata({ notes: note });
-    if (noteError) console.error("Sipariş notu kaydedilemedi:", noteError);
-  }
+  /*
+    PayTR sipariş kimliği siparişe kaydedilir: bildirim siparişi
+    numara deseniyle aramak yerine birebir bulur.
+  */
+  const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
+  const { error: metaError } = await mergeMetadata({ paytr_merchant_oid: merchantOid, ...(note ? { notes: note } : {}) });
+  if (metaError) console.error("Sipariş üstverisi kaydedilemedi:", metaError);
 
   // PayTR sepet formatı: [[ad, birim fiyat, adet], ...]
   const basket = Buffer.from(
@@ -280,7 +289,7 @@ export async function POST(request: Request) {
   const params = {
     merchant_id: config.merchantId,
     user_ip: ip,
-    merchant_oid: order.order_number.replace(/[^A-Za-z0-9]/g, ""),
+    merchant_oid: merchantOid,
     email,
     payment_amount: String(order.total), // kuruş
     user_basket: basket,

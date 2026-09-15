@@ -7,6 +7,7 @@ import { shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirm
 import { notifyTransferPaid } from "@/lib/email/transfer-paid";
 import { refundPayment } from "@/lib/paytr/refund";
 import { isBankTransfer } from "@/lib/payment-method";
+import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock";
 import { requireTenant } from "@/lib/tenant";
 
 const roles=new Set(["owner","admin","manager"]);
@@ -22,8 +23,16 @@ export async function updateOrderStatus(formData:FormData){
   if(!orderId||!orderStatuses.has(status)||!paymentStatuses.has(paymentStatus))redirect(`/siparisler/${orderId}?error=invalid-status`);
 
   /* Önceki ödeme durumu da okunur: havalede "ödendi"ye geçiş müşteriye bildirilir. */
-  const {data:ownedOrder}=await supabase.from("arc_orders").select("id,payment_status,metadata,total,order_number,customer_name,customer_email").eq("organization_id",organization.id).eq("id",orderId).maybeSingle();
+  const {data:ownedOrder}=await supabase.from("arc_orders").select("id,status,payment_status,metadata,total,order_number,customer_name,customer_email").eq("organization_id",organization.id).eq("id",orderId).maybeSingle();
   if(!ownedOrder)redirect(`/siparisler/${orderId}?error=order-not-found`);
+  /*
+    Parayı hareket ettirmeden "iade edildi" işaretlemek, iade
+    yetkisiyle aynı: yalnızca sahip ve yönetici. Mağaza yöneticisi
+    bunu yapınca müşteriye "İadeniz tamamlandı" gidiyor, sipariş de
+    gerçek iadeye kapanıyordu.
+  */
+  const marksRefund=(paymentStatus!==ownedOrder.payment_status&&["refunded","partially_refunded"].includes(paymentStatus))||(status==="refunded"&&ownedOrder.status!=="refunded");
+  if(marksRefund&&!["owner","admin"].includes(membership.role))redirect(`/siparisler/${orderId}?error=forbidden`);
   const {error}=await supabase.rpc("arc_update_order_status",{p_order_id:orderId,p_status:status,p_payment_status:paymentStatus});
 
   /*
@@ -36,7 +45,8 @@ export async function updateOrderStatus(formData:FormData){
 
     Gönderim hatası durum güncellemesini başarısız saymaz.
   */
-  if(!error){
+  /* Yalnızca durum gerçekten değiştiyse: yalnızca ödemeyi düzeltmek için yapılan kayıt aynı e-postayı tekrar göndermez. */
+  if(!error&&status!==ownedOrder.status){
     try{
       const {data:order}=await supabase.from("arc_orders").select("order_number,customer_name,customer_email,metadata").eq("id",orderId).single();
       /* Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti. */
@@ -189,11 +199,13 @@ export async function refundOrder(formData: FormData) {
     sessizce tam iadeye düşülüyordu. Kullanıcı 50 ₺ yazdığını
     sanırken siparişin tamamı iade edilebiliyordu.
   */
-  const requested = Number(formData.get("amount") ?? 0);
-  const amountKurus =
-    Number.isFinite(requested) && requested > 0
-      ? Math.round(requested * 100)
-      : (order.total ?? 0);
+  /* Yalnızca boş alan "tamamı" demek; "0", eksi ya da sayı olmayan girdi reddedilir (önceden tam iadeye düşüyordu). */
+  const rawAmount = String(formData.get("amount") ?? "").trim();
+  const requested = Number(rawAmount.replace(",", "."));
+  if (rawAmount && (!Number.isFinite(requested) || requested <= 0)) {
+    redirect(`/siparisler/${orderId}?error=invalid-amount`);
+  }
+  const amountKurus = rawAmount ? Math.round(requested * 100) : (order.total ?? 0);
 
   if (amountKurus <= 0 || amountKurus > (order.total ?? 0)) {
     redirect(`/siparisler/${orderId}?error=invalid-amount`);
@@ -205,19 +217,9 @@ export async function refundOrder(formData: FormData) {
   */
   const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
 
-  /*
-    Sipariş kilitlenir: çift tıklama ya da iki sekme aynı iadeyi
-    iki kez PayTR'a göndermesin. updated_at okunduğu değerle hâlâ
-    aynıysa güncellenir; ikinci istek eşleşme bulamaz.
-  */
-  const claim = supabase
-    .from("arc_orders")
-    .update({ updated_at: new Date().toISOString() })
-    .eq("organization_id", organization.id)
-    .eq("id", orderId)
-    .eq("payment_status", "paid");
-  const { data: claimed } = await (order.updated_at ? claim.eq("updated_at", order.updated_at) : claim.is("updated_at", null)).select("id");
-  if (!claimed?.length) redirect(`/siparisler/${orderId}?error=busy`);
+  /* Sipariş iade için kilitlenir: çift tıklama ya da ikinci sekme aynı iadeyi PayTR'a iki kez göndermesin (bkz. lib/order-lock). */
+  const lockedMeta = await claimOrderLock(supabase, organization.id, order, "refund_lock");
+  if (!lockedMeta) redirect(`/siparisler/${orderId}?error=busy`);
 
   const result = await refundPayment({
     merchantOid,
@@ -226,6 +228,7 @@ export async function refundOrder(formData: FormData) {
   });
 
   if (!result.ok) {
+    await releaseOrderLock(supabase, organization.id, orderId, lockedMeta, "refund_lock");
     console.error("İade başarısız:", order.order_number, result.message);
     redirect(`/siparisler/${orderId}?error=refund-failed`);
   }
@@ -253,7 +256,7 @@ export async function refundOrder(formData: FormData) {
       payment_status: tamIade ? "refunded" : "partially_refunded",
       status: yeniDurum,
       metadata: {
-        ...meta,
+        ...withoutLock(lockedMeta, "refund_lock"),
         refunded_at: new Date().toISOString(),
         refunded_amount: amountKurus,
         refund_reference: result.reference ?? null,

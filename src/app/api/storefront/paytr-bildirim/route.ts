@@ -66,19 +66,36 @@ export async function POST(request: Request) {
   try {
     const supabase = createServiceClient();
 
-    const { data: orders, error: findError } = await supabase
+    /*
+      Önce ödeme başlatılırken siparişe kaydedilen PayTR kimliğiyle
+      birebir aranır. Eski siparişlerde bu alan yok; o zaman numara
+      deseniyle aranır. Birebir sorgu hata verse bile desene düşülür:
+      bildirim hiçbir koşulda boşa gitmemeli.
+    */
+    const exact = await supabase
       .from("arc_orders")
       .select("id, order_number, payment_status")
       .eq("source", "native")
-      .ilike("order_number", `%${merchantOid.split("").join("%")}%`)
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .eq("metadata->>paytr_merchant_oid", merchantOid)
+      .limit(1);
+    if (exact.error) console.error("PayTR bildirimi: birebir arama başarısız, desene düşülüyor", exact.error.message);
 
-    if (findError) throw findError;
+    let order = exact.error ? undefined : exact.data?.[0];
+    if (!order) {
+      const { data: orders, error: findError } = await supabase
+        .from("arc_orders")
+        .select("id, order_number, payment_status")
+        .eq("source", "native")
+        .ilike("order_number", `%${merchantOid.split("").join("%")}%`)
+        .order("created_at", { ascending: false })
+        .limit(200);
 
-    const order = orders?.find(
-      (row) => row.order_number.replace(/[^A-Za-z0-9]/g, "") === merchantOid,
-    );
+      if (findError) throw findError;
+
+      order = orders?.find(
+        (row) => row.order_number.replace(/[^A-Za-z0-9]/g, "") === merchantOid,
+      );
+    }
 
     if (!order) {
       console.error("PayTR bildirimi: sipariş bulunamadı", { merchantOid });
@@ -86,11 +103,11 @@ export async function POST(request: Request) {
     }
 
     /*
-      PayTR aynı bildirimi yineleyebilir. Sonuçlanmış sipariş yeniden
-      işlenmez: onay e-postası ikinci kez gitmez, ödenmiş sipariş
-      sonradan gelen başarısız bildirimle bozulmaz.
+      PayTR aynı bildirimi yineleyebilir. Yalnızca ödemesi beklenen
+      sipariş işlenir: onay e-postası ikinci kez gitmez, ödenmiş ya da
+      (kısmen) iade edilmiş sipariş sonradan gelen bildirimle bozulmaz.
     */
-    if (order.payment_status === "paid" || order.payment_status === "refunded") {
+    if (!["pending", "authorized", "failed"].includes(order.payment_status)) {
       console.info("PayTR bildirimi: sipariş zaten sonuçlanmış", { merchantOid, paymentStatus: order.payment_status });
       return new Response("OK");
     }

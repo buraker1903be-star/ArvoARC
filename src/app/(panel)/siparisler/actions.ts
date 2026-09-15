@@ -10,6 +10,7 @@ import { nextOrderStep } from "@/lib/order-flow";
 import { backUrl } from "@/lib/back-url";
 import { isBankTransfer } from "@/lib/payment-method";
 import { notifyTransferPaid } from "@/lib/email/transfer-paid";
+import { claimOrderLock } from "@/lib/order-lock";
 
 const MANAGERS = ["owner", "admin", "manager"];
 
@@ -105,6 +106,11 @@ export async function quickStatus(formData: FormData) {
      bu kontrol elle gönderilen isteğe karşı. */
   if (isOrderClosed(order.status, order.payment_status)) redirect(backTo(formData, { error: "order-closed" }));
 
+  /* Yalnızca akıştaki bir sonraki adım ya da iptal (toplu işlemle aynı kural): elle gönderilen istek adım atlatamaz. */
+  if (status !== "cancelled" && nextOrderStep(order.status, order.payment_status)?.key !== status) {
+    redirect(backTo(formData, { error: "invalid-status" }));
+  }
+
   const { error } = await supabase.rpc("arc_update_order_status", {
     p_order_id: orderId,
     p_status: status,
@@ -139,7 +145,7 @@ export async function confirmTransferPayment(formData: FormData) {
   const orderId = String(formData.get("order_id") ?? "");
   const { data: order } = await supabase
     .from("arc_orders")
-    .select("status,payment_status,metadata,order_number,customer_name,customer_email,total")
+    .select("status,payment_status,metadata,order_number,customer_name,customer_email,total,updated_at")
     .eq("organization_id", organization.id)
     .eq("id", orderId)
     .maybeSingle();
@@ -148,6 +154,11 @@ export async function confirmTransferPayment(formData: FormData) {
   if (!isBankTransfer(order.metadata)) redirect(back({ error: "not-transfer" }));
   if (order.payment_status === "paid") redirect(back({ error: "already-paid" }));
   if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) redirect(back({ error: "order-closed" }));
+
+  /* Çift tıklama ya da ikinci sekme: sipariş kilitlenir, müşteriye ikinci "Ödemeniz alındı" gitmez. */
+  if (!(await claimOrderLock(supabase, organization.id, { id: orderId, updated_at: order.updated_at, metadata: order.metadata }, "transfer_lock"))) {
+    redirect(back({ error: "in-progress" }));
+  }
 
   const { error } = await supabase.rpc("arc_update_order_status", {
     p_order_id: orderId,
@@ -182,7 +193,7 @@ export async function cancelTransferOrder(formData: FormData) {
   const orderId = String(formData.get("order_id") ?? "");
   const { data: order } = await supabase
     .from("arc_orders")
-    .select("status,payment_status,metadata,order_number,customer_name,customer_email")
+    .select("status,payment_status,metadata,order_number,customer_name,customer_email,updated_at")
     .eq("organization_id", organization.id)
     .eq("id", orderId)
     .maybeSingle();
@@ -191,6 +202,11 @@ export async function cancelTransferOrder(formData: FormData) {
   if (!isBankTransfer(order.metadata)) redirect(back({ error: "not-transfer" }));
   if (order.payment_status === "paid") redirect(back({ error: "already-paid" }));
   if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) redirect(back({ error: "order-closed" }));
+
+  /* Çift gönderim ya da aynı anda "Ödeme alındı": sipariş kilitlenir, ikinci istek durur. */
+  if (!(await claimOrderLock(supabase, organization.id, { id: orderId, updated_at: order.updated_at, metadata: order.metadata }, "transfer_lock"))) {
+    redirect(back({ error: "in-progress" }));
+  }
 
   const { error } = await supabase.rpc("arc_update_order_status", {
     p_order_id: orderId,
