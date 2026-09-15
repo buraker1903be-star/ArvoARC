@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { orderConfirmationHtml, statusUpdateEmail, transferOrderEmail } from "@/lib/email/order-confirmation";
+import { orderConfirmationHtml, paymentReceivedEmail, statusUpdateEmail, transferOrderEmail } from "@/lib/email/order-confirmation";
+
+test("havale ödemesi alındı e-postası", () => {
+  const mail = paymentReceivedEmail("#AC-2001", "<b>Elif</b>", 184203);
+  assert.equal(mail.subject, "Ödemeniz alındı · #AC-2001");
+  assert.ok(mail.html.includes("₺1.842,03"), "tutar");
+  assert.ok(mail.html.includes("&lt;b&gt;Elif&lt;/b&gt;") && !mail.html.includes("<b>Elif</b>"), "kaçış");
+});
 
 test("havale e-postası: ödenecek tutar, indirim ve dörtlü IBAN", () => {
   const mail = transferOrderEmail({

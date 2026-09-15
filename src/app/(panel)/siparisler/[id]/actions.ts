@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sendEmail } from "@/lib/email/resend";
-import { shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
+import { paymentReceivedEmail, shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { refundPayment } from "@/lib/paytr/refund";
 import { isBankTransfer } from "@/lib/payment-method";
 import { requireTenant } from "@/lib/tenant";
@@ -20,7 +20,8 @@ export async function updateOrderStatus(formData:FormData){
   const paymentStatus=String(formData.get("payment_status")??"");
   if(!orderId||!orderStatuses.has(status)||!paymentStatuses.has(paymentStatus))redirect(`/siparisler/${orderId}?error=invalid-status`);
 
-  const {data:ownedOrder}=await supabase.from("arc_orders").select("id").eq("organization_id",organization.id).eq("id",orderId).maybeSingle();
+  /* Önceki ödeme durumu da okunur: havalede "ödendi"ye geçiş müşteriye bildirilir. */
+  const {data:ownedOrder}=await supabase.from("arc_orders").select("id,payment_status,metadata,total,order_number,customer_name,customer_email").eq("organization_id",organization.id).eq("id",orderId).maybeSingle();
   if(!ownedOrder)redirect(`/siparisler/${orderId}?error=order-not-found`);
   const {error}=await supabase.rpc("arc_update_order_status",{p_order_id:orderId,p_status:status,p_payment_status:paymentStatus});
 
@@ -45,6 +46,19 @@ export async function updateOrderStatus(formData:FormData){
       }
     }catch(mailError){
       console.error("Durum bildirimi gönderilemedi:",mailError);
+    }
+  }
+  /*
+    Havalede ödeme panelden onaylanıyor. Ödeme "ödendi"ye geçince
+    müşteriye "ödemeniz alındı" gider; kart ödemesinde bu bilgiyi
+    PayTR onayıyla giden e-posta veriyor. Zaten ödenmiş siparişte
+    yeniden kaydetmek ikinci e-posta göndermez.
+  */
+  if(!error&&ownedOrder.payment_status!=="paid"&&paymentStatus==="paid"&&isBankTransfer(ownedOrder.metadata)&&ownedOrder.customer_email){
+    try{
+      await sendEmail({to:ownedOrder.customer_email,...paymentReceivedEmail(ownedOrder.order_number,ownedOrder.customer_name||"değerli müşterimiz",ownedOrder.total)});
+    }catch(mailError){
+      console.error("Ödeme bildirimi gönderilemedi:",ownedOrder.order_number,mailError);
     }
   }
   if(error)redirect(`/siparisler/${orderId}?error=${encodeURIComponent(error.message)}`);

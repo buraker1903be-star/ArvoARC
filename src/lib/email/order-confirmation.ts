@@ -178,6 +178,48 @@ export function orderConfirmationHtml({
 </html>`;
 }
 
+/**
+ * Havale ödemesi alındı.
+ *
+ * Havalede ödeme panelden onaylanıyor; müşteri parasının ulaşıp
+ * ulaşmadığını öğrenemiyordu. Kart ödemesinde bu bilgiyi PayTR
+ * onayıyla giden e-posta zaten veriyor.
+ */
+export function paymentReceivedEmail(orderNumber: string, customerName: string, amount: number) {
+  return {
+    subject: `Ödemeniz alındı · ${orderNumber}`,
+    html: `<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:24px 12px;background:#f4f3ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;">
+    <tr><td style="padding:32px 28px;">
+      <img src="https://arvoculture.com/arvoculture-logo-transparent.png" alt="ArvoCulture" width="150" height="18"
+           style="display:block;width:150px;height:auto;margin:0 0 22px;border:0;">
+      <h1 style="margin:0 0 10px;font-size:22px;line-height:1.3;color:#10120f;font-weight:600;">Ödemeniz alındı</h1>
+      <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#5a5f54;">Merhaba ${escapeHtml(customerName)},</p>
+      <p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
+        <strong>${money(amount)}</strong> tutarındaki havale / EFT ödemeniz ulaştı. Siparişiniz hazırlanmaya başladı; kargoya verildiğinde tekrar bilgilendirileceksiniz.
+      </p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;background:#faf9f5;border-radius:10px;">
+        <tr><td style="padding:14px 16px;font-size:13px;color:#5a5f54;">
+          Sipariş numaranız <strong style="color:#10120f;"> ${escapeHtml(orderNumber)}</strong>
+        </td></tr>
+      </table>
+      <a href="https://arvoculture.com/hesap"
+         style="display:inline-block;margin:20px 0 0;padding:13px 26px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
+        Siparişimi görüntüle
+      </a>
+    </td></tr>
+  </table>
+  <p style="max-width:520px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
+    ARVOCULTURE GROUP TEKNOLOJİ SANAYİ VE TİCARET LTD. ŞTİ.
+  </p>
+</body>
+</html>`,
+  };
+}
+
 /** IBAN'ı dörtlü gruplar hâlinde yazar: "TR12 0006 …". */
 const formatIban = (iban: string) => iban.replace(/\s+/g, "").toUpperCase().replace(/(.{4})/g, "$1 ").trim();
 
