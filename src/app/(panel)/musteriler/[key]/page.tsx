@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { orderBadge, sourceLabel } from "@/lib/commerce-labels";
 import { countsAsRevenue } from "@/lib/order-flow";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { requireTenant } from "@/lib/tenant";
 import { Icon } from "@/components/panel/icons";
 import { currentTime, customerTags, DAY, daysAgo, type Customer } from "../customer-data";
@@ -73,11 +74,13 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
   */
   const paidIds = paidOrders.slice(0, 300).map((order) => order.id);
   const chunks = Array.from({ length: Math.ceil(paidIds.length / 150) }, (_, index) => paidIds.slice(index * 150, index * 150 + 150));
-  const itemResults = await Promise.all(chunks.map((chunk) => supabase.from("arc_order_items").select("product_name,sku,quantity,total").eq("organization_id", organization.id).in("order_id", chunk)));
+  /* 150 siparişin kalemi 1000 satırı aşabiliyor; her parça sayfalanarak okunur. */
+  type ItemRow = { product_name: string; sku: string; quantity: number; total: number };
+  const itemChunks = await Promise.all(chunks.map((chunk) => fetchAllRows<ItemRow>((from, to) =>
+    supabase.from("arc_order_items").select("product_name,sku,quantity,total").eq("organization_id", organization.id).in("order_id", chunk).order("id").range(from, to) as unknown as PromiseLike<{ data: ItemRow[] | null; error: { message: string } | null }>)));
   const favourites = new Map<string, { name: string; sku: string; quantity: number; total: number }>();
-  for (const result of itemResults) {
-    if (result.error) throw new Error(result.error.message);
-    for (const item of result.data ?? []) {
+  for (const { rows } of itemChunks) {
+    for (const item of rows) {
       const itemKey = item.sku || item.product_name;
       const current = favourites.get(itemKey);
       if (current) {

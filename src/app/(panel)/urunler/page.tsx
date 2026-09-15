@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { createProduct, bulkUpdateStatus } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel } from "@/lib/commerce-labels";
@@ -122,18 +123,23 @@ export default async function Products({ searchParams }: { searchParams: Promise
   const productIds = products.map((product) => product.id);
   const bestSellerCollection = bestSellerResult.data;
 
-  const [{ data: variants, error: variantsError }, { data: bestSellerMemberships, error: bestSellerMembershipError }] = await Promise.all([
+  type Variant = { id: string; product_id: string; sku: string; title: string; price: number; compare_at_price: number | null; currency: string; stock: number; allow_backorder: boolean; cost_price: number | null; supplier: string | null };
+  /*
+    Sayfadaki ürünlerin varyantları sayfalanarak okunur: çok bedenli
+    tedarikçi ürünlerinde bir sayfanın varyantları 1000 satırı
+    aşabiliyor, sondaki ürünlerin stok ve fiyatı eksik görünüyordu.
+  */
+  const [variants, { data: bestSellerMemberships, error: bestSellerMembershipError }] = await Promise.all([
     productIds.length
-      ? supabase.from("arc_product_variants").select("id,product_id,sku,title,price,compare_at_price,currency,stock,allow_backorder,cost_price,supplier").eq("organization_id", organization.id).in("product_id", productIds)
-      : Promise.resolve({ data: [], error: null }),
+      ? fetchAllRows<Variant>((from, to) => supabase.from("arc_product_variants").select("id,product_id,sku,title,price,compare_at_price,currency,stock,allow_backorder,cost_price,supplier").eq("organization_id", organization.id).in("product_id", productIds).order("id").range(from, to) as unknown as PromiseLike<{ data: Variant[] | null; error: { message: string } | null }>).then((result) => result.rows)
+      : Promise.resolve([] as Variant[]),
     productIds.length && bestSellerCollection
       ? supabase.from("arc_collection_products").select("product_id").eq("organization_id", organization.id).eq("collection_id", bestSellerCollection.id).in("product_id", productIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
-  if (variantsError || bestSellerMembershipError) throw new Error((variantsError ?? bestSellerMembershipError)?.message ?? "Ürün rozetleri okunamadı.");
+  if (bestSellerMembershipError) throw new Error(bestSellerMembershipError.message ?? "Ürün rozetleri okunamadı.");
 
   const bestSellerIds = new Set((bestSellerMemberships ?? []).map((item) => item.product_id));
-  type Variant = NonNullable<typeof variants>[number];
   const variantsByProduct = new Map<string, Variant[]>();
   for (const variant of variants ?? []) {
     const list = variantsByProduct.get(variant.product_id) ?? [];
