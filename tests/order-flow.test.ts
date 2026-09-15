@@ -1,7 +1,21 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isOrderClosed, orderBadge } from "@/lib/commerce-labels";
-import { countsAsRevenue, nextOrderStep } from "@/lib/order-flow";
+import { countsAsRevenue, nextOrderStep, refundedAmount, revenueAmount } from "@/lib/order-flow";
+
+test("kısmi iadede ciroya yalnızca kalan tutar sayılır", () => {
+  assert.equal(revenueAmount({ total: 100000, status: "confirmed", payment_status: "paid" }), 100000);
+  assert.equal(revenueAmount({ total: 100000, status: "confirmed", payment_status: "partially_refunded", refunded_amount: 30000 }), 70000);
+  assert.equal(revenueAmount({ total: 100000, status: "fulfilled", payment_status: "partially_refunded", refunded_amount: "abc" }), 100000);
+  assert.equal(revenueAmount({ total: 100000, status: "fulfilled", payment_status: "partially_refunded", refunded_amount: 150000 }), 0);
+  assert.equal(revenueAmount({ total: 100000, status: "cancelled", payment_status: "paid" }), 0);
+});
+
+test("iade edilen tutar: tam iadede tamamı, kısmi iadede kaydedilen tutar", () => {
+  assert.equal(refundedAmount({ total: 100000, status: "refunded", payment_status: "refunded" }), 100000);
+  assert.equal(refundedAmount({ total: 100000, status: "confirmed", payment_status: "partially_refunded", refunded_amount: 30000 }), 30000);
+  assert.equal(refundedAmount({ total: 100000, status: "confirmed", payment_status: "paid" }), 0);
+});
 
 test("ciroya yalnızca iptal ve iade edilmemiş sipariş sayılır", () => {
   assert.equal(countsAsRevenue("confirmed", "paid"), true);

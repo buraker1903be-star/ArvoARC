@@ -1,5 +1,5 @@
 import { fetchAllRows } from "@/lib/fetch-all";
-import { countsAsRevenue } from "@/lib/order-flow";
+import { countsAsRevenue, revenueAmount } from "@/lib/order-flow";
 import type { requireTenant } from "@/lib/tenant";
 
 type Supabase = Awaited<ReturnType<typeof requireTenant>>["supabase"];
@@ -28,11 +28,11 @@ export type Customer = {
   toplam görünmesin.
 */
 export async function loadCustomers(supabase: Supabase, organizationId: string) {
-  type OrderRow = { id: string; customer_name: string | null; customer_email: string | null; total: number; status: string; payment_status: string; created_at: string };
+  type OrderRow = { id: string; customer_name: string | null; customer_email: string | null; total: number; status: string; payment_status: string; refunded_amount: unknown; created_at: string };
   const { rows, truncated } = await fetchAllRows<OrderRow>((from, to) =>
     supabase
       .from("arc_orders")
-      .select("id,customer_name,customer_email,total,status,payment_status,created_at")
+      .select("id,customer_name,customer_email,total,status,payment_status,refunded_amount:metadata->refunded_amount,created_at")
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
       .range(from, to) as unknown as PromiseLike<{ data: OrderRow[] | null; error: { message: string } | null }>,
@@ -50,13 +50,13 @@ export async function loadCustomers(supabase: Supabase, organizationId: string) 
       existing.orders++;
       if (paid) {
         existing.paidOrders++;
-        existing.spent += order.total;
+        existing.spent += revenueAmount(order);
       }
       existing.firstOrderAt = Math.min(existing.firstOrderAt, at);
       existing.lastOrderAt = Math.max(existing.lastOrderAt, at);
     } else {
       /* Siparişler yeniden eskiye geldiği için ilk görülen ad en güncel ad. */
-      grouped.set(key, { key, name, email, orders: 1, paidOrders: paid ? 1 : 0, spent: paid ? order.total : 0, firstOrderAt: at, lastOrderAt: at });
+      grouped.set(key, { key, name, email, orders: 1, paidOrders: paid ? 1 : 0, spent: revenueAmount(order), firstOrderAt: at, lastOrderAt: at });
     }
   }
   return { customers: [...grouped.values()], orderCount: rows.length, truncated };

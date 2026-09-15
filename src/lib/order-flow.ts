@@ -22,6 +22,25 @@ export function countsAsRevenue(status?: string | null, paymentStatus?: string |
   return status !== "cancelled" && status !== "refunded" && paymentStatus !== "refunded";
 }
 
+type RevenueOrder = { total: number; status?: string | null; payment_status?: string | null; refunded_amount?: unknown };
+
+/** Siparişte iade edilen tutar (kuruş): tam iadede tamamı, kısmi iadede kaydedilen tutar. */
+export function refundedAmount(order: RevenueOrder) {
+  if (order.status === "refunded" || order.payment_status === "refunded") return order.total;
+  if (order.payment_status !== "partially_refunded") return 0;
+  return Math.min(order.total, Math.max(0, Number(order.refunded_amount ?? 0) || 0));
+}
+
+/*
+  Ciroya sayılan tutar. Kısmi iadede iade edilen kısım düşülür:
+  kısmi iadeli sipariş artık açık kaldığı için ciroya sayılıyor ve
+  öncesinde tamamı sayılıyordu.
+*/
+export function revenueAmount(order: RevenueOrder) {
+  if (!countsAsRevenue(order.status, order.payment_status)) return 0;
+  return order.total - refundedAmount(order);
+}
+
 /**
  * Bir sonraki adım. Kapanmış (iptal / iade) siparişte akış
  * durur: parası geri gitmiş sipariş hazırlanmaya davet edilmez.

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
-import { countsAsRevenue } from "@/lib/order-flow";
+import { countsAsRevenue, revenueAmount } from "@/lib/order-flow";
 import { DAY, trDayStart } from "@/lib/tr-time";
 import { TRANSFER_STALE_HOURS } from "@/lib/payment-method";
 import { orderBadge, productStatusLabel } from "@/lib/commerce-labels";
@@ -24,7 +24,7 @@ function currentTime() {
 }
 
 type Tone = "gold" | "info" | "brand" | "success" | "warning" | "danger" | "muted";
-type OrderRow = { id: string; order_number: string; customer_name: string | null; status: string; payment_status: string; total: number; currency: string; created_at: string };
+type OrderRow = { id: string; order_number: string; customer_name: string | null; status: string; payment_status: string; total: number; currency: string; refunded_amount: unknown; created_at: string };
 
 export default async function Dashboard() {
   const { supabase, organization } = await requireTenant();
@@ -40,7 +40,7 @@ export default async function Dashboard() {
   const ordersPromise = fetchAllRows<OrderRow>((from, to) =>
     supabase
       .from("arc_orders")
-      .select("id,order_number,customer_name,status,payment_status,total,currency,created_at")
+      .select("id,order_number,customer_name,status,payment_status,total,currency,refunded_amount:metadata->refunded_amount,created_at")
       .eq("organization_id", organization.id)
       .gte("created_at", new Date(since).toISOString())
       .order("created_at", { ascending: false })
@@ -78,7 +78,7 @@ export default async function Dashboard() {
     de toplanıyordu, Genel Bakış ile Analitik farklı ciro gösteriyordu.
   */
   const paidOrders = orders.filter((order) => countsAsRevenue(order.status, order.payment_status));
-  const sales = paidOrders.reduce((sum, order) => sum + order.total, 0);
+  const sales = paidOrders.reduce((sum, order) => sum + revenueAmount(order), 0);
   /* Sayaçlar veritabanından; katalog belleğe alınmıyor. */
   const variantCount = variantCountResult.count ?? 0;
   /* Toplam okunamazsa "0" yazmak stok bitmiş gibi gösterir. */
@@ -92,7 +92,7 @@ export default async function Dashboard() {
   const dailySales = Array<number>(14).fill(0);
   for (const order of paidOrders) {
     const day = Math.floor((Date.parse(order.created_at) - chartStart) / DAY);
-    if (day >= 0 && day < 14) dailySales[day] += order.total;
+    if (day >= 0 && day < 14) dailySales[day] += revenueAmount(order);
   }
   const maxDailySales = Math.max(...dailySales, 1);
   const chartTotal = dailySales.reduce((sum, value) => sum + value, 0);

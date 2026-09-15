@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
-import { countsAsRevenue } from "@/lib/order-flow";
+import { countsAsRevenue, refundedAmount, revenueAmount } from "@/lib/order-flow";
 import { DAY, TR_OFFSET as TR, trDayStart } from "@/lib/tr-time";
 import { orderStatusOptions, sourceLabel } from "@/lib/commerce-labels";
 import { Notice } from "@/components/panel/notice";
@@ -62,7 +62,7 @@ function Delta({ value, inverse = false }: { value: number | null; inverse?: boo
   return <span className="an-delta" data-dir={good ? "good" : bad ? "bad" : undefined}>{value > 0 ? "↑" : value < 0 ? "↓" : "→"} %{Math.abs(value)}</span>;
 }
 
-type OrderRow = { id: string; status: string; payment_status: string; total: number; source: string | null; created_at: string };
+type OrderRow = { id: string; status: string; payment_status: string; total: number; source: string | null; refunded_amount: unknown; created_at: string };
 
 export default async function Analytics({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
   const params = await searchParams;
@@ -80,7 +80,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
   const { rows: orders, truncated } = await fetchAllRows<OrderRow>((from, to) =>
     supabase
       .from("arc_orders")
-      .select("id,status,payment_status,total,source,created_at")
+      .select("id,status,payment_status,total,source,refunded_amount:metadata->refunded_amount,created_at")
       .eq("organization_id", organization.id)
       .gte("created_at", new Date(previousSince).toISOString())
       .order("created_at", { ascending: false })
@@ -91,8 +91,9 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
   const previous = orders.filter((order) => Date.parse(order.created_at) < since);
   const currentPaid = current.filter((order) => countsAsRevenue(order.status, order.payment_status));
   const previousPaid = previous.filter((order) => countsAsRevenue(order.status, order.payment_status));
-  const sum = (list: OrderRow[]) => list.reduce((total, order) => total + order.total, 0);
-  const refundedTotal = (list: OrderRow[]) => sum(list.filter((order) => order.status === "refunded" || order.payment_status === "refunded"));
+  /* Net ciro kısmi iadeyi düşer; "İade" kısmi iadeleri de sayar. */
+  const sum = (list: OrderRow[]) => list.reduce((total, order) => total + revenueAmount(order), 0);
+  const refundedTotal = (list: OrderRow[]) => list.reduce((total, order) => total + refundedAmount(order), 0);
 
   const revenue = sum(currentPaid);
   const previousRevenue = sum(previousPaid);
@@ -104,7 +105,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
     const at = Date.parse(order.created_at);
     const bucket = buckets.find((item) => at >= item.start && at < item.end);
     if (bucket) {
-      bucket.revenue += order.total;
+      bucket.revenue += revenueAmount(order);
       bucket.orders++;
     }
   }
@@ -118,7 +119,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
   for (const order of currentPaid) {
     const label = sourceLabel(order.source);
     const entry = sources.get(label) ?? { revenue: 0, orders: 0 };
-    entry.revenue += order.total;
+    entry.revenue += revenueAmount(order);
     entry.orders++;
     sources.set(label, entry);
   }

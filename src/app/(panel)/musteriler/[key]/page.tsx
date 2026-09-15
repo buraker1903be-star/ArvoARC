@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { orderBadge, sourceLabel } from "@/lib/commerce-labels";
-import { countsAsRevenue } from "@/lib/order-flow";
+import { countsAsRevenue, revenueAmount } from "@/lib/order-flow";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { requireTenant } from "@/lib/tenant";
 import { Icon } from "@/components/panel/icons";
@@ -55,7 +55,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
   const customerName = latestOrder.customer_name?.trim() || "İsimsiz müşteri";
   const customerEmail = latestOrder.customer_email?.trim() || "";
   const paidOrders = orders.filter((order) => countsAsRevenue(order.status, order.payment_status));
-  const totalSpent = paidOrders.reduce((sum, order) => sum + order.total, 0);
+  const totalSpent = paidOrders.reduce((sum, order) => sum + revenueAmount({ ...order, refunded_amount: (order.metadata as { refunded_amount?: unknown } | null)?.refunded_amount }), 0);
   const averageOrder = paidOrders.length ? Math.round(totalSpent / paidOrders.length) : 0;
   const firstAt = Date.parse(firstOrder.created_at);
   const lastAt = Date.parse(latestOrder.created_at);
