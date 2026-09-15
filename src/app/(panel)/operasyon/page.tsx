@@ -146,8 +146,9 @@ export default async function Operations({searchParams}:{searchParams:Promise<{o
             const transfer=isBankTransfer(order.metadata);
             /* Havalede bekleme süresi görünür; 72 saati geçen satır kırmızı ve iptal edilebilir. */
             const stale=transfer&&now-Date.parse(order.created_at)>TRANSFER_STALE_HOURS*3_600_000;
-            const waiting=transfer?` · ${waitingFor(order.created_at,now)} bekliyor${stale?" (süresi geçti)":""}`:"";
-            const row=<ActionRow href={`/siparisler/${order.id}`} icon="lira" tone={order.payment_status==="failed"||stale?"danger":"warning"} title={order.order_number} detail={`${paymentStatusLabel(order.payment_status)}${transfer?" · Havale":""}${waiting} · ${order.customer_name||"Müşteri"}`} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>;
+            /* Açık siparişler kartıyla aynı düzen: müşteri başlıkta, açıklama kısa kalsın (dar kartta üç satıra kırılıyordu). */
+            const detail=transfer?`Havale · ${waitingFor(order.created_at,now)} bekliyor${stale?" (süresi geçti)":""}`:paymentStatusLabel(order.payment_status);
+            const row=<ActionRow href={`/siparisler/${order.id}`} icon="lira" tone={order.payment_status==="failed"||stale?"danger":"warning"} title={`${order.order_number} · ${order.customer_name||"Müşteri"}`} detail={detail} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>;
             /* Havale ödemesi burada tek tıkla onaylanır; kart ödemesi PayTR bildirimiyle kapanır. */
             return transfer&&canManage&&order.payment_status!=="failed"?(
               <div className="ops-pay" key={order.id}>
