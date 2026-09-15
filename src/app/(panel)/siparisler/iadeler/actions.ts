@@ -6,7 +6,7 @@ import { requireTenant } from "@/lib/tenant";
 import { refundPayment } from "@/lib/paytr/refund";
 import { sendEmail } from "@/lib/email/resend";
 import { returnDecisionEmail } from "@/lib/email/order-confirmation";
-import { calculateRefund } from "@/lib/refund";
+import { calculateRefund, refundOutcome } from "@/lib/refund";
 import { isBankTransfer } from "@/lib/payment-method";
 import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock";
 
@@ -243,7 +243,7 @@ export async function resolveReturn(formData: FormData) {
   }
 
   const refundedTotal = alreadyRefunded + amountKurus;
-  const tamIade = refundedTotal >= order.total;
+  const outcome = refundOutcome({ orderTotal: order.total, refundedTotal, status: order.status });
 
   /*
     Test siparişinin iadesinde gerçek para hareketi olmuyor.
@@ -268,25 +268,20 @@ export async function resolveReturn(formData: FormData) {
     .eq("id", id);
 
   /*
-    Sipariş detayındaki iade akışıyla aynı kural: iade edilen
-    sipariş akıştan çıkar, kargoya verilmemişse iptal sayılır.
-    İki akış aynı siparişi farklı duruma bırakmamalı.
-
-    `undefined` bırakmak da riskliydi: alanın gönderilmemesi
-    Supabase istemcisinin `JSON.stringify` davranışına
-    güveniyordu; durum artık her zaman açıkça yazılıyor.
+    Sipariş detayındaki iade akışıyla aynı kural (refundOutcome):
+    tamamı iade edilen sipariş kapanır, kısmi iadede sipariş olduğu
+    adımda kalır. İki akış aynı siparişi farklı duruma bırakmamalı.
   */
-  const kargolandi = order.status === "fulfilled";
-
   const { error: orderError } = await supabase
     .from("arc_orders")
     .update({
-      payment_status: tamIade ? "refunded" : "partially_refunded",
-      status: tamIade ? "refunded" : kargolandi ? order.status : "cancelled",
+      payment_status: outcome.paymentStatus,
+      status: outcome.status,
       metadata: {
         ...withoutLock(lockedMeta, "refund_lock"),
         refunded_at: new Date().toISOString(),
         refunded_amount: refundedTotal,
+        refund_count: (Number(orderMeta.refund_count ?? 0) || 0) + 1,
         refund_reference: result.reference ?? null,
       },
       updated_at: new Date().toISOString(),

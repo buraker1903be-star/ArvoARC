@@ -453,7 +453,11 @@ export function statusUpdateEmail(
   if (!message) return null;
   // Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti; ikincisi gürültü.
   if (status === "fulfilled" && options.trackingSent) return null;
+  return noticeEmail(message, orderNumber, customerName);
+}
 
+/** Tek paragraflık bildirim e-postası: durum güncellemesi ve kısmi iade aynı şablonu kullanır. */
+function noticeEmail(message: { title: string; body: string }, orderNumber: string, customerName: string) {
   return {
     subject: `${message.title} · ${orderNumber}`,
     html: `<!DOCTYPE html>
@@ -501,6 +505,32 @@ export function statusUpdateEmail(
 </body>
 </html>`,
   };
+}
+
+/**
+ * Sipariş detayından yapılan kısmi iade bildirimi.
+ *
+ * Kısmi iadede sipariş açık kalır; müşteri hem iade edilen tutarı
+ * hem de kalan ürünlerin gönderileceğini öğrenmeli. Öncesinde kısmi
+ * iadede müşteriye hiç e-posta gitmiyordu.
+ */
+export function partialRefundEmail({
+  orderNumber,
+  customerName,
+  amount,
+  shipped,
+}: {
+  orderNumber: string;
+  customerName: string;
+  amount: number;
+  /** Sipariş kargoya verildiyse "kalan ürünler gönderilecek" cümlesi yazılmaz. */
+  shipped: boolean;
+}) {
+  const body = [
+    `Siparişiniz için ${money(amount)} tutarında iade işlemi başlatıldı. Tutarın kartınıza yansıma süresi bankanıza bağlıdır; genellikle birkaç iş günü sürer.`,
+    shipped ? "" : "Siparişinizin kalan ürünleri hazırlanıp kargoya verilmeye devam edecek.",
+  ].filter(Boolean).join(" ");
+  return noticeEmail({ title: "Kısmi iadeniz başlatıldı", body }, orderNumber, customerName);
 }
 
 /**

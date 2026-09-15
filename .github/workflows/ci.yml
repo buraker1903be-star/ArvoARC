@@ -1,0 +1,29 @@
+name: Kontrol
+
+# Her pushta ve PR'da tip, lint ve birim testleri çalışır.
+# Derleme (next build) Vercel'de yapılıyor; burada Supabase anahtarı gerekmez.
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kontrol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Tipler
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Testler
+        run: npm test

@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { calculateRefund } from "@/lib/refund";
+import { calculateRefund, refundOutcome } from "@/lib/refund";
+
+test("kısmi iadede sipariş olduğu adımda kalır, iptal edilmez", () => {
+  for (const status of ["pending", "confirmed", "processing", "fulfilled"]) {
+    assert.deepEqual(refundOutcome({ orderTotal: 100000, refundedTotal: 20000, status }), {
+      full: false, status, paymentStatus: "partially_refunded",
+    });
+  }
+});
+
+test("iade edilen toplam sipariş tutarına ulaşınca sipariş kapanır", () => {
+  assert.deepEqual(refundOutcome({ orderTotal: 100000, refundedTotal: 100000, status: "processing" }), {
+    full: true, status: "refunded", paymentStatus: "refunded",
+  });
+  assert.equal(refundOutcome({ orderTotal: 100000, refundedTotal: 60000 + 40000, status: "fulfilled" }).full, true);
+});
 
 test("kargo çıkmadıysa kargo bedeli de iade edilir", () => {
   assert.deepEqual(calculateRefund({ itemsTotal: 50000, orderTotal: 100000, shipping: 3000, orderStatus: "processing" }), {

@@ -67,17 +67,12 @@ export const paymentStatusOptions = Object.entries(labels.payment);
  * "Onayla" ya da "Kargoya ver" diye önermek, parası geri gitmiş
  * ürünü göndermeye davet etmek demek.
  *
- * Kısmi iade de kapanma sayılıyor. Kısmi iade pratikte müşterinin
- * siparişin bir kısmından vazgeçmesi; kalan kalemler gönderilecekse
- * bu, sipariş detayından bilinçli olarak yapılmalı.
+ * Kısmi iade kapanma sayılmaz: kalan ürünler hazırlanıp kargoya
+ * verilebilir. Öncesinde kısmi iade siparişi kapatıyor, kargolanmamış
+ * siparişi de iptal ediyordu; kalan ürünler gönderilemiyordu.
  */
 export function isOrderClosed(status?: string | null, paymentStatus?: string | null) {
-  return (
-    status === "cancelled" ||
-    status === "refunded" ||
-    paymentStatus === "refunded" ||
-    paymentStatus === "partially_refunded"
-  );
+  return status === "cancelled" || status === "refunded" || paymentStatus === "refunded";
 }
 
 /**
@@ -98,8 +93,9 @@ export function orderBadge(status?: string | null, paymentStatus?: string | null
   if (status === "cancelled" || status === "refunded" || paymentStatus === "refunded") {
     return { label: "İptal edildi", tone: "bad" as const };
   }
+  /* Kısmi iadeli sipariş açık: akıştaki yeri de görünsün. */
   if (paymentStatus === "partially_refunded") {
-    return { label: "Kısmi iade", tone: "bad" as const };
+    return { label: `${orderStatusLabel(status)} · Kısmi iade`, tone: status === "fulfilled" ? ("muted" as const) : ("warn" as const) };
   }
   if (paymentStatus === "failed") {
     return { label: "Ödeme başarısız", tone: "bad" as const };

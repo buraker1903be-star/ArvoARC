@@ -19,17 +19,24 @@ test("akış doğrusal ilerler, kargodan sonra durur", () => {
   assert.equal(nextOrderStep("fulfilled", "paid"), null);
 });
 
-test("kapanmış siparişte (iptal, iade, kısmi iade) akış durur", () => {
-  for (const [status, payment] of [["cancelled", "paid"], ["refunded", "refunded"], ["confirmed", "refunded"], ["confirmed", "partially_refunded"]]) {
+test("kapanmış siparişte (iptal, iade) akış durur", () => {
+  for (const [status, payment] of [["cancelled", "paid"], ["refunded", "refunded"], ["confirmed", "refunded"], ["cancelled", "partially_refunded"]]) {
     assert.equal(isOrderClosed(status, payment), true, `${status}/${payment}`);
     assert.equal(nextOrderStep(status, payment), null, `${status}/${payment}`);
   }
   assert.equal(isOrderClosed("confirmed", "paid"), false);
 });
 
+test("kısmi iadeli sipariş açık kalır ve akışta ilerler", () => {
+  assert.equal(isOrderClosed("confirmed", "partially_refunded"), false);
+  assert.equal(nextOrderStep("confirmed", "partially_refunded")?.key, "processing");
+  assert.equal(nextOrderStep("fulfilled", "partially_refunded"), null);
+});
+
 test("durum rozeti", () => {
   assert.deepEqual(orderBadge("cancelled", "paid"), { label: "İptal edildi", tone: "bad" });
-  assert.deepEqual(orderBadge("confirmed", "partially_refunded"), { label: "Kısmi iade", tone: "bad" });
+  assert.deepEqual(orderBadge("confirmed", "partially_refunded"), { label: "Onaylandı · Kısmi iade", tone: "warn" });
+  assert.deepEqual(orderBadge("fulfilled", "partially_refunded"), { label: "Tamamlandı · Kısmi iade", tone: "muted" });
   assert.deepEqual(orderBadge("pending", "failed"), { label: "Ödeme başarısız", tone: "bad" });
   assert.equal(orderBadge("pending", "pending").tone, "warn");
   assert.equal(orderBadge("fulfilled", "paid").tone, "muted");

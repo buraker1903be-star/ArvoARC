@@ -52,3 +52,27 @@ export function calculateRefund(input: {
 
   return { amount, itemsTotal, shippingRefund, shipped };
 }
+
+/**
+ * İadeden sonra siparişin durumu. Sipariş detayı ve iade talepleri
+ * aynı kuralı kullanır.
+ *
+ * Tamamı iade edilen sipariş kapanır. Kısmi iadede sipariş olduğu
+ * adımda kalır: kargoya verilmemişse kalan ürünler hazırlanıp
+ * gönderilebilir. Öncesinde kargolanmamış siparişte kısmi iade
+ * siparişi iptal ediyordu.
+ */
+export function refundOutcome(input: {
+  /** Siparişin tahsil edilen toplamı (kuruş). */
+  orderTotal: number;
+  /** Bu iade dâhil şimdiye kadar iade edilen toplam (kuruş). */
+  refundedTotal: number;
+  status?: string | null;
+}) {
+  const full = input.refundedTotal >= input.orderTotal;
+  return {
+    full,
+    status: full ? "refunded" : (input.status ?? "pending"),
+    paymentStatus: full ? "refunded" : "partially_refunded",
+  };
+}

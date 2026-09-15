@@ -27,7 +27,7 @@ type OrderMeta={discount?:number;coupon_code?:string;refunded_at?:string;refunde
 const ERRORS:Record<string,string>={
   "not-paid":"Bu sipariş ödenmediği için iade edilemez.",
   "already-refunded":"Bu sipariş zaten iade edilmiş.",
-  "invalid-amount":"Geçerli bir iade tutarı girin: sıfırdan büyük olmalı ve sipariş tutarını aşmamalı. Tamamını iade etmek için alanı boş bırakın.",
+  "invalid-amount":"Geçerli bir iade tutarı girin: sıfırdan büyük olmalı ve iade edilebilir kalan tutarı aşmamalı. Tamamını iade etmek için alanı boş bırakın.",
   "refund-failed":"PayTR iade talebini reddetti. Ayrıntı için sunucu günlüklerine bakın.",
   "refund-recorded-failed":"İade yapıldı ancak sipariş kaydı güncellenemedi. PayTR panelinden doğrulayın; tekrar iade denemeyin.",
   "transfer-order":"Havale siparişi PayTR'dan iade edilemez. Parayı bankadan iade edip siparişi elle kapatın.",
@@ -174,6 +174,8 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     if(newStatus&&!reachedAt.has(newStatus))reachedAt.set(newStatus,event.created_at);
   }
   const closed=isOrderClosed(order.status,order.payment_status);
+  const refundedSoFar=Math.max(0,Number(meta.refunded_amount??0)||0);
+  const refundable=Math.max(0,(order.total??0)-refundedSoFar);
   const flowIndex=orderFlow.findIndex(step=>step.key===order.status);
   const reachedIndex=flowIndex>=0?flowIndex:Math.max(0,...orderFlow.map((step,index)=>reachedAt.has(step.key)?index:0));
   const lastIndex=orderFlow.length-1;
@@ -394,12 +396,15 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         İade. Ayrı bir kartta ve yalnızca ödenmiş siparişte
         görünüyor: parasal işlem, yanlışlıkla tıklanmamalı.
       */}
-      {order.payment_status==="paid"&&!meta.refunded_at&&["owner","admin"].includes(membership.role)?(
+      {["paid","partially_refunded"].includes(order.payment_status)&&refundable>0&&!(meta.refunded_at&&refundedSoFar<=0)&&!isBankTransfer(meta)&&["owner","admin"].includes(membership.role)?(
         <section className="ac ac-pad order-noprint">
           <div className="ac-head">
             <div>
               <h3>İade</h3>
-              <p>Tutar PayTR üzerinden müşterinin kartına iade edilir.</p>
+              <p>
+                Tutar PayTR üzerinden müşterinin kartına iade edilir.
+                {refundedSoFar>0?<> Daha önce <strong>{money(refundedSoFar,order.currency)}</strong> iade edildi.</>:null}
+              </p>
             </div>
           </div>
 
@@ -407,24 +412,14 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             <input type="hidden" name="order_id" value={order.id}/>
             <label>
               İade tutarı (₺)
-              <input name="amount" type="number" min="0" step="0.01" max={(order.total/100).toFixed(2)} placeholder={`Tamamı: ${(order.total/100).toFixed(2)}`} className="ac-input"/>
+              <input name="amount" type="number" min="0" step="0.01" max={(refundable/100).toFixed(2)} placeholder={`${refundedSoFar>0?"Kalanın tamamı":"Tamamı"}: ${(refundable/100).toFixed(2)}`} className="ac-input"/>
             </label>
             <p className="order-hint">
-              Boş bırakırsanız siparişin tamamı iade edilir. Bu işlem geri
+              Boş bırakırsanız {refundedSoFar>0?"kalan tutarın":"siparişin"} tamamı iade edilir ve sipariş kapanır. Bu işlem geri
               alınamaz.
-              {/*
-                Kargo çıkmadıysa kargo bedeli de müşteriye geri gider;
-                tamamı zaten kargoyu içeriyor ama kısmi tutar yazan
-                kullanıcı bunu hesaba katmayı unutabiliyor.
-              */}
-              {order.status!=="fulfilled"&&(order.shipping??0)>0?(
-                <>
-                  {" "}Kargo çıkmadığı için{" "}
-                  <strong>{money(order.shipping,order.currency)}</strong>{" "}
-                  kargo bedeli de iadeye dâhildir; kısmi tutar yazarken
-                  bunu ekleyin.
-                </>
-              ):null}
+              {/* Kısmi iadede sipariş kapanmaz: kalan ürünler gönderilebilir. */}
+              {order.status!=="fulfilled"?" Kısmi iadede sipariş açık kalır; kalan ürünler hazırlanıp kargoya verilebilir.":""}
+              {" "}Müşteriye iade tutarını bildiren e-posta gider.
             </p>
             <button className="ac-btn ac-btn-danger" type="submit">İadeyi başlat</button>
           </form>

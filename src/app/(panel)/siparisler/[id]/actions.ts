@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sendEmail } from "@/lib/email/resend";
-import { shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
+import { partialRefundEmail, shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { notifyTransferPaid } from "@/lib/email/transfer-paid";
 import { refundPayment } from "@/lib/paytr/refund";
 import { isBankTransfer } from "@/lib/payment-method";
+import { refundOutcome } from "@/lib/refund";
 import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock";
 import { requireTenant } from "@/lib/tenant";
 
@@ -169,18 +170,22 @@ export async function refundOrder(formData: FormData) {
   const meta = (order.metadata ?? {}) as Record<string, unknown>;
 
   /*
-    Önce "zaten iade edilmiş" kontrolü.
-
-    Kısmi iadeden sonra ödeme durumu artık "partially_refunded"
-    olduğu için sıralama ters olduğunda kullanıcı "Bu sipariş
-    ödenmediği için iade edilemez" gibi yanlış bir mesaj
+    Önce "zaten iade edilmiş" kontrolü; sıralama ters olduğunda
+    kullanıcı "ödenmediği için iade edilemez" gibi yanlış bir mesaj
     görüyordu.
+
+    Kısmi iadeden sonra sipariş açık kaldığı için kalan tutar da
+    buradan iade edilebilir (örneğin sipariş sonradan iptal edilirse).
+    İade tutarı kaydı olmayan eski iadeli siparişlerde kalan
+    hesaplanamaz; onlar ikinci kez iade edilmez.
   */
-  if (meta.refunded_at) {
+  const alreadyRefunded = Math.max(0, Number(meta.refunded_amount ?? 0) || 0);
+  const remaining = Math.max(0, (order.total ?? 0) - alreadyRefunded);
+  if (order.payment_status === "refunded" || remaining <= 0 || (meta.refunded_at && alreadyRefunded <= 0)) {
     redirect(`/siparisler/${orderId}?error=already-refunded`);
   }
 
-  if (order.payment_status !== "paid") {
+  if (order.payment_status !== "paid" && order.payment_status !== "partially_refunded") {
     redirect(`/siparisler/${orderId}?error=not-paid`);
   }
 
@@ -190,8 +195,8 @@ export async function refundOrder(formData: FormData) {
   }
 
   /*
-    Kısmi iade formdan gelebilir ama sipariş tutarını aşamaz.
-    Boş bırakılırsa tam iade yapılır.
+    Kısmi iade formdan gelebilir ama iade edilebilir kalan tutarı
+    aşamaz. Boş bırakılırsa kalanın tamamı iade edilir.
   */
   /*
     `Number.isFinite` kontrolü şart: "abc" ya da "1.234,56" gibi
@@ -205,11 +210,14 @@ export async function refundOrder(formData: FormData) {
   if (rawAmount && (!Number.isFinite(requested) || requested <= 0)) {
     redirect(`/siparisler/${orderId}?error=invalid-amount`);
   }
-  const amountKurus = rawAmount ? Math.round(requested * 100) : (order.total ?? 0);
+  const amountKurus = rawAmount ? Math.round(requested * 100) : remaining;
 
-  if (amountKurus <= 0 || amountKurus > (order.total ?? 0)) {
+  if (amountKurus <= 0 || amountKurus > remaining) {
     redirect(`/siparisler/${orderId}?error=invalid-amount`);
   }
+
+  /* PayTR her iadede ayrı referans görmeli; ilk iade eski biçimde kalır. */
+  const priorRefunds = Math.max(Number(meta.refund_count ?? 0) || 0, alreadyRefunded > 0 ? 1 : 0);
 
   /*
     PayTR sipariş numarasını harf ve rakam dışındaki karakterler
@@ -224,7 +232,7 @@ export async function refundOrder(formData: FormData) {
   const result = await refundPayment({
     merchantOid,
     amountKurus,
-    referenceNo: `ARC${orderId.replace(/-/g, "").slice(0, 12)}`,
+    referenceNo: `ARC${orderId.replace(/-/g, "").slice(0, 12)}${priorRefunds ? `K${priorRefunds + 1}` : ""}`,
   });
 
   if (!result.ok) {
@@ -233,32 +241,25 @@ export async function refundOrder(formData: FormData) {
     redirect(`/siparisler/${orderId}?error=refund-failed`);
   }
 
-  const tamIade = amountKurus >= (order.total ?? 0);
-
   /*
-    İade edilen sipariş akıştan çıkar.
-
-    Öncesinde kısmi iadede `payment_status` "paid" bırakılıyor ve
-    durum hiç değişmiyordu: parası geri gitmiş sipariş listede
-    hâlâ "Bekliyor · Ödendi" görünüyor ve "Onayla →" düğmesiyle
-    hazırlanmaya davet ediliyordu.
-
-    Kargoya verilmemiş bir siparişin iadesi pratikte iptaldir;
-    kargoya verilmişse ürün yola çıkmış demektir, durumu
-    "Tamamlandı" kalır ve iade yalnızca ödeme tarafında görünür.
+    Tamamı iade edilen sipariş kapanır; kısmi iadede sipariş olduğu
+    adımda kalır ve kalan ürünler gönderilebilir (bkz. refundOutcome).
+    Ödeme durumu her iki hâlde de değişir: parası kısmen geri gitmiş
+    sipariş "Ödendi" görünmez.
   */
-  const kargolandi = order.status === "fulfilled";
-  const yeniDurum = tamIade ? "refunded" : kargolandi ? order.status : "cancelled";
+  const refundedTotal = alreadyRefunded + amountKurus;
+  const outcome = refundOutcome({ orderTotal: order.total ?? 0, refundedTotal, status: order.status });
 
   const { error } = await supabase
     .from("arc_orders")
     .update({
-      payment_status: tamIade ? "refunded" : "partially_refunded",
-      status: yeniDurum,
+      payment_status: outcome.paymentStatus,
+      status: outcome.status,
       metadata: {
         ...withoutLock(lockedMeta, "refund_lock"),
         refunded_at: new Date().toISOString(),
-        refunded_amount: amountKurus,
+        refunded_amount: refundedTotal,
+        refund_count: priorRefunds + 1,
         refund_reference: result.reference ?? null,
       },
       updated_at: new Date().toISOString(),
@@ -281,13 +282,12 @@ export async function refundOrder(formData: FormData) {
   }
 
   /* Müşteriye bildirim; hata iadeyi geçersiz kılmaz. */
-  if (order.customer_email && tamIade) {
+  if (order.customer_email) {
     try {
-      const mail = statusUpdateEmail(
-        "refunded",
-        order.order_number,
-        order.customer_name || "değerli müşterimiz",
-      );
+      const customerName = order.customer_name || "değerli müşterimiz";
+      const mail = outcome.full
+        ? statusUpdateEmail("refunded", order.order_number, customerName)
+        : partialRefundEmail({ orderNumber: order.order_number, customerName, amount: amountKurus, shipped: order.status === "fulfilled" });
       if (mail) await sendEmail({ to: order.customer_email, ...mail });
     } catch (mailError) {
       console.error("İade bildirimi gönderilemedi:", mailError);

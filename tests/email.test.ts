@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { orderConfirmationHtml, paymentReceivedEmail, statusUpdateEmail, transferOrderEmail } from "@/lib/email/order-confirmation";
+import { orderConfirmationHtml, partialRefundEmail, paymentReceivedEmail, statusUpdateEmail, transferOrderEmail } from "@/lib/email/order-confirmation";
+
+test("kısmi iade e-postası tutarı ve kalan ürünlerin gönderileceğini yazar", () => {
+  const mail = partialRefundEmail({ orderNumber: "#AC-2002", customerName: "<b>Elif</b>", amount: 25050, shipped: false });
+  assert.equal(mail.subject, "Kısmi iadeniz başlatıldı · #AC-2002");
+  assert.ok(mail.html.includes("₺250,50"), "tutar");
+  assert.ok(mail.html.includes("kalan ürünleri"), "kalan ürünler");
+  assert.ok(!mail.html.includes("<b>Elif</b>"), "ad kaçışlanır");
+  assert.ok(!partialRefundEmail({ orderNumber: "#AC-2002", customerName: "Elif", amount: 25050, shipped: true }).html.includes("kalan ürünleri"));
+});
 
 test("havale ödemesi alındı e-postası", () => {
   const mail = paymentReceivedEmail("#AC-2001", "<b>Elif</b>", 184203);
