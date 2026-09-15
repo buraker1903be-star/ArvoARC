@@ -132,7 +132,8 @@ export async function quickStatus(formData: FormData) {
  */
 export async function confirmTransferPayment(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
-  const back = (result: Record<string, string>) => backUrl(formData.get("back"), "/operasyon", result);
+  /* Operasyon listesinden de sipariş detayından da çağrılır; kullanıcı geldiği yere döner. */
+  const back = (result: Record<string, string>) => backUrl(formData.get("back"), fromDetail(formData) ? "/siparisler" : "/operasyon", result);
   if (!MANAGERS.includes(membership.role)) redirect(back({ error: "forbidden" }));
 
   const orderId = String(formData.get("order_id") ?? "");
@@ -174,7 +175,8 @@ export async function confirmTransferPayment(formData: FormData) {
  */
 export async function cancelTransferOrder(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
-  const back = (result: Record<string, string>) => backUrl(formData.get("back"), "/operasyon", result);
+  /* Operasyon listesinden de sipariş detayından da çağrılır; kullanıcı geldiği yere döner. */
+  const back = (result: Record<string, string>) => backUrl(formData.get("back"), fromDetail(formData) ? "/siparisler" : "/operasyon", result);
   if (!MANAGERS.includes(membership.role)) redirect(back({ error: "forbidden" }));
 
   const orderId = String(formData.get("order_id") ?? "");

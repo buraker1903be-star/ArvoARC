@@ -138,3 +138,7 @@
 
 /* Havale siparişi etiketi: ödeme panelden onaylanır */
 .panel-root .order-transfer-tag{margin-left:6px;vertical-align:middle}
+
+/* Sipariş detayı: havale ödemesi bekleyen siparişte tek tık onay / iptal */
+.panel-root .order-transfer{display:grid;gap:8px}
+.panel-root .order-transfer-actions{display:flex;flex-wrap:wrap;gap:8px}

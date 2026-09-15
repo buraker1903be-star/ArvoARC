@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
 import { refundOrder, updateFulfillmentDetails, updateOrderStatus } from "./actions";
-import { quickStatus } from "../actions";
+import { cancelTransferOrder, confirmTransferPayment, quickStatus } from "../actions";
+import { isBankTransfer, TRANSFER_STALE_HOURS } from "@/lib/payment-method";
+import { ConfirmSubmit } from "@/components/panel/confirm-submit";
+
+/* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
+function transferClock(){return Date.now();}
 import { isOrderClosed, orderBadge, orderStatusLabel, orderStatusOptions, paymentStatusLabel, paymentStatusOptions, sourceLabel } from "@/lib/commerce-labels";
 import { nextOrderStep, orderFlow } from "@/lib/order-flow";
 import { Icon } from "@/components/panel/icons";
@@ -34,6 +39,8 @@ const ERRORS:Record<string,string>={
   "invalid-fulfillment":"Kargo bilgileri çok uzun.",
   "invalid-tracking-url":"Takip bağlantısı https:// ile başlayan geçerli bir adres olmalı.",
   "save-failed":"Durum kaydedilemedi, tekrar deneyin.",
+  "not-transfer":"Bu sipariş havale ile verilmemiş; kart ödemeleri PayTR bildirimiyle kapanır.",
+  "already-paid":"Bu siparişin ödemesi zaten onaylanmış.",
 };
 
 function AddressCard({title,address}:{title:string;address?:Address}){
@@ -41,7 +48,7 @@ function AddressCard({title,address}:{title:string;address?:Address}){
   return <article className="ac order-party"><small>{title}</small>{lines.length?lines.map((line,index)=><p key={index}>{line}</p>):<p className="is-empty">Bilgi bulunmuyor.</p>}</article>;
 }
 
-export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string}>}){
+export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string;ok?:string}>}){
   const {id}=await params;const query=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const [{data:order,error},{data:items,error:itemsError},{data:events,error:eventsError}]=await Promise.all([
@@ -191,6 +198,16 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     {id:"created",kind:"created",title:"Sipariş oluşturuldu",detail:sourceLabel(order.source),by:"",at:String(order.created_at)},
   ].sort((a,b)=>b.at.localeCompare(a.at));
 
+  /*
+    Havale ödemesi bekleyen sipariş: Operasyon'daki tek tık onay ve
+    süresi geçince iptal burada da var. Öncesinde detayda ödeme ve
+    durum listelerini elle değiştirmek gerekiyordu.
+  */
+  const transferPending=isBankTransfer(meta)&&["pending","authorized"].includes(order.payment_status)&&!closed;
+  const waitedHours=Math.max(0,Math.floor((transferClock()-Date.parse(order.created_at))/3_600_000));
+  const waitedLabel=waitedHours<24?`${waitedHours} saattir`:`${Math.floor(waitedHours/24)} gündür`;
+  const transferStale=transferPending&&waitedHours>=TRANSFER_STALE_HOURS;
+
   return <>
     <section className="ac-bar">
       <div>
@@ -217,6 +234,31 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     <div className="ac-stack">
       {query.saved?<Notice title={query.saved==="fulfillment"?"Kargo ve operasyon bilgileri kaydedildi.":query.saved==="refund"?"İade tamamlandı.":"Sipariş durumu güncellendi."}/>:null}
       {query.error?<Notice tone="error" title="İşlem tamamlanamadı">{ERRORS[query.error]??query.error}</Notice>:null}
+      {query.ok==="payment"?<Notice title="Havale ödemesi onaylandı.">Sipariş onaylandı; müşterinin e-posta adresi varsa “Ödemeniz alındı” bildirimi gönderildi.</Notice>:null}
+      {query.ok==="cancelled"?<Notice title="Sipariş iptal edildi.">Müşterinin e-posta adresi varsa “Siparişiniz iptal edildi” bildirimi gönderildi.</Notice>:null}
+      {transferPending?(
+        <div className="order-transfer">
+          <Notice tone={transferStale?"error":"warn"} title={transferStale?`Havale ${waitedLabel} ödenmedi · süresi geçti`:`Havale ödemesi bekleniyor · ${waitedLabel}`}>
+            Ödeme hesabınıza ulaştıysa onaylayın; müşteriye “Ödemeniz alındı” e-postası gider.{transferStale?" Ödeme gelmeyecekse siparişi iptal edebilirsiniz.":""}
+          </Notice>
+          {canManage?(
+            <div className="order-transfer-actions order-noprint">
+              <form action={confirmTransferPayment}>
+                <input type="hidden" name="order_id" value={order.id}/>
+                <input type="hidden" name="back" value={`/siparisler/${order.id}`}/>
+                <ConfirmSubmit className="ac-btn ac-btn-primary" message={`${order.order_number} için ${money(order.total,order.currency)} havale ödemesi alındı olarak işaretlensin mi? Müşteriye “Ödemeniz alındı” e-postası gönderilir.`}>Ödeme alındı</ConfirmSubmit>
+              </form>
+              {transferStale?(
+                <form action={cancelTransferOrder}>
+                  <input type="hidden" name="order_id" value={order.id}/>
+                  <input type="hidden" name="back" value={`/siparisler/${order.id}`}/>
+                  <ConfirmSubmit className="ac-btn ac-btn-danger" message={`${order.order_number} ${waitedLabel} ödenmedi. Sipariş iptal edilsin mi? Müşteriye “Siparişiniz iptal edildi” e-postası gönderilir.`}>İptal et</ConfirmSubmit>
+                </form>
+              ):null}
+            </div>
+          ):null}
+        </div>
+      ):null}
       {closed?(
         <Notice tone="error" title={`Sipariş kapandı · ${badge.label}`}>
           {meta.refunded_at?`${money(Number(meta.refunded_amount??0),order.currency)} iade edildi · ${when(String(meta.refunded_at))}. `:""}
