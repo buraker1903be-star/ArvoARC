@@ -1,6 +1,32 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { orderConfirmationHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
+import { orderConfirmationHtml, statusUpdateEmail, transferOrderEmail } from "@/lib/email/order-confirmation";
+
+test("havale e-postası: ödenecek tutar, indirim ve dörtlü IBAN", () => {
+  const mail = transferOrderEmail({
+    orderNumber: "#AC-2001", customerName: "Elif",
+    items: [{ name: "Denim Ceket", quantity: 1, total: 189900 }],
+    total: 184203, transferDiscount: 5697,
+    bank: { holder: "ArvoCulture Ltd.", name: "Deneme Bankası", iban: "tr120006100519786457841326", note: null },
+  });
+  assert.equal(mail.subject, "Siparişiniz alındı · #AC-2001");
+  assert.ok(mail.html.includes("TR12 0006 1005 1978 6457 8413 26"), "IBAN gruplu ve büyük harf");
+  assert.ok(mail.html.includes("₺1.842,03"), "ödenecek tutar");
+  assert.ok(mail.html.includes("−₺56,97"), "havale indirimi");
+  assert.ok(mail.html.includes("AÇIKLAMA"), "açıklama satırı");
+});
+
+test("havale e-postası: IBAN yoksa banka bölümü yerine yönlendirme", () => {
+  const mail = transferOrderEmail({ orderNumber: "#AC-2", customerName: "Elif", items: [], total: 1000, bank: { iban: "" } });
+  assert.ok(!mail.html.includes("IBAN"));
+  assert.ok(mail.html.includes("Banka bilgileri sipariş onay sayfasında"));
+});
+
+test("havale e-postası: metinler HTML'e kaçışla girer", () => {
+  const mail = transferOrderEmail({ orderNumber: "#AC-3", customerName: "<i>x</i>", items: [{ name: "<script>", quantity: 1, total: 100 }], total: 100, bank: { iban: "TR00", holder: "A&B" } });
+  assert.ok(mail.html.includes("&lt;i&gt;x&lt;/i&gt;") && mail.html.includes("&lt;script&gt;") && mail.html.includes("A&amp;B"));
+  assert.ok(!mail.html.includes("<script>"));
+});
 
 test("kargoya verilen sipariş (fulfilled) müşteriye bildirilir", () => {
   const mail = statusUpdateEmail("fulfilled", "#AC-1001", "Elif");

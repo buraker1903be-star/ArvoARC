@@ -178,6 +178,108 @@ export function orderConfirmationHtml({
 </html>`;
 }
 
+/** IBAN'ı dörtlü gruplar hâlinde yazar: "TR12 0006 …". */
+const formatIban = (iban: string) => iban.replace(/\s+/g, "").toUpperCase().replace(/(.{4})/g, "$1 ").trim();
+
+/**
+ * Havale siparişi alındı e-postası.
+ *
+ * Havalede PayTR bildirimi gelmediği için müşteriye hiç e-posta
+ * gitmiyordu; sipariş numarası ve IBAN yalnızca sonuç sayfasında
+ * görünüyordu. Banka bilgileri mağaza ayarlarından gelir; IBAN
+ * girilmemişse banka bölümü yerine yönlendirme yazılır.
+ */
+export function transferOrderEmail({
+  orderNumber,
+  customerName,
+  items,
+  total,
+  transferDiscount = 0,
+  bank,
+}: {
+  orderNumber: string;
+  customerName: string;
+  items: OrderEmailItem[];
+  /** Ödenecek tutar, havale indirimi düşülmüş (kuruş). */
+  total: number;
+  transferDiscount?: number;
+  bank?: { holder?: string | null; name?: string | null; iban?: string | null; note?: string | null } | null;
+}) {
+  const rows = items
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding:8px 0;border-bottom:1px solid #e8e6df;color:#2b2f27;font-size:14px;">
+          ${escapeHtml(item.name)}<span style="color:#8b8f85;"> × ${item.quantity}</span>
+        </td>
+        <td style="padding:8px 0;border-bottom:1px solid #e8e6df;text-align:right;color:#2b2f27;font-size:14px;white-space:nowrap;">${money(item.total)}</td>
+      </tr>`,
+    )
+    .join("");
+
+  const bankRow = (label: string, value: string) => `
+    <tr><td style="padding:6px 0;font-size:12px;letter-spacing:.06em;color:#8b8f85;">${label}</td></tr>
+    <tr><td style="padding:0 0 10px;font-size:15px;color:#10120f;font-weight:600;">${value}</td></tr>`;
+
+  const bankBlock = bank?.iban
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;background:#faf9f5;border-radius:10px;">
+         <tr><td style="padding:16px;">
+           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+             ${bank.holder ? bankRow("ALICI", escapeHtml(bank.holder)) : ""}
+             ${bank.name ? bankRow("BANKA", escapeHtml(bank.name)) : ""}
+             ${bankRow("IBAN", `<span style="font-family:ui-monospace,Menlo,Consolas,monospace;">${escapeHtml(formatIban(bank.iban))}</span>`)}
+             ${bankRow("AÇIKLAMA", escapeHtml(orderNumber))}
+           </table>
+           ${bank.note ? `<p style="margin:4px 0 0;font-size:13px;line-height:1.6;color:#5a5f54;">${escapeHtml(bank.note)}</p>` : ""}
+         </td></tr>
+       </table>`
+    : `<p style="margin:20px 0 0;font-size:14px;line-height:1.65;color:#5a5f54;">
+         Banka bilgileri sipariş onay sayfasında yer alıyor. Bilgilere ulaşamazsanız bu e-postayı yanıtlayın, hemen iletelim.
+       </p>`;
+
+  return {
+    subject: `Siparişiniz alındı · ${orderNumber}`,
+    html: `<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:24px 12px;background:#f4f3ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;">
+    <tr><td style="padding:32px 28px;">
+      <img src="https://arvoculture.com/arvoculture-logo-transparent.png" alt="ArvoCulture" width="150" height="18"
+           style="display:block;width:150px;height:auto;margin:0 0 18px;border:0;">
+      <h1 style="margin:0 0 6px;font-size:24px;line-height:1.25;color:#10120f;font-weight:600;">Siparişiniz alındı</h1>
+      <p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
+        Merhaba ${escapeHtml(customerName)}, siparişiniz oluşturuldu. Havale veya EFT ile ödemeniz ulaştığında hazırlanmaya başlayacak.
+      </p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;">
+        ${rows}
+        ${transferDiscount > 0 ? `<tr>
+          <td style="padding:8px 0;font-size:14px;color:#c62d24;">Havale indirimi</td>
+          <td style="padding:8px 0;text-align:right;font-size:14px;color:#c62d24;">−${money(transferDiscount)}</td>
+        </tr>` : ""}
+        <tr>
+          <td style="padding:12px 0 0;font-size:16px;font-weight:600;color:#10120f;">Ödenecek tutar</td>
+          <td style="padding:12px 0 0;text-align:right;font-size:16px;font-weight:600;color:#10120f;">${money(total)}</td>
+        </tr>
+      </table>
+
+      ${bankBlock}
+
+      <p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#8b8f85;">
+        Açıklama kısmına sipariş numaranızı (${escapeHtml(orderNumber)}) yazmanız ödemenin hızlı eşleşmesini sağlar.
+        Sorularınız için bu e-postayı yanıtlayabilirsiniz.
+      </p>
+    </td></tr>
+  </table>
+  <p style="max-width:560px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
+    ARVOCULTURE GROUP TEKNOLOJİ SANAYİ VE TİCARET LTD. ŞTİ.
+  </p>
+</body>
+</html>`,
+  };
+}
+
 /** E-postaya giren metinlerde HTML kaçışı. */
 function escapeHtml(value: string) {
   return value

@@ -3,6 +3,39 @@ import { NextResponse } from "next/server";
 import { paytrConfig } from "@/lib/paytr/config";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+import { sendEmail } from "@/lib/email/resend";
+import { transferOrderEmail } from "@/lib/email/order-confirmation";
+
+/*
+  Havale siparişi e-postası. PayTR bildirimi gelmediği için onay
+  e-postası buradan gider. Kalemler ve banka bilgileri
+  veritabanından okunur; vitrinden gelen değerlere güvenilmez.
+*/
+async function sendTransferConfirmation(
+  supabase: ReturnType<typeof createServiceClient>,
+  order: { order_id: string; order_number: string },
+  to: string,
+  customerName: string,
+  total: number,
+  transferDiscount: number,
+) {
+  const [{ data: orderRow }, { data: items }] = await Promise.all([
+    supabase.from("arc_orders").select("organization_id").eq("id", order.order_id).single(),
+    supabase.from("arc_order_items").select("product_name, quantity, total").eq("order_id", order.order_id),
+  ]);
+  const { data: bank } = orderRow
+    ? await supabase.from("arc_store_settings").select("bank_name, bank_account_holder, bank_iban, bank_transfer_instructions").eq("organization_id", orderRow.organization_id).maybeSingle()
+    : { data: null };
+  const mail = transferOrderEmail({
+    orderNumber: order.order_number,
+    customerName: customerName || "değerli müşterimiz",
+    items: (items ?? []).map((item: { product_name: string; quantity: number; total: number }) => ({ name: item.product_name, quantity: item.quantity, total: item.total })),
+    total,
+    transferDiscount,
+    bank: bank ? { holder: bank.bank_account_holder, name: bank.bank_name, iban: bank.bank_iban, note: bank.bank_transfer_instructions } : null,
+  });
+  await sendEmail({ to, ...mail });
+}
 
 /* Sahte sipariş yığınına karşı: IP başına 10 dakikada 10 ödeme denemesi. */
 const orderLimiter = createRateLimiter({ limit: 10, windowMs: 10 * 60_000 });
@@ -213,11 +246,19 @@ export async function POST(request: Request) {
 
     /* Güncelleme olmadıysa indirim uygulanmadı; vitrine gerçek tutar döner. */
     if (transferError) console.error("Havale indirimi kaydedilemedi:", transferError);
+    const payable = transferError ? order.total : order.total - discount;
+
+    /* Gönderim hatası siparişi bozmaz: sipariş oluştu, müşteri sonuç sayfasında bilgileri görüyor. */
+    try {
+      await sendTransferConfirmation(supabase, order, email, name, payable, transferError ? 0 : discount);
+    } catch (mailError) {
+      console.error("Havale e-postası gönderilemedi:", order.order_number, mailError);
+    }
 
     return NextResponse.json(
       {
         orderNumber: order.order_number,
-        total: transferError ? order.total : order.total - discount,
+        total: payable,
         paymentMethod: "havale",
       },
       { headers },
