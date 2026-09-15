@@ -6,6 +6,8 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 
 /** "@/lib/x" → src/lib/x; uzantısız göreli yol → .ts dosyası. */
 export async function resolve(specifier, context, nextResolve) {
+  /* "server-only" sunucu dışında import edilince hata fırlatır; testte boş modül. */
+  if (specifier === "server-only") return { url: "data:text/javascript,export {};", shortCircuit: true };
   let target = specifier;
   if (target.startsWith("@/")) target = pathToFileURL(path.join(root, "src", target.slice(2))).href;
 

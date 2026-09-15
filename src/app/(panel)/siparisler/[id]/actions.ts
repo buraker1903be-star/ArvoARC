@@ -36,8 +36,10 @@ export async function updateOrderStatus(formData:FormData){
   */
   if(!error){
     try{
-      const {data:order}=await supabase.from("arc_orders").select("order_number,customer_name,customer_email").eq("id",orderId).single();
-      const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz");
+      const {data:order}=await supabase.from("arc_orders").select("order_number,customer_name,customer_email,metadata").eq("id",orderId).single();
+      /* Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti. */
+      const trackingSent=Boolean((order?.metadata as {tracking_number?:string}|null)?.tracking_number);
+      const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz",{trackingSent});
       if(order?.customer_email&&mail){
         await sendEmail({to:order.customer_email,...mail});
       }

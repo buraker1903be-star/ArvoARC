@@ -271,14 +271,16 @@ export function shippingNoticeHtml({
  * atmak gereksiz gürültü yaratır ve müşteri sonraki
  * bildirimleri de görmezden gelmeye başlar.
  */
+/*
+  Anahtarlar ARC'deki sipariş durumları. Öncesinde "shipped" ve
+  "delivered" yazıyordu; bu durumlar ARC'de yok ("Kargoya verildi"
+  = fulfilled). Sipariş kargoya verildiğinde müşteriye hiç e-posta
+  gitmiyordu.
+*/
 const STATUS_MESSAGES: Record<string, { title: string; body: string }> = {
-  shipped: {
-    title: "Siparişiniz kargoda",
+  fulfilled: {
+    title: "Siparişiniz kargoya verildi",
     body: "Siparişiniz kargoya teslim edildi. Takip bilgileri kısa süre içinde sistemde görünür olacak.",
-  },
-  delivered: {
-    title: "Siparişiniz teslim edildi",
-    body: "Siparişiniz teslim edildi. Ürünlerinizi beğendiğinizi umuyoruz; bir sorun olursa bu e-postayı yanıtlayabilirsiniz.",
   },
   cancelled: {
     title: "Siparişiniz iptal edildi",
@@ -294,10 +296,13 @@ export function statusUpdateEmail(
   status: string,
   orderNumber: string,
   customerName: string,
+  options: { trackingSent?: boolean } = {},
 ) {
   const message = STATUS_MESSAGES[status];
   // Bildirim gerektirmeyen durumda e-posta üretilmez.
   if (!message) return null;
+  // Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti; ikincisi gürültü.
+  if (status === "fulfilled" && options.trackingSent) return null;
 
   return {
     subject: `${message.title} · ${orderNumber}`,

@@ -49,10 +49,12 @@ export async function createOrder(formData: FormData) {
 }
 
 /* Müşteri bildirimi; gönderim hatası durum güncellemesini geçersiz kılmaz. */
-async function notifyStatus(order: { order_number: string; customer_name: string | null; customer_email: string | null }, status: string) {
+async function notifyStatus(order: { order_number: string; customer_name: string | null; customer_email: string | null; metadata?: unknown }, status: string) {
   if (!order.customer_email) return;
   try {
-    const mail = statusUpdateEmail(status, order.order_number, order.customer_name || "değerli müşterimiz");
+    /* Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti. */
+    const trackingSent = Boolean((order.metadata as { tracking_number?: string } | null)?.tracking_number);
+    const mail = statusUpdateEmail(status, order.order_number, order.customer_name || "değerli müşterimiz", { trackingSent });
     if (mail) await sendEmail({ to: order.customer_email, ...mail });
   } catch (mailError) {
     console.error("Durum bildirimi gönderilemedi:", order.order_number, mailError);
@@ -82,7 +84,7 @@ export async function quickStatus(formData: FormData) {
 
   const { data: order } = await supabase
     .from("arc_orders")
-    .select("status,payment_status,order_number,customer_name,customer_email")
+    .select("status,payment_status,order_number,customer_name,customer_email,metadata")
     .eq("organization_id", organization.id)
     .eq("id", orderId)
     .single();
@@ -138,7 +140,7 @@ export async function bulkStatus(formData: FormData) {
 
   const { data: orders, error } = await supabase
     .from("arc_orders")
-    .select("id,status,payment_status,order_number,customer_name,customer_email")
+    .select("id,status,payment_status,order_number,customer_name,customer_email,metadata")
     .eq("organization_id", organization.id)
     .in("id", ids);
   if (error) redirect(backTo(formData, { error: "save-failed" }));
