@@ -49,7 +49,9 @@ export function InteractionFeedback(){
       const anchor=target.closest("a[href]") as HTMLAnchorElement|null;
       if(anchor&&event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey&&!anchor.download&&anchor.target!=="_blank"){
         const url=new URL(anchor.href,window.location.href);
-        if(url.origin===window.location.origin&&url.href!==window.location.href){
+        /* Yalnızca # kısmı değişen bağlantı (ör. "İçeriğe geç") sayfa değiştirmez; gösterge açılmaz. */
+        const samePage=url.pathname===window.location.pathname&&url.search===window.location.search;
+        if(url.origin===window.location.origin&&url.href!==window.location.href&&!samePage){
           anchor.classList.add("is-pending-link");
           setFeedback({message:"Sayfa yükleniyor…",path:location});
         }

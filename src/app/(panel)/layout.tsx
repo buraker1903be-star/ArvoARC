@@ -9,6 +9,7 @@ import { NavProgress } from "@/components/panel/nav-progress";
 import { PanelBreadcrumb } from "@/components/panel/panel-breadcrumb";
 import { PanelNavigation } from "@/components/panel/panel-navigation";
 import { SidebarToggle } from "@/components/panel/sidebar-toggle";
+import { SkipLink } from "@/components/panel/skip-link";
 import { ThemeToggle } from "@/components/panel/theme-toggle";
 import { TopbarSearch } from "@/components/panel/topbar-search";
 import { Suspense } from "react";
@@ -49,6 +50,7 @@ export default async function PanelLayout({ children }: Readonly<{ children: Rea
 
   return (
     <div className={navCollapsed ? "panel-root is-nav-collapsed" : "panel-root"}>
+      <SkipLink />
       <NavProgress />
 
       <aside id="panel-sidebar" className="panel-sidebar">
@@ -97,7 +99,8 @@ export default async function PanelLayout({ children }: Readonly<{ children: Rea
             </div>
           </div>
         </header>
-        <div className="panel-content">{children}</div>
+        {/* Ekran okuyucuların "ana içerik" bölgesi; tabIndex, bağlantı odağı buraya taşıyabilsin diye. */}
+        <main id="icerik" className="panel-content" tabIndex={-1}>{children}</main>
       </section>
 
       <MobileNav tenantName={organization.name} tenantInitials={initials} roleName={roleName} />

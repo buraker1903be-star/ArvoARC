@@ -499,6 +499,12 @@ html[data-theme="dark"] .panel-root .product-card-badges .catalog-badge.navy{bac
 .panel-root ::-webkit-scrollbar-thumb{border:3px solid transparent;border-radius:999px;background:color-mix(in srgb,var(--ink) 20%,transparent) padding-box}
 .panel-root :is(a,button,summary):focus-visible{outline:3px solid color-mix(in srgb,var(--accent-bright) 55%,transparent);outline-offset:2px}
 
+/* "İçeriğe geç": ekran dışında durur, klavye odağında sol üstte belirir. */
+.panel-root .panel-skip{position:fixed;top:10px;left:10px;z-index:2000;padding:10px 16px;border-radius:12px;background:var(--brand-900);color:#fff;font-size:14px;font-weight:650;text-decoration:none;box-shadow:var(--shadow-md);transform:translateY(-200%);transition:transform .2s ease}
+.panel-root .panel-skip:focus-visible{transform:none;outline:3px solid var(--accent-bright);outline-offset:2px}
+.panel-root main.panel-content:focus{outline:none}
+@media (prefers-reduced-motion:reduce){.panel-root .panel-skip{transition:none}}
+
 /* Daraltılabilir kenar çubuğu (masaüstü) */
 @media(min-width:901px){
   .panel-sidebar{transition:width .5s var(--ease-sheet),padding .5s var(--ease-sheet)}
