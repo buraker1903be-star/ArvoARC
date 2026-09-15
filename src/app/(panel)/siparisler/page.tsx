@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { orderBadge, sourceLabel } from "@/lib/commerce-labels";
 import { nextOrderStep } from "@/lib/order-flow";
+import { isBankTransfer } from "@/lib/payment-method";
 import { Notice } from "@/components/panel/notice";
 import { OrderForm } from "./order-form";
 import { OrderTable, type OrderRow } from "./order-table";
@@ -101,7 +102,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   let listQuery = scoped(
     supabase
       .from("arc_orders")
-      .select("id,order_number,source,status,payment_status,customer_name,customer_email,total,currency,created_at", { count: "exact" })
+      .select("id,order_number,source,status,payment_status,customer_name,customer_email,total,currency,created_at,metadata", { count: "exact" })
       .eq("organization_id", organization.id),
   );
   if (statusFilter !== "all") listQuery = listQuery.eq("status", statusFilter);
@@ -152,6 +153,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     date: dateFormat.format(new Date(order.created_at)),
     badge: orderBadge(order.status, order.payment_status),
     next: nextOrderStep(order.status, order.payment_status),
+    transfer: isBankTransfer(order.metadata),
   }));
 
   const metrics = [

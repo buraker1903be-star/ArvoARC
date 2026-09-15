@@ -14,6 +14,8 @@ export type OrderRow = {
   date: string;
   badge: { label: string; tone?: string };
   next: { key: string; label: string } | null;
+  /** Havale siparişi: ödeme panelden onaylanır. */
+  transfer?: boolean;
 };
 
 const BULK_STEPS = [
@@ -103,7 +105,7 @@ export function OrderTable({ rows, canManage, back, children }: { rows: OrderRow
                 <b>{row.customer}</b>
                 {row.email ? <small>{row.email}</small> : null}
               </span>
-              <span className="order-cell-source">{row.source}</span>
+              <span className="order-cell-source">{row.source}{row.transfer ? <em className="ac-tag order-transfer-tag">Havale</em> : null}</span>
               <span className="order-amount">{row.total}</span>
               <span className="order-status"><em className="ac-tag" data-tone={row.badge.tone}>{row.badge.label}</em></span>
               {canManage ? (

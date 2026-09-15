@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sendEmail } from "@/lib/email/resend";
-import { paymentReceivedEmail, shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
+import { shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
+import { notifyTransferPaid } from "@/lib/email/transfer-paid";
 import { refundPayment } from "@/lib/paytr/refund";
 import { isBankTransfer } from "@/lib/payment-method";
 import { requireTenant } from "@/lib/tenant";
@@ -54,12 +55,8 @@ export async function updateOrderStatus(formData:FormData){
     PayTR onayıyla giden e-posta veriyor. Zaten ödenmiş siparişte
     yeniden kaydetmek ikinci e-posta göndermez.
   */
-  if(!error&&ownedOrder.payment_status!=="paid"&&paymentStatus==="paid"&&isBankTransfer(ownedOrder.metadata)&&ownedOrder.customer_email){
-    try{
-      await sendEmail({to:ownedOrder.customer_email,...paymentReceivedEmail(ownedOrder.order_number,ownedOrder.customer_name||"değerli müşterimiz",ownedOrder.total)});
-    }catch(mailError){
-      console.error("Ödeme bildirimi gönderilemedi:",ownedOrder.order_number,mailError);
-    }
+  if(!error&&ownedOrder.payment_status!=="paid"&&paymentStatus==="paid"&&isBankTransfer(ownedOrder.metadata)){
+    await notifyTransferPaid(ownedOrder);
   }
   if(error)redirect(`/siparisler/${orderId}?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/");revalidatePath("/siparisler");revalidatePath("/stok");revalidatePath("/urunler");revalidatePath(`/siparisler/${orderId}`);

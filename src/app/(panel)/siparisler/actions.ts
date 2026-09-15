@@ -8,6 +8,8 @@ import { statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { isOrderClosed } from "@/lib/commerce-labels";
 import { nextOrderStep } from "@/lib/order-flow";
 import { backUrl } from "@/lib/back-url";
+import { isBankTransfer } from "@/lib/payment-method";
+import { notifyTransferPaid } from "@/lib/email/transfer-paid";
 
 const MANAGERS = ["owner", "admin", "manager"];
 
@@ -116,6 +118,48 @@ export async function quickStatus(formData: FormData) {
   revalidatePath("/siparisler");
   revalidatePath(`/siparisler/${orderId}`);
   redirect(backTo(formData, fromDetail(formData) ? { saved: "1" } : { ok: "status" }));
+}
+
+/**
+ * Havale ödemesini tek tıkla onaylar (Operasyon Merkezi).
+ *
+ * Öncesinde sipariş detayına girip ödeme ve durum listelerini
+ * değiştirmek gerekiyordu. Yalnızca havale siparişinde ve ödeme
+ * beklerken çalışır; sipariş "onaylandı + ödendi" olur ve müşteriye
+ * "ödemeniz alındı" gider. Kart ödemesi PayTR bildirimiyle kapanır.
+ */
+export async function confirmTransferPayment(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  const back = (result: Record<string, string>) => backUrl(formData.get("back"), "/operasyon", result);
+  if (!MANAGERS.includes(membership.role)) redirect(back({ error: "forbidden" }));
+
+  const orderId = String(formData.get("order_id") ?? "");
+  const { data: order } = await supabase
+    .from("arc_orders")
+    .select("status,payment_status,metadata,order_number,customer_name,customer_email,total")
+    .eq("organization_id", organization.id)
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (!order) redirect(back({ error: "order-not-found" }));
+  if (!isBankTransfer(order.metadata)) redirect(back({ error: "not-transfer" }));
+  if (order.payment_status === "paid") redirect(back({ error: "already-paid" }));
+  if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) redirect(back({ error: "order-closed" }));
+
+  const { error } = await supabase.rpc("arc_update_order_status", {
+    p_order_id: orderId,
+    p_status: order.status === "pending" ? "confirmed" : order.status,
+    p_payment_status: "paid",
+  });
+  if (error) redirect(back({ error: "save-failed" }));
+
+  await notifyTransferPaid(order);
+
+  revalidatePath("/");
+  revalidatePath("/operasyon");
+  revalidatePath("/siparisler");
+  revalidatePath(`/siparisler/${orderId}`);
+  redirect(back({ ok: "payment", order: order.order_number }));
 }
 
 /**

@@ -135,3 +135,6 @@
   .order-parties{grid-template-columns:repeat(3,1fr)}
   .order-facts{display:none}
 }
+
+/* Havale siparişi etiketi: ödeme panelden onaylanır */
+.panel-root .order-transfer-tag{margin-left:6px;vertical-align:middle}

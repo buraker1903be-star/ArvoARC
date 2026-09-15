@@ -105,3 +105,9 @@
   .import-list .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"file status" "kind imported" "date skipped";row-gap:4px;padding:12px 14px}
   .il-status,.il-imported,.il-skipped{justify-self:end;text-align:right}
 }
+
+/* Operasyon: havale ödemesi satırı ve tek tık onay düğmesi */
+.ops-pay{display:flex;align-items:center;gap:8px}
+.ops-pay>.dash-row{flex:1;min-width:0}
+.ops-pay-btn{flex:none;min-height:34px;padding:6px 12px;font-size:12.5px;white-space:nowrap}
+@media (max-width:640px){.ops-pay{flex-wrap:wrap}.ops-pay>form{margin:0 8px 8px 52px}}

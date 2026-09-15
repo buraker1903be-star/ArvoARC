@@ -1,8 +1,21 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { orderStatusLabel, paymentStatusLabel } from "@/lib/commerce-labels";
+import { isBankTransfer } from "@/lib/payment-method";
 import { Icon, type IconName } from "@/components/panel/icons";
+import { Notice } from "@/components/panel/notice";
+import { ConfirmSubmit } from "@/components/panel/confirm-submit";
+import { confirmTransferPayment } from "../siparisler/actions";
 import "../modules.css";
+
+const PAYMENT_ERRORS:Record<string,string>={
+  forbidden:"Ödeme onayı için yönetici yetkisi gerekir.",
+  "order-not-found":"Sipariş bulunamadı.",
+  "not-transfer":"Bu sipariş havale ile verilmemiş; kart ödemeleri PayTR bildirimiyle kapanır.",
+  "already-paid":"Bu siparişin ödemesi zaten onaylanmış.",
+  "order-closed":"Sipariş kapanmış ya da ödemesi başarısız; detaydan kontrol edin.",
+  "save-failed":"Ödeme kaydedilemedi. Tekrar deneyin.",
+};
 
 type ProductMeta={image_paths?:string[];images?:string[];images_migrated?:boolean};
 const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"});
@@ -20,8 +33,10 @@ function ActionRow({href,icon,tone,title,detail,side}:{href:string;icon:IconName
   </Link>;
 }
 
-export default async function Operations(){
-  const {supabase,organization}=await requireTenant();
+export default async function Operations({searchParams}:{searchParams:Promise<{ok?:string;error?:string;order?:string}>}){
+  const params=await searchParams;
+  const {supabase,organization,membership}=await requireTenant();
+  const canManage=["owner","admin","manager"].includes(membership.role);
   /*
     Sorgular sınırlandırıldı ve filtreler veritabanında: her liste
     kendi filtresiyle ve sınırıyla çekiliyor, toplamlar ayrı sayım
@@ -47,7 +62,7 @@ export default async function Operations(){
   ]=await Promise.all([
     supabase.from("arc_orders").select("id,order_number,status,payment_status,customer_name,total,created_at").eq("organization_id",organization.id).in("status",OPEN).order("created_at",{ascending:false}).limit(8),
     supabase.from("arc_orders").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).in("status",OPEN),
-    supabase.from("arc_orders").select("id,order_number,status,payment_status,customer_name,total,created_at").eq("organization_id",organization.id).in("payment_status",PAYMENT).not("status","in","(cancelled,refunded)").order("created_at",{ascending:false}).limit(8),
+    supabase.from("arc_orders").select("id,order_number,status,payment_status,customer_name,total,created_at,metadata").eq("organization_id",organization.id).in("payment_status",PAYMENT).not("status","in","(cancelled,refunded)").order("created_at",{ascending:false}).limit(8),
     supabase.from("arc_orders").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).in("payment_status",PAYMENT).not("status","in","(cancelled,refunded)"),
     // Kritik: stok sıfır ya da eksi ve stoksuz satış kapalı (mağazada satın alınamıyor).
     supabase.from("arc_product_variants").select("id,product_id,sku,stock,allow_backorder").eq("organization_id",organization.id).lte("stock",0).eq("allow_backorder",false).order("stock",{ascending:true}).limit(8),
@@ -82,6 +97,9 @@ export default async function Operations(){
       </div>
     </section>
 
+    {params.ok==="payment"?<Notice title={`${params.order??"Sipariş"} için havale ödemesi onaylandı.`}>Sipariş onaylandı; müşterinin e-posta adresi varsa “Ödemeniz alındı” bildirimi gönderildi.</Notice>:null}
+    {params.error?<Notice tone="error" title="Ödeme onaylanamadı">{PAYMENT_ERRORS[params.error]??params.error}</Notice>:null}
+
     <div className="dash">
       {/* Renk anlamlı: sıfır olan sayaç nötr, dolu olan dikkat. */}
       <section className="ac-metrics" aria-label="Operasyon özeti">
@@ -114,9 +132,21 @@ export default async function Operations(){
           <div className="dash-card-head">
             <div><h2>Ödeme kontrolü</h2><p>Ödeme bekleyen, onaylanmış ama tahsil edilmemiş veya başarısız.</p></div>
           </div>
-          {(paymentPending??[]).length?<div className="dash-list">{(paymentPending??[]).map(order=>(
-            <ActionRow key={order.id} href={`/siparisler/${order.id}`} icon="lira" tone={order.payment_status==="failed"?"danger":"warning"} title={order.order_number} detail={`${paymentStatusLabel(order.payment_status)} · ${order.customer_name||"Müşteri"}`} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>
-          ))}</div>:<p className="dash-empty">Ödeme bekleyen sipariş bulunmuyor.</p>}
+          {(paymentPending??[]).length?<div className="dash-list">{(paymentPending??[]).map(order=>{
+            const transfer=isBankTransfer(order.metadata);
+            const row=<ActionRow href={`/siparisler/${order.id}`} icon="lira" tone={order.payment_status==="failed"?"danger":"warning"} title={order.order_number} detail={`${paymentStatusLabel(order.payment_status)}${transfer?" · Havale":""} · ${order.customer_name||"Müşteri"}`} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>;
+            /* Havale ödemesi burada tek tıkla onaylanır; kart ödemesi PayTR bildirimiyle kapanır. */
+            return transfer&&canManage&&order.payment_status!=="failed"?(
+              <div className="ops-pay" key={order.id}>
+                {row}
+                <form action={confirmTransferPayment}>
+                  <input type="hidden" name="order_id" value={order.id}/>
+                  <input type="hidden" name="back" value="/operasyon"/>
+                  <ConfirmSubmit className="ac-btn ops-pay-btn" message={`${order.order_number} için ${money.format(order.total/100)} havale ödemesi alındı olarak işaretlensin mi? Müşteriye “Ödemeniz alındı” e-postası gönderilir.`}>Ödeme alındı</ConfirmSubmit>
+                </form>
+              </div>
+            ):<div key={order.id}>{row}</div>;
+          })}</div>:<p className="dash-empty">Ödeme bekleyen sipariş bulunmuyor.</p>}
         </article>
 
         <article className="dash-card">
