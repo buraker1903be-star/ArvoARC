@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
+import { getStoreBrand, type StoreBrand } from "@/lib/store-brand";
 import { sendEmail } from "@/lib/email/resend";
 import { statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { isOrderClosed } from "@/lib/commerce-labels";
@@ -52,14 +53,14 @@ export async function createOrder(formData: FormData) {
 }
 
 /* Müşteri bildirimi; gönderim hatası durum güncellemesini geçersiz kılmaz. */
-async function notifyStatus(order: { order_number: string; customer_name: string | null; customer_email: string | null; metadata?: unknown; payment_status?: string | null }, status: string) {
+async function notifyStatus(order: { order_number: string; customer_name: string | null; customer_email: string | null; metadata?: unknown; payment_status?: string | null }, status: string, brand: StoreBrand) {
   if (!order.customer_email) return;
   try {
     /* Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti. */
     const trackingSent = Boolean((order.metadata as { tracking_number?: string } | null)?.tracking_number);
     /* Ödenmemiş siparişin iptalinde iade vaadi yerine "tutar alınmadı" yazılır. */
     const unpaid = Boolean(order.payment_status) && !["paid", "partially_refunded", "refunded"].includes(order.payment_status ?? "");
-    const mail = statusUpdateEmail(status, order.order_number, order.customer_name || "değerli müşterimiz", { trackingSent, unpaid });
+    const mail = statusUpdateEmail(status, order.order_number, order.customer_name || "değerli müşterimiz", brand, { trackingSent, unpaid });
     if (mail) await sendEmail({ to: order.customer_email, ...mail });
   } catch (mailError) {
     console.error("Durum bildirimi gönderilemedi:", order.order_number, mailError);
@@ -120,7 +121,7 @@ export async function quickStatus(formData: FormData) {
 
   if (error) redirect(backTo(formData, { error: "save-failed" }));
 
-  await notifyStatus(order, status);
+  await notifyStatus(order, status, await getStoreBrand(supabase, membership.organization_id));
 
   revalidatePath("/");
   revalidatePath("/siparisler");
@@ -167,7 +168,7 @@ export async function confirmTransferPayment(formData: FormData) {
   });
   if (error) redirect(back({ error: "save-failed" }));
 
-  await notifyTransferPaid(order);
+  await notifyTransferPaid(order, await getStoreBrand(supabase, membership.organization_id));
 
   revalidatePath("/");
   revalidatePath("/operasyon");
@@ -215,7 +216,7 @@ export async function cancelTransferOrder(formData: FormData) {
   });
   if (error) redirect(back({ error: "save-failed" }));
 
-  await notifyStatus(order, "cancelled");
+  await notifyStatus(order, "cancelled", await getStoreBrand(supabase, membership.organization_id));
 
   revalidatePath("/");
   revalidatePath("/operasyon");
@@ -263,7 +264,8 @@ export async function bulkStatus(formData: FormData) {
     else updated.push(order);
   }
 
-  await Promise.all(updated.map((order) => notifyStatus(order, status)));
+  const toplu = await getStoreBrand(supabase, membership.organization_id);
+  await Promise.all(updated.map((order) => notifyStatus(order, status, toplu)));
 
   revalidatePath("/");
   revalidatePath("/siparisler");

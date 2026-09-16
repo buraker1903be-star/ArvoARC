@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { storePaytrConfig, type PaytrStoreConfig } from "@/lib/paytr/config";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { resolveStore, storefrontCorsHeaders } from "@/lib/storefront-origin";
+import { getStoreBrand } from "@/lib/store-brand";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email/resend";
 import { transferOrderEmail } from "@/lib/email/order-confirmation";
@@ -27,7 +28,9 @@ async function sendTransferConfirmation(
   const { data: bank } = orderRow
     ? await supabase.from("arc_store_settings").select("bank_name, bank_account_holder, bank_iban, bank_transfer_instructions").eq("organization_id", orderRow.organization_id).maybeSingle()
     : { data: null };
+  const brand = await getStoreBrand(supabase, orderRow?.organization_id ?? "");
   const mail = transferOrderEmail({
+    brand,
     orderNumber: order.order_number,
     customerName: customerName || "değerli müşterimiz",
     items: (items ?? []).map((item: { product_name: string; quantity: number; total: number }) => ({ name: item.product_name, quantity: item.quantity, total: item.total })),
@@ -35,7 +38,7 @@ async function sendTransferConfirmation(
     transferDiscount,
     bank: bank ? { holder: bank.bank_account_holder, name: bank.bank_name, iban: bank.bank_iban, note: bank.bank_transfer_instructions } : null,
   });
-  await sendEmail({ to, ...mail });
+  await sendEmail({ to, ...mail, from: brand.from, replyTo: brand.replyTo });
 }
 
 /* Sahte sipariş yığınına karşı: IP başına 10 dakikada 10 ödeme denemesi. */

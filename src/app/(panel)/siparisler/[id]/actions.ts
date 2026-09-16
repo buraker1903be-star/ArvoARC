@@ -10,6 +10,7 @@ import { isBankTransfer } from "@/lib/payment-method";
 import { refundOutcome } from "@/lib/refund";
 import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock";
 import { requireTenant } from "@/lib/tenant";
+import { getStoreBrand } from "@/lib/store-brand";
 
 const roles=new Set(["owner","admin","manager"]);
 const orderStatuses=new Set(["pending","confirmed","processing","fulfilled","cancelled","refunded"]);
@@ -54,7 +55,7 @@ export async function updateOrderStatus(formData:FormData){
       const trackingSent=Boolean((order?.metadata as {tracking_number?:string}|null)?.tracking_number);
       /* Ödenmemiş siparişin iptalinde iade vaadi yerine "tutar alınmadı" yazılır. */
       const unpaid=!["paid","partially_refunded","refunded"].includes(paymentStatus);
-      const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz",{trackingSent,unpaid});
+      const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz",await getStoreBrand(supabase,organization.id),{trackingSent,unpaid});
       if(order?.customer_email&&mail){
         await sendEmail({to:order.customer_email,...mail});
       }
@@ -69,7 +70,7 @@ export async function updateOrderStatus(formData:FormData){
     yeniden kaydetmek ikinci e-posta göndermez.
   */
   if(!error&&ownedOrder.payment_status!=="paid"&&paymentStatus==="paid"&&isBankTransfer(ownedOrder.metadata)){
-    await notifyTransferPaid(ownedOrder);
+    await notifyTransferPaid(ownedOrder, await getStoreBrand(supabase, organization.id));
   }
   if(error)redirect(`/siparisler/${orderId}?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/");revalidatePath("/siparisler");revalidatePath("/stok");revalidatePath("/urunler");revalidatePath(`/siparisler/${orderId}`);
@@ -117,6 +118,7 @@ export async function updateFulfillmentDetails(formData:FormData){
           to:order.customer_email,
           subject:`Siparişiniz kargoda · ${order.order_number}`,
           html:shippingNoticeHtml({
+          brand: await getStoreBrand(supabase, organization.id),
             orderNumber:order.order_number,
             customerName:order.customer_name||"değerli müşterimiz",
             carrier:carrier||"Kargo",
@@ -288,8 +290,9 @@ export async function refundOrder(formData: FormData) {
     try {
       const customerName = order.customer_name || "değerli müşterimiz";
       const mail = outcome.full
-        ? statusUpdateEmail("refunded", order.order_number, customerName)
-        : partialRefundEmail({ orderNumber: order.order_number, customerName, amount: amountKurus, shipped: order.status === "fulfilled" });
+        ? statusUpdateEmail("refunded", order.order_number, customerName, await getStoreBrand(supabase, organization.id))
+        : partialRefundEmail({
+          brand: await getStoreBrand(supabase, organization.id), orderNumber: order.order_number, customerName, amount: amountKurus, shipped: order.status === "fulfilled" });
       if (mail) await sendEmail({ to: order.customer_email, ...mail });
     } catch (mailError) {
       console.error("İade bildirimi gönderilemedi:", mailError);

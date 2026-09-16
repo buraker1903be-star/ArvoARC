@@ -1,4 +1,5 @@
 import "server-only";
+import type { StoreBrand } from "@/lib/store-brand";
 
 /**
  * Sipariş onay e-postası şablonu.
@@ -19,7 +20,25 @@ const money = (kurus: number) =>
     currency: "TRY",
   }).format(kurus / 100);
 
+
+/*
+  Marka parçaları mağazadan geliyor (lib/store-brand.ts). Önceden logo,
+  hesap bağlantısı ve altbilgideki unvan/adres bu dosyada sabitti; ikinci
+  mağazanın müşterisi ArvoCulture logolu e-posta alırdı.
+*/
+const brandLogo = (brand: StoreBrand) =>
+  brand.logoUrl
+    ? `<img src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.name)}" height="18"
+           style="display:block;max-width:180px;height:auto;margin:0 0 20px;border:0;">`
+    : `<p style="margin:0 0 20px;font-size:17px;font-weight:600;color:#10120f;">${escapeHtml(brand.name)}</p>`;
+
+const brandFooter = (brand: StoreBrand) =>
+  [brand.legalName, brand.legalAddress].filter(Boolean).map((satir) => escapeHtml(String(satir))).join("<br>");
+
+const hesapLinki = (brand: StoreBrand) => `${brand.siteUrl}/hesap`;
+
 export function orderConfirmationHtml({
+  brand,
   orderNumber,
   customerName,
   items,
@@ -29,6 +48,7 @@ export function orderConfirmationHtml({
   total,
   address,
 }: {
+  brand: StoreBrand;
   orderNumber: string;
   customerName: string;
   items: OrderEmailItem[];
@@ -83,10 +103,7 @@ export function orderConfirmationHtml({
           olarak engelliyor; bu yüzden alt metin anlamlı ve
           yüksekliği sabit — engellenen görsel düzeni bozmasın.
         -->
-        <img src="https://arvoculture.com/arvoculture-logo-transparent.png"
-             alt="ArvoCulture"
-             width="150" height="18"
-             style="display:block;width:150px;height:auto;margin:0 0 18px;border:0;">
+        ${brandLogo(brand)}
         <h1 style="margin:0 0 6px;font-size:24px;line-height:1.25;color:#10120f;font-weight:600;">
           Siparişiniz alındı
         </h1>
@@ -151,7 +168,7 @@ export function orderConfirmationHtml({
 
     <tr>
       <td style="padding:28px;">
-        <a href="https://arvoculture.com/hesap"
+        <a href="${hesapLinki(brand)}"
            style="display:inline-block;padding:13px 24px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
           Siparişimi görüntüle
         </a>
@@ -171,8 +188,7 @@ export function orderConfirmationHtml({
   </table>
 
   <p style="max-width:560px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
-    ARVOCULTURE GROUP TEKNOLOJİ SANAYİ VE TİCARET LTD. ŞTİ.<br>
-    Yakuplu Mah. Hürriyet Bulvarı, Skyport Residence No:1 D:113, Beylikdüzü / İstanbul
+    ${brandFooter(brand)}
   </p>
 </body>
 </html>`;
@@ -185,7 +201,7 @@ export function orderConfirmationHtml({
  * ulaşmadığını öğrenemiyordu. Kart ödemesinde bu bilgiyi PayTR
  * onayıyla giden e-posta zaten veriyor.
  */
-export function paymentReceivedEmail(orderNumber: string, customerName: string, amount: number) {
+export function paymentReceivedEmail(orderNumber: string, customerName: string, amount: number, brand: StoreBrand) {
   return {
     subject: `Ödemeniz alındı · ${orderNumber}`,
     html: `<!DOCTYPE html>
@@ -194,8 +210,7 @@ export function paymentReceivedEmail(orderNumber: string, customerName: string, 
 <body style="margin:0;padding:24px 12px;background:#f4f3ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;">
     <tr><td style="padding:32px 28px;">
-      <img src="https://arvoculture.com/arvoculture-logo-transparent.png" alt="ArvoCulture" width="150" height="18"
-           style="display:block;width:150px;height:auto;margin:0 0 22px;border:0;">
+      ${brandLogo(brand)}
       <h1 style="margin:0 0 10px;font-size:22px;line-height:1.3;color:#10120f;font-weight:600;">Ödemeniz alındı</h1>
       <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#5a5f54;">Merhaba ${escapeHtml(customerName)},</p>
       <p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
@@ -206,14 +221,14 @@ export function paymentReceivedEmail(orderNumber: string, customerName: string, 
           Sipariş numaranız <strong style="color:#10120f;"> ${escapeHtml(orderNumber)}</strong>
         </td></tr>
       </table>
-      <a href="https://arvoculture.com/hesap"
+      <a href="${hesapLinki(brand)}"
          style="display:inline-block;margin:20px 0 0;padding:13px 26px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
         Siparişimi görüntüle
       </a>
     </td></tr>
   </table>
   <p style="max-width:520px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
-    ARVOCULTURE GROUP TEKNOLOJİ SANAYİ VE TİCARET LTD. ŞTİ.
+    ${brandFooter(brand)}
   </p>
 </body>
 </html>`,
@@ -232,6 +247,7 @@ const formatIban = (iban: string) => iban.replace(/\s+/g, "").toUpperCase().repl
  * girilmemişse banka bölümü yerine yönlendirme yazılır.
  */
 export function transferOrderEmail({
+  brand,
   orderNumber,
   customerName,
   items,
@@ -239,6 +255,7 @@ export function transferOrderEmail({
   transferDiscount = 0,
   bank,
 }: {
+  brand: StoreBrand;
   orderNumber: string;
   customerName: string;
   items: OrderEmailItem[];
@@ -287,8 +304,7 @@ export function transferOrderEmail({
 <body style="margin:0;padding:24px 12px;background:#f4f3ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;">
     <tr><td style="padding:32px 28px;">
-      <img src="https://arvoculture.com/arvoculture-logo-transparent.png" alt="ArvoCulture" width="150" height="18"
-           style="display:block;width:150px;height:auto;margin:0 0 18px;border:0;">
+      ${brandLogo(brand)}
       <h1 style="margin:0 0 6px;font-size:24px;line-height:1.25;color:#10120f;font-weight:600;">Siparişiniz alındı</h1>
       <p style="margin:0;font-size:14px;line-height:1.65;color:#5a5f54;">
         Merhaba ${escapeHtml(customerName)}, siparişiniz oluşturuldu. Havale veya EFT ile ödemeniz ulaştığında hazırlanmaya başlayacak.
@@ -315,7 +331,7 @@ export function transferOrderEmail({
     </td></tr>
   </table>
   <p style="max-width:560px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
-    ARVOCULTURE GROUP TEKNOLOJİ SANAYİ VE TİCARET LTD. ŞTİ.
+    ${brandFooter(brand)}
   </p>
 </body>
 </html>`,
@@ -339,12 +355,14 @@ function escapeHtml(value: string) {
  * sitesinde arama yapmak zorunda kalmasın.
  */
 export function shippingNoticeHtml({
+  brand,
   orderNumber,
   customerName,
   carrier,
   trackingNumber,
   trackingUrl,
 }: {
+  brand: StoreBrand;
   orderNumber: string;
   customerName: string;
   carrier: string;
@@ -365,9 +383,7 @@ export function shippingNoticeHtml({
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;">
     <tr>
       <td style="padding:32px 28px;">
-        <img src="https://arvoculture.com/arvoculture-logo-transparent.png"
-             alt="ArvoCulture" width="150" height="18"
-             style="display:block;width:150px;height:auto;margin:0 0 22px;border:0;">
+        ${brandLogo(brand)}
 
         <h1 style="margin:0 0 10px;font-size:22px;line-height:1.3;color:#10120f;font-weight:600;">
           Siparişiniz kargoda
@@ -401,7 +417,7 @@ export function shippingNoticeHtml({
   </table>
 
   <p style="max-width:520px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
-    ARVOCULTURE GROUP TEKNOLOJİ SANAYİ VE TİCARET LTD. ŞTİ.
+    ${brandFooter(brand)}
   </p>
 </body>
 </html>`;
@@ -446,6 +462,7 @@ export function statusUpdateEmail(
   status: string,
   orderNumber: string,
   customerName: string,
+  brand: StoreBrand,
   options: { trackingSent?: boolean; unpaid?: boolean } = {},
 ) {
   const message = status === "cancelled" && options.unpaid ? UNPAID_CANCELLED : STATUS_MESSAGES[status];
@@ -453,11 +470,11 @@ export function statusUpdateEmail(
   if (!message) return null;
   // Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti; ikincisi gürültü.
   if (status === "fulfilled" && options.trackingSent) return null;
-  return noticeEmail(message, orderNumber, customerName);
+  return noticeEmail(message, orderNumber, customerName, brand);
 }
 
 /** Tek paragraflık bildirim e-postası: durum güncellemesi ve kısmi iade aynı şablonu kullanır. */
-function noticeEmail(message: { title: string; body: string }, orderNumber: string, customerName: string) {
+function noticeEmail(message: { title: string; body: string }, orderNumber: string, customerName: string, brand: StoreBrand) {
   return {
     subject: `${message.title} · ${orderNumber}`,
     html: `<!DOCTYPE html>
@@ -467,9 +484,7 @@ function noticeEmail(message: { title: string; body: string }, orderNumber: stri
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;">
     <tr>
       <td style="padding:32px 28px;">
-        <img src="https://arvoculture.com/arvoculture-logo-transparent.png"
-             alt="ArvoCulture" width="150" height="18"
-             style="display:block;width:150px;height:auto;margin:0 0 22px;border:0;">
+        ${brandLogo(brand)}
 
         <h1 style="margin:0 0 10px;font-size:22px;line-height:1.3;color:#10120f;font-weight:600;">
           ${escapeHtml(message.title)}
@@ -491,7 +506,7 @@ function noticeEmail(message: { title: string; body: string }, orderNumber: stri
           </tr>
         </table>
 
-        <a href="https://arvoculture.com/hesap"
+        <a href="${hesapLinki(brand)}"
            style="display:inline-block;margin:20px 0 0;padding:13px 26px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
           Siparişimi görüntüle
         </a>
@@ -500,7 +515,7 @@ function noticeEmail(message: { title: string; body: string }, orderNumber: stri
   </table>
 
   <p style="max-width:520px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
-    ARVOCULTURE GROUP TEKNOLOJİ SANAYİ VE TİCARET LTD. ŞTİ.
+    ${brandFooter(brand)}
   </p>
 </body>
 </html>`,
@@ -515,11 +530,13 @@ function noticeEmail(message: { title: string; body: string }, orderNumber: stri
  * iadede müşteriye hiç e-posta gitmiyordu.
  */
 export function partialRefundEmail({
+  brand,
   orderNumber,
   customerName,
   amount,
   shipped,
 }: {
+  brand: StoreBrand;
   orderNumber: string;
   customerName: string;
   amount: number;
@@ -530,7 +547,7 @@ export function partialRefundEmail({
     `Siparişiniz için ${money(amount)} tutarında iade işlemi başlatıldı. Tutarın kartınıza yansıma süresi bankanıza bağlıdır; genellikle birkaç iş günü sürer.`,
     shipped ? "" : "Siparişinizin kalan ürünleri hazırlanıp kargoya verilmeye devam edecek.",
   ].filter(Boolean).join(" ");
-  return noticeEmail({ title: "Kısmi iadeniz başlatıldı", body }, orderNumber, customerName);
+  return noticeEmail({ title: "Kısmi iadeniz başlatıldı", body }, orderNumber, customerName, brand);
 }
 
 /**
@@ -541,12 +558,14 @@ export function partialRefundEmail({
  * kalmamalı.
  */
 export function returnDecisionEmail({
+  brand,
   approved,
   orderNumber,
   customerName,
   amount,
   note,
 }: {
+  brand: StoreBrand;
   approved: boolean;
   orderNumber: string;
   customerName: string;
@@ -607,9 +626,7 @@ export function returnDecisionEmail({
 <body style="margin:0;padding:24px 12px;background:#f4f3ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;">
     <tr><td style="padding:32px 28px;">
-      <img src="https://arvoculture.com/arvoculture-logo-transparent.png"
-           alt="ArvoCulture" width="150" height="18"
-           style="display:block;width:150px;height:auto;margin:0 0 22px;border:0;">
+      ${brandLogo(brand)}
       <h1 style="margin:0 0 10px;font-size:22px;line-height:1.3;color:#10120f;font-weight:600;">
         ${escapeHtml(title)}
       </h1>

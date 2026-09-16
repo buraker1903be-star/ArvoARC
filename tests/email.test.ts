@@ -1,18 +1,31 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { orderConfirmationHtml, partialRefundEmail, paymentReceivedEmail, statusUpdateEmail, transferOrderEmail } from "@/lib/email/order-confirmation";
+import type { StoreBrand } from "@/lib/store-brand";
+
+/* Şablonlar marka bilgisini mağazadan alıyor; testte sabit bir marka yeter. */
+const TEST_BRAND: StoreBrand = {
+  name: "Test Mağaza",
+  logoUrl: null,
+  siteUrl: "https://test.example",
+  legalName: "TEST LTD. ŞTİ.",
+  legalAddress: "Test Mah., İstanbul",
+  from: "Test <test@example.com>",
+  replyTo: "info@example.com",
+};
+
 
 test("kısmi iade e-postası tutarı ve kalan ürünlerin gönderileceğini yazar", () => {
-  const mail = partialRefundEmail({ orderNumber: "#AC-2002", customerName: "<b>Elif</b>", amount: 25050, shipped: false });
+  const mail = partialRefundEmail({ brand: TEST_BRAND, orderNumber: "#AC-2002", customerName: "<b>Elif</b>", amount: 25050, shipped: false });
   assert.equal(mail.subject, "Kısmi iadeniz başlatıldı · #AC-2002");
   assert.ok(mail.html.includes("₺250,50"), "tutar");
   assert.ok(mail.html.includes("kalan ürünleri"), "kalan ürünler");
   assert.ok(!mail.html.includes("<b>Elif</b>"), "ad kaçışlanır");
-  assert.ok(!partialRefundEmail({ orderNumber: "#AC-2002", customerName: "Elif", amount: 25050, shipped: true }).html.includes("kalan ürünleri"));
+  assert.ok(!partialRefundEmail({ brand: TEST_BRAND, orderNumber: "#AC-2002", customerName: "Elif", amount: 25050, shipped: true }).html.includes("kalan ürünleri"));
 });
 
 test("havale ödemesi alındı e-postası", () => {
-  const mail = paymentReceivedEmail("#AC-2001", "<b>Elif</b>", 184203);
+  const mail = paymentReceivedEmail("#AC-2001", "<b>Elif</b>", 184203, TEST_BRAND);
   assert.equal(mail.subject, "Ödemeniz alındı · #AC-2001");
   assert.ok(mail.html.includes("₺1.842,03"), "tutar");
   assert.ok(mail.html.includes("&lt;b&gt;Elif&lt;/b&gt;") && !mail.html.includes("<b>Elif</b>"), "kaçış");
@@ -20,6 +33,7 @@ test("havale ödemesi alındı e-postası", () => {
 
 test("havale e-postası: ödenecek tutar, indirim ve dörtlü IBAN", () => {
   const mail = transferOrderEmail({
+    brand: TEST_BRAND,
     orderNumber: "#AC-2001", customerName: "Elif",
     items: [{ name: "Denim Ceket", quantity: 1, total: 189900 }],
     total: 184203, transferDiscount: 5697,
@@ -33,59 +47,60 @@ test("havale e-postası: ödenecek tutar, indirim ve dörtlü IBAN", () => {
 });
 
 test("havale e-postası: IBAN yoksa banka bölümü yerine yönlendirme", () => {
-  const mail = transferOrderEmail({ orderNumber: "#AC-2", customerName: "Elif", items: [], total: 1000, bank: { iban: "" } });
+  const mail = transferOrderEmail({ brand: TEST_BRAND, orderNumber: "#AC-2", customerName: "Elif", items: [], total: 1000, bank: { iban: "" } });
   assert.ok(!mail.html.includes("IBAN"));
   assert.ok(mail.html.includes("Banka bilgileri sipariş onay sayfasında"));
 });
 
 test("havale e-postası: metinler HTML'e kaçışla girer", () => {
-  const mail = transferOrderEmail({ orderNumber: "#AC-3", customerName: "<i>x</i>", items: [{ name: "<script>", quantity: 1, total: 100 }], total: 100, bank: { iban: "TR00", holder: "A&B" } });
+  const mail = transferOrderEmail({ brand: TEST_BRAND, orderNumber: "#AC-3", customerName: "<i>x</i>", items: [{ name: "<script>", quantity: 1, total: 100 }], total: 100, bank: { iban: "TR00", holder: "A&B" } });
   assert.ok(mail.html.includes("&lt;i&gt;x&lt;/i&gt;") && mail.html.includes("&lt;script&gt;") && mail.html.includes("A&amp;B"));
   assert.ok(!mail.html.includes("<script>"));
 });
 
 test("kargoya verilen sipariş (fulfilled) müşteriye bildirilir", () => {
-  const mail = statusUpdateEmail("fulfilled", "#AC-1001", "Elif");
+  const mail = statusUpdateEmail("fulfilled", "#AC-1001", "Elif", TEST_BRAND);
   assert.equal(mail?.subject, "Siparişiniz kargoya verildi · #AC-1001");
 });
 
 test("takip numarası girildiyse ikinci kargo e-postası gitmez", () => {
-  assert.equal(statusUpdateEmail("fulfilled", "#AC-1001", "Elif", { trackingSent: true }), null);
+  assert.equal(statusUpdateEmail("fulfilled", "#AC-1001", "Elif", TEST_BRAND, { trackingSent: true }), null);
 });
 
 test("iptal ve iade bildirilir; takip seçeneği onları etkilemez", () => {
-  assert.equal(statusUpdateEmail("cancelled", "#AC-1", "Elif", { trackingSent: true })?.subject, "Siparişiniz iptal edildi · #AC-1");
-  assert.equal(statusUpdateEmail("refunded", "#AC-1", "Elif")?.subject, "İadeniz tamamlandı · #AC-1");
+  assert.equal(statusUpdateEmail("cancelled", "#AC-1", "Elif", TEST_BRAND, { trackingSent: true })?.subject, "Siparişiniz iptal edildi · #AC-1");
+  assert.equal(statusUpdateEmail("refunded", "#AC-1", "Elif", TEST_BRAND)?.subject, "İadeniz tamamlandı · #AC-1");
 });
 
 test("ödenmemiş siparişin iptalinde iade vaadi yok", () => {
-  const unpaid = statusUpdateEmail("cancelled", "#AC-1", "Elif", { unpaid: true });
+  const unpaid = statusUpdateEmail("cancelled", "#AC-1", "Elif", TEST_BRAND, { unpaid: true });
   assert.equal(unpaid?.subject, "Siparişiniz iptal edildi · #AC-1");
   assert.ok(unpaid?.html.includes("herhangi bir tutar tahsil edilmedi"));
   assert.ok(!unpaid?.html.includes("iade edilir"));
 });
 
 test("ödenmiş siparişin iptalinde iade bilgisi korunur", () => {
-  const paid = statusUpdateEmail("cancelled", "#AC-1", "Elif", { unpaid: false });
+  const paid = statusUpdateEmail("cancelled", "#AC-1", "Elif", TEST_BRAND, { unpaid: false });
   assert.ok(paid?.html.includes("iade edilir"));
   // unpaid yalnızca iptali etkiler
-  assert.equal(statusUpdateEmail("fulfilled", "#AC-1", "Elif", { unpaid: true })?.subject, "Siparişiniz kargoya verildi · #AC-1");
+  assert.equal(statusUpdateEmail("fulfilled", "#AC-1", "Elif", TEST_BRAND, { unpaid: true })?.subject, "Siparişiniz kargoya verildi · #AC-1");
 });
 
 test("ara durumlar e-posta üretmez", () => {
   for (const status of ["pending", "confirmed", "processing", "shipped", "delivered"]) {
-    assert.equal(statusUpdateEmail(status, "#AC-1", "Elif"), null, status);
+    assert.equal(statusUpdateEmail(status, "#AC-1", "Elif", TEST_BRAND), null, status);
   }
 });
 
 test("müşteri adı HTML'e kaçışla girer", () => {
-  const mail = statusUpdateEmail("cancelled", "#AC-1", "<b>Elif</b>");
+  const mail = statusUpdateEmail("cancelled", "#AC-1", "<b>Elif</b>", TEST_BRAND);
   assert.ok(mail?.html.includes("&lt;b&gt;Elif&lt;/b&gt;"));
   assert.ok(!mail?.html.includes("<b>Elif</b>"));
 });
 
 test("onay e-postasında tutarlar TL biçiminde", () => {
   const html = orderConfirmationHtml({
+    brand: TEST_BRAND,
     orderNumber: "#AC-1", customerName: "Elif",
     items: [{ name: "Denim Ceket", quantity: 2, total: 379800 }],
     subtotal: 379800, discount: 37980, shipping: 0, total: 341820,

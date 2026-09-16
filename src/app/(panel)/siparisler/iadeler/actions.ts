@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
+import { getStoreBrand } from "@/lib/store-brand";
 import { refundPayment } from "@/lib/paytr/refund";
 import { sendEmail } from "@/lib/email/resend";
 import { returnDecisionEmail } from "@/lib/email/order-confirmation";
@@ -93,6 +94,7 @@ export async function resolveReturn(formData: FormData) {
     if (order.customer_email) {
       try {
         const mail = returnDecisionEmail({
+          brand: await getStoreBrand(supabase, organization.id),
           approved: false,
           orderNumber: order.order_number,
           customerName: order.customer_name || "değerli müşterimiz",
@@ -136,6 +138,7 @@ export async function resolveReturn(formData: FormData) {
     if (order.customer_email) {
       try {
         const mail = returnDecisionEmail({
+          brand: await getStoreBrand(supabase, organization.id),
           approved: true,
           orderNumber: order.order_number,
           customerName: order.customer_name || "değerli müşterimiz",
@@ -303,6 +306,7 @@ export async function resolveReturn(formData: FormData) {
   if (order.customer_email) {
     try {
       const mail = returnDecisionEmail({
+          brand: await getStoreBrand(supabase, organization.id),
         approved: true,
         orderNumber: order.order_number,
         customerName: order.customer_name || "değerli müşterimiz",

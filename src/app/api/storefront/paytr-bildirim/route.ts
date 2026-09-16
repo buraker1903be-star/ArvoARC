@@ -3,6 +3,7 @@ import { storePaytrConfig } from "@/lib/paytr/config";
 import { sendEmail } from "@/lib/email/resend";
 import { orderConfirmationHtml } from "@/lib/email/order-confirmation";
 import { createServiceClient } from "@/lib/paytr/service-client";
+import { getStoreBrand } from "@/lib/store-brand";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -173,7 +174,7 @@ async function sendOrderConfirmation(
   const { data: order } = await supabase
     .from("arc_orders")
     .select(
-      "order_number, customer_name, customer_email, subtotal, shipping, total, metadata",
+      "order_number, customer_name, customer_email, subtotal, shipping, total, metadata, organization_id",
     )
     .eq("id", orderId)
     .single();
@@ -191,7 +192,9 @@ async function sendOrderConfirmation(
     string | null
   >;
 
+  const brand = await getStoreBrand(supabase, order.organization_id);
   const html = orderConfirmationHtml({
+    brand,
     orderNumber: order.order_number,
     customerName: order.customer_name || "değerli müşterimiz",
     items: (items ?? []).map((item: {
@@ -216,8 +219,10 @@ async function sendOrderConfirmation(
   });
 
   await sendEmail({
+    from: brand.from,
+    replyTo: brand.replyTo,
     to: order.customer_email,
-    subject: `Siparişiniz alındı · ${order.order_number}`,
+    subject: `${brand.name} · siparişiniz alındı · ${order.order_number}`,
     html,
   });
 }
