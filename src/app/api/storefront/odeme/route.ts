@@ -146,6 +146,38 @@ export async function POST(request: Request) {
   const supabase = createServiceClient();
 
   /*
+    Ödeme gecikmesinde mağaza kademeli kapanır (public.arc_store_stage).
+    "sales_closed" ve "closed" kademelerinde yeni sipariş alınmaz — kartla da
+    havaleyle de. Panel bir kademe önce kapanmıştı; vitrinin tamamen kapanması
+    ise vitrin projesinde.
+
+    Kurum slug ile çözülüyor: bu uç zaten tek mağazaya göre yazılmış
+    (create_arvoculture_storefront_order). Çok mağazalı hale gelince ikisi
+    birlikte düzeltilmeli.
+
+    Kurum ya da kademe okunamazsa engellenmez: geçici bir arıza satışı durdurmamalı.
+  */
+  const { data: storeOrganization } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", process.env.STOREFRONT_ORGANIZATION_SLUG ?? "arvoculture")
+    .maybeSingle();
+  if (storeOrganization) {
+    const { data: stage } = await supabase.rpc("arc_store_stage", {
+      p_organization_id: storeOrganization.id,
+    });
+    if (stage === "sales_closed" || stage === "closed") {
+      return NextResponse.json(
+        {
+          error: "store_suspended",
+          message: "Mağaza şu anda sipariş alamıyor. Lütfen daha sonra tekrar deneyin.",
+        },
+        { status: 503, headers },
+      );
+    }
+  }
+
+  /*
     Kupon son bir kez doğrulanıyor. Sepette geçerliyken ödeme
     anında dolmuş olabilir: son kullanım hakkını başka bir
     müşteri almış olabilir ya da müşteri aynı kodu ikinci kez

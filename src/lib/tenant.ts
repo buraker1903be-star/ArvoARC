@@ -20,5 +20,17 @@ export const requireTenant = cache(async function requireTenant() {
     redirect("/login?error=organization-inactive");
   }
   if(!tenant.commerce_enabled)redirect("/login?error=commerce-disabled");
+  /*
+    Arc aboneliği ArvoOS üzerinden yönetilir. Kademe kuralı veritabanında
+    tek yerde (public.arc_store_stage); panel "open" dışındaki her kademede
+    kapanır — ödeme gecikince ilk kapanan panel, vitrin ve satış bir süre
+    daha sürer.
+
+    Kademe hiç gelmezse (RPC'nin eski sürümü yayındaysa) engellenmez:
+    yayın sırası yüzünden mağaza sahibi paneline kilitlenmemeli.
+  */
+  if(tenant.arc_stage&&tenant.arc_stage!=="open"){
+    redirect("/login?error=license-inactive");
+  }
   return {supabase,user:{id:userId},membership:{organization_id:organization.id,role:tenant.membership_role},organization};
 });

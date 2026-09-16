@@ -14,6 +14,7 @@ const messages: Record<string, string> = {
   "no-organization": "Bu kullanıcıya bağlı aktif bir organizasyon bulunamadı.",
   "organization-inactive": "Organizasyon aktif değil.",
   "commerce-disabled": "ARVO ARC erişimi bu organizasyon için aktif değil.",
+  "license-inactive": "Arc aboneliğiniz sona ermiş ya da askıya alınmış. Verileriniz duruyor; abonelik yenilenince kaldığınız yerden devam edersiniz.",
   "server-error": "Giriş servisine ulaşılamadı. Sistem yöneticisi yapılandırmayı kontrol etmelidir.",
 };
 
