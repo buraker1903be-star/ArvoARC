@@ -45,6 +45,8 @@ export async function updatePaymentSettings(formData:FormData){
   // Anahtarlar yalnızca yazılır, geri gösterilmez: boş bırakılırsa kayıtlı olan korunur.
   const paytrMerchantKey=String(formData.get("paytr_merchant_key")??"").trim();
   const paytrMerchantSalt=String(formData.get("paytr_merchant_salt")??"").trim();
+  const emailFrom=String(formData.get("email_from")??"").trim();
+  const emailReplyTo=String(formData.get("email_reply_to")??"").trim();
   if(bankTransferEnabled&&(!bankName||!bankAccountHolder||!/^TR\d{24}$/.test(bankIban)))redirect("/ayarlar?error=invalid-bank-transfer");
   if(paytrEnabled&&!paytrMerchantId)redirect("/ayarlar?error=paytr-merchant-required");
   if(!Number.isInteger(paytrMaxInstallment)||paytrMaxInstallment<0||paytrMaxInstallment>12)redirect("/ayarlar?error=invalid-installment");
@@ -55,6 +57,15 @@ export async function updatePaymentSettings(formData:FormData){
     o yüzden ikisi birlikte istenir.
   */
   if((paytrMerchantKey?1:0)!==(paytrMerchantSalt?1:0))redirect("/ayarlar?error=paytr-key-pair-required");
+  /*
+    Gönderen adresi doğrudan e-posta başlığına giriyor. Satır sonu ya da
+    fazladan alan enjekte edilmesini engellemek için biçim sınırlı tutuluyor:
+    ya düz adres ya da "Ad <adres>" kalıbı.
+  */
+  const adres="[^@\\s<>,;]+@[^@\\s<>,;]+\\.[^@\\s<>,;]{2,}";
+  const gonderenGecerli=!emailFrom||new RegExp(`^(${adres}|[^<>\\r\\n]{1,60}<${adres}>)$`).test(emailFrom);
+  const yanitGecerli=!emailReplyTo||new RegExp(`^${adres}$`).test(emailReplyTo);
+  if(!gonderenGecerli||!yanitGecerli)redirect("/ayarlar?error=invalid-email-sender");
   let paytrSecrets:{paytr_merchant_key_enc:string;paytr_merchant_salt_enc:string}|null=null;
   if(paytrMerchantKey&&paytrMerchantSalt){
     if(!paymentCredentialsConfigured())redirect("/ayarlar?error=paytr-encryption-missing");
@@ -65,7 +76,9 @@ export async function updatePaymentSettings(formData:FormData){
     bank_iban:bankIban||null,bank_transfer_instructions:bankTransferInstructions||null,
     paytr_enabled:paytrEnabled,paytr_test_mode:paytrTestMode,paytr_merchant_id:paytrMerchantId||null,
     paytr_no_installment:paytrNoInstallment,paytr_max_installment:paytrMaxInstallment,
-    ...(paytrSecrets??{}),updated_at:new Date().toISOString()
+    ...(paytrSecrets??{}),
+    email_from:emailFrom||null,email_reply_to:emailReplyTo||null,
+    updated_at:new Date().toISOString()
   }).eq("organization_id",organization.id);
   if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/ayarlar");redirect("/ayarlar?saved=payments");

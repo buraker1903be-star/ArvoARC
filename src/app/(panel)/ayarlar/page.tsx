@@ -22,6 +22,7 @@ const ERRORS:Record<string,string>={
   "invalid-bank-transfer":"Havale için banka adı, hesap sahibi ve TR ile başlayan 26 haneli IBAN gerekli.",
   "paytr-merchant-required":"PayTR’ı açmak için mağaza numarası gerekli.",
   "invalid-installment":"Taksit sayısı 0 ile 12 arasında olmalı.",
+  "invalid-email-sender":"Gönderen adresi geçersiz. Ya düz adres yazın (siparis@alanadiniz.com) ya da \"Mağaza Adı <siparis@alanadiniz.com>\" biçiminde.",
   "file-required":"Bir dosya seçin.",
   "invalid-brand-file":"Dosya türü veya boyutu uygun değil.",
   "settings-required":"Önce marka ayarlarını kaydedin.",
@@ -41,7 +42,7 @@ const PENDING:Record<string,string>={
 
 export default async function Settings({searchParams}:{searchParams:Promise<{saved?:string;error?:string}>}){
   const query=await searchParams;const {supabase,organization,membership}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,email_from,email_reply_to").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
   // Anahtarın kendisi hiç okunmaz; yalnızca kayıtlı olup olmadığı gösterilir.
@@ -155,6 +156,15 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
             <div className="check-stack"><label className="check-inline"><input type="checkbox" name="paytr_test_mode" defaultChecked={settings?.paytr_test_mode??true}/> Test modu</label><label className="check-inline"><input type="checkbox" name="paytr_no_installment" defaultChecked={settings?.paytr_no_installment}/> Taksiti kapat</label></div>
           </div>
           <div className="security-note"><b>{keysStored?"Anahtarlarınız kayıtlı.":"Tahsilat kendi PayTR hesabınıza yapılır."}</b><p>Anahtar ve salt şifrelenerek saklanır, hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazmanız yeterli; boş bırakırsanız kayıtlı olan korunur.</p><code>{`https://${callbackHost}/api/storefront/paytr-bildirim`}</code></div>
+        </article>
+        <article className="payment-method">
+          <div className="payment-title"><div><small>MÜŞTERİ E-POSTALARI</small><h4>Gönderen adresi</h4></div></div>
+          <p>Sipariş onayı, kargo bildirimi ve şifre sıfırlama e-postaları bu adresten gider. Boş bırakılırsa platformun varsayılan adresi kullanılır.</p>
+          <div className="payment-fields">
+            <label className="wide">Gönderen<input name="email_from" defaultValue={settings?.email_from??""} placeholder="Mağaza Adı &lt;siparis@alanadiniz.com&gt;" autoComplete="off"/></label>
+            <label className="wide">Yanıt adresi<input name="email_reply_to" type="email" defaultValue={settings?.email_reply_to??""} placeholder="info@alanadiniz.com" autoComplete="off"/></label>
+          </div>
+          <div className="security-note"><b>Önce alan adınızı doğrulatın.</b><p>E-posta sağlayıcısı, sahipliğini kanıtlamadığınız bir alan adından gönderim yapmaz. Doğrulama tamamlanmadan bu alanı doldurursanız e-postalar gönderilemez ve müşterileriniz sipariş onayı alamaz. Alan adı doğrulaması için bizimle iletişime geçin.</p></div>
         </article>
         <button className="payment-save" type="submit">Ödeme ayarlarını kaydet</button>
       </form>:<p className="catalog-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
