@@ -50,6 +50,13 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
   const faviconUrl=settings?.favicon_path?supabase.storage.from("organization-assets").getPublicUrl(settings.favicon_path).data.publicUrl:"";
   const domainStatus=settings?.domain_status??"not_configured";
   const panelDomainStatus=settings?.panel_domain_status??"not_configured";
+  /*
+    PayTR bildirim adresi PANEL alan adındadır, vitrininki değil: bu uç
+    (api/storefront/paytr-bildirim) panel projesinde yayınlanıyor, vitrin
+    ayrı bir Vercel projesi. Ekranda vitrin adresi yazıyordu; o adres 404
+    döndüğü için bildirim hiç ulaşmıyordu.
+  */
+  const callbackHost=panelDomainStatus==="verified"&&settings?.panel_custom_domain?settings.panel_custom_domain:"arc.arvo-os.com";
   return <>
     <section className="ac-bar"><div><h1>Mağaza Ayarları</h1><p>Marka kimliği, alan adları ve ödeme yöntemleri.</p></div></section>
 
@@ -147,7 +154,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
             <label>Mağaza salt (merchant_salt)<input name="paytr_merchant_salt" type="password" placeholder={keysStored?"Kayıtlı · değiştirmek için yazın":"PayTR merchant_salt"} autoComplete="new-password"/></label>
             <div className="check-stack"><label className="check-inline"><input type="checkbox" name="paytr_test_mode" defaultChecked={settings?.paytr_test_mode??true}/> Test modu</label><label className="check-inline"><input type="checkbox" name="paytr_no_installment" defaultChecked={settings?.paytr_no_installment}/> Taksiti kapat</label></div>
           </div>
-          <div className="security-note"><b>{keysStored?"Anahtarlarınız kayıtlı.":"Tahsilat kendi PayTR hesabınıza yapılır."}</b><p>Anahtar ve salt şifrelenerek saklanır, hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazmanız yeterli; boş bırakırsanız kayıtlı olan korunur.</p><code>{`${settings?.storefront_url??"https://arvoculture.com"}/api/storefront/paytr-bildirim`}</code></div>
+          <div className="security-note"><b>{keysStored?"Anahtarlarınız kayıtlı.":"Tahsilat kendi PayTR hesabınıza yapılır."}</b><p>Anahtar ve salt şifrelenerek saklanır, hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazmanız yeterli; boş bırakırsanız kayıtlı olan korunur.</p><code>{`https://${callbackHost}/api/storefront/paytr-bildirim`}</code></div>
         </article>
         <button className="payment-save" type="submit">Ödeme ayarlarını kaydet</button>
       </form>:<p className="catalog-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
