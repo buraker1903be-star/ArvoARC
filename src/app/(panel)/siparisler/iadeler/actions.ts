@@ -231,6 +231,8 @@ export async function resolveReturn(formData: FormData) {
   const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
 
   const result = await refundPayment({
+    supabase,
+    organizationId: organization.id,
     merchantOid,
     amountKurus,
     referenceNo: `ARCIADE${id.replace(/-/g, "").slice(0, 12)}`,

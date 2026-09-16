@@ -1,6 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
-import { paytrConfig } from "@/lib/paytr/config";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { storePaytrConfig } from "@/lib/paytr/config";
 
 /**
  * PayTR iade servisi.
@@ -19,16 +20,27 @@ export type RefundResult =
   | { ok: false; message: string };
 
 export async function refundPayment({
+  supabase,
+  organizationId,
   merchantOid,
   amountKurus,
   referenceNo,
 }: {
+  /** İade, siparişin ait olduğu mağazanın kendi PayTR hesabından yapılır. */
+  supabase: SupabaseClient;
+  organizationId: string;
   merchantOid: string;
   /** İade tutarı kuruş cinsinden. */
   amountKurus: number;
   referenceNo?: string;
 }): Promise<RefundResult> {
-  const config = paytrConfig();
+  let config;
+  try {
+    config = await storePaytrConfig(supabase, organizationId);
+  } catch (error) {
+    console.error("İade: PayTR yapılandırması alınamadı", organizationId, error);
+    return { ok: false, message: "Mağazanın PayTR bilgileri girilmemiş. Ayarlar → Ödeme bölümünden girin." };
+  }
 
   if (!merchantOid) {
     return { ok: false, message: "Sipariş numarası eksik." };
@@ -117,8 +129,12 @@ export async function refundPayment({
  * PayTR'dan doğrulamak için. Panelde "Ödeme durumunu sorgula"
  * düğmesiyle kullanılır.
  */
-export async function queryPaymentStatus(merchantOid: string) {
-  const config = paytrConfig();
+export async function queryPaymentStatus(
+  supabase: SupabaseClient,
+  organizationId: string,
+  merchantOid: string,
+) {
+  const config = await storePaytrConfig(supabase, organizationId);
 
   const token = crypto
     .createHmac("sha256", config.merchantKey)

@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
-import { paytrConfig } from "@/lib/paytr/config";
+import { storePaytrConfig, type PaytrStoreConfig } from "@/lib/paytr/config";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email/resend";
@@ -219,9 +219,6 @@ export async function POST(request: Request) {
       .eq("id", order.order_id);
   };
 
-  // --- 2. PayTR token iste -----------------------------------
-  const config = paytrConfig();
-
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0";
 
@@ -268,6 +265,34 @@ export async function POST(request: Request) {
         paymentMethod: "havale",
       },
       { headers },
+    );
+  }
+
+  // --- 2. PayTR token iste -----------------------------------
+  /*
+    Anahtarlar mağaza başına: siparişin hangi mağazaya ait olduğunu
+    okuyup o mağazanın kendi PayTR hesabını kullanıyoruz. Havale yolu
+    yukarıda döndüğü için, PayTR bilgisi girilmemiş mağaza hâlâ havaleyle
+    satış yapabilir.
+  */
+  const { data: orderOwner } = await supabase
+    .from("arc_orders")
+    .select("organization_id")
+    .eq("id", order.order_id)
+    .single();
+
+  let config: PaytrStoreConfig;
+  try {
+    if (!orderOwner) throw new Error("Sipariş okunamadı");
+    config = await storePaytrConfig(supabase, orderOwner.organization_id);
+  } catch (configError) {
+    console.error("PayTR yapılandırması alınamadı:", order.order_number, configError);
+    return NextResponse.json(
+      {
+        error: "paytr_unavailable",
+        message: "Kartla ödeme şu an kullanılamıyor. Havale/EFT ile ödeyebilir ya da bizimle iletişime geçebilirsiniz.",
+      },
+      { status: 503, headers },
     );
   }
 

@@ -41,9 +41,11 @@ const PENDING:Record<string,string>={
 
 export default async function Settings({searchParams}:{searchParams:Promise<{saved?:string;error?:string}>}){
   const query=await searchParams;const {supabase,organization,membership}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
+  // Anahtarın kendisi hiç okunmaz; yalnızca kayıtlı olup olmadığı gösterilir.
+  const keysStored=Boolean(settings?.paytr_merchant_key_enc);
   const logoUrl=settings?.logo_path?supabase.storage.from("organization-assets").getPublicUrl(settings.logo_path).data.publicUrl:"";
   const faviconUrl=settings?.favicon_path?supabase.storage.from("organization-assets").getPublicUrl(settings.favicon_path).data.publicUrl:"";
   const domainStatus=settings?.domain_status??"not_configured";
@@ -141,9 +143,11 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
           <div className="payment-fields">
             <label className="wide">Mağaza numarası<input name="paytr_merchant_id" defaultValue={settings?.paytr_merchant_id??""} placeholder="PayTR merchant_id" autoComplete="off"/></label>
             <label>En yüksek taksit<select name="paytr_max_installment" defaultValue={settings?.paytr_max_installment??0}><option value="0">PayTR belirlesin</option>{[1,2,3,4,5,6,9,12].map(value=><option key={value} value={value}>{value} taksit</option>)}</select></label>
+            <label>Mağaza anahtarı (merchant_key)<input name="paytr_merchant_key" type="password" placeholder={keysStored?"Kayıtlı · değiştirmek için yazın":"PayTR merchant_key"} autoComplete="new-password"/></label>
+            <label>Mağaza salt (merchant_salt)<input name="paytr_merchant_salt" type="password" placeholder={keysStored?"Kayıtlı · değiştirmek için yazın":"PayTR merchant_salt"} autoComplete="new-password"/></label>
             <div className="check-stack"><label className="check-inline"><input type="checkbox" name="paytr_test_mode" defaultChecked={settings?.paytr_test_mode??true}/> Test modu</label><label className="check-inline"><input type="checkbox" name="paytr_no_installment" defaultChecked={settings?.paytr_no_installment}/> Taksiti kapat</label></div>
           </div>
-          <div className="security-note"><b>Gizli anahtarlar panelde saklanmaz.</b><p>PAYTR_MERCHANT_KEY ve PAYTR_MERCHANT_SALT yalnızca mağazanın Vercel sunucu ortamına eklenir.</p><code>https://arvoculture.com/api/paytr/callback</code></div>
+          <div className="security-note"><b>{keysStored?"Anahtarlarınız kayıtlı.":"Tahsilat kendi PayTR hesabınıza yapılır."}</b><p>Anahtar ve salt şifrelenerek saklanır, hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazmanız yeterli; boş bırakırsanız kayıtlı olan korunur.</p><code>{`${settings?.storefront_url??"https://arvoculture.com"}/api/storefront/paytr-bildirim`}</code></div>
         </article>
         <button className="payment-save" type="submit">Ödeme ayarlarını kaydet</button>
       </form>:<p className="catalog-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}

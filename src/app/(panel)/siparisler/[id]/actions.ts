@@ -230,6 +230,8 @@ export async function refundOrder(formData: FormData) {
   if (!lockedMeta) redirect(`/siparisler/${orderId}?error=busy`);
 
   const result = await refundPayment({
+    supabase,
+    organizationId: organization.id,
     merchantOid,
     amountKurus,
     referenceNo: `ARC${orderId.replace(/-/g, "").slice(0, 12)}${priorRefunds ? `K${priorRefunds + 1}` : ""}`,

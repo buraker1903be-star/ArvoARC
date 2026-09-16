@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { paytrConfig } from "@/lib/paytr/config";
+import { storePaytrConfig } from "@/lib/paytr/config";
 import { sendEmail } from "@/lib/email/resend";
 import { orderConfirmationHtml } from "@/lib/email/order-confirmation";
 import { createServiceClient } from "@/lib/paytr/service-client";
@@ -23,8 +23,6 @@ export const dynamic = "force-dynamic";
  *      dönülür; sorun loglanır ve panelden takip edilir.
  */
 export async function POST(request: Request) {
-  const config = paytrConfig();
-
   const form = await request.formData();
   const merchantOid = String(form.get("merchant_oid") ?? "");
   const status = String(form.get("status") ?? "");
@@ -32,29 +30,27 @@ export async function POST(request: Request) {
   const hash = String(form.get("hash") ?? "");
   const failedReason = String(form.get("failed_reason_msg") ?? "");
 
-  // --- 1. İmza doğrulaması ----------------------------------
-  const expected = crypto
-    .createHmac("sha256", config.merchantKey)
-    .update(merchantOid + config.merchantSalt + status + totalAmount)
-    .digest("base64");
-
-  // Zamanlama saldırısına kapalı karşılaştırma.
-  const valid =
-    hash.length === expected.length &&
-    crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expected));
-
-  if (!valid) {
-    console.error("PayTR bildirimi: imza doğrulanamadı", { merchantOid });
-    return new Response("PAYTR notification failed: bad hash", { status: 400 });
-  }
-
   // merchant_oid yalnızca harf ve rakamdan oluşur (odeme/route.ts).
   if (!/^[A-Za-z0-9]{1,64}$/.test(merchantOid)) {
     console.error("PayTR bildirimi: geçersiz merchant_oid", { merchantOid });
     return new Response("OK");
   }
 
-  // --- 2. Siparişi bul --------------------------------------
+  // --- 1. Siparişi bul --------------------------------------
+  /*
+    İmza doğrulaması siparişten SONRA yapılır: anahtarlar artık mağaza
+    başına, yani hangi anahtarla doğrulayacağımızı bilmek için önce
+    siparişin hangi mağazaya ait olduğunu bulmamız gerekiyor. Sipariş
+    araması yalnızca okumadır; doğrulanmamış bildirimle hiçbir kayıt
+    değişmez, karar hâlâ imzaya bağlıdır.
+
+    merchant_oid, sipariş numarasındaki harf ve rakamlar. Önceden
+    sırasız 200 sipariş çekilip içinde aranıyordu: mağaza 200
+    siparişi geçince ödemesi alınmış sipariş bulunamıyor ve
+    "bekliyor"da kalıyordu. Artık karakterlerin arasına joker
+    konarak doğrudan aranıyor; eşleşme normalleştirilmiş numarayla
+    kesinleşiyor.
+  */
   /*
     merchant_oid, sipariş numarasındaki harf ve rakamlar. Önceden
     sırasız 200 sipariş çekilip içinde aranıyordu: mağaza 200
@@ -74,7 +70,7 @@ export async function POST(request: Request) {
     */
     const exact = await supabase
       .from("arc_orders")
-      .select("id, order_number, payment_status")
+      .select("id, order_number, payment_status, organization_id")
       .eq("source", "native")
       .eq("metadata->>paytr_merchant_oid", merchantOid)
       .limit(1);
@@ -84,7 +80,7 @@ export async function POST(request: Request) {
     if (!order) {
       const { data: orders, error: findError } = await supabase
         .from("arc_orders")
-        .select("id, order_number, payment_status")
+        .select("id, order_number, payment_status, organization_id")
         .eq("source", "native")
         .ilike("order_number", `%${merchantOid.split("").join("%")}%`)
         .order("created_at", { ascending: false })
@@ -100,6 +96,23 @@ export async function POST(request: Request) {
     if (!order) {
       console.error("PayTR bildirimi: sipariş bulunamadı", { merchantOid });
       return new Response("OK");
+    }
+
+    // --- 2. İmza doğrulaması (siparişin mağazasının anahtarıyla) ---
+    const config = await storePaytrConfig(supabase, order.organization_id);
+    const expected = crypto
+      .createHmac("sha256", config.merchantKey)
+      .update(merchantOid + config.merchantSalt + status + totalAmount)
+      .digest("base64");
+
+    // Zamanlama saldırısına kapalı karşılaştırma.
+    const valid =
+      hash.length === expected.length &&
+      crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expected));
+
+    if (!valid) {
+      console.error("PayTR bildirimi: imza doğrulanamadı", { merchantOid });
+      return new Response("PAYTR notification failed: bad hash", { status: 400 });
     }
 
     /*

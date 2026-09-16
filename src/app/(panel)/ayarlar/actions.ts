@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
 import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/vercel-domains";
+import { encryptSecret,paymentCredentialsConfigured } from "@/lib/payment-credentials";
 
 const roles=new Set(["owner","admin","manager"]);
 const imageTypes:Record<string,string>={"image/png":"png","image/jpeg":"jpg","image/webp":"webp","image/x-icon":"ico","image/vnd.microsoft.icon":"ico"};
@@ -41,14 +42,30 @@ export async function updatePaymentSettings(formData:FormData){
   const paytrTestMode=formData.get("paytr_test_mode")==="on";
   const paytrNoInstallment=formData.get("paytr_no_installment")==="on";
   const paytrMaxInstallment=Number(formData.get("paytr_max_installment")??0);
+  // Anahtarlar yalnızca yazılır, geri gösterilmez: boş bırakılırsa kayıtlı olan korunur.
+  const paytrMerchantKey=String(formData.get("paytr_merchant_key")??"").trim();
+  const paytrMerchantSalt=String(formData.get("paytr_merchant_salt")??"").trim();
   if(bankTransferEnabled&&(!bankName||!bankAccountHolder||!/^TR\d{24}$/.test(bankIban)))redirect("/ayarlar?error=invalid-bank-transfer");
   if(paytrEnabled&&!paytrMerchantId)redirect("/ayarlar?error=paytr-merchant-required");
   if(!Number.isInteger(paytrMaxInstallment)||paytrMaxInstallment<0||paytrMaxInstallment>12)redirect("/ayarlar?error=invalid-installment");
+  /*
+    Mağaza kendi PayTR hesabıyla tahsil eder. Anahtar ve salt şifrelenerek
+    saklanır (AES-256-GCM); şifreleme anahtarı yoksa düz yazmak yerine hata
+    veririz. Biri girilip diğeri boş bırakılırsa yarım yapılandırma oluşur,
+    o yüzden ikisi birlikte istenir.
+  */
+  if((paytrMerchantKey?1:0)!==(paytrMerchantSalt?1:0))redirect("/ayarlar?error=paytr-key-pair-required");
+  let paytrSecrets:{paytr_merchant_key_enc:string;paytr_merchant_salt_enc:string}|null=null;
+  if(paytrMerchantKey&&paytrMerchantSalt){
+    if(!paymentCredentialsConfigured())redirect("/ayarlar?error=paytr-encryption-missing");
+    paytrSecrets={paytr_merchant_key_enc:encryptSecret(paytrMerchantKey),paytr_merchant_salt_enc:encryptSecret(paytrMerchantSalt)};
+  }
   const {error}=await supabase.from("arc_store_settings").update({
     bank_transfer_enabled:bankTransferEnabled,bank_name:bankName||null,bank_account_holder:bankAccountHolder||null,
     bank_iban:bankIban||null,bank_transfer_instructions:bankTransferInstructions||null,
     paytr_enabled:paytrEnabled,paytr_test_mode:paytrTestMode,paytr_merchant_id:paytrMerchantId||null,
-    paytr_no_installment:paytrNoInstallment,paytr_max_installment:paytrMaxInstallment,updated_at:new Date().toISOString()
+    paytr_no_installment:paytrNoInstallment,paytr_max_installment:paytrMaxInstallment,
+    ...(paytrSecrets??{}),updated_at:new Date().toISOString()
   }).eq("organization_id",organization.id);
   if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/ayarlar");redirect("/ayarlar?saved=payments");
