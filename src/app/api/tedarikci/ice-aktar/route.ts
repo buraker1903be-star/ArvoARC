@@ -116,12 +116,27 @@ export async function POST(request: Request) {
 async function runSync(mode: "tam" | "stok") {
   const supabase = serviceClient();
 
-  // --- Tedarikçi ayarları ------------------------------------
+  /*
+    --- Tedarikçi ayarları ------------------------------------
+
+    Önceden yalnızca arvoculture mağazasının tedarikçisi alınıyordu; ikinci
+    mağaza açıldığında onun ürünleri hiç aktarılmazdı.
+
+    Her çalıştırmada TEK mağaza işleniyor, hepsi bir döngüde değil: aktarım
+    imleçle parça parça ilerliyor ve tüm mağazaları tek istekte dolaşmak cron
+    süresini mağaza sayısıyla birlikte büyütür, er geç zaman aşımına sokar.
+
+    Sıra: yarım kalmış aktarım (sync_cursor > 0) önce bitirilir, yoksa en uzun
+    süredir güncellenmemiş mağaza seçilir. 10 dakikada bir çalıştığı için
+    mağazalar kendiliğinden sırayla dolaşılır.
+  */
   const { data: suppliers, error: supplierError } = await supabase
     .from("arc_suppliers")
-    .select("*, organizations!inner(slug)")
+    .select("*")
     .eq("code", "tarzyeri")
-    .eq("organizations.slug", "arvoculture")
+    .not("feed_url", "is", null)
+    .order("sync_cursor", { ascending: false })
+    .order("last_synced_at", { ascending: true, nullsFirst: true })
     .limit(1);
 
   const rule = suppliers?.[0];
@@ -513,7 +528,7 @@ async function runSync(mode: "tam" | "stok") {
   if (bitti) {
     const { error: catError } = await supabase.rpc(
       "arc_categorize_supplier_products",
-      { p_supplier: "tarzyeri" },
+      { p_supplier: rule.code, p_organization_id: orgId },
     );
     if (catError) console.error("Kategorileme hatası:", catError);
   }
