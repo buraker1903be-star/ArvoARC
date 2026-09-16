@@ -10,6 +10,12 @@ import "server-only";
  * Buradan gönderilen e-postalar yalnızca müşteriye ait; gönderen
  * kimliği ArvoCulture.
  */
+/*
+  Varsayılan gönderen. Mağaza kendi adresini ayarına yazana kadar bu kullanılır
+  — bir alan adından e-posta gönderebilmek için o alan adının Resend'de
+  doğrulanmış olması gerekiyor (DNS işi), yani yeni mağaza kendi adresini ancak
+  doğrulamayı tamamladıktan sonra kullanabilir.
+*/
 const FROM = "ArvoCulture <siparis@arvoculture.com>";
 const REPLY_TO = "info@arvoculture.com";
 
@@ -17,10 +23,15 @@ export async function sendEmail({
   to,
   subject,
   html,
+  from,
+  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
+  /** Mağazanın kendi gönderen adresi; verilmezse varsayılan kullanılır. */
+  from?: string | null;
+  replyTo?: string | null;
 }) {
   const key = process.env.RESEND_API_KEY;
 
@@ -39,9 +50,9 @@ export async function sendEmail({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: FROM,
+        from: from || FROM,
         to: [to],
-        reply_to: REPLY_TO,
+        reply_to: replyTo || REPLY_TO,
         subject,
         html,
       }),

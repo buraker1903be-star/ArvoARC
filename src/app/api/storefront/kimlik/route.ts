@@ -3,6 +3,8 @@ import { createServiceClient } from "@/lib/paytr/service-client";
 import { sendEmail } from "@/lib/email/resend";
 import { signupEmail, resetPasswordEmail } from "@/lib/email/auth-emails";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+import { resolveStore, storefrontCorsHeaders } from "@/lib/storefront-origin";
+import { getStoreBrand } from "@/lib/store-brand";
 
 /*
   E-posta bombardımanına karşı: IP başına 15 dakikada 10, aynı
@@ -12,10 +14,10 @@ import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 const ipLimiter = createRateLimiter({ limit: 10, windowMs: 15 * 60_000 });
 const emailLimiter = createRateLimiter({ limit: 3, windowMs: 15 * 60_000 });
 
-const tooMany = (request: Request, retryAfterSeconds: number) =>
+const tooMany = (headers: Record<string, string>, retryAfterSeconds: number) =>
   NextResponse.json(
     { error: "too_many_requests" },
-    { status: 429, headers: { ...corsHeaders(request), "Retry-After": String(retryAfterSeconds) } },
+    { status: 429, headers: { ...headers, "Retry-After": String(retryAfterSeconds) } },
   );
 
 export const runtime = "nodejs";
@@ -32,48 +34,36 @@ export const dynamic = "force-dynamic";
  * üzerinden ArvoCulture kimliğiyle gönderiliyor. `generateLink`
  * service_role yetkisi istiyor; bu yüzden işlem sunucuda.
  */
-const STOREFRONT = process.env.STOREFRONT_URL ?? "https://arvoculture.com";
-
 /*
-  Tarayıcı, farklı alan adına giden istekleri sunucu açıkça izin
-  vermedikçe engelliyor. Vitrin arvoculture.com'da, bu uç nokta
-  arc.arvo-os.com'da; izin başlıkları olmadan istek hiç
-  ulaşmıyordu.
-
-  İzin yalnızca vitrine veriliyor; başka bir siteden çağrılamaz.
+  CORS ve mağaza çözümlemesi ortak modülde (lib/storefront-origin.ts): izin
+  yalnızca arc_store_settings'te alan adı kayıtlı vitrinlere veriliyor.
+  Eskiden yalnızca arvoculture.com sabitti; ikinci mağazanın müşterisi üye
+  bile olamıyordu.
 */
-/*
-  Vitrin hem `arvoculture.com` hem `www.arvoculture.com`
-  üzerinden açılabiliyor ve tarayıcı bu ikisini farklı köken
-  sayıyor. Sabit tek bir adrese izin vermek, www ile gelen
-  isteklerin engellenmesine yol açıyordu.
-*/
-const ALLOWED = new Set([
-  STOREFRONT,
-  STOREFRONT.replace("https://", "https://www."),
-]);
+const cors = (origin: string | null, allow: boolean) => ({
+  ...storefrontCorsHeaders(origin, allow),
+  "Access-Control-Max-Age": "86400",
+  Vary: "Origin",
+});
 
-function corsHeaders(request: Request) {
-  const origin = request.headers.get("origin") ?? "";
-  return {
-    // Yalnızca tanınan köken yansıtılır; bilinmeyen sitelere
-    // izin verilmez.
-    "Access-Control-Allow-Origin": ALLOWED.has(origin) ? origin : STOREFRONT,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Max-Age": "86400",
-    Vary: "Origin",
-  };
-}
-
-/** Tarayıcının ön kontrol isteği. */
 export async function OPTIONS(request: Request) {
-  return new Response(null, { status: 204, headers: corsHeaders(request) });
+  const origin = request.headers.get("origin");
+  const organizationId = await resolveStore(createServiceClient(), origin);
+  return new Response(null, { status: 204, headers: cors(origin, Boolean(organizationId)) });
 }
 
 export async function POST(request: Request) {
+  const origin = request.headers.get("origin");
+  const supabase = createServiceClient();
+  const organizationId = await resolveStore(supabase, origin);
+  const CORS = cors(origin, Boolean(organizationId));
+
+  if (!organizationId) {
+    return NextResponse.json({ error: "taninmayan_magaza" }, { status: 403, headers: CORS });
+  }
+
   const byIp = ipLimiter(clientIp(request));
-  if (!byIp.ok) return tooMany(request, byIp.retryAfterSeconds);
+  if (!byIp.ok) return tooMany(CORS, byIp.retryAfterSeconds);
 
   let body: { islem?: string; email?: string; sifre?: string };
 
@@ -82,7 +72,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json(
       { error: "gecersiz_istek" },
-      { status: 400, headers: corsHeaders(request) },
+      { status: 400, headers: CORS },
     );
   }
 
@@ -92,15 +82,15 @@ export async function POST(request: Request) {
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
     return NextResponse.json(
       { error: "gecersiz_eposta" },
-      { status: 400, headers: corsHeaders(request) },
+      { status: 400, headers: CORS },
     );
   }
 
   const byEmail = emailLimiter(email);
-  if (!byEmail.ok) return tooMany(request, byEmail.retryAfterSeconds);
+  if (!byEmail.ok) return tooMany(CORS, byEmail.retryAfterSeconds);
 
-  const CORS = corsHeaders(request);
-  const supabase = createServiceClient();
+  // Marka ve yönlendirme adresi mağazanın kendi kaydından.
+  const brand = await getStoreBrand(supabase, organizationId);
 
   try {
     if (islem === "kayit") {
@@ -116,7 +106,7 @@ export async function POST(request: Request) {
         type: "signup",
         email,
         password: sifre,
-        options: { redirectTo: `${STOREFRONT}/hesap` },
+        options: { redirectTo: `${brand.siteUrl}/hesap` },
       });
 
       if (error) {
@@ -130,8 +120,8 @@ export async function POST(request: Request) {
 
       const link = data.properties?.action_link;
       if (link) {
-        const mail = signupEmail(link);
-        await sendEmail({ to: email, ...mail });
+        const mail = signupEmail(link, brand);
+        await sendEmail({ to: email, ...mail, from: brand.from, replyTo: brand.replyTo });
       }
 
       return NextResponse.json({ ok: true }, { headers: CORS });
@@ -141,7 +131,7 @@ export async function POST(request: Request) {
       const { data, error } = await supabase.auth.admin.generateLink({
         type: "recovery",
         email,
-        options: { redirectTo: `${STOREFRONT}/hesap` },
+        options: { redirectTo: `${brand.siteUrl}/hesap` },
       });
 
       /*
@@ -156,8 +146,8 @@ export async function POST(request: Request) {
 
       const link = data.properties?.action_link;
       if (link) {
-        const mail = resetPasswordEmail(link);
-        await sendEmail({ to: email, ...mail });
+        const mail = resetPasswordEmail(link, brand);
+        await sendEmail({ to: email, ...mail, from: brand.from, replyTo: brand.replyTo });
       }
 
       return NextResponse.json({ ok: true }, { headers: CORS });
