@@ -126,7 +126,6 @@ export async function POST(request: Request) {
     oran sunucuda uygulanıyor.
   */
   const isTransfer = body.paymentMethod === "havale";
-  const TRANSFER_DISCOUNT_PERCENT = 3;
 
   if (!email || !name || rawItems.length === 0) {
     return NextResponse.json({ error: "invalid" }, { status: 422, headers });
@@ -178,12 +177,30 @@ export async function POST(request: Request) {
     beklediğinden fazla ödeme yapmasın.
   */
   if (couponCode) {
-    const { data: check } = await supabase.rpc("arc_check_coupon", {
+    /*
+      Ara toplam burada henüz bilinmiyor: fiyatlama sipariş fonksiyonunun
+      içinde. null geçiyoruz — "bilinmiyor" demek. Eskiden 0 geçiliyordu ve
+      alt limiti olan her kupon "0 < limit" diye elenip siparişi tamamen
+      engelliyordu. Alt limit sipariş oluşturulurken gerçek tutarla
+      uygulanıyor.
+
+      Hata yutulmuyor: doğrulama çalışmazsa kuponu geçerli saymak, "ilk
+      alışverişe özel" kodların ikinci kez kullanılmasına yol açar.
+    */
+    const { data: check, error: checkError } = await supabase.rpc("arc_check_coupon", {
       p_organization_id: organizationId,
       p_code: couponCode,
-      p_subtotal: 0,
+      p_subtotal: null,
       p_email: email,
     });
+
+    if (checkError) {
+      console.error("Kupon doğrulanamadı:", couponCode, checkError.message);
+      return NextResponse.json(
+        { couponRejected: "İndirim kodu şu anda doğrulanamıyor. Kodu kaldırıp tekrar deneyin." },
+        { status: 503, headers },
+      );
+    }
 
     const row = Array.isArray(check) ? check[0] : check;
 
@@ -252,15 +269,33 @@ export async function POST(request: Request) {
     üstverisine yazılıyor; panelde ve faturada görünüyor.
   */
   if (isTransfer) {
-    const discount = Math.round(
-      (order.total * TRANSFER_DISCOUNT_PERCENT) / 100,
-    );
+    /*
+      Havalenin açık olup olmadığı ve indirim oranı mağazanın ayarında.
+      Eskiden ikisi de yoktu: havaleyi panelden kapatmış bir mağazadan da
+      havale siparişi geçiyor, indirim ise kodda sabit %3 olduğu için her
+      mağazaya uygulanıyordu.
+    */
+    const { data: transferSettings } = await supabase
+      .from("arc_store_settings")
+      .select("bank_transfer_enabled, bank_transfer_discount_percent")
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
+    if (transferSettings?.bank_transfer_enabled === false) {
+      return NextResponse.json(
+        { error: "transfer_disabled", message: "Bu mağazada havale ile ödeme kapalı." },
+        { status: 422, headers },
+      );
+    }
+
+    const discountPercent = Number(transferSettings?.bank_transfer_discount_percent ?? 3);
+    const discount = Math.round((order.total * discountPercent) / 100);
 
     const { error: transferError } = await mergeMetadata(
       {
         payment_method: "Banka havalesi / EFT",
         transfer_discount: discount,
-        transfer_discount_percent: TRANSFER_DISCOUNT_PERCENT,
+        transfer_discount_percent: discountPercent,
         ...(note ? { notes: note } : {}),
       },
       { total: order.total - discount, payment_status: "pending", status: "pending" },
