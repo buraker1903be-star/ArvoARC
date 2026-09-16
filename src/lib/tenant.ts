@@ -26,10 +26,16 @@ export const requireTenant = cache(async function requireTenant() {
     kapanır — ödeme gecikince ilk kapanan panel, vitrin ve satış bir süre
     daha sürer.
 
-    Kademe hiç gelmezse (RPC'nin eski sürümü yayındaysa) engellenmez:
-    yayın sırası yüzünden mağaza sahibi paneline kilitlenmemeli.
+    Kademe hiç gelmezse (RPC'nin arc_stage döndürmeyen bir sürümü yayındaysa)
+    engellenmez: yayın sırası yüzünden mağaza sahibini paneline kilitlemek
+    istemiyoruz. Ama sessiz de geçmiyoruz — bu durumda yaptırım tamamen
+    kapalıdır ve fark edilmezse aylarca öyle kalır. Tek sahibi
+    supabase/migrations/20260916200500_tenant_rpc_canonical.sql; ArvoOS'un eski
+    bir migration'ı fonksiyonu geri almış olabilir.
   */
-  if(tenant.arc_stage&&tenant.arc_stage!=="open"){
+  if(tenant.arc_stage===undefined||tenant.arc_stage===null){
+    console.error("[kiracı] arc_resolve_commerce_tenant arc_stage döndürmüyor; Arc kademe yaptırımı KAPALI. 20260916200500_tenant_rpc_canonical.sql yeniden uygulanmalı.");
+  }else if(tenant.arc_stage!=="open"){
     redirect("/login?error=license-inactive");
   }
   return {supabase,user:{id:userId},membership:{organization_id:organization.id,role:tenant.membership_role},organization};
