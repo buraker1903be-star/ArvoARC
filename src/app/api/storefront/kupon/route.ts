@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+import { resolveStore, storefrontCorsHeaders } from "@/lib/storefront-origin";
 
 /* Kupon kodlarının deneme yanılmayla aranmasına karşı: IP başına 10 dakikada 30 deneme. */
 const couponLimiter = createRateLimiter({ limit: 30, windowMs: 10 * 60_000 });
@@ -16,29 +17,33 @@ export const dynamic = "force-dynamic";
  * Geçersiz kod sessizce yok sayılıyor, müşteri indirim aldığını
  * sanıp ödeme sayfasında tam tutarı görüyordu.
  */
-const STOREFRONT = process.env.STOREFRONT_URL ?? "https://arvoculture.com";
-
-const ALLOWED = new Set([
-  STOREFRONT,
-  STOREFRONT.replace("https://", "https://www."),
-]);
-
-function corsHeaders(request: Request) {
-  const origin = request.headers.get("origin") ?? "";
-  return {
-    "Access-Control-Allow-Origin": ALLOWED.has(origin) ? origin : STOREFRONT,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    Vary: "Origin",
-  };
-}
+/*
+  Kupon isteğin geldiği mağazanın indirimlerinde aranır. Eskiden hangi
+  vitrinden gelirse gelsin arvoculture'ın kuponlarına bakılıyordu.
+*/
+const cors = (origin: string | null, allow: boolean) => ({
+  ...storefrontCorsHeaders(origin, allow),
+  Vary: "Origin",
+});
 
 export async function OPTIONS(request: Request) {
-  return new Response(null, { status: 204, headers: corsHeaders(request) });
+  const origin = request.headers.get("origin");
+  const organizationId = await resolveStore(createServiceClient(), origin);
+  return new Response(null, { status: 204, headers: cors(origin, Boolean(organizationId)) });
 }
 
 export async function POST(request: Request) {
-  const headers = corsHeaders(request);
+  const origin = request.headers.get("origin");
+  const supabase = createServiceClient();
+  const organizationId = await resolveStore(supabase, origin);
+  const headers = cors(origin, Boolean(organizationId));
+
+  if (!organizationId) {
+    return NextResponse.json(
+      { valid: false, message: "Bu adresten kupon sorgulanamıyor.", discountAmount: 0 },
+      { status: 403, headers },
+    );
+  }
 
   const limited = couponLimiter(clientIp(request));
   if (!limited.ok) {
@@ -66,9 +71,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createServiceClient();
-
-  const { data, error } = await supabase.rpc("check_arvoculture_coupon", {
+  const { data, error } = await supabase.rpc("arc_check_coupon", {
+    p_organization_id: organizationId,
     p_code: code,
     p_subtotal: Math.round(Number(body.subtotal ?? 0)),
     p_email: body.email ? String(body.email).trim() : null,

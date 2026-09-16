@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { storePaytrConfig, type PaytrStoreConfig } from "@/lib/paytr/config";
 import { createServiceClient } from "@/lib/paytr/service-client";
+import { resolveStore, storefrontCorsHeaders } from "@/lib/storefront-origin";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email/resend";
 import { transferOrderEmail } from "@/lib/email/order-confirmation";
@@ -55,25 +56,12 @@ export const dynamic = "force-dynamic";
  * fonksiyonu gerçek toplamı döndürür ve PayTR'a giden tutar odur.
  */
 
-const ALLOWED_ORIGINS = [
-  process.env.STOREFRONT_URL ?? "https://arvoculture.com",
-  "https://www.arvoculture.com",
-];
-
-function corsHeaders(origin: string | null) {
-  const allowed =
-    origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]!;
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
-}
-
-export function OPTIONS(request: Request) {
+export async function OPTIONS(request: Request) {
+  const origin = request.headers.get("origin");
+  const organizationId = await resolveStore(createServiceClient(), origin);
   return new NextResponse(null, {
     status: 204,
-    headers: corsHeaders(request.headers.get("origin")),
+    headers: storefrontCorsHeaders(origin, Boolean(organizationId)),
   });
 }
 
@@ -94,7 +82,15 @@ function parseItem(raw: unknown): Item | null {
 }
 
 export async function POST(request: Request) {
-  const headers = corsHeaders(request.headers.get("origin"));
+  const origin = request.headers.get("origin");
+  const supabase = createServiceClient();
+  /*
+    Sipariş hangi mağazaya yazılacak: isteğin geldiği alan adından çözülüyor.
+    Tanınmayan alan adından sipariş alınmıyor — eskiden hangi alan adından
+    gelirse gelsin sipariş arvoculture'a yazılırdı.
+  */
+  const organizationId = await resolveStore(supabase, origin);
+  const headers = storefrontCorsHeaders(origin, Boolean(organizationId));
 
   const limited = orderLimiter(clientIp(request));
   if (!limited.ok) {
@@ -143,7 +139,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createServiceClient();
+  // Tanınmayan alan adı: sipariş yazılacak mağaza belli değil.
+  if (!organizationId) {
+    return NextResponse.json(
+      { error: "unknown_store", message: "Bu adresten sipariş alınamıyor." },
+      { status: 403, headers },
+    );
+  }
 
   /*
     Ödeme gecikmesinde mağaza kademeli kapanır (public.arc_store_stage).
@@ -151,30 +153,19 @@ export async function POST(request: Request) {
     havaleyle de. Panel bir kademe önce kapanmıştı; vitrinin tamamen kapanması
     ise vitrin projesinde.
 
-    Kurum slug ile çözülüyor: bu uç zaten tek mağazaya göre yazılmış
-    (create_arvoculture_storefront_order). Çok mağazalı hale gelince ikisi
-    birlikte düzeltilmeli.
-
-    Kurum ya da kademe okunamazsa engellenmez: geçici bir arıza satışı durdurmamalı.
+    Kademe okunamazsa engellenmez: geçici bir arıza satışı durdurmamalı.
   */
-  const { data: storeOrganization } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("slug", process.env.STOREFRONT_ORGANIZATION_SLUG ?? "arvoculture")
-    .maybeSingle();
-  if (storeOrganization) {
-    const { data: stage } = await supabase.rpc("arc_store_stage", {
-      p_organization_id: storeOrganization.id,
-    });
-    if (stage === "sales_closed" || stage === "closed") {
-      return NextResponse.json(
-        {
-          error: "store_suspended",
-          message: "Mağaza şu anda sipariş alamıyor. Lütfen daha sonra tekrar deneyin.",
-        },
-        { status: 503, headers },
-      );
-    }
+  const { data: stage } = await supabase.rpc("arc_store_stage", {
+    p_organization_id: organizationId,
+  });
+  if (stage === "sales_closed" || stage === "closed") {
+    return NextResponse.json(
+      {
+        error: "store_suspended",
+        message: "Mağaza şu anda sipariş alamıyor. Lütfen daha sonra tekrar deneyin.",
+      },
+      { status: 503, headers },
+    );
   }
 
   /*
@@ -187,7 +178,8 @@ export async function POST(request: Request) {
     beklediğinden fazla ödeme yapmasın.
   */
   if (couponCode) {
-    const { data: check } = await supabase.rpc("check_arvoculture_coupon", {
+    const { data: check } = await supabase.rpc("arc_check_coupon", {
+      p_organization_id: organizationId,
       p_code: couponCode,
       p_subtotal: 0,
       p_email: email,
@@ -205,8 +197,9 @@ export async function POST(request: Request) {
 
   // --- 1. Sipariş oluştur (tutar sunucuda hesaplanır) --------
   const { data, error } = await supabase.rpc(
-    "create_arvoculture_storefront_order",
+    "arc_create_storefront_order",
     {
+      p_organization_id: organizationId,
       p_email: email,
       p_name: name,
       p_phone: phone,
@@ -302,21 +295,13 @@ export async function POST(request: Request) {
 
   // --- 2. PayTR token iste -----------------------------------
   /*
-    Anahtarlar mağaza başına: siparişin hangi mağazaya ait olduğunu
-    okuyup o mağazanın kendi PayTR hesabını kullanıyoruz. Havale yolu
-    yukarıda döndüğü için, PayTR bilgisi girilmemiş mağaza hâlâ havaleyle
-    satış yapabilir.
+    Anahtarlar mağaza başına: isteğin geldiği mağazanın kendi PayTR hesabı
+    kullanılıyor. Havale yolu yukarıda döndüğü için, PayTR bilgisi girilmemiş
+    mağaza hâlâ havaleyle satış yapabilir.
   */
-  const { data: orderOwner } = await supabase
-    .from("arc_orders")
-    .select("organization_id")
-    .eq("id", order.order_id)
-    .single();
-
   let config: PaytrStoreConfig;
   try {
-    if (!orderOwner) throw new Error("Sipariş okunamadı");
-    config = await storePaytrConfig(supabase, orderOwner.organization_id);
+    config = await storePaytrConfig(supabase, organizationId);
   } catch (configError) {
     console.error("PayTR yapılandırması alınamadı:", order.order_number, configError);
     return NextResponse.json(
