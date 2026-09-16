@@ -302,6 +302,10 @@ export async function POST(request: Request) {
   let config: PaytrStoreConfig;
   try {
     config = await storePaytrConfig(supabase, organizationId);
+    // Mağaza panelden kartla ödemeyi kapattıysa yeni ödeme başlatılmaz.
+    // (İade ve gelen bildirim doğrulaması bu bayrağa bakmaz; onlar çalışmaya
+    // devam etmeli.)
+    if (!config.enabled) throw new Error("Mağaza kartla ödemeyi kapatmış");
   } catch (configError) {
     console.error("PayTR yapılandırması alınamadı:", order.order_number, configError);
     return NextResponse.json(

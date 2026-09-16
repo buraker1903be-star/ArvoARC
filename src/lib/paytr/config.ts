@@ -21,6 +21,13 @@ function required(name: string) {
 }
 
 export interface PaytrStoreConfig {
+  /*
+    Mağaza panelden "PayTR ile ödeme"yi kapattı mı. Yapılandırmanın kendisi
+    yine döner: iade ve gelen bildirimin imza doğrulaması, mağaza kartla
+    ödemeyi kapatsa da çalışmak zorunda. Yalnızca YENİ ödeme başlatan yol
+    bu bayrağa bakar.
+  */
+  enabled: boolean;
   merchantId: string;
   merchantKey: string;
   merchantSalt: string;
@@ -36,6 +43,7 @@ export interface PaytrStoreConfig {
  */
 function legacyConfig(storeUrl: string): PaytrStoreConfig {
   return {
+    enabled: true,
     merchantId: required("PAYTR_MERCHANT_ID"),
     merchantKey: required("PAYTR_MERCHANT_KEY"),
     merchantSalt: required("PAYTR_MERCHANT_SALT"),
@@ -52,6 +60,7 @@ export class PaytrNotConfiguredError extends Error {
 }
 
 type SettingsRow = {
+  paytr_enabled: boolean | null;
   paytr_merchant_id: string | null;
   paytr_merchant_key_enc: string | null;
   paytr_merchant_salt_enc: string | null;
@@ -78,7 +87,7 @@ export async function storePaytrConfig(
   const { data, error } = await supabase
     .from("arc_store_settings")
     .select(
-      "paytr_merchant_id, paytr_merchant_key_enc, paytr_merchant_salt_enc, paytr_test_mode, storefront_url, organizations(slug)",
+      "paytr_enabled, paytr_merchant_id, paytr_merchant_key_enc, paytr_merchant_salt_enc, paytr_test_mode, storefront_url, organizations(slug)",
     )
     .eq("organization_id", organizationId)
     .maybeSingle<SettingsRow>();
@@ -88,6 +97,7 @@ export async function storePaytrConfig(
 
   if (data?.paytr_merchant_id && data.paytr_merchant_key_enc && data.paytr_merchant_salt_enc) {
     return {
+      enabled: data.paytr_enabled !== false,
       merchantId: data.paytr_merchant_id,
       merchantKey: decryptSecret(data.paytr_merchant_key_enc),
       merchantSalt: decryptSecret(data.paytr_merchant_salt_enc),
