@@ -93,6 +93,15 @@ export async function POST(request: Request) {
       valid: Boolean(row?.valid),
       message: row?.message ?? "Kod geçerli değil.",
       discountAmount: Number(row?.discount_amount ?? 0),
+      /*
+        "Ücretsiz Kargo" kuponunun ürün indirimi yoktur (discountAmount 0),
+        etkisi kargo satırındadır. Vitrin bunu bilmeden yalnızca
+        discountAmount'a bakarsa sepette "Kod uygulandı" yazıp kargoyu
+        göstermeye devam eder; sipariş ise sunucuda kargosuz hesaplanır.
+        arc_check_coupon discount_type'ı zaten döndürüyordu, buradan
+        geçirilmiyordu.
+      */
+      freeShipping: row?.discount_type === "free_shipping",
     },
     { headers },
   );
