@@ -12,6 +12,17 @@ const imageTypes:Record<string,string>={"image/png":"png","image/jpeg":"jpg","im
 const domainPattern=/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 const subdomainPattern=/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
+/* Alan adı başka bir mağazada kullanılıyorsa veritabanı 23505 döndürür
+   (20260917140000: tekil indeksler + sütunlar arası tetikleyici). Kontrol
+   uygulamada yapılamıyor: mağaza sahibi başka mağazanın ayar satırını RLS
+   yüzünden okuyamaz, yani "bu alan adı başkasında mı" sorusunu soramaz.
+   Hata mesajı kimin kullandığını söylemez; mağazalar birbirinin varlığını
+   öğrenmemeli. */
+function domainErrorCode(error:{code?:string|null;message?:string}){
+  if(error.code==="23505")return "domain-in-use";
+  return error.code??error.message??"unknown";
+}
+
 export async function updateStoreSettings(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
@@ -71,7 +82,12 @@ export async function updatePaymentSettings(formData:FormData){
     if(!paymentCredentialsConfigured())redirect("/ayarlar?error=paytr-encryption-missing");
     paytrSecrets={paytr_merchant_key_enc:encryptSecret(paytrMerchantKey),paytr_merchant_salt_enc:encryptSecret(paytrMerchantSalt)};
   }
-  const {error}=await supabase.from("arc_store_settings").update({
+  /* upsert, update DEĞİL. Hiçbir migration varsayılan bir arc_store_settings
+     satırı oluşturmuyor; yeni bir mağaza doğrudan Ödeme sekmesine giderse
+     update 0 satır günceller, error null döner ve ekranda "kaydedildi"
+     çıkar — PayTR anahtarları hiçbir yere yazılmamış olur. */
+  const {error}=await supabase.from("arc_store_settings").upsert({
+    organization_id:organization.id,
     bank_transfer_enabled:bankTransferEnabled,bank_name:bankName||null,bank_account_holder:bankAccountHolder||null,
     bank_iban:bankIban||null,bank_transfer_instructions:bankTransferInstructions||null,
     paytr_enabled:paytrEnabled,paytr_test_mode:paytrTestMode,paytr_merchant_id:paytrMerchantId||null,
@@ -79,7 +95,7 @@ export async function updatePaymentSettings(formData:FormData){
     ...(paytrSecrets??{}),
     email_from:emailFrom||null,email_reply_to:emailReplyTo||null,
     updated_at:new Date().toISOString()
-  }).eq("organization_id",organization.id);
+  },{onConflict:"organization_id"});
   if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/ayarlar");redirect("/ayarlar?saved=payments");
 }
@@ -132,12 +148,13 @@ export async function updatePanelDomainSettings(formData:FormData){
   let provision;
   try{provision=await ensureVercelProjectDomain(panelDomain,"panel");}
   catch(error){redirect(`/ayarlar?error=${encodeURIComponent(error instanceof Error?error.message:"Vercel alan adı eklenemedi")}`);}
-  const {error}=await supabase.from("arc_store_settings").update({
+  const {error}=await supabase.from("arc_store_settings").upsert({
+    organization_id:organization.id,
     panel_custom_domain:panelDomain,panel_domain_status:provision.active?"active":"pending_dns",
     panel_domain_verification_token:`arvo-verification=${randomUUID().replace(/-/g,"")}`,
     panel_domain_verified_at:provision.active?new Date().toISOString():null,updated_at:new Date().toISOString()
-  }).eq("organization_id",organization.id);
-  if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.code??error.message)}`);
+  },{onConflict:"organization_id"});
+  if(error)redirect(`/ayarlar?error=${encodeURIComponent(domainErrorCode(error))}`);
   revalidatePath("/ayarlar");redirect("/ayarlar?saved=panel-domain");
 }
 
@@ -159,12 +176,13 @@ export async function updateStorefrontDomainSettings(formData:FormData){
     catch(error){redirect(`/ayarlar?error=${encodeURIComponent(error instanceof Error?error.message:"Vercel alan adı eklenemedi")}`);}
   }
   const storefrontUrl=customDomain?`https://${customDomain}`:`https://${platformSubdomain}.shop.arvo-os.com`;
-  const {error}=await supabase.from("arc_store_settings").update({
+  const {error}=await supabase.from("arc_store_settings").upsert({
+    organization_id:organization.id,
     custom_domain:customDomain||null,platform_subdomain:platformSubdomain||null,
     domain_status:customDomain?(provision?.active?"active":"pending_dns"):"active",domain_verification_token:customDomain?token:null,
     domain_verified_at:customDomain&&provision?.active?new Date().toISOString():customDomain?null:new Date().toISOString(),storefront_url:storefrontUrl,updated_at:new Date().toISOString()
-  }).eq("organization_id",organization.id);
-  if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.code??error.message)}`);
+  },{onConflict:"organization_id"});
+  if(error)redirect(`/ayarlar?error=${encodeURIComponent(domainErrorCode(error))}`);
   revalidatePath("/ayarlar");revalidatePath("/magaza");redirect("/ayarlar?saved=domain");
 }
 

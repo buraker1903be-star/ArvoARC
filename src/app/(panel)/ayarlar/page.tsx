@@ -33,6 +33,8 @@ const ERRORS:Record<string,string>={
   "invalid-subdomain":"Alt alan adı yalnızca küçük harf, rakam ve tire içerebilir.",
   "domain-required":"Alt alan adı veya özel alan adı girin.",
   "panel-domain-required":"Önce panel alan adını kaydedin.",
+  /* Kimin kullandığı söylenmez: mağazalar birbirinin varlığını öğrenmemeli. */
+  "domain-in-use":"Bu alan adı başka bir mağazada kullanılıyor. Size ait olduğunu düşünüyorsanız bize bildirin.",
 };
 /* DNS kaydı henüz yayılmadıysa hata değil, bekleme durumu. */
 const PENDING:Record<string,string>={
