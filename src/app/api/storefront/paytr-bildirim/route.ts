@@ -156,8 +156,15 @@ export async function POST(request: Request) {
       return new Response("OK");
     }
 
+    /*
+      Eski adı settle_arvoculture_storefront_order idi ve gövdesi
+      organizations.slug = 'arvoculture' ile SABİTLENMİŞTİ: başka bir
+      mağazanın siparişi için "Sipariş bulunamadı" fırlatıyor, bildirim
+      yutuluyor, ödeme alınmış sipariş sonsuza kadar "ödeme bekliyor"da
+      kalıyordu. 20260917180000 kurumu siparişten türetiyor.
+    */
     const { error: settleError } = await supabase.rpc(
-      "settle_arvoculture_storefront_order",
+      "arc_settle_storefront_order",
       {
         p_order_id: order.id,
         p_paid: status === "success",

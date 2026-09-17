@@ -515,7 +515,13 @@ async function runSync(mode: "tam" | "stok") {
   if (mode !== "tam" && stockUpdates.length > 0) {
     const { data: updated, error: bulkError } = await supabase.rpc(
       "arc_bulk_update_supplier_stock",
-      { p_supplier: "tarzyeri", p_rows: stockUpdates },
+      /*
+        Kurum artık parametre. Fonksiyonun eski sürümü kurumu
+        "where slug = 'arvoculture'" ile kendisi buluyordu: hangi mağaza
+        çağırırsa çağırsın stok ve FİYAT ArvoCulture'ın varyantlarına
+        yazılıyordu (20260917180000).
+      */
+      { p_organization_id: orgId, p_supplier: "tarzyeri", p_rows: stockUpdates },
     );
 
     if (bulkError) {

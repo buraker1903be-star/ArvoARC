@@ -68,6 +68,23 @@ export function describeOrderEvent(
     };
   }
 
+  /* Ödeme alındı ama stok yetmedi. Sipariş ödendi kalır (müşterinin parası
+     alınmışken sessizce iptal etmek yanlış olur), ekip müdahale eder. */
+  if (eventType === "stock_shortfall") {
+    const items = Array.isArray((data as Record<string, unknown>).items)
+      ? ((data as Record<string, unknown>).items as Array<Record<string, unknown>>)
+      : [];
+    const detail = items
+      .map((item) => `${text(item.sku)}: ${text(item.istenen)} istendi, ${text(item.mevcut)} vardı`)
+      .join(" · ");
+    return {
+      kind: "payment",
+      tone: "danger",
+      title: "Stok yetmedi",
+      detail: detail || "Ödeme alındı ama stok yetersiz; tedarikle karşılayın.",
+    };
+  }
+
   /* Kargo olayı TÜR ADINA göre değil İÇERİĞE göre tanınıyor: olayları yazan
      arc_log_order_event tetikleyicisi bu depoda tanımlı değil (canlıda
      yaşıyor), yani tür adını varsayamayız. Kargo alanlarını taşıyan olay
