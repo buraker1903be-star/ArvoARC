@@ -1,12 +1,13 @@
 import { requireTenant } from "@/lib/tenant";
 import { Notice } from "@/components/panel/notice";
-import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
+import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
 import "../catalog.css";
 
 const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending_dns:"DNS bekleniyor",verifying:"Doğrulanıyor",active:"Aktif",failed:"Bağlantı hatası"};
 
 const SAVED:Record<string,string>={
   general:"Marka ayarları kaydedildi.",
+  sales:"Satış ayarları kaydedildi.",
   payments:"Ödeme ayarları kaydedildi.",
   logo:"Logo yüklendi.",
   favicon:"Favicon yüklendi.",
@@ -35,6 +36,11 @@ const ERRORS:Record<string,string>={
   "panel-domain-required":"Önce panel alan adını kaydedin.",
   /* Kimin kullandığı söylenmez: mağazalar birbirinin varlığını öğrenmemeli. */
   "domain-in-use":"Bu alan adı başka bir mağazada kullanılıyor. Size ait olduğunu düşünüyorsanız bize bildirin.",
+  "invalid-order-prefix":"Sipariş öneki 1-6 harf olmalı (rakam ve işaret olmaz). Örnek: AC.",
+  "invalid-shipping-fee":"Kargo ücreti 0 ile 100.000 ₺ arasında olmalı.",
+  "invalid-free-threshold":"Ücretsiz kargo eşiği 0 ile 1.000.000 ₺ arasında olmalı.",
+  "invalid-transfer-discount":"Havale indirimi %0 ile %100 arasında olmalı.",
+  "order-prefix-in-use":"Bu sipariş öneki başka bir mağazada kullanılıyor. Sipariş numaraları çakışmasın diye önek mağazaya özel olmalı.",
 };
 /* DNS kaydı henüz yayılmadıysa hata değil, bekleme durumu. */
 const PENDING:Record<string,string>={
@@ -44,7 +50,7 @@ const PENDING:Record<string,string>={
 
 export default async function Settings({searchParams}:{searchParams:Promise<{saved?:string;error?:string}>}){
   const query=await searchParams;const {supabase,organization,membership}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,email_from,email_reply_to").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
   // Anahtarın kendisi hiç okunmaz; yalnızca kayıtlı olup olmadığı gösterilir.
@@ -93,6 +99,20 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
           <label>Dil / bölge<select name="locale" defaultValue={settings?.locale??"tr-TR"}><option value="tr-TR">Türkçe · Türkiye</option><option value="en-US">English · United States</option></select></label>
           <label>Düşük stok eşiği<input name="low_stock_threshold" type="number" min="0" max="10000" step="1" defaultValue={settings?.low_stock_threshold??5} required/></label>
           <button type="submit">Marka ayarlarını kaydet</button>
+        </form>:<p className="catalog-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
+      </section>
+
+      {/* Satış ayarları: sütunlar vardı ama hiçbir form onları yazmıyordu,
+          yani her mağaza ArvoCulture tarifesiyle satıyordu. */}
+      <section className="card settings-section">
+        <header><h2>Satış ayarları</h2><p>Kargo, ücretsiz kargo eşiği, havale indirimi ve sipariş numarası öneki.</p></header>
+        {canManage?<form action={updateSalesSettings} className="settings-form">
+          <label>Kargo ücreti (₺)<input name="shipping_fee" type="number" min="0" max="100000" step="0.01" defaultValue={((settings?.shipping_fee??12000)/100).toFixed(2)} required/></label>
+          <label>Ücretsiz kargo eşiği (₺)<input name="free_shipping_threshold" type="number" min="0" max="1000000" step="0.01" defaultValue={((settings?.free_shipping_threshold??200000)/100).toFixed(2)} required/></label>
+          <label>Havale indirimi (%)<input name="bank_transfer_discount_percent" type="number" min="0" max="100" step="0.1" defaultValue={settings?.bank_transfer_discount_percent??3} required/></label>
+          <label>Sipariş numarası öneki<input name="order_prefix" maxLength={6} pattern="[A-Za-z]{1,6}" defaultValue={settings?.order_prefix??"AC"} required/></label>
+          <p className="catalog-hint">Sepet tutarı eşiği geçerse kargo alınmaz. Eşik, indirim uygulanmadan önceki ara toplamla karşılaştırılır. Önek her mağazada farklı olmalı: sipariş numaraları çakışırsa ödeme bildirimleri yanlış siparişe düşebilir.</p>
+          <button type="submit">Satış ayarlarını kaydet</button>
         </form>:<p className="catalog-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
       </section>
 

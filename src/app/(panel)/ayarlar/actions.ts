@@ -40,6 +40,45 @@ export async function updateStoreSettings(formData:FormData){
   redirect("/ayarlar?saved=general");
 }
 
+/*
+  Mağazaya özgü satış ayarları. Sütunlar 20260916200000 ve 20260916220000'de
+  eklenmişti ama panelde HİÇBİR form onları yazmıyordu: değerler yalnızca
+  sipariş hesabında okunuyordu. Sonuç, her yeni mağazanın ArvoCulture
+  tarifesiyle satması — 120 TL kargo, 2.000 TL ücretsiz kargo eşiği, her
+  havalede %3 indirim ve 'AC' sipariş öneki.
+
+  Kargo ve eşik veritabanında KURUŞ; form ₺ alıyor.
+*/
+export async function updateSalesSettings(formData:FormData){
+  const {supabase,organization,membership}=await requireTenant();
+  if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
+
+  const prefix=String(formData.get("order_prefix")??"").trim().toUpperCase();
+  const shippingFee=Number(formData.get("shipping_fee")??0);
+  const freeThreshold=Number(formData.get("free_shipping_threshold")??0);
+  const transferDiscount=Number(formData.get("bank_transfer_discount_percent")??0);
+
+  /* Veritabanı kısıtıyla aynı: yalnızca harf, 1-6 karakter. */
+  if(!/^[A-Z]{1,6}$/.test(prefix))redirect("/ayarlar?error=invalid-order-prefix");
+  if(!Number.isFinite(shippingFee)||shippingFee<0||shippingFee>100000)redirect("/ayarlar?error=invalid-shipping-fee");
+  if(!Number.isFinite(freeThreshold)||freeThreshold<0||freeThreshold>1000000)redirect("/ayarlar?error=invalid-free-threshold");
+  if(!Number.isFinite(transferDiscount)||transferDiscount<0||transferDiscount>100)redirect("/ayarlar?error=invalid-transfer-discount");
+
+  const {error}=await supabase.from("arc_store_settings").upsert({
+    organization_id:organization.id,
+    order_prefix:prefix,
+    shipping_fee:Math.round(shippingFee*100),
+    free_shipping_threshold:Math.round(freeThreshold*100),
+    bank_transfer_discount_percent:transferDiscount,
+    updated_at:new Date().toISOString(),
+  },{onConflict:"organization_id"});
+  /* Önek mağaza başına tekil (20260917160000); çakışmada 23505 döner. */
+  if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.code==="23505"?"order-prefix-in-use":error.message)}`);
+
+  revalidatePath("/ayarlar");revalidatePath("/magaza");
+  redirect("/ayarlar?saved=sales");
+}
+
 export async function updatePaymentSettings(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
