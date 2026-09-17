@@ -2,7 +2,8 @@
 
 import { cookies } from "next/headers";
 import { requireTenant } from "@/lib/tenant";
-import { inventoryKindLabel, orderBadge, orderStatusLabel } from "@/lib/commerce-labels";
+import { inventoryKindLabel, orderBadge, orderStatusLabel, paymentStatusLabel } from "@/lib/commerce-labels";
+import { describeOrderEvent } from "@/lib/order-events";
 import { DAY } from "@/lib/tr-time";
 import { SEEN_COOKIE, type ActivityAlert, type ActivityFeed, type ActivityItem } from "@/lib/activity";
 import { TRANSFER_STALE_HOURS } from "@/lib/payment-method";
@@ -83,6 +84,8 @@ export async function loadActivity(): Promise<ActivityFeed> {
     ...eventRows.map((event): ActivityItem => {
       const data = (event.event_data ?? {}) as Record<string, string | null>;
       const number = orderNumbers.get(event.order_id) ?? "Sipariş";
+      /* Durum olayının başlığı burada sipariş numarası + yeni durum;
+         ortak etiketleyici yalnızca ayrıntıyı ve tonu veriyor. */
       if (event.event_type === "status_updated") {
         const closed = data.new_status === "cancelled" || data.new_status === "refunded";
         return {
@@ -91,10 +94,18 @@ export async function loadActivity(): Promise<ActivityFeed> {
           detail: `${orderStatusLabel(data.old_status)} → ${orderStatusLabel(data.new_status)}`,
         };
       }
+      /* Eskiden buradaki dal KOŞULSUZDU: status_updated dışındaki her olay
+         "Kargo bilgisi güncellendi" olarak gösteriliyordu. Ödeme uyarıları
+         da o etiketle görünürdü. */
+      const view = describeOrderEvent(event.event_type, data, {
+        orderStatusLabel, paymentStatusLabel, money: (kurus) => money.format(kurus / 100),
+      });
       return {
-        id: `event-${event.id}`, kind: "shipping", tone: "muted", at: event.created_at, href: `/siparisler/${event.order_id}`,
-        title: `${number} · Kargo bilgisi güncellendi`,
-        detail: `${data.shipping_carrier || "Kargo firması yok"} · ${data.tracking_number || "Takip numarası yok"}`,
+        id: `event-${event.id}`,
+        kind: view.kind === "payment" ? "status" : view.kind === "unknown" ? "shipping" : view.kind,
+        tone: view.tone, at: event.created_at, href: `/siparisler/${event.order_id}`,
+        title: `${number} · ${view.title}`,
+        detail: view.detail,
       };
     }),
     ...(returns.error ? [] : (returns.data ?? [])).map((request): ActivityItem => {

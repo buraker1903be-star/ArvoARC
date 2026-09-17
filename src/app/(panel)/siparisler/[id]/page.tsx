@@ -10,6 +10,7 @@ import { ConfirmSubmit } from "@/components/panel/confirm-submit";
 function transferClock(){return Date.now();}
 import { isOrderClosed, orderBadge, orderStatusLabel, orderStatusOptions, paymentStatusLabel, paymentStatusOptions, sourceLabel } from "@/lib/commerce-labels";
 import { nextOrderStep, orderFlow } from "@/lib/order-flow";
+import { describeOrderEvent } from "@/lib/order-events";
 import { Icon } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
 import { PrintButton } from "@/components/panel/print-button";
@@ -185,14 +186,19 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
 
   /* İşlem geçmişi: kayıtlı olaylar + oluşturma + (varsa) iade, yeniden eskiye. */
   const timeline=[
+    /* Eskiden burada "status_updated mı, değilse kargo" ikilemi vardı:
+       tanınmayan her olay "Kargo bilgileri güncellendi" diye gösteriliyordu.
+       Etiketler artık tek yerden (lib/order-events.ts). */
     ...(events??[]).map(event=>{
       const data=(event.event_data??{}) as Record<string,string|null>;
-      const isStatus=event.event_type==="status_updated";
+      const view=describeOrderEvent(event.event_type,data,{
+        orderStatusLabel,paymentStatusLabel,money:(kurus)=>money(kurus,order.currency),
+      });
       return {
         id:String(event.id),
-        kind:isStatus?"status":"shipping",
-        title:isStatus?"Sipariş durumu güncellendi":"Kargo bilgileri güncellendi",
-        detail:isStatus?`${orderStatusLabel(data.old_status)} → ${orderStatusLabel(data.new_status)} · Ödeme: ${paymentStatusLabel(data.new_payment_status)}`:`${data.shipping_carrier||"Kargo firması yok"} · ${data.tracking_number||"Takip numarası yok"}`,
+        kind:view.kind==="payment"?"status":view.kind==="unknown"?"shipping":view.kind,
+        title:view.title,
+        detail:view.detail,
         by:event.created_by?"Yetkili kullanıcı":"Sistem",
         at:String(event.created_at),
       };
