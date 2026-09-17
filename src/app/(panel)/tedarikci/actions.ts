@@ -52,20 +52,37 @@ export async function updateSupplier(formData: FormData) {
     redirect("/tedarikci?error=invalid-buffer");
   }
 
-  const { error } = await supabase
+  const { data: saved, error } = await supabase
     .from("arc_suppliers")
     .update({
       margin_percent: Math.round(margin),
-      // Kargo payı ve yuvarlama kuruş cinsinden saklanıyor.
+      // Kargo payı, ek hizmet bedeli ve yuvarlama kuruş cinsinden saklanıyor.
       shipping_markup: Math.round(shipping * 100),
       round_to_kurus: Math.round(round),
+      /*
+        service_fee ve stock_buffer okunuyor ve doğrulanıyordu ama update
+        gövdesinde YOKTU: kullanıcı değeri giriyor, "kaydedildi" görüyor,
+        değer hiçbir yere yazılmıyordu. service_fee içe aktarımda satış
+        fiyatına giriyor (api/tedarikci/ice-aktar), yani kaydedilmemesi
+        doğrudan fiyatı etkiliyordu.
+
+        NOT: stock_buffer artık saklanıyor ama henüz hiçbir davranışı yok —
+        "tedarikçi stoğu bu değerin altına düşerse ürün satışa kapanır"
+        kuralı kodda uygulanmıyor.
+      */
+      service_fee: Math.round(service * 100),
+      stock_buffer: Math.round(buffer),
       publish_directly: publishDirectly,
       updated_at: new Date().toISOString(),
     })
     .eq("organization_id", organization.id)
-    .eq("code", code);
+    .eq("code", code)
+    .select("code");
 
   if (error) redirect("/tedarikci?error=save-failed");
+  /* RLS elerse ya da kod eşleşmezse hata değil 0 satır döner; doğrulanmazsa
+     kullanıcı kaydedilmeyen ayarı kaydedilmiş sanır. */
+  if (!saved?.length) redirect("/tedarikci?error=save-failed");
 
   revalidatePath("/tedarikci");
   redirect("/tedarikci?ok=saved");

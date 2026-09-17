@@ -253,7 +253,14 @@ export async function POST(request: Request) {
     boş görünüyordu. Artık mevcut değerlerle birleşiyor.
   */
   const mergeMetadata = async (extra: Record<string, unknown>, fields: Record<string, unknown> = {}) => {
-    const { data: current } = await supabase.from("arc_orders").select("metadata").eq("id", order.order_id).single();
+    const { data: current, error: readError } = await supabase.from("arc_orders").select("metadata").eq("id", order.order_id).single();
+    /*
+      Okuma hatası yutulursa current null kalır ve metadata YALNIZCA yeni
+      anahtarlarla üzerine yazılır — yukarıdaki yorumda "düzeltildi" denen
+      hatanın ta kendisi geri gelir: teslimat adresi, kupon kodu ve indirim
+      silinir. Okunamıyorsa hiç yazmıyoruz.
+    */
+    if (readError) return { error: readError };
     return supabase
       .from("arc_orders")
       .update({
@@ -278,11 +285,24 @@ export async function POST(request: Request) {
       havale siparişi geçiyor, indirim ise kodda sabit %3 olduğu için her
       mağazaya uygulanıyordu.
     */
-    const { data: transferSettings } = await supabase
+    const { data: transferSettings, error: transferSettingsError } = await supabase
       .from("arc_store_settings")
       .select("bank_transfer_enabled, bank_transfer_discount_percent")
       .eq("organization_id", organizationId)
       .maybeSingle();
+
+    /*
+      Ayar okunamazsa havale AÇIK sayılamaz: "=== false" kontrolü undefined'ı
+      geçirdiği için geçici bir arızada, havaleyi panelden kapatmış mağazadan
+      da sipariş geçiyor ve indirim varsayılan %3'e düşüyordu.
+    */
+    if (transferSettingsError) {
+      console.error("Havale ayarları okunamadı:", transferSettingsError.message);
+      return NextResponse.json(
+        { error: "transfer_unavailable", message: "Havale ile ödeme şu anda kullanılamıyor, lütfen kartla deneyin." },
+        { status: 503, headers },
+      );
+    }
 
     if (transferSettings?.bank_transfer_enabled === false) {
       return NextResponse.json(
@@ -291,8 +311,34 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+      İndirim YALNIZCA mal bedeline uygulanır. Eskiden taban order.total idi,
+      yani kargo da indiriliyordu: 120 TL kargonun %3'ü müşteriye hediye
+      ediliyordu. Ayrıca yalnızca total güncelleniyordu; subtotal ve shipping
+      olduğu gibi kaldığı için panelde ve dışa aktarmada
+      subtotal − indirim + kargo ≠ total oluyordu.
+    */
+    const { data: amounts, error: amountsError } = await supabase
+      .from("arc_orders")
+      .select("subtotal, shipping, metadata")
+      .eq("id", order.order_id)
+      .single();
+    if (amountsError) {
+      console.error("Sipariş tutarları okunamadı:", amountsError.message);
+      return NextResponse.json(
+        { error: "transfer_unavailable", message: "Havale ile ödeme şu anda kullanılamıyor, lütfen kartla deneyin." },
+        { status: 503, headers },
+      );
+    }
+
+    const subtotal = Number(amounts?.subtotal ?? 0);
+    const shipping = Number(amounts?.shipping ?? 0);
+    const couponDiscount = Number((amounts?.metadata as Record<string, unknown> | null)?.discount ?? 0);
+    const goodsAfterCoupon = Math.max(subtotal - couponDiscount, 0);
+
     const discountPercent = Number(transferSettings?.bank_transfer_discount_percent ?? 3);
-    const discount = Math.round((order.total * discountPercent) / 100);
+    const discount = Math.round((goodsAfterCoupon * discountPercent) / 100);
+    const transferTotal = Math.max(goodsAfterCoupon - discount, 0) + shipping;
 
     const { error: transferError } = await mergeMetadata(
       {
@@ -301,12 +347,12 @@ export async function POST(request: Request) {
         transfer_discount_percent: discountPercent,
         ...(note ? { notes: note } : {}),
       },
-      { total: order.total - discount, payment_status: "pending", status: "pending" },
+      { total: transferTotal, payment_status: "pending", status: "pending" },
     );
 
     /* Güncelleme olmadıysa indirim uygulanmadı; vitrine gerçek tutar döner. */
     if (transferError) console.error("Havale indirimi kaydedilemedi:", transferError);
-    const payable = transferError ? order.total : order.total - discount;
+    const payable = transferError ? order.total : transferTotal;
 
     /*
       Havale kaydı yazılamadıysa e-posta gönderilmez: sipariş havale
