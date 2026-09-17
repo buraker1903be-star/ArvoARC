@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { fetchTarzyeri, parseDetail, slugify } from "@/lib/supplier/tarzyeri";
+import { sellableStock } from "@/lib/supplier-stock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -306,7 +307,8 @@ async function runSync(mode: "tam" | "stok") {
           seenSkus.add(variant.sku);
           stockUpdates.push({
             sku: variant.sku,
-            stock: variant.quantity,
+            // Tedarikçi stoğu tamponun altındaysa ürün satışa kapatılır.
+            stock: sellableStock(variant.quantity, rule.stock_buffer),
             cost: product.costPrice,
             price: stockPrice,
           });
@@ -437,7 +439,8 @@ async function runSync(mode: "tam" | "stok") {
             supplier_sku: variant.sku,
             cost_price: product.costPrice,
             price,
-            stock: variant.quantity,
+            // Tedarikçi stoğu tamponun altındaysa ürün satışa kapatılır.
+            stock: sellableStock(variant.quantity, rule.stock_buffer),
             title: `${variant.color} / ${variant.size}`,
             updated_at: now,
           };
