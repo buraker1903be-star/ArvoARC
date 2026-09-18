@@ -53,6 +53,8 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
   const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
+  /* Ödemenin gittiği hesap (IBAN, PayTR) yalnızca owner/admin: bkz. actions.ts PAYMENT_ROLES. */
+  const canManagePayments=["owner","admin"].includes(membership.role);
   // Anahtarın kendisi hiç okunmaz; yalnızca kayıtlı olup olmadığı gösterilir.
   const keysStored=Boolean(settings?.paytr_merchant_key_enc);
   const logoUrl=settings?.logo_path?supabase.storage.from("organization-assets").getPublicUrl(settings.logo_path).data.publicUrl:"";
@@ -156,7 +158,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
     </div>
     <section className="card settings-section payment-section">
       <div className="head"><div><small>ÖDEME ALTYAPISI</small><h3>Ödeme yöntemleri</h3><p>Her mağaza kendi havale hesabını ve PayTR mağaza numarasını yönetir.</p></div><span>GÜVENLİ YAPILANDIRMA</span></div>
-      {canManage?<form action={updatePaymentSettings} className="payment-form">
+      {canManagePayments?<form action={updatePaymentSettings} className="payment-form">
         <article className="payment-method">
           <div className="payment-title"><div><small>MANUEL ÖDEME</small><h4>Havale / EFT</h4></div><label className="check-inline"><input type="checkbox" name="bank_transfer_enabled" defaultChecked={settings?.bank_transfer_enabled}/><span>Etkin</span></label></div>
           <p>Sipariş sonrası müşteriye banka bilgilerini ve ödeme açıklamasını gösterir. Bu bilgiler havale siparişinde “Siparişiniz alındı” e-postasıyla da gönderilir; mağaza sayfasındaki IBAN ile aynı olmalı.</p>
@@ -189,7 +191,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
           <div className="security-note"><b>Önce alan adınızı doğrulatın.</b><p>E-posta sağlayıcısı, sahipliğini kanıtlamadığınız bir alan adından gönderim yapmaz. Doğrulama tamamlanmadan bu alanı doldurursanız e-postalar gönderilemez ve müşterileriniz sipariş onayı alamaz. Alan adı doğrulaması için bizimle iletişime geçin.</p></div>
         </article>
         <button className="payment-save" type="submit">Ödeme ayarlarını kaydet</button>
-      </form>:<p className="catalog-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
+      </form>:<p className="catalog-hint">Ödeme hesaplarını (IBAN, PayTR) yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
     </section>
     </div>
   </>;

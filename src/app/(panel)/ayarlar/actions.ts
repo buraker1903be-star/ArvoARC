@@ -8,6 +8,14 @@ import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/verce
 import { encryptSecret,paymentCredentialsConfigured } from "@/lib/payment-credentials";
 
 const roles=new Set(["owner","admin","manager"]);
+/*
+  Ödemenin gittiği hesap: IBAN, banka, PayTR mağaza numarası ve anahtarları.
+  Önceden manager da değiştirebiliyordu; kendi PayTR anahtarlarını ya da
+  IBAN'ını yazan biri kartla ve havaleyle gelen bütün tahsilatı kendi
+  hesabına yönlendirebilirdi. ArvoOS'ta finans yazma yetkisi de owner/admin.
+  Veritabanında aynı kural: private.arc_guard_payment_settings.
+*/
+const PAYMENT_ROLES=new Set(["owner","admin"]);
 const imageTypes:Record<string,string>={"image/png":"png","image/jpeg":"jpg","image/webp":"webp","image/x-icon":"ico","image/vnd.microsoft.icon":"ico"};
 const domainPattern=/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 const subdomainPattern=/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -81,7 +89,7 @@ export async function updateSalesSettings(formData:FormData){
 
 export async function updatePaymentSettings(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
-  if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
+  if(!PAYMENT_ROLES.has(membership.role))redirect("/ayarlar?error=forbidden");
   const bankTransferEnabled=formData.get("bank_transfer_enabled")==="on";
   const paytrEnabled=formData.get("paytr_enabled")==="on";
   const bankName=String(formData.get("bank_name")??"").trim();
