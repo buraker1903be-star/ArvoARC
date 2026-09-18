@@ -42,6 +42,13 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   yalnızca iade toplamı sipariş tutarına ulaşınca kapanır. Kargo çıkmadıysa
   kargo bedeli de iadeye girer, çıktıysa girmez. Tahsil edilenden fazlası
   iade edilemez.
+- **Vitrin (ArvoCulture-site) ARC'ın hesabını aynalar.** Sipariş
+  fonksiyonunda ya da `api/storefront/odeme`'de kargo, kupon veya havale
+  kuralı değişirse vitrindeki `src/lib/order-quote.ts` ve testi aynı gün
+  güncellenmeli; kural değişikliği tek başına yapılınca müşteri ödemede ARC'ın
+  tahsil ettiğinden farklı tutar görür (17 Eylül 2026'da oldu). Vitrinin
+  okuduğu ayarlar `get_arvoculture_storefront_settings` ile açılır; bu
+  fonksiyonun döndürdüğü alanlar vitrinin sözleşmesidir.
 - **E-postaya giren her kullanıcı metni HTML'e kaçışla girer** (müşteri adı,
   not, adres).
 - **Geri dönüş adresi doğrulanır**: başka bölüme ya da dış adrese
