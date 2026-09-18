@@ -62,6 +62,32 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
 - Köprü, taşıma günü öncesinde yayına alınır ve eski veritabanında da
   çalışabilir (hedef adres ortam değişkeninden).
 
+### Giriş ayarları — UYGULANDI 19.09.2026
+- Yeni projede Site URL `https://arc.arvo-os.com`; yönlendirme izinleri:
+  `https://arc.arvo-os.com/**`, `https://*.arvo-os.com/**`,
+  `https://app.arvoculture.com/**`, `https://arvoculture.com/**`,
+  `https://www.arvoculture.com/**`.
+- Kayıt ayarları eski projeyle aynı (kayıt açık, e-posta doğrulama açık,
+  yalnızca e-posta sağlayıcısı).
+- Özel SMTP iki projede de KAPALI: Supabase'in varsayılan e-postası yalnızca
+  proje ekibine gider. ARC'ın şifre belirleme e-postaları personele
+  ulaşmaz; yeni projede Authentication → Emails → SMTP'ye Resend bilgisi
+  girilmeli (sır: kullanıcı girer).
+
+### Veri ölçümü (19.09.2026)
+- ~3.400 ürün, ~15.700 varyant (tablolar ~32 MB), 29 sipariş, 3 kurum.
+- auth.users: toplam 11; ARC'la bağlantılı (üyelik, sipariş, adres) 2.
+  Geçişte taşınacak kullanıcılar: ARC kurumlarının üyeleri + siparişi,
+  adresi, favorisi ya da iadesi olanlar + vitrin müşterisi olarak kayıtlı
+  olanlar.
+- Görseller yol olarak saklanıyor (`metadata.image_paths`), tam adres
+  değil; adres çalışma anında projenin URL'sinden kuruluyor. Geçişte
+  `arc-product-images` (418 dosya, 221 MB) ve `organization-assets`
+  (4 dosya) KOPYALANMALI; aksi halde görseller kırılır.
+- Veri yüklenirken tetikleyiciler kapatılmalı
+  (`set session_replication_role = replica`): stok, kupon sayacı ve sipariş
+  olayı tetikleyicileri bir kez daha çalışmasın.
+
 ### 3. Veri
 - Bakım penceresi: mağazalar `sales_closed` (vitrin açık, satış kapalı);
   PayTR'da bekleyen ödeme kalmadığı doğrulanır.
