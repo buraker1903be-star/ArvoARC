@@ -14,18 +14,27 @@ migration'larda yoktu; yalnızca canlı veritabanında tanımlıydı. Sonuçlar�
 - Vitrin (ArvoCulture-site) ile ARC arasındaki tutar sapması bu yüzden geç
   fark edildi.
 
+## Aynı veritabanı: ArvoOS + ARC
+
+ArvoOS (`crm_*`, `hr_*`, `organizations`, `organization_memberships` …) ve ARC
+(`arc_*`) **aynı Supabase projesini** kullanıyor. Bu anlık görüntü ikisini de
+kapsar; ArvoOS'un deposunda eksik olan tablolar da (`crm_contracts`,
+`crm_proposals`, `hr_employees` …) burada.
+
 ## Nasıl güncellenir
 
 1. Supabase → SQL Editor'de `scripts/sema-disa-aktar.sql` dosyasının tamamını
-   çalıştırın. Salt okunurdur, hiçbir şeyi değiştirmez; veri ve sır içermez
-   (yalnızca yapı: tipler, sekanslar, tablolar, varsayılanlar, kısıtlar,
-   indeksler, görünümler, RLS, politikalar, fonksiyonlar, fonksiyon yetkileri,
-   tetikleyiciler).
-2. Tek hücre döner. Kopyalayıp `supabase/schema/canli-sema.sql` dosyasına
-   yapıştırın ve commit edin.
+   çalıştırın. Salt okunurdur, hiçbir şeyi değiştirmez; veri ve sır içermez.
+2. Sonucu **Download CSV** ile indirin.
+3. `node scripts/sema-kaydet.mjs ~/Downloads/<indirilen>.csv`
 
-Bir migration'ı canlıya uyguladıktan sonra bu dosyayı da yeniden üretin; fark
-(`git diff`) migration'ın gerçekte ne değiştirdiğini gösterir.
+Betik CSV kaçışını çözer ve dosyayı bayt bayt yazar; elle kopyalayıp
+yapıştırmaya gerek yok. Yazmadan önce çıktıda gömülü anahtar arar (Supabase
+gizli anahtarı, JWT, Stripe/Resend anahtarı, özel anahtar); bulursa dosyayı
+yazmaz ve satırı gösterir.
+
+Bir migration'ı canlıya uyguladıktan sonra dosyayı yeniden üretin; `git diff`
+migration'ın gerçekte ne değiştirdiğini gösterir.
 
 ## Doğrulama
 
@@ -34,6 +43,8 @@ Sorgu, ARC'a benzeyen bir örnek şemada (enum, kimlik sütunu, sekans, fonksiyo
 yetkileri, tetikleyici, RLS) gidiş-dönüş sınandı: çıktı boş bir veritabanında
 hatasız çalıştı ve kataloğun on kategorisi kaynakla birebir aynı çıktı.
 
-Kapsam dışı: uzantılar, tablo düzeyi yetkiler (GRANT … ON TABLE), domain ve
-bileşik tipler, `public` dışındaki şemalar (auth, storage). Supabase'e geri
+Kapsam: `public` ve `private` şemaları (politikalar ve tetikleyiciler
+private'taki fonksiyonlara dayanıyor). Kapsam dışı: uzantılar, tablo düzeyi
+yetkiler (GRANT … ON TABLE), domain ve bileşik tipler, private şemasındaki
+tablolar, auth ve storage şemaları. Supabase'e geri
 yüklerken bunlar platformdan gelir.

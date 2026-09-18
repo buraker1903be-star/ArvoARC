@@ -10,10 +10,11 @@
 -- supabase/schema/canli-sema.sql dosyasına yapıştırın.
 --
 -- Salt okunurdur: hiçbir şeyi değiştirmez. pg_dump'ın yerini tutmaz
--- (uzantılar, tablo yetkileri, domain ve bileşik tipler yok) ama enum
+-- (uzantılar, tablo yetkileri, domain ve bileşik tipler, private şemasındaki
+-- tablolar yok) ama enum
 -- tiplerini, sekansları, tabloları, kimlik sütunlarını, varsayılanları,
--- kısıtları, indeksleri, RLS'i, politikaları, görünümleri, fonksiyonları,
--- fonksiyon yetkilerini ve tetikleyicileri kapsar.
+-- kısıtları, indeksleri, RLS'i, politikaları, görünümleri, fonksiyonları
+-- (public ve private), fonksiyon yetkilerini ve tetikleyicileri kapsar.
 -- ============================================================
 with
 tablolar as (
@@ -104,28 +105,28 @@ gorunum_ddl as (
   where n.nspname = 'public' and c.relkind = 'v'
 ),
 fonksiyon_ddl as (
-  select p.proname as ad, 15 as sira, pg_get_functiondef(p.oid) || ';' as ddl
+  select n.nspname || '.' || p.proname as ad, 15 as sira, pg_get_functiondef(p.oid) || ';' as ddl
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public' and p.prokind in ('f', 'p')
+  where n.nspname in ('public', 'private') and p.prokind in ('f', 'p')
     and not exists (select 1 from pg_depend dep where dep.objid = p.oid and dep.deptype = 'e')
 ),
 yetki_ddl as (
-  select p.proname as ad, 85 as sira,
-         format('revoke all on function public.%I(%s) from public;', p.proname, pg_get_function_identity_arguments(p.oid))
+  select n.nspname || '.' || p.proname as ad, 85 as sira,
+         format('revoke all on function %I.%I(%s) from public;', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid))
          || coalesce(E'\n' || string_agg(
-              format('grant execute on function public.%I(%s) to %s;',
-                p.proname, pg_get_function_identity_arguments(p.oid),
+              format('grant execute on function %I.%I(%s) to %s;',
+                n.nspname, p.proname, pg_get_function_identity_arguments(p.oid),
                 case when acl.grantee = 0 then 'public' else quote_ident(r.rolname) end),
               E'\n'), '') as ddl
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   left join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl on acl.privilege_type = 'EXECUTE'
   left join pg_roles r on r.oid = acl.grantee
-  where n.nspname = 'public' and p.prokind in ('f', 'p')
+  where n.nspname in ('public', 'private') and p.prokind in ('f', 'p')
     and not exists (select 1 from pg_depend dep where dep.objid = p.oid and dep.deptype = 'e')
     and (acl.grantee is null or acl.grantee <> p.proowner)
-  group by p.oid, p.proname
+  group by p.oid, n.nspname, p.proname
 ),
 tetikleyici_ddl as (
   select c.relname as ad, 90 as sira, pg_get_triggerdef(tg.oid) || ';' as ddl
@@ -148,6 +149,8 @@ select E'-- Canlı şema dışa aktarımı: ' || now()::date || E'\n-- scripts/s
        || E'-- kısıtlar, yabancı anahtarlar, indeksler, görünümler, RLS, politikalar,\n'
        || E'-- yetkiler, tetikleyiciler. Fonksiyon gövdeleri tablolar tamamlanmadan\n'
        || E'-- denetlenmesin diye:\n'
-       || E'set check_function_bodies = false;\n\n'
+       || E'set check_function_bodies = false;\n'
+       || E'-- Politikalar ve tetikleyiciler private şemasındaki fonksiyonlara dayanıyor.\n'
+       || E'create schema if not exists private;\n\n'
        || string_agg(ddl, E'\n\n' order by sira, ad, ddl) as ddl
 from hepsi;
