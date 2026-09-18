@@ -1,0 +1,200 @@
+-- ============================================================
+-- ARC ayrılması: yeni projenin kurulum betiğini ESKİ (ortak) veritabanında
+-- üretir. Salt okunur; hiçbir şeyi değiştirmez. Bkz. AYRILMA.md.
+--
+-- Seçim:
+--  - tablolar: arc_% + ARC'ın okuduğu dört paylaşılan tablo (organizations,
+--    organization_memberships, organization_product_licenses,
+--    organization_modules; ArvoOS köprüsü doldurur);
+--  - fonksiyonlar: adı arc_ / arvoculture / storefront geçenler, bu
+--    tabloların tetikleyici ve politikalarının çağırdıkları, ve bunların
+--    gövdelerinde adı geçen diğer public/private fonksiyonlar (kapanış);
+--  - kısıtlar: yabancı anahtar yalnızca seçili tablolara ve auth.users'a;
+--  - paylaşılan tabloların ArvoOS politikaları ve tetikleyicileri ALINMAZ:
+--    RLS açık, politika yok (yalnızca servis anahtarı ve security definer
+--    fonksiyonlar okur/yazar);
+--  - depolar: arc-product-images, organization-assets ve kuralları.
+--
+-- Çıktı: tek satır; toplam, özet (json) ve betik.
+-- ============================================================
+with recursive
+paylasilan(ad) as (values ('organizations'), ('organization_memberships'), ('organization_product_licenses'), ('organization_modules')),
+tablolar as (
+  select c.oid, c.relname, c.relrowsecurity as rls, (c.relname in (select ad from paylasilan)) as paylasilan
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'r'
+    and (c.relname like 'arc\_%' or c.relname in (select ad from paylasilan))
+),
+depo_kurallari as (
+  select pol.*, coalesce(pg_get_expr(pol.polqual, pol.polrelid), '') || ' ' || coalesce(pg_get_expr(pol.polwithcheck, pol.polrelid), '') as ifade
+  from pg_policy pol
+  where pol.polrelid = 'storage.objects'::regclass
+    and (coalesce(pg_get_expr(pol.polqual, pol.polrelid), '') || coalesce(pg_get_expr(pol.polwithcheck, pol.polrelid), '')) ~ '(arc-product-images|organization-assets)'
+),
+tum_fonksiyonlar as (
+  select p.oid, n.nspname, p.proname, p.prosrc
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname in ('public', 'private') and p.prokind in ('f', 'p')
+    and not exists (select 1 from pg_depend dep where dep.objid = p.oid and dep.deptype = 'e')
+),
+tohum as (
+  select f.oid from tum_fonksiyonlar f
+  where f.proname like 'arc\_%' or f.proname like '%arvoculture%' or f.proname like '%storefront%'
+  union
+  select tg.tgfoid from pg_trigger tg join tablolar t on t.oid = tg.tgrelid
+  where not tg.tgisinternal and not t.paylasilan
+  union
+  select f.oid from tum_fonksiyonlar f
+  join pg_policies pol on pol.schemaname = 'public' and pol.tablename in (select relname from tablolar where not paylasilan)
+  where position(f.proname || '(' in coalesce(pol.qual, '') || coalesce(pol.with_check, '')) > 0
+  union
+  -- Depo kurallarının çağırdıkları (ör. private.can_manage_organization_assets).
+  select f.oid from tum_fonksiyonlar f join depo_kurallari d on position(f.proname || '(' in d.ifade) > 0
+),
+kapanis(oid) as (
+  select oid from tohum
+  union
+  select g.oid from kapanis k
+  join tum_fonksiyonlar kf on kf.oid = k.oid
+  join tum_fonksiyonlar g on g.oid <> kf.oid and position(g.proname || '(' in kf.prosrc) > 0
+),
+fonksiyonlar as (select f.* from tum_fonksiyonlar f where f.oid in (select oid from kapanis)),
+kullanilan_tipler as (
+  select distinct a.atttypid as oid from tablolar t join pg_attribute a on a.attrelid = t.oid and a.attnum > 0 and not a.attisdropped
+  union
+  select distinct unnest(p.proargtypes::oid[] || p.prorettype) from pg_proc p where p.oid in (select oid from fonksiyonlar)
+),
+tip_ddl as (
+  select 3 as sira, ty.typname as ad,
+         format('do $t$ begin create type public.%I as enum (%s); exception when duplicate_object then null; end $t$;',
+           ty.typname, (select string_agg(quote_literal(e.enumlabel), ', ' order by e.enumsortorder) from pg_enum e where e.enumtypid = ty.oid)) as ddl
+  from pg_type ty join pg_namespace n on n.oid = ty.typnamespace
+  where n.nspname = 'public' and ty.typtype = 'e'
+    and (ty.oid in (select oid from kullanilan_tipler) or ty.typarray in (select oid from kullanilan_tipler))
+),
+sekans_ddl as (
+  select 5, c.relname, format('create sequence if not exists public.%I;', c.relname)
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'S'
+    and not exists (select 1 from pg_depend dep where dep.objid = c.oid and dep.deptype = 'i')
+    and exists (select 1 from pg_attrdef d join tablolar t on t.oid = d.adrelid where pg_get_expr(d.adbin, d.adrelid) like '%' || c.relname || '%')
+),
+tablo_ddl as (
+  select 10, t.relname,
+         format(E'create table if not exists public.%I (\n%s\n);', t.relname,
+           string_agg(format('  %I %s%s%s', a.attname, format_type(a.atttypid, a.atttypmod),
+             case a.attidentity when 'a' then ' generated always as identity' when 'd' then ' generated by default as identity' else '' end,
+             case when a.attnotnull then ' not null' else '' end), E',\n' order by a.attnum))
+  from tablolar t join pg_attribute a on a.attrelid = t.oid and a.attnum > 0 and not a.attisdropped
+  group by t.relname
+),
+fonksiyon_ddl as (
+  select 15, f.nspname || '.' || f.proname, pg_get_functiondef(f.oid) || ';' from fonksiyonlar f
+),
+varsayilan_ddl as (
+  select 17, t.relname, format('alter table public.%I alter column %I set default %s;', t.relname, a.attname, pg_get_expr(d.adbin, d.adrelid))
+  from tablolar t join pg_attribute a on a.attrelid = t.oid and a.attnum > 0 and not a.attisdropped
+  join pg_attrdef d on d.adrelid = t.oid and d.adnum = a.attnum
+  where a.attidentity = '' and a.attgenerated = ''
+),
+kisit_ddl as (
+  select case when con.contype = 'f' then 30 else 20 end, t.relname,
+         format('alter table public.%I add constraint %I %s;', t.relname, con.conname, pg_get_constraintdef(con.oid))
+  from tablolar t join pg_constraint con on con.conrelid = t.oid
+  where con.contype <> 'f'
+     or con.confrelid in (select oid from tablolar)
+     or con.confrelid = 'auth.users'::regclass
+),
+indeks_ddl as (
+  select 40, t.relname, pg_get_indexdef(i.indexrelid) || ';'
+  from tablolar t join pg_index i on i.indrelid = t.oid
+  where not exists (select 1 from pg_constraint c where c.conindid = i.indexrelid)
+),
+rls_ddl as (
+  select 50, relname, format('alter table public.%I enable row level security;', relname) from tablolar where rls or paylasilan
+),
+politika_ddl as (
+  select 60, p.tablename,
+         format(E'create policy %I on public.%I as %s for %s to %s%s%s;', p.policyname, p.tablename, p.permissive, p.cmd,
+           array_to_string(p.roles, ', '),
+           case when p.qual is not null then E'\n  using (' || p.qual || ')' else '' end,
+           case when p.with_check is not null then E'\n  with check (' || p.with_check || ')' else '' end)
+  from pg_policies p where p.schemaname = 'public' and p.tablename in (select relname from tablolar where not paylasilan)
+),
+fonksiyon_yetki_ddl as (
+  select 85, f.nspname || '.' || f.proname,
+         format('revoke all on function %I.%I(%s) from public;', f.nspname, f.proname, pg_get_function_identity_arguments(f.oid))
+         || coalesce(E'\n' || string_agg(format('grant execute on function %I.%I(%s) to %s;', f.nspname, f.proname,
+              pg_get_function_identity_arguments(f.oid), case when acl.grantee = 0 then 'public' else quote_ident(r.rolname) end), E'\n'), '')
+  from fonksiyonlar f join pg_proc p on p.oid = f.oid
+  left join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl on acl.privilege_type = 'EXECUTE'
+  left join pg_roles r on r.oid = acl.grantee
+  where acl.grantee is null or acl.grantee <> p.proowner
+  group by f.oid, f.nspname, f.proname
+),
+tablo_yetki_ddl as (
+  select 86, t.relname,
+         string_agg(format('grant %s on table public.%I to %s;', acl.privilege_type, t.relname,
+           case when acl.grantee = 0 then 'public' else quote_ident(r.rolname) end), E'\n' order by r.rolname, acl.privilege_type)
+  from tablolar t join pg_class c on c.oid = t.oid
+  cross join lateral aclexplode(c.relacl) acl left join pg_roles r on r.oid = acl.grantee
+  where acl.grantee <> c.relowner
+  group by t.relname
+),
+tetikleyici_ddl as (
+  select 90, t.relname, pg_get_triggerdef(tg.oid) || ';'
+  from pg_trigger tg join tablolar t on t.oid = tg.tgrelid
+  where not tg.tgisinternal and not t.paylasilan
+),
+depo_ddl as (
+  select 95, 'storage.buckets',
+         format('insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values (%L, %L, %L::boolean, %s, %L) on conflict (id) do nothing;',
+           b.id, b.name, b.public, coalesce(b.file_size_limit::text, 'null'), b.allowed_mime_types)
+  from storage.buckets b where b.id in ('arc-product-images', 'organization-assets')
+  union all
+  -- Boş koşul yazılmaz: insert'te using, select/delete'te with check
+  -- Postgres'te hata verir.
+  select 96, 'storage.' || pol.polname,
+         format(E'drop policy if exists %I on storage.objects;\ncreate policy %I on storage.objects as %s for %s to %s%s%s;',
+           pol.polname, pol.polname, case when pol.polpermissive then 'permissive' else 'restrictive' end,
+           case pol.polcmd when 'r' then 'select' when 'a' then 'insert' when 'w' then 'update' when 'd' then 'delete' else 'all' end,
+           coalesce((select string_agg(case when rr = 0 then 'public' else quote_ident(pg_get_userbyid(rr)) end, ', ') from unnest(pol.polroles) rr), 'public'),
+           coalesce(E'\n  using (' || pg_get_expr(pol.polqual, pol.polrelid) || ')', ''),
+           coalesce(E'\n  with check (' || pg_get_expr(pol.polwithcheck, pol.polrelid) || ')', ''))
+  from depo_kurallari pol
+),
+hepsi(sira, ad, ddl) as (
+  select * from tip_ddl union all select * from sekans_ddl union all select * from tablo_ddl union all
+  select * from fonksiyon_ddl union all select * from varsayilan_ddl union all select * from kisit_ddl union all
+  select * from indeks_ddl union all select * from rls_ddl union all select * from politika_ddl union all
+  select * from fonksiyon_yetki_ddl union all select * from tablo_yetki_ddl union all
+  select * from tetikleyici_ddl union all select * from depo_ddl
+),
+metin as (
+  select E'-- ARC kurulum betiği: ' || now()::date || E' (scripts/ayrilma/arc-kurulum-uret.sql)\n'
+      || E'set check_function_bodies = false;\ncreate schema if not exists private;\n'
+      || E'grant usage on schema private to authenticated, anon, service_role;\n'
+      || E'create extension if not exists pgcrypto with schema extensions;\n\n'
+      || string_agg(ddl, E'\n\n' order by sira, ad, ddl) as t
+  from hepsi
+),
+ozet as (
+  select json_build_object(
+    'tablolar', (select count(*) from tablolar),
+    'fonksiyonlar', (select count(*) from fonksiyonlar),
+    'fonksiyon_adlari', (select json_agg(nspname || '.' || proname order by nspname, proname) from fonksiyonlar),
+    'tipler', (select count(*) from tip_ddl),
+    'politikalar', (select count(*) from politika_ddl),
+    'tetikleyiciler', (select count(*) from tetikleyici_ddl),
+    'depo', (select count(*) from depo_ddl),
+    'dis_tablo_kullanan_fonksiyonlar', (
+      select json_agg(distinct f.nspname || '.' || f.proname || ' → ' || c.relname)
+      from fonksiyonlar f join pg_class c on c.relkind = 'r' and c.relnamespace = 'public'::regnamespace
+      where c.oid not in (select oid from tablolar) and f.prosrc ~ ('\m' || c.relname || '\M')),
+    'atlanan_yabanci_anahtarlar', (
+      select json_agg(t.relname || '.' || con.conname || ' → ' || con.confrelid::regclass::text)
+      from tablolar t join pg_constraint con on con.conrelid = t.oid
+      where con.contype = 'f' and con.confrelid not in (select oid from tablolar) and con.confrelid <> 'auth.users'::regclass)
+  ) as j
+)
+select length(t) as toplam, (select j from ozet)::text as ozet, t as betik from metin;

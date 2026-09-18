@@ -25,7 +25,22 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
 
 ## Aşamalar
 
-### 1. Şema (yeni projeye yalnızca ARC'ın ihtiyacı)
+### 1. Şema (yeni projeye yalnızca ARC'ın ihtiyacı) — UYGULANDI 18.09.2026
+- `scripts/ayrilma/arc-kurulum-uret.sql` eski projenin SQL Editor'ünde
+  çalıştırılır (salt okunur), çıkan betik yeni projede çalıştırılır. Betik
+  tek işlemde çalışır; hata olursa hiçbir şey yazılmaz.
+- Yeni projede doğrulandı: 22 tablo, 57 fonksiyon, 52 politika,
+  8 tetikleyici, 2 depo + 8 depo kuralı, RLS kapalı tablo yok; bütün
+  fonksiyonlar `check_function_bodies = on` ile yeniden derlendi, hata yok.
+- **Geçiş günü betik yeniden üretilip uygulanmalı**: o güne kadar eski
+  projeye uygulanan ARC migration'ları yeni projede yok. Sıra: yeni projede
+  `public` ve `private` şemalarını boşalt → betiği yeniden üret ve uygula →
+  veriyi taşı.
+- Yeni proje FREE planda: yedek yok, 500 MB veritabanı / 1 GB depolama
+  sınırı, düşük etkinlikte duraklatma. Geçişten önce PRO organizasyona
+  taşınmalı.
+
+Önceki plan metni:
 - Eski projeden şema dökümü (`pg_dump --schema-only`, public + private).
 - Dökümden ARC nesneleri ve yukarıdaki paylaşılan tabloların ARC'ın
   kullandığı sütunları süzülür → `supabase/ayrilma/kurulum.sql`.
