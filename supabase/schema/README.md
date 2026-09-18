@@ -36,6 +36,28 @@ yazmaz ve satırı gösterir.
 Bir migration'ı canlıya uyguladıktan sonra dosyayı yeniden üretin; `git diff`
 migration'ın gerçekte ne değiştirdiğini gösterir.
 
+## Katalog ve şema sözleşmesi
+
+`katalog.json` şemanın uygulama kodunu ilgilendiren özetidir: tablo → sütunlar
+ve public fonksiyon adları. `scripts/check-schema-usage.mjs` koddaki
+`.from("…").select/eq/order/insert/update/upsert` ve `.rpc("…")` ifadelerini
+bununla karşılaştırır ve CI'da çalışır (`npm run check:schema`). Aynı betik ve
+katalog ArvoOS ve ArvoCulture-site'ta da birebir durur.
+
+Anlık görüntüyü yeniledikten sonra:
+
+```bash
+npm run schema:catalog        # canli-sema.sql → katalog.json
+cp supabase/schema/katalog.json ../ArvoOS/supabase/schema/
+cp supabase/schema/katalog.json ../ArvoCulture-site/supabase/schema/
+```
+
+**Geçici durum (18 Eylül 2026):** ilk `katalog.json`, SQL Editor çıktısından
+elle çıkarıldı; `canli-sema.sql` henüz depoda değil. Kodun kullandığı bütün
+tablo ve sütunlar katalogda bulundu (tek eksik gerçek hataydı), yani kodun
+dokunduğu kısım doğrulandı. `canli-sema.sql` kaydedilince katalog ondan
+yeniden üretilecek; fark varsa `git diff`'te görünür.
+
 ## Doğrulama
 
 Sorgu, ARC'a benzeyen bir örnek şemada (enum, kimlik sütunu, sekans, fonksiyon

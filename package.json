@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/register.mjs --test \"tests/**/*.test.ts\"",
     "check:migrations": "node scripts/check-migrations.mjs",
-    "db:new": "node scripts/new-migration.mjs"
+    "check:schema": "node scripts/check-schema-usage.mjs",
+    "db:new": "node scripts/new-migration.mjs",
+    "schema:catalog": "node scripts/sema-katalog.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
