@@ -27,3 +27,8 @@ jobs:
         run: npm run lint
       - name: Testler
         run: npm test
+      # Yeni migration adı ve sürüm sırası (scripts/check-migrations.mjs).
+      # ArvoOS ve ARC aynı veritabanına yazıyor; migration'lar SQL Editor'den
+      # elle uygulanıyor, sıralama hatası ancak burada yakalanır.
+      - name: Migration denetimi
+        run: npm run check:migrations

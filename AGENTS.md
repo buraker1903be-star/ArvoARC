@@ -54,6 +54,13 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
 - **Geri dönüş adresi doğrulanır**: başka bölüme ya da dış adrese
   yönlendirme engellenir, filtre ve sayfa korunur.
 
+## Migration
+
+Yeni dosyayı **`npm run db:new -- <ad>`** ile açın; sürümü son migration'ın
+ardına kendisi yerleştirir. `npm run check:migrations` CI'da çalışır. ARC ve
+ArvoOS aynı veritabanını kullanır; migration'lar SQL Editor'den elle
+uygulanır. Canlı şemanın tam anlık görüntüsü `supabase/schema/` altında.
+
 ## Testler
 
 ```bash
