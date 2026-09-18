@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { login } from "./actions";
 import "./login.css";
 
@@ -47,6 +48,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <label>E-posta adresi<input name="email" type="email" autoComplete="email" required placeholder="adiniz@kurum.com" /></label>
           <label>Parola<input name="password" type="password" autoComplete="current-password" required placeholder="••••••••" /></label>
           <button type="submit">Giriş yap <b>→</b></button>
+          <small><Link href="/sifre">Şifremi unuttum / ilk şifremi belirleyeceğim</Link></small>
           <small>Hesaplar ArvoOS kurum yöneticisi tarafından oluşturulur. Açık üyelik bulunmaz.</small>
         </form>
       </section>

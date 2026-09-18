@@ -69,6 +69,7 @@
 .login-card>small{display:block;margin-top:22px;padding-top:18px;border-top:1px solid var(--line);text-align:center;color:var(--muted);font-size:12px;line-height:1.6}
 
 .login-error{margin-bottom:6px;padding:12px 14px;border:1px solid #efcdc8;border-radius:10px;background:#f9e9e7;color:#8c2f2b;font-size:13px;line-height:1.5}
+.login-notice{margin-bottom:6px;padding:12px 14px;border:1px solid #cfe3d3;border-radius:10px;background:#eaf5ec;color:#245b33;font-size:13px;line-height:1.5}
 
 .login-shell :is(a,button,input):focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 

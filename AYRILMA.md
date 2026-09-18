@@ -41,6 +41,9 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
   şifre belirleme e-postası gider. **Şifreler iki sistemde ayrı yaşar**:
   taşıma anındaki şifre iki tarafta aynıdır, sonrasında birinde değiştirmek
   diğerini değiştirmez.
+- Şifre belirleme: ARC'ta `/sifre` (bağlantı gönder) → `/auth/yenile` →
+  `/sifre/yeni`. Yeni projede Auth → URL Configuration'a panel alan adları
+  (`https://arc.arvo-os.com/**` ve mağazaların panel alan adları) eklenmeli.
 - Köprü, taşıma günü öncesinde yayına alınır ve eski veritabanında da
   çalışabilir (hedef adres ortam değişkeninden).
 
