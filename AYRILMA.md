@@ -115,7 +115,11 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
   engelli): yükleme `on conflict (pk) do update` ile yapılmalı. Eski
   tarafta prova sonrası silinen satırlar (nadiren) elle temizlenir.
 
-### Görseller
+### Görseller — PROVA YAPILDI 19.09.2026
+- 420 dosya (418 ürün görseli, 2 mağaza/tema), 221,5 MB; hata yok, eksik
+  yok. Anahtar panodan okunuyor: terminale yapıştırmada iki kez 15 karaktere
+  kısaldı. Gerçek geçişte betik yeniden çalıştırılır (üzerine yazar; aradaki
+  yeni görseller de gelir).
 - `node scripts/ayrilma/03-gorselleri-kopyala.mjs` (ArvoARC klasöründe):
   yeni veritabanındaki yollardan listeyi çıkarır, eski projenin herkese açık
   adresinden indirir, yeni projeye secret anahtarla yükler. Anahtarı gizli
