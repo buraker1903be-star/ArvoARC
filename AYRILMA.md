@@ -1,5 +1,26 @@
 # ARC'ın kendi veritabanına taşınması
 
+> **GEÇİŞ TAMAMLANDI — 19.09.2026.** ARC ve ArvoCulture vitrini
+> `obaskcdxaaezjglayash` projesinde çalışıyor (`/api/saglik` gösterir).
+> ARC migration'ları artık YALNIZCA bu projeye uygulanır. Eski ortak projedeki
+> `arc_` tabloları salt okunur yedek olarak duruyor; bir süre sonra silinecek.
+>
+> Geçişte çıkan ve düzeltilen sorunlar:
+> - Yeni tip secret anahtar yalnızca oluşturulduğu an tam gösteriliyor;
+>   uygulama içi tarayıcıda kopyala düğmesi çalışmıyor → kendi tarayıcıda
+>   oluşturup o an kopyalamak gerekiyor.
+> - `session_replication_role` fonksiyon içinden verilemiyor → tablo bazında
+>   `disable trigger user`.
+> - Paylaşılan `organization_memberships` politikasız kurulmuştu; personel
+>   her şeyi boş görüyordu → `20260919083313_uyelik_okuma_kurali.sql`.
+> - Sahip hesabı `b.erdogan@arvoculture.com`; varsayılan Supabase e-postası
+>   yalnızca proje ekibine gidiyor → şifre SQL'le belirlendi. Personel
+>   e-postaları için Resend SMTP ayarlanmalı.
+>
+> Kalan: geçici `arc-aktarim` anahtarlarını sil (iki proje), `04c-temizlik.sql`,
+> Resend SMTP, eski `arc_` tablolarının silinmesi (bir süre sonra), kullanılmayan
+> `cernfbgdzkjmefqdeiub` projesi.
+
 Karar (18 Eylül 2026): ARC, ArvoOS ile paylaştığı Supabase projesinden
 (`oahshpkgdzrraqdzjqau`) kendi projesine (`obaskcdxaaezjglayash`, ArvoOS PRO organizasyonunda) taşınıyor.
 İlk açılan `cernfbgdzkjmefqdeiub` (ücretsiz plan, ayrı organizasyon) KULLANILMIYOR;
