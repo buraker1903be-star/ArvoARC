@@ -65,6 +65,13 @@ projeden ayrıldık (AYRILMA.md). Eski projedeki `arc_*` tabloları yedektir.
 `organization_modules` burada ArvoOS'un kopyasıdır; onları ArvoOS köprüsü
 yazar, ARC kodu yazmaz. Bağlı proje: `/api/saglik`.
 
+**Her yeni fonksiyonun yetkisini açıkça yazın.** Bu projede 19.09.2026'dan
+beri varsayılan yetki kapalı: yeni fonksiyon hiçbir role açık doğmaz
+(20260919114636). Taşınırken revoke satırları kaybolduğu için siparişi
+"ödendi" yapan fonksiyon birkaç saat vitrinin herkese açık anahtarına açık
+kaldı. Sunucunun çağırdığı fonksiyon yalnızca `service_role`'e, panelin
+çağırdığı `authenticated`'a, vitrinin okuduğu `anon`'a açılır.
+
 ## Testler
 
 ```bash
