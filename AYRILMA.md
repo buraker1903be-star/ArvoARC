@@ -17,8 +17,13 @@
 >   yalnızca proje ekibine gidiyor → şifre SQL'le belirlendi. Personel
 >   e-postaları için Resend SMTP ayarlanmalı.
 >
+> Resend SMTP KURULDU (19.09.2026): gönderen `ARVO ARC <no-reply@arvo-os.com>`,
+> smtp.resend.com:465, Resend anahtarı `supabase-arc-smtp` (yalnızca gönderim,
+> arvo-os.com). İlk e-posta istenmeyene düştü → `arvo-os.com` için DMARC TXT
+> kaydı eklenecek (`_dmarc` = `v=DMARC1; p=none; rua=mailto:…`).
+>
 > Kalan: geçici `arc-aktarim` anahtarlarını sil (iki proje), `04c-temizlik.sql`,
-> Resend SMTP, eski `arc_` tablolarının silinmesi (bir süre sonra), kullanılmayan
+> DMARC kaydı, eski `arc_` tablolarının silinmesi (bir süre sonra), kullanılmayan
 > `cernfbgdzkjmefqdeiub` projesi.
 
 Karar (18 Eylül 2026): ARC, ArvoOS ile paylaştığı Supabase projesinden
