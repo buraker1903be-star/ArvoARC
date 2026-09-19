@@ -1,7 +1,9 @@
 # ARC'ın kendi veritabanına taşınması
 
 Karar (18 Eylül 2026): ARC, ArvoOS ile paylaştığı Supabase projesinden
-(`oahshpkgdzrraqdzjqau`) kendi projesine (`cernfbgdzkjmefqdeiub`) taşınıyor.
+(`oahshpkgdzrraqdzjqau`) kendi projesine (`obaskcdxaaezjglayash`, ArvoOS PRO organizasyonunda) taşınıyor.
+İlk açılan `cernfbgdzkjmefqdeiub` (ücretsiz plan, ayrı organizasyon) KULLANILMIYOR;
+silinebilir.
 Lisansı ArvoOS yönetmeye devam eder ve ARC'a aktarır; bugünkü verinin tamamı
 (katalog, siparişler, müşteri hesapları, görseller) taşınır.
 
@@ -25,7 +27,7 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
 
 ## Aşamalar
 
-### 1. Şema (yeni projeye yalnızca ARC'ın ihtiyacı) — UYGULANDI 18.09.2026
+### 1. Şema (yeni projeye yalnızca ARC'ın ihtiyacı) — UYGULANDI 19.09.2026 (obaskcdxaaezjglayash)
 - `scripts/ayrilma/arc-kurulum-uret.sql` eski projenin SQL Editor'ünde
   çalıştırılır (salt okunur), çıkan betik yeni projede çalıştırılır. Betik
   tek işlemde çalışır; hata olursa hiçbir şey yazılmaz.
@@ -36,9 +38,7 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
   projeye uygulanan ARC migration'ları yeni projede yok. Sıra: yeni projede
   `public` ve `private` şemalarını boşalt → betiği yeniden üret ve uygula →
   veriyi taşı.
-- Yeni proje FREE planda: yedek yok, 500 MB veritabanı / 1 GB depolama
-  sınırı, düşük etkinlikte duraklatma. Geçişten önce PRO organizasyona
-  taşınmalı.
+- Proje ArvoOS'un PRO organizasyonunda (yedek var, duraklatma yok).
 
 Önceki plan metni:
 - Eski projeden şema dökümü (`pg_dump --schema-only`, public + private).
@@ -62,8 +62,9 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
 - Köprü, taşıma günü öncesinde yayına alınır ve eski veritabanında da
   çalışabilir (hedef adres ortam değişkeninden).
 
-### Giriş ayarları — UYGULANDI 19.09.2026
-- Yeni projede Site URL `https://arc.arvo-os.com`; yönlendirme izinleri:
+### Giriş ayarları — KISMEN UYGULANDI 19.09.2026
+- Site URL `https://arc.arvo-os.com` olmalı — obaskcdxaaezjglayash'ta
+  HENÜZ `http://localhost:3000` (kullanıcı girecek). Yönlendirme izinleri (girildi):
   `https://arc.arvo-os.com/**`, `https://*.arvo-os.com/**`,
   `https://app.arvoculture.com/**`, `https://arvoculture.com/**`,
   `https://www.arvoculture.com/**`.
