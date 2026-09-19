@@ -77,11 +77,17 @@ kisit_ddl as (
   from tablolar t
   join pg_constraint con on con.conrelid = t.oid
 ),
+-- İndeksler yabancı anahtarlardan (30) ÖNCE: bir yabancı anahtar benzersiz
+-- indekse dayanabiliyor (billing_invoices); sonra gelirse döküm kurulamıyor.
 indeks_ddl as (
-  select t.relname as ad, 40 as sira, pg_get_indexdef(i.indexrelid) || ';' as ddl
+  select t.relname as ad, 25 as sira, pg_get_indexdef(i.indexrelid) || ';' as ddl
   from tablolar t
   join pg_index i on i.indrelid = t.oid
-  where not exists (select 1 from pg_constraint c where c.conindid = i.indexrelid)
+  -- Yalnızca pk/unique/exclusion kısıtının KENDİ indeksi atlanır. Yabancı
+  -- anahtar da dayandığı indeksi conindid'de gösteriyor; eski filtre bu yüzden
+  -- billing_invoices_id_org_uidx gibi bağımsız benzersiz indeksleri düşürüyor,
+  -- döküm kurulamıyordu.
+  where not exists (select 1 from pg_constraint c where c.conindid = i.indexrelid and c.contype in ('p', 'u', 'x'))
 ),
 rls_ddl as (
   select relname as ad, 50 as sira, format('alter table public.%I enable row level security;', relname) as ddl

@@ -108,7 +108,11 @@ kisit_ddl as (
 indeks_ddl as (
   select 40, t.relname, pg_get_indexdef(i.indexrelid) || ';'
   from tablolar t join pg_index i on i.indrelid = t.oid
-  where not exists (select 1 from pg_constraint c where c.conindid = i.indexrelid)
+  -- Yalnızca pk/unique/exclusion kısıtının KENDİ indeksi atlanır. Yabancı
+  -- anahtar da dayandığı indeksi conindid'de gösteriyor; eski filtre bu yüzden
+  -- billing_invoices_id_org_uidx gibi bağımsız benzersiz indeksleri düşürüyor,
+  -- döküm kurulamıyordu.
+  where not exists (select 1 from pg_constraint c where c.conindid = i.indexrelid and c.contype in ('p', 'u', 'x'))
 ),
 rls_ddl as (
   select 50, relname, format('alter table public.%I enable row level security;', relname) from tablolar where rls or paylasilan
