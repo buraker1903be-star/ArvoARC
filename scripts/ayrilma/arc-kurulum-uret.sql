@@ -175,7 +175,11 @@ metin as (
       || E'set check_function_bodies = false;\ncreate schema if not exists private;\n'
       || E'grant usage on schema private to authenticated, anon, service_role;\n'
       || E'create extension if not exists pgcrypto with schema extensions;\n\n'
-      || string_agg(ddl, E'\n\n' order by sira, ad, ddl) as t
+      || string_agg(ddl, E'\n\n' order by sira, ad, ddl)
+      -- ARC politikaları üyeliği çağıranın yetkisiyle sorguluyor; paylaşılan
+      -- tablo politikasız kurulunca personel her şeyi boş görüyordu
+      -- (19.09.2026). Kullanıcı yalnızca kendi üyeliğini okur.
+      || E'\n\ncreate policy arc_members_read_own_membership on public.organization_memberships for select to authenticated using (user_id = (select auth.uid()));\n' as t
   from hepsi
 ),
 ozet as (
