@@ -151,3 +151,28 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
 
 Bağlantı adresleri ve anahtarlar sohbete ya da depoya yazılmaz. Döküm ve
 aktarım komutları kullanıcının terminalinde, ortam değişkenleriyle çalışır.
+
+## Geçiş günü (adım adım)
+
+Önkoşul (bir kez, SQL Editor'den):
+- YENİ projede `scripts/ayrilma/04a-yeni-proje-fonksiyonlari.sql`
+- ESKİ projede `scripts/ayrilma/04b-eski-proje-fonksiyonu.sql` (salt okunur)
+
+1. ArvoOS → Platform → Lisanslar: ArvoCulture'ın ARC lisansını
+   **askıya al** (vitrin açık, satış kapalı; kademe `sales_closed`).
+2. `node scripts/ayrilma/04-son-aktarim.mjs` (ArvoARC klasöründe): iki secret
+   anahtarı panodan sırayla okur; hesaplar → 18 tablo → görseller; sonunda
+   sayıları karşılaştırır. Tekrar çalıştırılabilir.
+3. Vercel **ArvoARC** projesi: `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` → yeni
+   proje. Vercel **ArvoCulture** projesi: `ARC_SUPABASE_URL`,
+   `ARC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` → yeni proje. İkisini yeniden dağıt.
+4. Kontrol: ARC girişi, ürün listesi ve görseller, vitrin ürün sayfası,
+   sepet (ödeme yapmadan).
+5. Lisansı yeniden **aktif** yap (köprü yeni projeye de yazar).
+6. `04c-temizlik.sql`: yardımcı fonksiyonları iki projeden kaldır.
+
+Yardımcı fonksiyonlar PGlite'ta sınandı (varsa güncelle, tetikleyici kapalı,
+bileşik anahtar, silme eşitlemesi, hesap/kimlik değişimi, arc_ dışı red; seçim
+kuralı). Supabase'de `session_replication_role` yetkisi provada görülecek.
