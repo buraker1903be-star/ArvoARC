@@ -57,9 +57,13 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
 ## Migration
 
 Yeni dosyayı **`npm run db:new -- <ad>`** ile açın; sürümü son migration'ın
-ardına kendisi yerleştirir. `npm run check:migrations` CI'da çalışır. ARC ve
-ArvoOS aynı veritabanını kullanır; migration'lar SQL Editor'den elle
-uygulanır. Canlı şemanın tam anlık görüntüsü `supabase/schema/` altında.
+ardına kendisi yerleştirir. `npm run check:migrations` CI'da çalışır.
+Migration'lar SQL Editor'den elle uygulanır ve **yalnızca ARC'ın kendi
+projesine** (`obaskcdxaaezjglayash`): 19 Eylül 2026'da ArvoOS'la paylaşılan
+projeden ayrıldık (AYRILMA.md). Eski projedeki `arc_*` tabloları yedektir.
+`organizations`, `organization_memberships`, `organization_product_licenses`,
+`organization_modules` burada ArvoOS'un kopyasıdır; onları ArvoOS köprüsü
+yazar, ARC kodu yazmaz. Bağlı proje: `/api/saglik`.
 
 ## Testler
 

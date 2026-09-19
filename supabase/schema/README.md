@@ -14,12 +14,13 @@ migration'larda yoktu; yalnızca canlı veritabanında tanımlıydı. Sonuçlar�
 - Vitrin (ArvoCulture-site) ile ARC arasındaki tutar sapması bu yüzden geç
   fark edildi.
 
-## Aynı veritabanı: ArvoOS + ARC
+## Hangi veritabanı
 
-ArvoOS (`crm_*`, `hr_*`, `organizations`, `organization_memberships` …) ve ARC
-(`arc_*`) **aynı Supabase projesini** kullanıyor. Bu anlık görüntü ikisini de
-kapsar; ArvoOS'un deposunda eksik olan tablolar da (`crm_contracts`,
-`crm_proposals`, `hr_employees` …) burada.
+19 Eylül 2026'ya kadar ArvoOS ve ARC aynı Supabase projesini kullanıyordu;
+`katalog.json` o ortak şemanın görüntüsü. O tarihte ARC kendi projesine
+(`obaskcdxaaezjglayash`) taşındı (../../AYRILMA.md). Şema aynı kuruldu, bu
+yüzden katalog ARC tabloları için hâlâ doğru. Yeniden üretirken sorguyu
+**ARC'ın projesinde** çalıştırın; ArvoOS'un şeması için ArvoOS'un projesinde.
 
 ## Nasıl güncellenir
 
