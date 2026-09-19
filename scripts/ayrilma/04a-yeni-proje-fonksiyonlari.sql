@@ -170,3 +170,6 @@ grant execute on function public.arc_aktarim_pk(text) to service_role;
 grant execute on function public.arc_aktarim_yukle(text, jsonb) to service_role;
 grant execute on function public.arc_aktarim_sil(text, jsonb) to service_role;
 grant execute on function public.arc_aktarim_hesap_yukle(jsonb, jsonb) to service_role;
+
+-- Veri API'si yeni fonksiyonu hemen görsün (yoksa "schema cache" hatası).
+notify pgrst, 'reload schema';

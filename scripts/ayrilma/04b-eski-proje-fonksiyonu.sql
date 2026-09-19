@@ -51,3 +51,6 @@ $$;
 
 revoke all on function public.arc_aktarim_hesaplar() from public, anon, authenticated;
 grant execute on function public.arc_aktarim_hesaplar() to service_role;
+
+-- Veri API'si yeni fonksiyonu hemen görsün (yoksa "schema cache" hatası).
+notify pgrst, 'reload schema';
