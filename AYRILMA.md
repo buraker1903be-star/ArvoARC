@@ -115,6 +115,16 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
   engelli): yükleme `on conflict (pk) do update` ile yapılmalı. Eski
   tarafta prova sonrası silinen satırlar (nadiren) elle temizlenir.
 
+### Görseller
+- `node scripts/ayrilma/03-gorselleri-kopyala.mjs` (ArvoARC klasöründe):
+  yeni veritabanındaki yollardan listeyi çıkarır, eski projenin herkese açık
+  adresinden indirir, yeni projeye secret anahtarla yükler. Anahtarı gizli
+  sorar. Tarayıcıdan anonim yüklemeye geçici kural açmak güvenlik gerekçesiyle
+  reddedildi; bu yol hiçbir kuralı gevşetmez.
+- `arc_store_themes.config` logo/favicon/tema görseli için eski projenin TAM
+  adresini saklıyor (`*_url`). Geçişte bu adresler yeni projeye çevrilmeli:
+  `oahshpkgdzrraqdzjqau.supabase.co` → `obaskcdxaaezjglayash.supabase.co`.
+
 Önceki plan metni:
 - Bakım penceresi: mağazalar `sales_closed` (vitrin açık, satış kapalı);
   PayTR'da bekleyen ödeme kalmadığı doğrulanır.
