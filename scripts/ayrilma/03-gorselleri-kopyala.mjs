@@ -32,7 +32,7 @@ async function gizliSor(soru) {
   // doğrudan okunur; ekrana yazılmaz.
   try {
     const pano = execSync("pbpaste", { encoding: "utf8" }).trim();
-    if (pano.startsWith("sb_secret_") && pano.length > 30) {
+    if ((pano.startsWith("sb_secret_") && pano.length > 30) || (pano.startsWith("eyJ") && pano.length > 100)) {
       console.log("Anahtar panodan okundu.");
       return pano;
     }

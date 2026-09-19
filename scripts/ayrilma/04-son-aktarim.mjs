@@ -49,10 +49,12 @@ async function anahtarAl(proje) {
     await enter(`\n${proje.ad} projesinin secret anahtarını Supabase'deki kopyala düğmesiyle kopyalayıp Enter'a basın: `);
     let pano = "";
     try { pano = temizle(execSync("pbpaste", { encoding: "utf8" })); } catch {}
-    if (pano.startsWith("sb_secret_") && pano.length > 30) return pano;
+    // Yeni tip secret anahtar (sb_secret_…) ya da eski tip service_role (JWT, eyJ…).
+    if ((pano.startsWith("sb_secret_") && pano.length > 30) || (pano.startsWith("eyJ") && pano.length > 100)) return pano;
     console.log(pano.startsWith("sb_secret_")
-      ? `  Panodaki anahtar eksik (${pano.length} karakter). Göz simgesiyle açıp kopyala düğmesini kullanın.`
-      : "  Panoda secret anahtar yok (sb_secret_ ile başlamalı).");
+      ? `  Panodaki anahtar eksik (${pano.length} karakter). Supabase mevcut secret anahtarı yalnızca oluşturulduğu an gösteriyor:
+  API Keys → "New secret key" ile geçici bir anahtar oluşturup o an kopyalayın.`
+      : "  Panoda secret anahtar yok (sb_secret_… ya da eski tip service_role eyJ…).");
   }
   process.exit(1);
 }
