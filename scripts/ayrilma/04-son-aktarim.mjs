@@ -99,7 +99,10 @@ console.log("\nHesaplar…");
 }
 
 // ---- 3. Tablolar ------------------------------------------------------------
+// Yabancı anahtarlar açık: önce ebeveynden çocuğa yazılır (TABLOLAR sırası),
+// eskide olmayan satırlar ancak hepsi yazıldıktan sonra TERS sırada silinir.
 console.log("\nTablolar…");
+const silinecek = [];
 for (const tablo of TABLOLAR) {
   const pk = await yeni.rpc("arc_aktarim_pk", { p_tablo: tablo });
   if (pk.error || !pk.data?.length) { rapor.hatalar.push(`${tablo}: birincil anahtar bulunamadı`); console.log(`  ✗ ${tablo}: birincil anahtar yok`); continue; }
@@ -134,18 +137,26 @@ for (const tablo of TABLOLAR) {
       if (data.length < SAYFA) break;
     }
     await gonder();
-    const sil = await yeni.rpc("arc_aktarim_sil", { p_tablo: tablo, p_anahtarlar: anahtarlar });
-    if (sil.error) throw new Error(`silme: ${sil.error.message}`);
-    const { count } = await yeni.from(tablo).select("*", { count: "exact", head: true });
-    rapor.tablolar[tablo] = { eski: okunan, yeni: count, yazilan, silinen: sil.data, adres: cevrilen };
+    silinecek.push({ tablo, anahtarlar });
+    rapor.tablolar[tablo] = { eski: okunan, yazilan, adres: cevrilen };
     rapor.adres_cevrilen += cevrilen;
-    const esit = count === okunan;
-    console.log(`  ${esit ? "✓" : "✗"} ${tablo.padEnd(26)} eski ${String(okunan).padStart(6)} · yeni ${String(count).padStart(6)}${sil.data ? ` · ${sil.data} silindi` : ""}${cevrilen ? ` · ${cevrilen} adres çevrildi` : ""}`);
-    if (!esit) rapor.hatalar.push(`${tablo}: sayılar farklı (eski ${okunan}, yeni ${count})`);
+    console.log(`  ✓ ${tablo.padEnd(26)} ${String(okunan).padStart(6)} satır yazıldı${cevrilen ? ` · ${cevrilen} adres çevrildi` : ""}`);
   } catch (e) {
     rapor.hatalar.push(`${tablo}: ${e.message}`);
     console.log(`  ✗ ${tablo}: ${e.message}`);
   }
+}
+
+// ---- 3b. Eskide olmayanları sil (çocuktan ebeveyne) ve sayıları karşılaştır --
+console.log("\nEşitleme ve karşılaştırma…");
+for (const { tablo, anahtarlar } of silinecek.reverse()) {
+  const sil = await yeni.rpc("arc_aktarim_sil", { p_tablo: tablo, p_anahtarlar: anahtarlar });
+  if (sil.error) { rapor.hatalar.push(`${tablo}: silme: ${sil.error.message}`); console.log(`  ✗ ${tablo}: silme: ${sil.error.message}`); continue; }
+  const { count } = await yeni.from(tablo).select("*", { count: "exact", head: true });
+  Object.assign(rapor.tablolar[tablo], { yeni: count, silinen: sil.data });
+  const esit = count === anahtarlar.length;
+  console.log(`  ${esit ? "✓" : "✗"} ${tablo.padEnd(26)} eski ${String(anahtarlar.length).padStart(6)} · yeni ${String(count).padStart(6)}${sil.data ? ` · ${sil.data} silindi` : ""}`);
+  if (!esit) rapor.hatalar.push(`${tablo}: sayılar farklı (eski ${anahtarlar.length}, yeni ${count})`);
 }
 
 // ---- 4. Görseller -----------------------------------------------------------

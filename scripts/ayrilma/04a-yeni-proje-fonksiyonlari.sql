@@ -3,10 +3,14 @@
 -- scripts/ayrilma/04-son-aktarim.mjs bu fonksiyonları çağırır. Geçişten sonra
 -- 04c-temizlik.sql ile kaldırılır.
 --
--- Neden veritabanında: veri tetikleyiciler KAPALIYKEN yazılmalı
--- (session_replication_role = replica). Açık olursa stok hareketi, kupon
--- kullanım sayacı, sipariş olayı gibi tetikleyiciler eski veritabanında zaten
--- çalışmış işleri bir kez daha yapar. Bu ayar veri API'sinden verilemez.
+-- Neden veritabanında: veri ARC'ın tetikleyicileri KAPALIYKEN yazılmalı. Açık
+-- olursa stok hareketi, kupon kullanım sayacı, sipariş olayı gibi
+-- tetikleyiciler eski veritabanında zaten çalışmış işleri bir kez daha yapar.
+-- Tabloya göre `disable trigger user` kullanılır: session_replication_role
+-- Supabase'de fonksiyon içinden verilemiyor ("permission denied to set
+-- parameter", 19.09.2026). Yabancı anahtarlar AÇIK kalır; betik tabloları
+-- ebeveynden çocuğa yazar, silmeleri ters sırada yapar. Tetikleyiciler aynı
+-- işlem içinde yeniden açılır; hata olursa işlemle birlikte geri alınır.
 --
 -- Yalnızca service_role (secret anahtar) çağırabilir; yalnızca arc_ tablolarına
 -- ve ARC'ın hesaplarına dokunur.
@@ -48,7 +52,7 @@ begin
     return 0;
   end if;
   hedef := format('public.%I', p_tablo)::regclass;
-  perform set_config('session_replication_role', 'replica', true);
+  execute format('alter table %s disable trigger user', hedef);
 
   select string_agg(quote_ident(a.attname), ',' order by a.attnum),
          string_agg(format('%1$I = excluded.%1$I', a.attname), ',' order by a.attnum)
@@ -71,6 +75,7 @@ begin
     hedef, sutunlar, sutunlar, hedef, anahtar, guncelle)
   using p_satirlar;
   get diagnostics adet = row_count;
+  execute format('alter table %s enable trigger user', hedef);
   return adet;
 end
 $$;
@@ -96,7 +101,7 @@ begin
     raise exception 'Anahtar listesi dizi olmalı';
   end if;
   hedef := format('public.%I', p_tablo)::regclass;
-  perform set_config('session_replication_role', 'replica', true);
+  execute format('alter table %s disable trigger user', hedef);
 
   select string_agg('t.' || quote_ident(a.attname), ',' order by array_position(i.indkey, a.attnum)),
          string_agg('k.' || quote_ident(a.attname), ',' order by array_position(i.indkey, a.attnum))
@@ -109,6 +114,7 @@ begin
     hedef, hedef, sol, sag)
   using p_anahtarlar;
   get diagnostics adet = row_count;
+  execute format('alter table %s enable trigger user', hedef);
   return adet;
 end
 $$;
@@ -131,7 +137,6 @@ begin
   if jsonb_array_length(p_kullanicilar) = 0 then
     return jsonb_build_object('kullanici', 0, 'kimlik', 0);
   end if;
-  perform set_config('session_replication_role', 'replica', true);
 
   select string_agg(quote_ident(a.attname), ',' order by a.attnum),
          string_agg(format('%1$I = excluded.%1$I', a.attname), ',' order by a.attnum) filter (where a.attname <> 'id')
