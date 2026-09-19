@@ -47,7 +47,15 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
 - Yeni projede SQL Editor'den uygulanır; PGlite'ta önce sınanır.
 - Bundan sonra ARC migration'ları yalnızca yeni projeye uygulanır.
 
-### 2. Köprü (ArvoOS → ARC)
+### 2. Köprü (ArvoOS → ARC) — ÇALIŞIYOR 19.09.2026
+- ArvoOS Vercel'de `ARC_SUPABASE_URL`, `ARC_SUPABASE_SECRET_KEY`, `CRON_SECRET`
+  tanımlı; 04:30 eşitlemesi kurum, lisans, modül, sahibin hesabı ve
+  üyeliğini yeni projeye yazdı. `arc_store_stage(arvoculture)` = `open`.
+- Durum: ArvoOS Platform ana sayfası (köprü kapalı / bağlanamıyor / bağlı).
+  Lisans kaydı aktarım hatasını gösterir. İlk denemede anahtar başka
+  projeden kopyalanmıştı (iki proje de "ArvoARC" adında) → 401.
+
+Önceki plan metni:
 - ArvoOS `lib/arc-bridge.ts`: kurum, `arc` lisansı, `commerce` modülü ve
   ARC mağazası olan kurumların üyelikleri ARC veritabanına yazılır
   (ArvoLab köprüsünün aynısı; ArvoOS erişilemezse ARC son bilinen durumla
