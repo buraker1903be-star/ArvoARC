@@ -34,7 +34,12 @@ async function gizliSor(soru) {
   return cevap.trim();
 }
 
-const anahtar = await gizliSor("Yeni ARC projesinin secret anahtarı (sb_secret_…), yapıştırıp Enter: ");
+const ham = await gizliSor("Yeni ARC projesinin secret anahtarı (sb_secret_…), yapıştırıp Enter: ");
+// Terminal yapıştırılan metnin başına/sonuna görünmez kaçış dizileri ekleyebiliyor
+// ("bracketed paste": ESC[200~ … ESC[201~). İlk denemede anahtar bu yüzden
+// "Invalid API key" aldı. Kaçış dizileri ve yazdırılamayan karakterler atılır.
+const anahtar = ham.replace(/\x1b\[[0-9;]*[~A-Za-z]/g, "").replace(/[^\x21-\x7e]/g, "");
+console.log(`Anahtar alındı: ${anahtar.length} karakter${anahtar.length !== ham.length ? ` (${ham.length - anahtar.length} görünmez karakter temizlendi)` : ""}.`);
 if (!anahtar.startsWith("sb_secret_") && !anahtar.startsWith("eyJ")) {
   console.error("Bu bir secret anahtar gibi görünmüyor (sb_secret_ ile başlamalı). Publishable anahtar yükleme yapamaz.");
   process.exit(1);
