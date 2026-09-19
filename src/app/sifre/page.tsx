@@ -11,8 +11,8 @@ const errors: Record<string, string> = {
   "link-expired": "Bağlantının süresi dolmuş ya da daha önce kullanılmış. Yeni bir bağlantı isteyin.",
 };
 
-export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string; sent?: string }> }) {
-  const { error, sent } = await searchParams;
+export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string; sent?: string; neden?: string }> }) {
+  const { error, sent, neden } = await searchParams;
   return (
     <main className="login-shell">
       <section className="login-brand">
@@ -33,7 +33,7 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
           ) : (
             <p>Hesabınıza bağlı adrese şifre belirleme bağlantısı gelecek.</p>
           )}
-          {error ? <div className="login-error" role="alert">{errors[error] ?? "İşlem tamamlanamadı."}</div> : null}
+          {error ? <div className="login-error" role="alert">{errors[error] ?? "İşlem tamamlanamadı."}{neden ? <><br /><small>Ayrıntı: {neden}</small></> : null}</div> : null}
           <label>E-posta adresi<input name="email" type="email" autoComplete="email" required placeholder="adiniz@kurum.com" /></label>
           <button type="submit">Bağlantı gönder <b>→</b></button>
           <small><Link href="/login">Girişe dön</Link></small>
