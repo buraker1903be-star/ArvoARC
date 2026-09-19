@@ -97,7 +97,25 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
   (`set session_replication_role = replica`): stok, kupon sayacı ve sipariş
   olayı tetikleyicileri bir kez daha çalışmasın.
 
-### 3. Veri
+### 3. Veri — PROVA YAPILDI 19.09.2026
+- Yöntem: eski projenin SQL Editor'ünde tablo tablo `json_agg` ile okunur,
+  tarayıcının IndexedDB'sinde bekletilir, yeni projede
+  `json_populate_recordset` ile `session_replication_role = replica`
+  altında (tetikleyiciler kapalı) yazılır. Veri sohbetten geçmez.
+- SQL Editor'ün sorgu sınırı ~1 MB: yükleme parçaları en çok 600 KB.
+- Hesap seçimi: ARC kurumlarının üyeleri + ARC'ta verisi olanlar + ARC
+  kayıtlarında "oluşturan" olarak geçenler + hiçbir kuruma üye olmayan ve
+  ArvoOS davet/çalışan izi taşımayan (vitrin müşterisi) hesaplar. Şifre
+  özetleriyle; köprünün açtığı şifresiz hesap üzerine yazılır.
+- Sonuç: 16 tablonun sayıları birebir (3.442 ürün, 15.740 varyant, 6.915
+  koleksiyon eşleşmesi, 36 sipariş, 63 kalem…), 6 hesap / 6 kimlik; kopuk
+  yabancı anahtar yok; vitrin fonksiyonları 3.429 ürün, aynı kargo/havale
+  ayarları, kademe `open`.
+- **Gerçek geçişte** tablolar boşaltılamıyor (silme işlemi otomasyonda
+  engelli): yükleme `on conflict (pk) do update` ile yapılmalı. Eski
+  tarafta prova sonrası silinen satırlar (nadiren) elle temizlenir.
+
+Önceki plan metni:
 - Bakım penceresi: mağazalar `sales_closed` (vitrin açık, satış kapalı);
   PayTR'da bekleyen ödeme kalmadığı doğrulanır.
 - `arc_` tablolarının verisi, ilgili kurumlar, üyelikler, lisanslar ve
