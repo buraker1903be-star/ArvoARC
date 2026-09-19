@@ -152,6 +152,13 @@ tablosu yok; ArvoLab köprüsüyle aynı ilke (`ArvoOS/lib/arvolab.ts`).
 Bağlantı adresleri ve anahtarlar sohbete ya da depoya yazılmaz. Döküm ve
 aktarım komutları kullanıcının terminalinde, ortam değişkenleriyle çalışır.
 
+## Son aktarım provası — BAŞARILI 19.09.2026 07:30 UTC
+`04-son-aktarim.mjs` iki dakikada: 6 hesap / 6 kimlik (şifre özetleriyle),
+18 tablonun hepsinde eski = yeni, 2 tema adresi yeni projeye çevrildi, 420
+görsel (221,5 MB). İlk denemede `session_replication_role` Supabase'de
+fonksiyon içinden reddedildi; tablo bazında `disable trigger user` ile
+çözüldü (yabancı anahtarlar açık, silmeler ters sırada).
+
 ## Geçiş günü (adım adım)
 
 Önkoşul (bir kez, SQL Editor'den):
