@@ -13,12 +13,13 @@
 //
 // Kullanım (ArvoARC klasöründe):
 //   node scripts/ayrilma/03-gorselleri-kopyala.mjs
-// Yeni projenin secret anahtarını (sb_secret_…) sorar; ekranda görünmez,
-// hiçbir yere kaydedilmez. Tekrar çalıştırılabilir (aynı dosyanın üzerine yazar).
+// Yeni projenin secret anahtarını önce panodan okur (Supabase → API Keys →
+// kopyala düğmesi); yoksa sorar. Ekrana yazılmaz, hiçbir yere kaydedilmez. Tekrar çalıştırılabilir (aynı dosyanın üzerine yazar).
 
 import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
 import readline from "node:readline";
+import { execSync } from "node:child_process";
 
 const ESKI = "https://oahshpkgdzrraqdzjqau.supabase.co";
 const YENI = "https://obaskcdxaaezjglayash.supabase.co";
@@ -26,6 +27,17 @@ const ESZAMANLI = 6;
 
 async function gizliSor(soru) {
   if (process.env.ARC_YENI_SECRET) return process.env.ARC_YENI_SECRET.trim();
+  // Önce pano: terminale yapıştırmada anahtar iki kez 15 karaktere kısaldı
+  // (19.09.2026). Supabase'deki kopyala düğmesiyle alınan anahtar panodan
+  // doğrudan okunur; ekrana yazılmaz.
+  try {
+    const pano = execSync("pbpaste", { encoding: "utf8" }).trim();
+    if (pano.startsWith("sb_secret_") && pano.length > 30) {
+      console.log("Anahtar panodan okundu.");
+      return pano;
+    }
+    if (pano.startsWith("sb_secret_")) console.log(`Panodaki anahtar eksik görünüyor (${pano.length} karakter); Supabase'de kopyala düğmesini kullanın.`);
+  } catch {}
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
   rl._writeToOutput = (s) => { if (s.includes(soru)) rl.output.write(s); };
   const cevap = await new Promise((res) => rl.question(soru, res));
