@@ -12,8 +12,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const source = path.join(root, "supabase", "schema", "canli-sema.sql");
-const target = path.join(root, "supabase", "schema", "katalog.json");
+// sema-kaydet.mjs ile aynı gerekçe: dışa aktarım ArvoOS için de kullanılıyor.
+const targetRoot = process.argv[2] ? path.resolve(process.argv[2]) : root;
+const source = path.join(targetRoot, "supabase", "schema", "canli-sema.sql");
+const target = path.join(targetRoot, "supabase", "schema", "katalog.json");
 
 export function buildCatalog(sql) {
   const tables = {};

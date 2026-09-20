@@ -12,13 +12,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const target = path.join(root, "supabase", "schema", "canli-sema.sql");
 
 const input = process.argv[2];
 if (!input) {
-  console.error("Kullanım: node scripts/sema-kaydet.mjs <indirilen.csv>");
+  console.error("Kullanım: node scripts/sema-kaydet.mjs <indirilen.csv> [hedef-depo-kökü]");
   process.exit(1);
 }
+
+// Aynı dışa aktarım sorgusu ArvoOS'un SQL Editor'ünde de çalıştırılıyor
+// (AGENTS.md → Veritabanı). Hedef kök verilmezse bu depoya yazılır.
+const targetRoot = process.argv[3] ? path.resolve(process.argv[3]) : root;
+const target = path.join(targetRoot, "supabase", "schema", "canli-sema.sql");
 
 let text = fs.readFileSync(input, "utf8").replace(/^﻿/, "").replace(/\r\n/g, "\n");
 text = text.replace(/^ddl\n/, "");
