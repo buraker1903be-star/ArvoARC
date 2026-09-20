@@ -90,9 +90,22 @@ Bir hata düzeltince onu sabitleyen testi de ekleyin. Bir mantık parçası test
 edilemiyorsa nedeni genellikle Next/Supabase'e bağlı bir dosyanın içinde
 durmasıdır — ayırın.
 
+`tests/db/` (`npm run test:db`) canlı şema dökümünü (`supabase/schema/canli-sema.sql`)
+ve dökümden sonraki migration'ları PGlite'a kurar; kuralları Supabase
+rolleriyle (anon, authenticated, service_role) doğrudan veritabanına gelen
+isteklerle sınar. Döküm yenilendiğinde `tests/db/ortam.mjs` içindeki
+`ILK_UYGULANAN` sürümünü ileri alın.
+
+**`tests/db/yetki.test.mjs` hangi fonksiyonun kime açık olduğunu sabitler.**
+Yeni fonksiyonu oraya bilerek ekleyin; liste değişmeden test kırılır. Postgres
+yeni fonksiyonu PUBLIC'e açık oluşturur ve Supabase varsayılanı anon'a da
+EXECUTE verir — bu yüzden her fonksiyonun ardından `revoke all on function …
+from public, anon, authenticated;` yazılır (19.09.2026: siparişi "ödendi"
+yapan fonksiyon herkese açık kalmıştı).
+
 ## Kontroller
 
-`npx tsc --noEmit`, `npm run lint`, `npm test` — üçü de CI'da
+`npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run test:db` — dördü de CI'da
 (`.github/workflows/ci.yml`) çalışır. Derleme CI'da yapılmaz, Vercel tarafında.
 
 **Şema sözleşmesi** (`npm run check:schema`): koddaki tablo, sütun ve RPC

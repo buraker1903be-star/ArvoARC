@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/register.mjs --test \"tests/**/*.test.ts\"",
+    "test:db": "node --test 'tests/db/*.test.mjs'",
     "check:migrations": "node scripts/check-migrations.mjs",
     "check:schema": "node scripts/check-schema-usage.mjs",
     "db:new": "node scripts/new-migration.mjs",
@@ -22,6 +23,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.16",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

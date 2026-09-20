@@ -32,6 +32,8 @@ jobs:
       # elle uygulanıyor, sıralama hatası ancak burada yakalanır.
       - name: Migration denetimi
         run: npm run check:migrations
+      - name: Veritabanı testleri
+        run: npm run test:db
       # Koddaki tablo/sütun/fonksiyon adları canlı şemada var mı
       # (supabase/schema/katalog.json). Supabase istemcisi tipsiz; yanlış
       # sütun adı derlemede görünmez, üretimde sessizce boş veri döndürür.
