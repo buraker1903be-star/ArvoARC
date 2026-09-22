@@ -36,6 +36,8 @@ const OTHER_DATABASE_FILES = new Map([
 ]);
 const OTHER_DATABASE_RECEIVERS = new Map([
   ["lab", "ArvoLab veritabanı istemcisi (arvolabClient)"],
+  // Randevu da ayrı bir Supabase projesi; rdv_* tabloları orada.
+  ["rdv", "Randevu veritabanı istemcisi (randevuClient)"],
 ]);
 
 const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
@@ -111,6 +113,13 @@ for (const dir of SOURCE_DIRS) {
 
     for (const m of s.matchAll(/(?:\.rpc|\brpc(?:OrEmpty|OrNull)?(?:<[^>()]*>)?)\(\s*"([a-z_0-9]+)"|\/rest\/v1\/rpc\/([a-z_0-9]+)/g)) {
       const name = m[1] ?? m[2];
+      /*
+        Alıcı denetimi tablolarda vardı, RPC'de yoktu: lab.rpc("…") bu
+        projenin kataloğunda aranıyor ve "fonksiyon yok" deniyordu. Oysa
+        ArvoLab ayrı bir veritabanı ve fonksiyonu orada.
+      */
+      const receiver = s.slice(Math.max(0, m.index - 60), m.index).match(/([A-Za-z_$][\w$]*)\s*$/)?.[1];
+      if (receiver && OTHER_DATABASE_RECEIVERS.has(receiver)) continue;
       if (!functions.has(name)) problems.push(`${at(m.index)}  fonksiyon yok: ${name}()`);
     }
   }
