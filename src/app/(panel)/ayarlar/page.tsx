@@ -1,6 +1,7 @@
 import { requireTenant } from "@/lib/tenant";
 import { Notice } from "@/components/panel/notice";
-import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
+import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
+import { baglantiyiSina } from "@/lib/tryoto/ayar";
 import "../catalog.css";
 
 const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending_dns:"DNS bekleniyor",verifying:"Doğrulanıyor",active:"Aktif",failed:"Bağlantı hatası"};
@@ -50,13 +51,18 @@ const PENDING:Record<string,string>={
 
 export default async function Settings({searchParams}:{searchParams:Promise<{saved?:string;error?:string}>}){
   const query=await searchParams;const {supabase,organization,membership}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
   /* Ödemenin gittiği hesap (IBAN, PayTR) yalnızca owner/admin: bkz. actions.ts PAYMENT_ROLES. */
   const canManagePayments=["owner","admin"].includes(membership.role);
   // Anahtarın kendisi hiç okunmaz; yalnızca kayıtlı olup olmadığı gösterilir.
   const keysStored=Boolean(settings?.paytr_merchant_key_enc);
+  /* Bağlantı yalnızca yetkiliye sınanıyor: OTO'ya gereksiz istek atmamak
+     ve firma listesini görmeye yetkisi olmayana göstermemek için. */
+  const kargoBaglantisi=canManagePayments
+    ?await baglantiyiSina(organization.id,settings)
+    :{durum:"kapali" as const};
   const logoUrl=settings?.logo_path?supabase.storage.from("organization-assets").getPublicUrl(settings.logo_path).data.publicUrl:"";
   const faviconUrl=settings?.favicon_path?supabase.storage.from("organization-assets").getPublicUrl(settings.favicon_path).data.publicUrl:"";
   const domainStatus=settings?.domain_status??"not_configured";
@@ -156,6 +162,44 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
         </section>
       </section>
     </div>
+    {/*
+      KARGO ENTEGRASYONU. Bağlantı sayfa açılırken sınanıyor: hesapta
+      hangi kargo firmalarının açık olduğunu panelden görmenin başka yolu
+      yok ve bu bilgi olmadan gönderi ekranında firma seçilemez. Hata
+      sayfayı düşürmüyor (baglantiyiSina yakalıyor), yoksa yanlış yazılmış
+      bir anahtar bütün ayar ekranını erişilemez yapardı.
+    */}
+    <section className="card settings-section payment-section">
+      <div className="head"><div><small>KARGO ALTYAPISI</small><h3>tryOTO entegrasyonu</h3><p>Bir siparişin kalemleri farklı kargo firmalarına bölünerek gönderilebilir; her parçanın kendi takip numarası olur.</p></div><span>MAĞAZAYA ÖZEL</span></div>
+      {canManagePayments?<>
+        <form action={updateShippingIntegration} className="payment-form">
+          <article className="payment-method">
+            <div className="payment-title"><div><small>GÖNDERİ SAĞLAYICISI</small><h4>tryOTO</h4></div><label className="check-inline"><input type="checkbox" name="tryoto_enabled" defaultChecked={settings?.tryoto_enabled??false}/><span>Etkin</span></label></div>
+            <p>Yenileme anahtarını OTO panelinde <b>Ayarlar → API Entegrasyonları</b> bölümünden “Connect” ile üretirsiniz. Gönderi oluşturmak OTO cüzdanınızdaki bakiyeyi harcar.</p>
+            <div className="payment-fields">
+              <label className="wide">Yenileme anahtarı (refresh token)<input name="tryoto_refresh_token" type="password" placeholder={settings?.tryoto_refresh_token_enc?"Kayıtlı · değiştirmek için yazın":"OTO refresh token"} autoComplete="new-password"/></label>
+              <label className="wide">Gönderici konum kodu (pickup location)<input name="tryoto_pickup_location_code" defaultValue={settings?.tryoto_pickup_location_code??""} placeholder="OTO'da tanımlı konumun kodu" autoComplete="off"/></label>
+              <div className="check-stack"><label className="check-inline"><input type="checkbox" name="tryoto_test_mode" defaultChecked={settings?.tryoto_test_mode??true}/> Test (sandbox) hesabı</label></div>
+            </div>
+            <div className="security-note"><b>{settings?.tryoto_refresh_token_enc?"Anahtarınız kayıtlı.":"Anahtar henüz girilmedi."}</b><p>Anahtar şifrelenerek saklanır ve hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazın; boş bırakırsanız kayıtlı olan korunur. Gönderici konum kodunu boş bırakırsanız gönderi oluştururken adres tek tek yazılır.</p></div>
+          </article>
+          <button className="payment-save" type="submit">Kargo ayarlarını kaydet</button>
+        </form>
+        <article className="payment-method">
+          <div className="payment-title"><div><small>BAĞLANTI DURUMU</small><h4>Hesabınızda açık kargo firmaları</h4></div></div>
+          {kargoBaglantisi.durum==="kapali"?<p className="catalog-hint">Entegrasyon kapalı. Etkinleştirip kaydedince firmalar burada listelenir.</p>
+          :kargoBaglantisi.durum==="anahtar-yok"?<p className="catalog-hint">Yenileme anahtarı girilmemiş; bağlantı sınanamıyor.</p>
+          :kargoBaglantisi.durum==="hata"?<div className="security-note"><b>Bağlantı kurulamadı.</b><p>{kargoBaglantisi.mesaj}</p></div>
+          :kargoBaglantisi.firmalar.length?<>
+            <ul className="tryoto-carriers">
+              {kargoBaglantisi.firmalar.map(firma=><li key={firma.kod}><b>{firma.ad}</b><small>{firma.kod}</small>{firma.etkin===false?<span>kapalı</span>:null}</li>)}
+            </ul>
+            <p className="catalog-hint">{kargoBaglantisi.firmalar.length} firma bulundu. Gönderi oluştururken bu firmalar arasından seçim yapılır.</p>
+          </>:<div className="security-note"><b>Bağlantı kuruldu ama firma listesi okunamadı.</b><p>OTO beklenmedik bir yanıt döndürdü; ham hâli aşağıda. Bu genelde hesapta henüz kargo anlaşması tanımlı olmadığında olur.</p><code>{kargoBaglantisi.hamYanit}</code></div>}
+        </article>
+      </>:<p className="catalog-hint">Kargo entegrasyonunu yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
+    </section>
+
     <section className="card settings-section payment-section">
       <div className="head"><div><small>ÖDEME ALTYAPISI</small><h3>Ödeme yöntemleri</h3><p>Her mağaza kendi havale hesabını ve PayTR mağaza numarasını yönetir.</p></div><span>GÜVENLİ YAPILANDIRMA</span></div>
       {canManagePayments?<form action={updatePaymentSettings} className="payment-form">

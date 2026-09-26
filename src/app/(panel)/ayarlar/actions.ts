@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
 import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/vercel-domains";
 import { encryptSecret,paymentCredentialsConfigured } from "@/lib/payment-credentials";
+import { jetonlariUnut } from "@/lib/tryoto/istemci";
 
 const roles=new Set(["owner","admin","manager"]);
 /*
@@ -255,4 +256,54 @@ export async function verifyStorefrontDomain(){
   catch(error){redirect(`/ayarlar?error=${encodeURIComponent(error instanceof Error?error.message:"Vercel doğrulaması başarısız")}`);}
   await supabase.from("arc_store_settings").update({domain_status:result.active?"active":"pending_dns",domain_verified_at:result.active?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("organization_id",organization.id);
   revalidatePath("/ayarlar");revalidatePath("/magaza");redirect(result.active?"/ayarlar?saved=storefront-domain-verified":"/ayarlar?error=storefront-dns-not-ready");
+}
+
+/*
+  KARGO ENTEGRASYONU (tryOTO).
+
+  Yetki ödeme ayarlarıyla AYNI (owner/admin): gönderi oluşturmak OTO
+  cüzdanındaki bakiyeyi harcıyor, yani bu anahtar para harcatan bir yetki.
+  Manager'ın erişmesi, ödeme anahtarlarına erişmesinden farksız olurdu.
+
+  Yenileme anahtarı PayTR anahtarlarıyla aynı yöntemle şifreleniyor ve
+  hiçbir ekranda geri gösterilmiyor; boş bırakılırsa kayıtlı olan korunuyor.
+*/
+export async function updateShippingIntegration(formData:FormData){
+  const {supabase,organization,membership}=await requireTenant();
+  if(!PAYMENT_ROLES.has(membership.role))redirect("/ayarlar?error=forbidden");
+  const etkin=formData.get("tryoto_enabled")==="on";
+  const testModu=formData.get("tryoto_test_mode")==="on";
+  const gondericiKodu=String(formData.get("tryoto_pickup_location_code")??"").trim();
+  const yenilemeAnahtari=String(formData.get("tryoto_refresh_token")??"").trim();
+
+  /* Kayıtlı anahtar var mı: "etkin ama anahtarsız" bir yapılandırma
+     kaydedilirse gönderi ekranı her denemede yetki hatası verir ve sebebi
+     ayar ekranında görünmez. */
+  const {data:mevcut}=await supabase.from("arc_store_settings")
+    .select("tryoto_refresh_token_enc").eq("organization_id",organization.id).maybeSingle();
+  const anahtarVar=Boolean(mevcut?.tryoto_refresh_token_enc)||Boolean(yenilemeAnahtari);
+  if(etkin&&!anahtarVar)redirect("/ayarlar?error=tryoto-key-required");
+
+  let sifreli:{tryoto_refresh_token_enc:string}|null=null;
+  if(yenilemeAnahtari){
+    if(!paymentCredentialsConfigured())redirect("/ayarlar?error=paytr-encryption-missing");
+    sifreli={tryoto_refresh_token_enc:encryptSecret(yenilemeAnahtari)};
+  }
+
+  /* upsert, update DEĞİL: hiçbir migration varsayılan bir ayar satırı
+     oluşturmuyor ve yeni mağazada update 0 satır günceller, hata dönmez —
+     ekranda "kaydedildi" yazar, anahtar hiçbir yere yazılmamış olur. */
+  const {error}=await supabase.from("arc_store_settings").upsert({
+    organization_id:organization.id,
+    tryoto_enabled:etkin,tryoto_test_mode:testModu,
+    tryoto_pickup_location_code:gondericiKodu||null,
+    ...(sifreli??{}),
+    updated_at:new Date().toISOString()
+  },{onConflict:"organization_id"});
+  if(error)redirect(`/ayarlar?error=${encodeURIComponent(error.message)}`);
+
+  /* Anahtar değiştiyse bellekteki erişim jetonu artık eski hesaba ait:
+     unutulmazsa sonraki gönderi yanlış hesapta açılırdı. */
+  if(yenilemeAnahtari)jetonlariUnut(organization.id);
+  revalidatePath("/ayarlar");redirect("/ayarlar?saved=shipping");
 }
