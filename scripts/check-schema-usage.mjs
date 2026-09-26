@@ -42,11 +42,10 @@
 // daha çok zarar verir. Amaç yazım hatası ve sütun adı kaymasını yakalamak,
 // SQL'i doğrulamak değil.
 //
-// Denetimin kendisi ArvoOS'ta sınanır (tests/unit/check-schema-usage.test.ts
-// + tests/fixtures/sema). Örnek ağaç oraya konuldu çünkü diğer iki depoda
-// tsconfig/eslint "tests/fixtures"i dışarıda bırakmıyor ve kasıtlı hatalı
-// dosyalar derlemeye girerdi; denetimin mantığı üçünde de aynı olduğu için
-// tek yerde sınanması yetiyor.
+// Denetimin kendisi sınanır: check-schema-usage.test.ts + tests/fixtures/sema
+// (ArvoOS'ta tests/unit/ altında, diğer ikisinde tests/ altında). Örnek ağaç
+// kasıtlı hatalı kod içerdiği için üç depoda da tsconfig ve eslint
+// "tests/fixtures"i dışarıda bırakır.
 // Aynı dosya ArvoOS, ArvoARC ve ArvoCulture-site'ta birebir durur.
 import fs from "node:fs";
 import path from "node:path";
