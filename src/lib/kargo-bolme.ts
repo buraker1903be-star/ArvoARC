@@ -22,6 +22,13 @@ export interface SiparisKalemi {
   id: string;
   quantity: number;
   product_name: string;
+  /*
+    Kalemin tedarikçisi (arc_product_variants.supplier). Sipariş kaleminde
+    saklı değil, varyanttan geliyor; çağıran birleştirip veriyor.
+    Bilinmiyorsa null — o kalem "tedarikçisi belirsiz" grubuna düşüyor,
+    gizlenmiyor.
+  */
+  supplier?: string | null;
 }
 
 export interface GonderiKalemi {
@@ -132,4 +139,48 @@ export const OTO_DURUM_ESLEME: Record<string, string> = {
 export function otoDurumunuCevir(otoDurumu: string | null | undefined): string {
   if (!otoDurumu) return "created";
   return OTO_DURUM_ESLEME[otoDurumu] ?? "in_transit";
+}
+
+/** Bir gönderi önerisi: aynı tedarikçinin kargoya verilmemiş kalemleri. */
+export interface TedarikciGrubu {
+  tedarikci: string | null;
+  kalemler: { id: string; ad: string; kalan: number }[];
+  toplamAdet: number;
+}
+
+/*
+  GÖNDERİ ÖNERİSİ TEDARİKÇİYE GÖRE.
+
+  Bölmenin gerçek ekseni kargo firması değil tedarikçi: paketler ayrı
+  depolardan çıkıyor ve tek gönderi fiziksel olarak mümkün değil. Firma
+  seçimi bunun ARDINDAN geliyor (Tarzyeri genelde Sürat, LR Yurtiçi).
+
+  Kargoya verilmiş adetler düşülüyor, tamamı verilmiş kalem listede
+  görünmüyor. Boş kalan grup da dönmüyor: "0 kalem" başlığı ekranda
+  yalnızca yer kaplar.
+*/
+export function tedarikciGruplari(kalemler: SiparisKalemi[], gonderiler: Gonderi[]): TedarikciGrubu[] {
+  const kalan = kalanAdetler(kalemler, gonderiler);
+  const gruplar = new Map<string, TedarikciGrubu>();
+  for (const kalem of kalemler) {
+    const kalanAdet = kalan.get(kalem.id) ?? 0;
+    if (kalanAdet <= 0) continue;
+    const tedarikci = kalem.supplier?.trim() || null;
+    // Map anahtarı olarak null kullanılamaz; ayrı bir işaret gerekiyor.
+    const anahtar = tedarikci ?? "\u0000belirsiz";
+    const grup = gruplar.get(anahtar) ?? { tedarikci, kalemler: [], toplamAdet: 0 };
+    grup.kalemler.push({ id: kalem.id, ad: kalem.product_name, kalan: kalanAdet });
+    grup.toplamAdet += kalanAdet;
+    gruplar.set(anahtar, grup);
+  }
+  /*
+    Tedarikçisi belirsiz grup SONDA: adı olan gruplar işin bilinen kısmı,
+    belirsiz olan dikkat isteyen artık. Alfabetik sıra tedarikçiler
+    arasında tutarlı bir yerleşim veriyor.
+  */
+  return [...gruplar.values()].sort((a, b) => {
+    if (!a.tedarikci) return 1;
+    if (!b.tedarikci) return -1;
+    return a.tedarikci.localeCompare(b.tedarikci, "tr");
+  });
 }

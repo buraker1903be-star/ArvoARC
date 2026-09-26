@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bolmeSorunu, kalanAdetler, kargoDurumu, otoDurumunuCevir } from "@/lib/kargo-bolme";
+import { bolmeSorunu, kalanAdetler, kargoDurumu, otoDurumunuCevir, tedarikciGruplari } from "@/lib/kargo-bolme";
 
 /*
   Bölünmüş kargo hesabı. Sınanan şey "toplama biliyor mu" değil: bir
@@ -96,4 +96,52 @@ test("OTO durumu çevriliyor, BİLİNMEYEN 'yolda' sayılıyor", () => {
   assert.equal(otoDurumunuCevir("delivered"), "delivered");
   assert.equal(otoDurumunuCevir("sortingAtHub"), "in_transit", "bilinmeyen adım");
   assert.equal(otoDurumunuCevir(null), "created", "durum gelmediyse oluşturuldu");
+});
+
+const kalemlerTedarikcili = [
+  { id: "k1", quantity: 3, product_name: "Kupa", supplier: "Tarzyeri" },
+  { id: "k2", quantity: 1, product_name: "Tabak", supplier: "Tarzyeri" },
+  { id: "k3", quantity: 2, product_name: "Krem", supplier: "LR" },
+  { id: "k4", quantity: 1, product_name: "Kaşık", supplier: null },
+];
+
+test("bölme önerisi TEDARİKÇİYE göre gruplanıyor", () => {
+  /*
+    Bölmenin gerçek ekseni kargo firması değil tedarikçi: paketler ayrı
+    depolardan çıkıyor ve tek gönderi fiziksel olarak mümkün değil.
+  */
+  const gruplar = tedarikciGruplari(kalemlerTedarikcili, []);
+  assert.deepEqual(gruplar.map((g) => [g.tedarikci, g.toplamAdet]), [
+    ["LR", 2],
+    ["Tarzyeri", 4],
+    [null, 1],
+  ]);
+});
+
+test("kargoya verilen adet öneriden düşülüyor", () => {
+  const mevcut = [gonderi("g1", "created", [{ order_item_id: "k1", quantity: 2 }])];
+  const tarzyeri = tedarikciGruplari(kalemlerTedarikcili, mevcut).find((g) => g.tedarikci === "Tarzyeri")!;
+  assert.deepEqual(tarzyeri.kalemler, [
+    { id: "k1", ad: "Kupa", kalan: 1 },
+    { id: "k2", ad: "Tabak", kalan: 1 },
+  ]);
+});
+
+test("tamamı kargoya verilmiş tedarikçi ÖNERİDE görünmüyor", () => {
+  // "0 kalem" başlığı ekranda yalnızca yer kaplar.
+  const mevcut = [gonderi("g1", "created", [{ order_item_id: "k3", quantity: 2 }])];
+  const gruplar = tedarikciGruplari(kalemlerTedarikcili, mevcut);
+  assert.equal(gruplar.some((g) => g.tedarikci === "LR"), false);
+});
+
+test("tedarikçisi BELİRSİZ kalem gizlenmiyor, sonda duruyor", () => {
+  // Adı olan gruplar işin bilinen kısmı; belirsiz olan dikkat isteyen artık.
+  const gruplar = tedarikciGruplari(kalemlerTedarikcili, []);
+  assert.equal(gruplar.at(-1)!.tedarikci, null);
+  assert.deepEqual(gruplar.at(-1)!.kalemler, [{ id: "k4", ad: "Kaşık", kalan: 1 }]);
+});
+
+test("boş tedarikçi adı belirsiz sayılıyor", () => {
+  const gruplar = tedarikciGruplari([{ id: "x", quantity: 1, product_name: "X", supplier: "   " }], []);
+  assert.equal(gruplar[0].tedarikci, null);
 });
