@@ -6,7 +6,7 @@ import "./login.css";
 
 export const metadata: Metadata = {
   title: "Giriş",
-  description: "ARVO ARC mağaza yönetim paneli girişi.",
+  description: "ArvoARC mağaza yönetim paneli girişi.",
 };
 
 const messages: Record<string, string> = {
@@ -14,8 +14,8 @@ const messages: Record<string, string> = {
   "invalid-credentials": "E-posta veya şifre hatalı.",
   "no-organization": "Bu kullanıcıya bağlı aktif bir organizasyon bulunamadı.",
   "organization-inactive": "Organizasyon aktif değil.",
-  "commerce-disabled": "ARVO ARC erişimi bu organizasyon için aktif değil.",
-  "license-inactive": "Arc aboneliğiniz sona ermiş ya da askıya alınmış. Verileriniz duruyor; abonelik yenilenince kaldığınız yerden devam edersiniz.",
+  "commerce-disabled": "ArvoARC erişimi bu organizasyon için aktif değil.",
+  "license-inactive": "ArvoARC aboneliğiniz sona ermiş ya da askıya alınmış. Verileriniz duruyor; abonelik yenilenince kaldığınız yerden devam edersiniz.",
   "server-error": "Giriş servisine ulaşılamadı. Sistem yöneticisi yapılandırmayı kontrol etmelidir.",
 };
 
@@ -30,7 +30,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="login-shell">
       <section className="login-brand">
-        <Image src="/arvo-arc-logo.png" alt="ARVO ARC" width={200} height={39} priority />
+        <Image src="/arvo-arc-logo.png" alt="ArvoARC" width={200} height={39} priority />
         <div>
           <span>ADAPTIVE RETAIL CORE</span>
           <h1>Mağazanızın tüm operasyonu, tek ve güvenli panelde.</h1>

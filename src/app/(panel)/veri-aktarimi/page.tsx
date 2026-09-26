@@ -38,7 +38,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
     <div className="ac-stack">
       {params.imported ? <Notice tone={count(params.errors) ? "warn" : "success"} title={`${count(params.imported)} aktif ürün aktarıldı.`}>{count(params.errors) ? `${count(params.errors)} satır hatalı olduğu için aktarılamadı.` : null}</Notice> : null}
       {params.orders ? <Notice tone={count(params.orderErrors) ? "warn" : "success"} title={`${count(params.orders)} eski sipariş aktarıldı.`}>{`Hata: ${count(params.orderErrors)} · Atlanan satır: ${count(params.orderSkipped)}`}</Notice> : null}
-      {params.images ? <Notice tone={count(params.imageErrors) ? "warn" : "success"} title={`${count(params.images)} ürünün görselleri ARC depolamasına taşındı.`}>{`Hata: ${count(params.imageErrors)} · Kalan ürün: ${count(params.remaining)}`}</Notice> : null}
+      {params.images ? <Notice tone={count(params.imageErrors) ? "warn" : "success"} title={`${count(params.images)} ürünün görselleri ArvoARC depolamasına taşındı.`}>{`Hata: ${count(params.imageErrors)} · Kalan ürün: ${count(params.remaining)}`}</Notice> : null}
       {params.error ? <Notice tone="error" title="Aktarım başlatılamadı">{ERRORS[params.error] ?? params.error}</Notice> : null}
 
       <div className="import-grid">
@@ -66,7 +66,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
 
         <section className="ac ac-pad import-card">
           <div className="ac-head"><div><h3>Görselleri taşı</h3><p>Shopify CDN bağını kaldırır</p></div></div>
-          <p>Shopify ürün görsellerini ARC depolamasına kopyalar. Zaman aşımını önlemek için her çalıştırmada 5 ürün taşınır; kalan sayısı işlem sonunda gösterilir.</p>
+          <p>Shopify ürün görsellerini ArvoARC depolamasına kopyalar. Zaman aşımını önlemek için her çalıştırmada 5 ürün taşınır; kalan sayısı işlem sonunda gösterilir.</p>
           {canManage ? (
             <form action={migrateShopifyImages} className="import-form">
               <button className="ac-btn ac-btn-primary" type="submit">Sonraki görsel grubunu taşı</button>

@@ -121,16 +121,16 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
       <section className="domain-stack">
         <section className="card settings-section domain-section">
           <div className="head"><div><small>YÖNETİM PANELİ</small><h3>Panel alan adı</h3></div><em className={panelDomainStatus}>{statusLabel[panelDomainStatus]??panelDomainStatus}</em></div>
-          <p className="domain-explainer"><b>ARVO ARC paneli</b> · Sipariş, ürün, stok ve mağaza yönetimi için kullanılır. Müşteriler bu adresi görmez.</p>
+          <p className="domain-explainer"><b>ArvoARC paneli</b> · Sipariş, ürün, stok ve mağaza yönetimi için kullanılır. Müşteriler bu adresi görmez.</p>
           <div className="domain-current"><small>MARKALI PANEL ADRESİ</small><strong>{settings?.panel_custom_domain??"Henüz tanımlanmadı"}</strong><span>{settings?.panel_domain_verified_at?"SSL ve alan adı doğrulandı":"DNS bağlantısı bekleniyor"}</span></div>
-          <div className="domain-platform"><small>ARVO ARC ana paneli</small><strong>arc.arvo-os.com</strong></div>
+          <div className="domain-platform"><small>ArvoARC ana paneli</small><strong>arc.arvo-os.com</strong></div>
           {canManage&&<form action={updatePanelDomainSettings} className="domain-form">
             <label>Müşteriye özel panel alan adı<input name="panel_custom_domain" defaultValue={settings?.panel_custom_domain??""} placeholder="app.markaniz.com" required/></label>
             <button type="submit">Panel alan adını kaydet</button>
           </form>}
           {settings?.panel_custom_domain&&panelDomainStatus!=="active"&&<div className="dns-guide">
             <div><span>1</span><p><b>CNAME kaydı</b><code>{settings.panel_custom_domain} → 78128f864bd971a1.vercel-dns-017.com</code></p></div>
-            <div><span>2</span><p><b>Vercel doğrulaması</b><small>Alan adı ARVO ARC projesine eklenir ve DNS kaydı kontrol edilir.</small></p></div>
+            <div><span>2</span><p><b>Vercel doğrulaması</b><small>Alan adı ArvoARC projesine eklenir ve DNS kaydı kontrol edilir.</small></p></div>
             <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli panel bağlantısı etkinleşir.</small></p></div>
             {canManage&&<form action={verifyPanelDomain}><button type="submit">DNS bağlantısını doğrula</button></form>}
           </div>}
@@ -171,7 +171,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
         </article>
         <article className="payment-method paytr-method">
           <div className="payment-title"><div><small>KARTLA ÖDEME</small><h4>PayTR iFrame API</h4></div><label className="check-inline"><input type="checkbox" name="paytr_enabled" defaultChecked={settings?.paytr_enabled}/><span>Etkin</span></label></div>
-          <p>Kart bilgileri ARVO ARC sunucularına gelmeden PayTR’ın güvenli ödeme ekranında işlenir.</p>
+          <p>Kart bilgileri ArvoARC sunucularına gelmeden PayTR’ın güvenli ödeme ekranında işlenir.</p>
           <div className="payment-fields">
             <label className="wide">Mağaza numarası<input name="paytr_merchant_id" defaultValue={settings?.paytr_merchant_id??""} placeholder="PayTR merchant_id" autoComplete="off"/></label>
             <label>En yüksek taksit<select name="paytr_max_installment" defaultValue={settings?.paytr_max_installment??0}><option value="0">PayTR belirlesin</option>{[1,2,3,4,5,6,9,12].map(value=><option key={value} value={value}>{value} taksit</option>)}</select></label>

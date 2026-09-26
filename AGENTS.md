@@ -42,10 +42,10 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   yalnızca iade toplamı sipariş tutarına ulaşınca kapanır. Kargo çıkmadıysa
   kargo bedeli de iadeye girer, çıktıysa girmez. Tahsil edilenden fazlası
   iade edilemez.
-- **Vitrin (ArvoCulture-site) ARC'ın hesabını aynalar.** Sipariş
+- **Vitrin (ArvoCulture-site) ArvoARC'ın hesabını aynalar.** Sipariş
   fonksiyonunda ya da `api/storefront/odeme`'de kargo, kupon veya havale
   kuralı değişirse vitrindeki `src/lib/order-quote.ts` ve testi aynı gün
-  güncellenmeli; kural değişikliği tek başına yapılınca müşteri ödemede ARC'ın
+  güncellenmeli; kural değişikliği tek başına yapılınca müşteri ödemede ArvoARC'ın
   tahsil ettiğinden farklı tutar görür (17 Eylül 2026'da oldu). Vitrinin
   okuduğu ayarlar `get_arvoculture_storefront_settings` ile açılır; bu
   fonksiyonun döndürdüğü alanlar vitrinin sözleşmesidir.
@@ -58,12 +58,12 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
 
 Yeni dosyayı **`npm run db:new -- <ad>`** ile açın; sürümü son migration'ın
 ardına kendisi yerleştirir. `npm run check:migrations` CI'da çalışır.
-Migration'lar SQL Editor'den elle uygulanır ve **yalnızca ARC'ın kendi
+Migration'lar SQL Editor'den elle uygulanır ve **yalnızca ArvoARC'ın kendi
 projesine** (`obaskcdxaaezjglayash`): 19 Eylül 2026'da ArvoOS'la paylaşılan
 projeden ayrıldık (AYRILMA.md). Eski projedeki `arc_*` tabloları yedektir.
 `organizations`, `organization_memberships`, `organization_product_licenses`,
 `organization_modules` burada ArvoOS'un kopyasıdır; onları ArvoOS köprüsü
-yazar, ARC kodu yazmaz. Bağlı proje: `/api/saglik`.
+yazar, ArvoARC kodu yazmaz. Bağlı proje: `/api/saglik`.
 
 **Her yeni fonksiyonun ardından `revoke all on function … from public, anon,
 authenticated;` yazın**, sonra yalnızca gereken role `grant` verin: sunucunun

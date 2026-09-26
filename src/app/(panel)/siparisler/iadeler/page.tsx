@@ -55,7 +55,7 @@ const ERRORS: Record<string, string> = {
  * İade talepleri.
  *
  * Öncesinde iade süreci üç ayrı yerde yürüyordu: müşteri
- * e-posta atıyor, siz PayTR panelinden para iade ediyor, ARC'ta
+ * e-posta atıyor, siz PayTR panelinden para iade ediyor, ArvoARC'ta
  * durumu elle değiştiriyordunuz. Burada hepsi tek akışta.
  */
 export default async function ReturnsPage({

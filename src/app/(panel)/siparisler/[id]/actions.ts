@@ -236,7 +236,7 @@ export async function refundOrder(formData: FormData) {
     organizationId: organization.id,
     merchantOid,
     amountKurus,
-    referenceNo: `ARC${orderId.replace(/-/g, "").slice(0, 12)}${priorRefunds ? `K${priorRefunds + 1}` : ""}`,
+    referenceNo: `ArvoARC${orderId.replace(/-/g, "").slice(0, 12)}${priorRefunds ? `K${priorRefunds + 1}` : ""}`,
   });
 
   if (!result.ok) {

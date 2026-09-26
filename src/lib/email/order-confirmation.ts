@@ -432,8 +432,8 @@ export function shippingNoticeHtml({
  * bildirimleri de görmezden gelmeye başlar.
  */
 /*
-  Anahtarlar ARC'deki sipariş durumları. Öncesinde "shipped" ve
-  "delivered" yazıyordu; bu durumlar ARC'de yok ("Kargoya verildi"
+  Anahtarlar ArvoARC'deki sipariş durumları. Öncesinde "shipped" ve
+  "delivered" yazıyordu; bu durumlar ArvoARC'de yok ("Kargoya verildi"
   = fulfilled). Sipariş kargoya verildiğinde müşteriye hiç e-posta
   gitmiyordu.
 */

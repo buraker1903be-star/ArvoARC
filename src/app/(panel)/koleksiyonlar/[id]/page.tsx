@@ -22,7 +22,7 @@ function PickerRow({product,checked}:{product:ProductRow;checked:boolean}){
   return <label className={checked?"selected":""}>
     <input type="checkbox" name="product_ids" value={product.id} defaultChecked={checked}/>
     <i>{product.name.slice(0,2).toLocaleUpperCase("tr-TR")}</i>
-    <span><b>{product.name}</b><small>{meta.vendor||"ARVO ARC"} · {meta.type||"Katalog ürünü"}</small></span>
+    <span><b>{product.name}</b><small>{meta.vendor||"ArvoARC"} · {meta.type||"Katalog ürünü"}</small></span>
     <em>{product.status==="active"?"Aktif":product.status==="draft"?"Taslak":"Arşiv"}</em>
   </label>;
 }
@@ -66,7 +66,7 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
       <div>
         <Link prefetch={false} className="product-back" href="/koleksiyonlar">← Koleksiyonlar</Link>
         <h1>{collection.title}</h1>
-        <p>/koleksiyon/{collection.slug} · {members.length.toLocaleString("tr-TR")} ürün · {collection.source==="shopify"?"Shopify eşlemesi":"ARVO ARC"}</p>
+        <p>/koleksiyon/{collection.slug} · {members.length.toLocaleString("tr-TR")} ürün · {collection.source==="shopify"?"Shopify eşlemesi":"ArvoARC"}</p>
       </div>
       <div className="product-head-actions"><em className="ac-tag" data-tone={collection.status==="active"?undefined:collection.status==="draft"?"warn":"muted"}>{collection.status==="active"?"Aktif":collection.status==="draft"?"Taslak":"Arşivlenmiş"}</em></div>
     </section>

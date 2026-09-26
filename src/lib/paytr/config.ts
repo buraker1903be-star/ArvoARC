@@ -38,7 +38,7 @@ export interface PaytrStoreConfig {
 
 /**
  * Ortam değişkenlerindeki anahtarlar. Bunlar ArvoCulture'ın kendi PayTR
- * hesabına ait; ARC'ın değil. Yeni mağazalar bunları KULLANMAZ, yoksa
+ * hesabına ait; ArvoARC'ın değil. Yeni mağazalar bunları KULLANMAZ, yoksa
  * tahsilatları ArvoCulture'ın hesabına düşer.
  */
 function legacyConfig(storeUrl: string): PaytrStoreConfig {

@@ -52,7 +52,7 @@ export function MobileNav({ tenantName, tenantInitials, roleName }: { tenantName
         <header className="mobile-drawer-header">
           <div className="mobile-drawer-brand">
             <i>A</i>
-            <span><b>ARVO ARC</b><small>ADAPTIVE RETAIL CORE</small></span>
+            <span><b>ArvoARC</b><small>ADAPTIVE RETAIL CORE</small></span>
           </div>
           <button ref={closeButtonRef} type="button" onClick={close} aria-label="Menüyü kapat" tabIndex={open ? 0 : -1}>
             <Icon name="close" size={20} />

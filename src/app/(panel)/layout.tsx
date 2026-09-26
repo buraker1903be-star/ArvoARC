@@ -54,9 +54,9 @@ export default async function PanelLayout({ children }: Readonly<{ children: Rea
       <NavProgress />
 
       <aside id="panel-sidebar" className="panel-sidebar">
-        <Link prefetch={false} className="panel-brand" href="/" aria-label="ARVO ARC — Genel Bakış">
+        <Link prefetch={false} className="panel-brand" href="/" aria-label="ArvoARC — Genel Bakış">
           <i>A</i>
-          <span><b>ARVO ARC</b><small>ADAPTIVE RETAIL CORE</small></span>
+          <span><b>ArvoARC</b><small>ADAPTIVE RETAIL CORE</small></span>
         </Link>
 
         <div className="panel-org" title={organization.name}>

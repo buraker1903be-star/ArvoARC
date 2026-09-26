@@ -16,7 +16,7 @@ import "./design.css";
 const inter=Inter({subsets:["latin","latin-ext"],variable:"--font-inter",display:"swap",preload:false});
 
 export const metadata:Metadata={
-  title:{default:"ARVO ARC",template:"%s | ARVO ARC"},
+  title:{default:"ArvoARC",template:"%s | ArvoARC"},
   description:"Adaptive Retail Core — yeni nesil ticaret yönetim platformu."
 };
 

@@ -16,7 +16,7 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
   return (
     <main className="login-shell">
       <section className="login-brand">
-        <Image src="/arvo-arc-logo.png" alt="ARVO ARC" width={200} height={39} priority />
+        <Image src="/arvo-arc-logo.png" alt="ArvoARC" width={200} height={39} priority />
         <div>
           <span>ADAPTIVE RETAIL CORE</span>
           <h1>Şifrenizi belirleyin.</h1>

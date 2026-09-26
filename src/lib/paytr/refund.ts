@@ -7,7 +7,7 @@ import { storePaytrConfig } from "@/lib/paytr/config";
  * PayTR iade servisi.
  *
  * Öncesinde iade için PayTR paneline girmek gerekiyordu; iki ayrı
- * yerde işlem yapmak hem yavaş hem hataya açık. Artık ARC'tan
+ * yerde işlem yapmak hem yavaş hem hataya açık. Artık ArvoARC'tan
  * yapılabiliyor ve sipariş kaydıyla birlikte yürüyor.
  *
  * PayTR dokümanı iade entegrasyonunda dikkat edilmesi

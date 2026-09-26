@@ -88,7 +88,7 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
           {visible.map(collection=>(
             <div className="list-row" key={collection.id}>
               <span className="col-name"><Link prefetch={false} className="list-row-link" href={`/koleksiyonlar/${collection.id}`}><b>{collection.title}</b></Link><small>/{collection.slug}</small></span>
-              <span className="col-source">{collection.source==="shopify"?"Shopify":"ARVO ARC"}</span>
+              <span className="col-source">{collection.source==="shopify"?"Shopify":"ArvoARC"}</span>
               <span className="col-count"><em className="stock-pill" data-tone={(counts.get(collection.id)??0)===0?"warn":undefined}>{(counts.get(collection.id)??0).toLocaleString("tr-TR")} ürün</em></span>
               <span className="col-status"><em className="ac-tag" data-tone={collection.status==="active"?undefined:collection.status==="draft"?"warn":"muted"}>{statusLabels[collection.status]??collection.status}</em></span>
             </div>

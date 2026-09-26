@@ -7,9 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 /*
   Şifre belirleme / sıfırlama.
 
-  ARC kendi veritabanına taşınınca (AYRILMA.md) ArvoOS'ta sonradan eklenen
-  personel ARC'ta şifresiz açılıyor (ArvoOS lib/arc-bridge.ts); ilk şifresini
-  buradan belirler. Önceden ARC'ta şifre yenileme yolu hiç yoktu: şifresini
+  ArvoARC kendi veritabanına taşınınca (AYRILMA.md) ArvoOS'ta sonradan eklenen
+  personel ArvoARC'ta şifresiz açılıyor (ArvoOS lib/arc-bridge.ts); ilk şifresini
+  buradan belirler. Önceden ArvoARC'ta şifre yenileme yolu hiç yoktu: şifresini
   unutan personel ArvoOS'tan sıfırlıyordu, ki o da yalnızca ortak veritabanı
   sayesinde işe yarıyordu.
 */

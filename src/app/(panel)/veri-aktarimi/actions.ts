@@ -65,7 +65,7 @@ export async function importActiveProducts(formData:FormData){
     const variantRows:{organization_id:string;product_id:string;sku:string;title:string;price:number;compare_at_price:number|null;currency:string;stock:number;attributes:Record<string,string>;external_id:string;allow_backorder:boolean}[]=[];
     for(const r of variants){const key=[r["Option1 Value"],r["Option2 Value"],r["Option3 Value"],r["Variant SKU"],r["Variant Price"]].join("|");if(seen.has(key))continue;seen.add(key);n++;
       const attrs:Record<string,string>={};for(const i of [1,2,3]){const name=optionNames[i],value=r[`Option${i} Value`]?.trim();if(name&&value)attrs[name]=value;}
-      const sku=r["Variant SKU"]?.trim()||`ARC-${handle.slice(0,35).toUpperCase()}-${String(n).padStart(3,"0")}`; const price=moneyToCents(r["Variant Price"]); const rawCompareAtPrice=moneyToCents(r["Variant Compare At Price"]); const compareAtPrice=rawCompareAtPrice>price?rawCompareAtPrice:null;
+      const sku=r["Variant SKU"]?.trim()||`ArvoARC-${handle.slice(0,35).toUpperCase()}-${String(n).padStart(3,"0")}`; const price=moneyToCents(r["Variant Price"]); const rawCompareAtPrice=moneyToCents(r["Variant Compare At Price"]); const compareAtPrice=rawCompareAtPrice>price?rawCompareAtPrice:null;
       variantRows.push({organization_id:organization.id,product_id:product.id,sku,title:Object.values(attrs).join(" / ")||"Default",price,compare_at_price:compareAtPrice,currency:"TRY",stock:0,attributes:attrs,external_id:`${handle}:${n}`,allow_backorder:true});
     }
     if(variantRows.length){

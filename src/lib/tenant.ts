@@ -21,7 +21,7 @@ export const requireTenant = cache(async function requireTenant() {
   }
   if(!tenant.commerce_enabled)redirect("/login?error=commerce-disabled");
   /*
-    Arc aboneliği ArvoOS üzerinden yönetilir. Kademe kuralı veritabanında
+    ArvoARC aboneliği ArvoOS üzerinden yönetilir. Kademe kuralı veritabanında
     tek yerde (public.arc_store_stage); panel "open" dışındaki her kademede
     kapanır — ödeme gecikince ilk kapanan panel, vitrin ve satış bir süre
     daha sürer.
@@ -34,7 +34,7 @@ export const requireTenant = cache(async function requireTenant() {
     bir migration'ı fonksiyonu geri almış olabilir.
   */
   if(tenant.arc_stage===undefined||tenant.arc_stage===null){
-    console.error("[kiracı] arc_resolve_commerce_tenant arc_stage döndürmüyor; Arc kademe yaptırımı KAPALI. 20260916200500_tenant_rpc_canonical.sql yeniden uygulanmalı.");
+    console.error("[kiracı] arc_resolve_commerce_tenant arc_stage döndürmüyor; ArvoARC kademe yaptırımı KAPALI. 20260916200500_tenant_rpc_canonical.sql yeniden uygulanmalı.");
   }else if(tenant.arc_stage!=="open"){
     redirect("/login?error=license-inactive");
   }

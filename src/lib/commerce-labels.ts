@@ -21,7 +21,7 @@ const labels = {
     failed: "Başarısız",
   },
   source: {
-    native: "ARVO ARC",
+    native: "ArvoARC",
     shopify: "Shopify arşivi",
   },
   importKind: {

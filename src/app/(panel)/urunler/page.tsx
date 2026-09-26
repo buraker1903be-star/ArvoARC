@@ -150,7 +150,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
   /*
     Görsel adresleri iki türlü saklanıyor:
 
-    - Kendi ürünlerimiz: ARC deposundaki göreli yol. İmzalı
+    - Kendi ürünlerimiz: ArvoARC deposundaki göreli yol. İmzalı
       bağlantı üretilmesi gerekiyor.
     - Tedarikçi ürünleri: tedarikçi CDN'inin tam adresi. Doğrudan
       kullanılıyor.

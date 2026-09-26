@@ -1,5 +1,5 @@
 /* =====================================================================
-   ARVO ARC — Panel dili
+   ArvoARC — Panel dili
    ArvoOS'in "gece mavisi ve şampanya" (2026-09) sistemi, ticaret
    paneline uyarlanmış hâli. Tüm kurallar .panel-root altında: giriş
    ekranı ve vitrin yönlendirmeleri etkilenmez.
@@ -8,7 +8,7 @@
    1. Palet (tek kaynak — sabit hex yalnızca burada)
    2. Kabuk: kenar çubuğu, üst çubuk, içerik
    3. Bileşenler: sayfa şeridi, kart, ölçüm, düğme, rozet, tablo, form
-   4. Eski ARC sınıflarının yeni dile köprüsü
+   4. Eski ArvoARC sınıflarının yeni dile köprüsü
    5. Hareket, daraltılmış menü, mobil, yazdırma
    ===================================================================== */
 
@@ -48,7 +48,7 @@
   --glass-blur:saturate(180%) blur(22px);
   --sidebar-w:264px;
 
-  /* Eski ARC adları → yeni palet. globals.css ve design.css bu adları
+  /* Eski ArvoARC adları → yeni palet. globals.css ve design.css bu adları
      kullanıyor; burada yeniden bağlanınca eski sayfalar da yeni
      renklere ve karanlık moda kendiliğinden geçiyor. */
   --navy:var(--brand-800);--navy-2:var(--brand-600);
@@ -432,7 +432,7 @@ html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{b
 /* Görünmezken parıltı dönmesin: sonsuz animasyon boşuna kare çizer. */
 .nav-progress:not(.visible) .nav-progress-glow{animation:none}
 
-/* ---------- 4. Eski ARC sınıflarının köprüsü ---------- */
+/* ---------- 4. Eski ArvoARC sınıflarının köprüsü ---------- */
 
 /* Kart başlığı: üst etiket altın, başlık tek yazı tipinde. */
 .panel-root .head small,.panel-root :is(.product-catalog-head,.product-editor-heading,.discount-builder-head) small,.panel-root .subhead small{color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.18em}

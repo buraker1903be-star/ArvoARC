@@ -7,9 +7,9 @@ export default function NotFound() {
   return (
     <main className="login-shell">
       <section className="login-brand">
-        <Image src="/arvo-arc-logo.png" alt="ARVO ARC" width={200} height={39} priority />
+        <Image src="/arvo-arc-logo.png" alt="ArvoARC" width={200} height={39} priority />
         <div>
-          <span>ARVO ARC</span>
+          <span>ArvoARC</span>
           <h1>Bu adreste bir sayfa yok.</h1>
           <p>Bağlantı eski ya da hatalı olabilir. Panele dönüp aradığınız kaydı arama ile bulabilirsiniz.</p>
         </div>

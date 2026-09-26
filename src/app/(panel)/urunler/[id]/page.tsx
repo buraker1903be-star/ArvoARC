@@ -52,7 +52,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
   const variantList=variants??[];
 
   /*
-    Görseller: kendi ürünlerimizde ARC deposundaki yol (imzalı
+    Görseller: kendi ürünlerimizde ArvoARC deposundaki yol (imzalı
     bağlantı gerekir), tedarikçi ürünlerinde CDN adresi. Öncesinde
     tedarikçi adresleri de imzalanmaya çalışılıyor, galeri boş
     kalabiliyordu. Yalnızca depodaki görseller silinebilir.
@@ -87,7 +87,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
       <div>
         <Link prefetch={false} className="product-back" href="/urunler">← Ürünler</Link>
         <h1>{product.name}</h1>
-        <p>{meta.subtitle||[meta.vendor||"ARVO ARC",meta.type,sourceLabel(product.source)].filter(Boolean).join(" · ")}</p>
+        <p>{meta.subtitle||[meta.vendor||"ArvoARC",meta.type,sourceLabel(product.source)].filter(Boolean).join(" · ")}</p>
       </div>
       <div className="product-head-actions">
         <em className="ac-tag" data-tone={statusTone}>{productStatusLabel(product.status)}</em>

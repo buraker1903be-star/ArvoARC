@@ -187,7 +187,7 @@ export default async function Operations({searchParams}:{searchParams:Promise<{o
             <Link prefetch={false} className="dash-card-link" href="/urunler?filter=active">Ürünler <Icon name="chevron" size={15}/></Link>
           </div>
           {missingImages.length?<div className="dash-list">{missingImages.slice(0,8).map(product=>(
-            <ActionRow key={product.id} href={`/urunler/${product.id}`} icon="tag" tone="gold" title={product.name} detail={product.source==="shopify"?"Shopify aktarımı":"ARVO ARC"} side={<span className="ops-cta">Görsel ekle</span>}/>
+            <ActionRow key={product.id} href={`/urunler/${product.id}`} icon="tag" tone="gold" title={product.name} detail={product.source==="shopify"?"Shopify aktarımı":"ArvoARC"} side={<span className="ops-cta">Görsel ekle</span>}/>
           ))}</div>:<p className="dash-empty">Aktif ürünlerde görsel eksiği bulunmuyor.</p>}
         </article>
       </div>

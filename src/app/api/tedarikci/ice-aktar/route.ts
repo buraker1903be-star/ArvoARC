@@ -15,7 +15,7 @@ export const maxDuration = 60;
 const BATCH = 40;
 
 /**
- * Satış fiyatı — ARC'taki `arc_sale_price` fonksiyonunun aynısı.
+ * Satış fiyatı — ArvoARC'taki `arc_sale_price` fonksiyonunun aynısı.
  *
  * Önceden her varyant için ayrı bir RPC çağrısı yapılıyordu;
  * 120 ürün için 500'den fazla ağ turu demekti ve süre sınırını

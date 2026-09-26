@@ -10,7 +10,7 @@ import { Icon, type IconName } from "./icons";
 
 /*
   Üst çubuktaki zil ve sağdan açılan bildirim çekmecesi (ArvoOS
-  bildirim merkezinin ARC karşılığı).
+  bildirim merkezinin ArvoARC karşılığı).
 
   - Liste her açılışta sunucu işlemiyle yüklenir; üzerine gelince
     önceden yüklenmeye başlar.
