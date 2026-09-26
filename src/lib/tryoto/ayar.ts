@@ -1,5 +1,6 @@
 import { decryptSecret } from "@/lib/payment-credentials";
 import { firmalariCozumle, type KargoFirmasi } from "./firmalar";
+import { konumlariCozumle, type GondericiKonumu } from "./konumlar";
 import { OtoHatasi } from "./hatalar";
 import { otoIstek } from "./istemci";
 
@@ -38,7 +39,7 @@ export function tryotoAyari(satir: AyarSatiri | null | undefined): TryotoAyari {
 export type BaglantiSonucu =
   | { durum: "kapali" }
   | { durum: "anahtar-yok" }
-  | { durum: "basarili"; firmalar: KargoFirmasi[]; hamYanit: string | null }
+  | { durum: "basarili"; firmalar: KargoFirmasi[]; konumlar: GondericiKonumu[]; hamYanit: string | null }
   | { durum: "hata"; mesaj: string };
 
 /**
@@ -58,6 +59,28 @@ export async function baglantiyiSina(magazaId: string, satir: AyarSatiri | null 
     const anahtar = decryptSecret(satir.tryoto_refresh_token_enc);
     const govde = await otoIstek({ magazaId, yenilemeAnahtari: anahtar, yol: "dcList", govde: {} });
     const firmalar = firmalariCozumle(govde);
+
+    /*
+      Gönderici konumları da çekiliyor: createOrder'a verilecek kodu
+      kullanıcı OTO panelinde arayıp elle kopyalıyordu ve yanlış yazılan
+      kod ancak ilk gönderi denemesinde hata veriyordu.
+
+      Bu çağrının hatası bağlantıyı başarısız SAYMIYOR: konum listesi
+      olmadan da gönderi yapılabiliyor (adres tek tek gönderiliyor), oysa
+      firma listesi olmadan seçim hiç yapılamaz.
+    */
+    let konumlar: GondericiKonumu[] = [];
+    try {
+      const konumGovdesi = await otoIstek({
+        magazaId,
+        yenilemeAnahtari: anahtar,
+        yol: "getPickupLocationList?status=active",
+        yontem: "GET",
+      });
+      konumlar = konumlariCozumle(konumGovdesi);
+    } catch {
+      konumlar = [];
+    }
     /*
       Liste çözülemediyse ham yanıt ekranda gösteriliyor. "Hiç firma yok"
       demek yanıltıcı olurdu: dcList'in gövde şekli belgelenmemiş ve
@@ -67,6 +90,7 @@ export async function baglantiyiSina(magazaId: string, satir: AyarSatiri | null 
     return {
       durum: "basarili",
       firmalar,
+      konumlar,
       hamYanit: firmalar.length ? null : JSON.stringify(govde).slice(0, 600),
     };
   } catch (hata) {

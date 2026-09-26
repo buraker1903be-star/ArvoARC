@@ -178,10 +178,22 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
             <p>Yenileme anahtarını OTO panelinde <b>Ayarlar → API Entegrasyonları</b> bölümünden “Connect” ile üretirsiniz. Gönderi oluşturmak OTO cüzdanınızdaki bakiyeyi harcar.</p>
             <div className="payment-fields">
               <label className="wide">Yenileme anahtarı (refresh token)<input name="tryoto_refresh_token" type="password" placeholder={settings?.tryoto_refresh_token_enc?"Kayıtlı · değiştirmek için yazın":"OTO refresh token"} autoComplete="new-password"/></label>
-              <label className="wide">Gönderici konum kodu (pickup location)<input name="tryoto_pickup_location_code" defaultValue={settings?.tryoto_pickup_location_code??""} placeholder="OTO'da tanımlı konumun kodu" autoComplete="off"/></label>
+              <label className="wide">Gönderici konum kodu (pickup location)
+                {/* Kayıtlı konum varsa listeden seçiliyor: kodu OTO panelinde
+                    arayıp elle kopyalamak gereksiz bir adımdı ve yanlış
+                    yazılan kod ancak ilk gönderi denemesinde hata veriyordu.
+                    Liste çekilemediyse alan serbest metin olarak kalıyor —
+                    kod elle de girilebilmeli. */}
+                {kargoBaglantisi.durum==="basarili"&&kargoBaglantisi.konumlar.length
+                  ?<select name="tryoto_pickup_location_code" defaultValue={settings?.tryoto_pickup_location_code??""}>
+                      <option value="">Kullanma · adresi her gönderide yaz</option>
+                      {kargoBaglantisi.konumlar.map(konum=><option key={konum.kod} value={konum.kod}>{konum.ad} · {konum.kod}{konum.sehir?` · ${konum.sehir}`:""} ({konum.tur==="depo"?"depo":"şube"})</option>)}
+                    </select>
+                  :<input name="tryoto_pickup_location_code" defaultValue={settings?.tryoto_pickup_location_code??""} placeholder="OTO'da tanımlı konumun kodu (isteğe bağlı)" autoComplete="off"/>}
+              </label>
               <div className="check-stack"><label className="check-inline"><input type="checkbox" name="tryoto_test_mode" defaultChecked={settings?.tryoto_test_mode??true}/> Test (sandbox) hesabı</label></div>
             </div>
-            <div className="security-note"><b>{settings?.tryoto_refresh_token_enc?"Anahtarınız kayıtlı.":"Anahtar henüz girilmedi."}</b><p>Anahtar şifrelenerek saklanır ve hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazın; boş bırakırsanız kayıtlı olan korunur. Gönderici konum kodunu boş bırakırsanız gönderi oluştururken adres tek tek yazılır.</p></div>
+            <div className="security-note"><b>{settings?.tryoto_refresh_token_enc?"Anahtarınız kayıtlı.":"Anahtar henüz girilmedi."}</b><p>Anahtar şifrelenerek saklanır ve hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazın; boş bırakırsanız kayıtlı olan korunur.</p><p>Gönderici konumu <b>isteğe bağlı</b>: OTO panelinde tanımladığınız depo ya da şube burada listelenir. Hiç tanımlamadıysanız boş bırakın — gönderi oluştururken adres tek tek gönderilir.</p></div>
           </article>
           <button className="payment-save" type="submit">Kargo ayarlarını kaydet</button>
         </form>
@@ -194,7 +206,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
             <ul className="tryoto-carriers">
               {kargoBaglantisi.firmalar.map(firma=><li key={firma.kod}><b>{firma.ad}</b><small>{firma.kod}</small>{firma.etkin===false?<span>kapalı</span>:null}</li>)}
             </ul>
-            <p className="catalog-hint">{kargoBaglantisi.firmalar.length} firma bulundu. Gönderi oluştururken bu firmalar arasından seçim yapılır.</p>
+            <p className="catalog-hint">{kargoBaglantisi.firmalar.length} firma bulundu. Gönderi oluştururken bu firmalar arasından seçim yapılır.{kargoBaglantisi.konumlar.length?` ${kargoBaglantisi.konumlar.length} gönderici konumu tanımlı.`:" Gönderici konumu tanımlı değil; adres her gönderide tek tek gönderilecek."}</p>
           </>:<div className="security-note"><b>Bağlantı kuruldu ama firma listesi okunamadı.</b><p>OTO beklenmedik bir yanıt döndürdü; ham hâli aşağıda. Bu genelde hesapta henüz kargo anlaşması tanımlı olmadığında olur.</p><code>{kargoBaglantisi.hamYanit}</code></div>}
         </article>
       </>:<p className="catalog-hint">Kargo entegrasyonunu yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
