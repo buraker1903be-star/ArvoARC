@@ -11,15 +11,21 @@ import path from "node:path";
 
 const KOK = path.resolve(import.meta.dirname, "../../supabase");
 /*
-  Döküm 19.09.2026'da alındı ama yetki migration'larından ÖNCEki durumu taşıyor:
-  fonksiyonlar oluşturulurken Supabase'in varsayılanı onları anon'a açıyor ve
-  dökümdeki "revoke … from public" bunu geri almıyor (ARC'taki açığın kökü).
-  Bu yüzden yetkileri düzelten migration (20260919114636) dökümün üzerine
-  yeniden uygulanır; yalnızca grant/revoke içerir, tekrar çalıştırılabilir.
-  Ondan eski migration'lar dökümde zaten var, tekrar uygulanamaz (politika
-  çakışır). Yeni migration eklendikçe buradaki sürüm ileri alınır.
+  Dökümde ZATEN OLAN migration'lar tekrar uygulanamaz: create policy ve
+  create trigger "if not exists" kabul etmiyor, ikinci uygulama çakışıyor.
+  Bu yüzden yalnızca dökümden SONRA eklenenler kuruluyor ve döküm her
+  yenilendiğinde buradaki sürüm ileri alınır.
+
+  27.09.2026'da döküm bölünmüş kargo migration'ını (20260926231939) da
+  içerecek şekilde yenilendi; sürüm onun bir ardına alındı.
+
+  Not: 19.09.2026 dökümünde yetkiler eksikti (fonksiyonlar oluşturulurken
+  Supabase'in varsayılanı onları anon'a açıyor ve dökümdeki "revoke …
+  from public" bunu geri almıyordu — ArvoARC'taki açığın kökü). Yeni döküm
+  fonksiyon yetkilerini olduğu gibi taşıyor, yani o migration'ı yeniden
+  uygulamaya gerek kalmadı.
 */
-const ILK_UYGULANAN = "20260919114636";
+const ILK_UYGULANAN = "20260926231940";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;
