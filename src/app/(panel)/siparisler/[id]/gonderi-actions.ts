@@ -208,7 +208,12 @@ async function etiketBilgisi(
   const oto = otoKimligi?.trim();
   if (oto && oto !== siparisKimligi) denemeler.push({ print: true, kimlik: oto });
 
-  let sonHata: string | null = null;
+  /*
+    HER DENEMENİN sonucu ayrı yazılıyor, yalnızca son hata değil. Son
+    hatayı göstermek yanıltıcıydı: üç uçtan hangisinin neden düştüğü
+    bilinmeden ne kimlik ne plan sorunu ayırt edilebiliyor.
+  */
+  const notlar: string[] = [];
   /*
     AWB'si olmayan ama takip numarası ya da firma taşıyan yanıt SAKLANIYOR:
     etiket gecikmişken bile takip numarasını kayda yazmak, müşteriye
@@ -216,6 +221,7 @@ async function etiketBilgisi(
   */
   let kismi: EtiketBilgisi | null = null;
   for (const deneme of denemeler) {
+    const ad = `${deneme.print ? "print" : "orderStatus"} (${deneme.kimlik})`;
     try {
       const yanit = deneme.print
         ? await otoIstek<Record<string, unknown>>({
@@ -233,11 +239,13 @@ async function etiketBilgisi(
       const bilgi = etiketiCozumle(yanit);
       if (etiketHazir(bilgi)) return { bilgi, hata: null };
       if (!kismi && (bilgi.takipNo || bilgi.firma)) kismi = bilgi;
+      // Yanıt geldi ama etiket adresi yok: bu da bir bulgu, hata kadar önemli.
+      notlar.push(`${ad}: yanıt geldi, etiket adresi boş`);
     } catch (hata) {
-      sonHata = hata instanceof OtoHatasi ? hata.message : "Etiket bilgisi alınamadı.";
+      notlar.push(`${ad}: ${hata instanceof OtoHatasi ? hata.message : "istek başarısız"}`);
     }
   }
-  return { bilgi: kismi, hata: sonHata };
+  return { bilgi: kismi, hata: notlar.length ? `Etiket alınamadı · ${notlar.join(" · ")}` : null };
 }
 
 /** Gönderinin OTO'daki sipariş kimliği; createOrder'a verilen değerle aynı. */

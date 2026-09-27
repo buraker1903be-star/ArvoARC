@@ -55,6 +55,21 @@ test("403 ile 401 AYRI konuşuyor", () => {
   assert.doesNotMatch(kullaniciMesaji(null, 403), /anahtarını kontrol/);
 });
 
+test("mesajsız yanıtta DURUM KODU söyleniyor", () => {
+  /*
+    27.09.2026: etiket alınamadı ve ekrandaki tek cümle "OTO isteği
+    tamamlanamadı" idi. Kod bilinmediği için ne kimliğe ne gövdeye
+    bakılabildi — 400 ile 404 bambaşka iki teşhis.
+  */
+  assert.match(kullaniciMesaji(null, 400), /HTTP 400/);
+  assert.match(kullaniciMesaji(null, 404), /HTTP 404/);
+  assert.match(kullaniciMesaji(null, 404), /bulamadı/);
+  // HTTP 200 + success:false: istek ULAŞTI ve reddedildi, sorun gövdede.
+  assert.match(kullaniciMesaji(null, 200), /sebep bildirmedi/);
+  // Kod hiç yoksa (ağ hatası) uydurulmuyor.
+  assert.doesNotMatch(kullaniciMesaji(null), /HTTP/);
+});
+
 test("OtoHatasi ham mesajı da taşıyor", () => {
   // Kullanıcıya çevirisi gösterilir, günlüğe ham metin yazılır.
   const hata = new OtoHatasi("Insufficient balance", 400);

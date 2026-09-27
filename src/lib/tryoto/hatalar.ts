@@ -72,7 +72,22 @@ export function kullaniciMesaji(hamMesaj: string | null, durumKodu?: number): st
       return "OTO bu isteği reddetti. Uç, hesabınızın paketinde kapalı olabilir (ücretsiz pakette bazı uçlar kullanılamıyor).";
     }
     if (durumKodu && durumKodu >= 500) return "OTO servisi şu an yanıt vermiyor. Biraz sonra tekrar deneyin.";
-    return "OTO isteği tamamlanamadı.";
+    if (durumKodu === 404) {
+      return "OTO bu kaydı bulamadı (HTTP 404): istenen kimlik OTO tarafında yok.";
+    }
+    /*
+      HTTP 200 + success:false. Ayrı yazılıyor çünkü teşhisi bambaşka:
+      istek OTO'ya ULAŞTI ve reddedildi, yani ağ, anahtar ve uç doğru —
+      sorun gövdededir. "Tamamlanamadı" demek bunu gizliyordu.
+    */
+    if (durumKodu === 200) return "OTO isteği reddetti ama sebep bildirmedi (HTTP 200).";
+    /*
+      DURUM KODU MESAJA YAZILIYOR. Kod olmadan "OTO isteği tamamlanamadı"
+      hiçbir şey söylemiyor: 27.09.2026'da etiket alınamadı ve ekrandaki
+      tek cümle buydu — 400 mü 404 mü olduğu bilinmediği için ne gövdeye
+      ne kimliğe bakılabildi.
+    */
+    return durumKodu ? `OTO isteği tamamlanamadı (HTTP ${durumKodu}).` : "OTO isteği tamamlanamadı.";
   }
   const kucuk = hamMesaj.toLocaleLowerCase("en-US");
   const eslesen = BILINEN.find((satir) => kucuk.includes(satir.iz));
