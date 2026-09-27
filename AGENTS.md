@@ -74,6 +74,14 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   üretmedi ve sebep hiçbir ekranda görünmedi. Hata mesajı durum koduyla
   birlikte gösterilir; 401 ile 403 ayrı şeylerdir ve HTTP 200 +
   `success:false` üçüncü bir durumdur.
+- **Sorunlu gönderide müşteriye OTOMATİK bildirim gitmez.** OTO'nun
+  `returned`, `lost` ve `failed` durumları `arc_shipments.status` alanında
+  `failed` oluyor. Müşteriye kendiliğinden "paketiniz kayboldu" demek,
+  durum incelenmeden gitmiş olur ve paket çoğu zaman birkaç gün sonra
+  teslim edilir. Uyarı OPERASYONCUYA gidiyor (bildirim çekmecesi +
+  sipariş listesinde `?kargo=sorunlu`), müşteri sipariş sayfasında ne
+  olduğunu ve ne yapacağını görüyor; haber verme kararı insanın.
+  27.09.2026'da bilerek böyle bırakıldı.
 - **Panelde iptal edilen OTO gönderisi OTO'da da iptal edilir.** Önce
   yalnızca `arc_shipments.status` işaretleniyordu ve gönderi OTO'da
   canlı kalıyordu: kurye alıma gelebiliyor, tedarikçi etiketi
