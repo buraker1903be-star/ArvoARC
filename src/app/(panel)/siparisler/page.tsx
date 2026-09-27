@@ -168,20 +168,22 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   const listeIdleri = (listResult.data ?? []).map((order) => order.id);
   const [{ data: listeKalemleri }, { data: listeGonderileri }] = listeIdleri.length
     ? await Promise.all([
-        supabase.from("arc_order_items").select("id,order_id,variant_id,sku,quantity,total")
+        /*
+          MALİYET KALEMİN KENDİSİNDE. Önce varyantın BUGÜNKÜ cost_price
+          değeri okunuyordu ve tedarikçi fiyatı değişince geçmiş
+          siparişlerin kârı da değişmiş görünüyordu. Artık satış anında
+          donuyor (tetikleyici private.arc_order_item_cost); varyant
+          sorgusu da gerekmiyor.
+        */
+        supabase.from("arc_order_items").select("id,order_id,quantity,total,cost_price")
           .eq("organization_id", organization.id).in("order_id", listeIdleri),
         supabase.from("arc_shipments").select("order_id,status,arc_shipment_items(order_item_id,quantity)")
           .eq("organization_id", organization.id).in("order_id", listeIdleri),
       ])
     : [{ data: [] }, { data: [] }];
 
-  type ListeKalemi = { id: string; order_id: string; variant_id: string | null; sku: string | null; quantity: number; total: number };
+  type ListeKalemi = { id: string; order_id: string; quantity: number; total: number; cost_price: number | null };
   const kalemler = (listeKalemleri ?? []) as ListeKalemi[];
-  const varyantIdleri = [...new Set(kalemler.map((k) => k.variant_id).filter((x): x is string => Boolean(x)))];
-  const { data: maliyetler } = varyantIdleri.length
-    ? await supabase.from("arc_product_variants").select("id,cost_price").eq("organization_id", organization.id).in("id", varyantIdleri)
-    : { data: [] };
-  const maliyetById = new Map(((maliyetler ?? []) as Array<{ id: string; cost_price: number | null }>).map((v) => [v.id, v.cost_price]));
 
   const kalemlerBySiparis = new Map<string, ListeKalemi[]>();
   for (const kalem of kalemler) {
@@ -212,11 +214,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     kar: (() => {
       const kalem = kalemlerBySiparis.get(order.id) ?? [];
       const sonuc = siparisKari(
-        kalem.map((k) => ({
-          toplamKurus: k.total,
-          adet: k.quantity,
-          maliyetKurus: k.variant_id ? maliyetById.get(k.variant_id) ?? null : null,
-        })),
+        kalem.map((k) => ({ toplamKurus: k.total, adet: k.quantity, maliyetKurus: k.cost_price })),
         order.status,
         order.payment_status,
       );

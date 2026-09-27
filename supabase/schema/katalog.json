@@ -112,6 +112,7 @@
       "organization_id"
     ],
     "arc_order_items": [
+      "cost_price",
       "id",
       "order_id",
       "organization_id",

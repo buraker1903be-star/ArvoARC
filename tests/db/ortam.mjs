@@ -30,10 +30,11 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   27.09.2026 akşam dökümü o günün BÜTÜN migration'larını içeriyor:
   kargo bildirimi sütunu, vitrinde kargo takibi (get_arvoculture_my_orders
   yeniden kuruldu), sipariş silme ve iade kalemlerinin doğrulanması.
-  İmleç sonuncunun ardında; dökümde zaten olan bir migration'ı yeniden
-  uygulamak "already exists" ile düşerdi.
+  Sipariş kalemi maliyeti (20260927162152) de dâhil. İmleç sonuncunun
+  ardında; dökümde zaten olan bir migration'ı yeniden uygulamak
+  "already exists" ile düşerdi.
 */
-const ILK_UYGULANAN = "20260927131920";
+const ILK_UYGULANAN = "20260927162153";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;

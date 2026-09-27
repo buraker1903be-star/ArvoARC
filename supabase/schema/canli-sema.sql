@@ -143,7 +143,8 @@ create table if not exists public.arc_order_items (
   sku text not null,
   quantity integer not null,
   unit_price bigint not null,
-  total bigint not null
+  total bigint not null,
+  cost_price bigint
 );
 
 create table if not exists public.arc_orders (
@@ -535,6 +536,24 @@ begin
     end if;
   end loop;
 
+  return new;
+end
+$function$
+;
+
+CREATE OR REPLACE FUNCTION private.arc_order_item_cost()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if new.cost_price is null and new.variant_id is not null then
+    select v.cost_price into new.cost_price
+      from public.arc_product_variants v
+     where v.id = new.variant_id
+       and v.organization_id = new.organization_id;
+  end if;
   return new;
 end
 $function$
@@ -4702,6 +4721,8 @@ grant execute on function public.update_arvoculture_profile(p_full_name text, p_
 grant execute on function public.update_arvoculture_profile(p_full_name text, p_phone text) to authenticated;
 
 CREATE TRIGGER arc_addresses_before_write BEFORE INSERT OR UPDATE ON public.arc_customer_addresses FOR EACH ROW EXECUTE FUNCTION arc_address_before_write();
+
+CREATE TRIGGER arc_order_item_cost BEFORE INSERT ON public.arc_order_items FOR EACH ROW EXECUTE FUNCTION private.arc_order_item_cost();
 
 CREATE TRIGGER arc_order_items_stock_check BEFORE INSERT ON public.arc_order_items FOR EACH ROW EXECUTE FUNCTION arc_check_supplier_stock();
 
