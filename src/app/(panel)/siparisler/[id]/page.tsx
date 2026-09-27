@@ -1,4 +1,4 @@
-import { gonderiDurumEtiketi, kargoDurumu, tedarikciGruplari } from "@/lib/kargo-bolme";
+import { gonderiDurumEtiketi, kargoGorunumu, tedarikciGruplari } from "@/lib/kargo-bolme";
 import { KARGO_FIRMALARI } from "@/lib/kargo-firmalari";
 import { elleGonderiEkle, etiketiAl, gonderiIptal, kargoDurumlariniGuncelle, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
 import { teslimatSecenekleri } from "@/lib/tryoto/ayar";
@@ -80,7 +80,9 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   const gonderiler=((shipments??[]) as Array<{id:string;sequence:number;source:string;status:string;carrier_code:string|null;carrier_name:string|null;tracking_number:string|null;tracking_url:string|null;awb_url:string|null;supplier:string|null;shipped_at:string|null;failure_reason:string|null;arc_shipment_items:{order_item_id:string;quantity:number}[]|null}>)
     .map(satir=>({...satir,items:satir.arc_shipment_items??[]}));
   const gruplar=tedarikciGruplari(kargoKalemleri,gonderiler);
-  const kargoDurumuOzet=kargoDurumu(kargoKalemleri,gonderiler);
+  /* Teslim aşaması dâhil: cron delivered yazıyordu ama ekran "kargoda"
+     demeye devam ediyordu. */
+  const kargoDurumuOzet=kargoGorunumu(kargoKalemleri,gonderiler);
   /* İptal edilen gönderi ne özette ne sayımda: yola çıkmayacak bir
      paketin takip numarasını göstermek yanlış bilgi. */
   const acikGonderiler=gonderiler.filter(g=>g.status!=="cancelled");
@@ -366,13 +368,16 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           girilmedi" yazıyordu — özet şeridi, ekranın en çok bakılan
           yeri, yanlış bilgi veriyordu.
         */}
-        <article className="ac-metric" data-tone={kargoDurumuOzet==="tamam"?"good":kargoDurumuOzet==="kismi"?"warn":undefined}>
+        <article className="ac-metric" data-tone={kargoDurumuOzet==="teslim"?"good":kargoDurumuOzet==="kismi"?"warn":undefined}>
           <span>Kargo</span>
           <strong>{acikGonderiler.length?(acikGonderiler.length>1?`${acikGonderiler.length} paket`:acikGonderiler[0].carrier_name||"1 paket"):meta.shipping_carrier||"—"}</strong>
           <small>{
             acikGonderiler.length
               ? (takipliGonderiSayisi
-                  ? `${takipliGonderiSayisi} takip numarası · ${kargoDurumuOzet==="tamam"?"tüm ürünler kargoda":"bir kısmı kargoda"}`
+                  ? `${takipliGonderiSayisi} takip numarası · ${
+                      kargoDurumuOzet==="teslim"?"tamamı teslim edildi"
+                      :kargoDurumuOzet==="tamam"?"tüm ürünler kargoda"
+                      :"bir kısmı kargoda"}`
                   : "takip numarası bekleniyor")
               : meta.tracking_number?`Takip: ${meta.tracking_number}`:"Henüz kargoya verilmedi"
           }</small>
@@ -458,7 +463,11 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
       */}
       <section id="gonderiler" className="ac ac-pad order-noprint">
         <div className="ac-head">
-          <div><h3>Gönderiler</h3><p>{acikGonderiler.length?`${acikGonderiler.length} gönderi · ${kargoDurumuOzet==="tamam"?"tüm ürünler kargoda":kargoDurumuOzet==="kismi"?"bir kısmı kargoda":"henüz kargoya verilmedi"}`:"Bu siparişte henüz gönderi yok."}</p></div>
+          <div><h3>Gönderiler</h3><p>{acikGonderiler.length?`${acikGonderiler.length} gönderi · ${
+            kargoDurumuOzet==="teslim"?"tamamı teslim edildi"
+            :kargoDurumuOzet==="tamam"?"tüm ürünler kargoda"
+            :kargoDurumuOzet==="kismi"?"bir kısmı kargoda"
+            :"henüz kargoya verilmedi"}`:"Bu siparişte henüz gönderi yok."}</p></div>
           {/*
             Durum OTO'dan ÇEKİLİYOR, webhook'la gelmiyor: OTO'nun webhook
             yükünün şekli belgelenmemiş ve tahmine dayalı bir uç nokta,

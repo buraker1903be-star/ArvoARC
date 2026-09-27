@@ -142,6 +142,28 @@ export function otoDurumunuCevir(otoDurumu: string | null | undefined): string {
 }
 
 /*
+  SİPARİŞİN KARGO GÖRÜNÜMÜ: kargoDurumu'nun üstüne TESLİM aşaması.
+
+  kargoDurumu yalnızca "kalemler gönderiye girdi mi" sorusunu
+  yanıtlıyor; paketin teslim edilip edilmediğini söylemiyor. Cron
+  durumu OTO'dan çekip delivered yazıyordu ama listede hâlâ "Kargoda"
+  görünüyordu — yani sistem biliyor, ekran söylemiyordu.
+
+  Teslim sayılması için İKİ ŞART: bütün kalemler gönderiye girmiş
+  olmalı VE açık gönderilerin hepsi teslim edilmiş olmalı. Tek paketi
+  teslim edilmiş üç paketli siparişe "teslim edildi" demek, müşteri
+  kalanını beklerken yanlış bilgi olurdu.
+*/
+export type KargoGorunumu = KargoDurumu | "teslim";
+
+export function kargoGorunumu(kalemler: SiparisKalemi[], gonderiler: Gonderi[]): KargoGorunumu {
+  const temel = kargoDurumu(kalemler, gonderiler);
+  if (temel !== "tamam") return temel;
+  const acik = gonderiler.filter((gonderi) => gonderi.status !== "cancelled");
+  return acik.length && acik.every((gonderi) => gonderi.status === "delivered") ? "teslim" : temel;
+}
+
+/*
   GÖNDERİ DURUMUNUN PANELDEKİ KARŞILIĞI.
 
   Kart durumu şöyle seçiyordu: iptal, teslim edildi, tedarikçi gönderdi

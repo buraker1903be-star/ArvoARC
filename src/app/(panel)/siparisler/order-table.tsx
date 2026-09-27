@@ -27,7 +27,7 @@ export type OrderRow = {
     KARGO. Gönderilerden türetiliyor, ayrı sütunda tutulmuyor; sipariş
     detayındaki özetle aynı fonksiyondan geliyor.
   */
-  kargo: { durum: "yok" | "kismi" | "tamam"; sorunlu: boolean };
+  kargo: { durum: "yok" | "kismi" | "tamam" | "teslim"; sorunlu: boolean };
 };
 
 /*
@@ -38,6 +38,7 @@ const KARGO_ETIKETI: Record<OrderRow["kargo"]["durum"], string> = {
   yok: "Verilmedi",
   kismi: "Kısmen",
   tamam: "Kargoda",
+  teslim: "Teslim edildi",
 };
 
 const BULK_STEPS = [
@@ -181,7 +182,12 @@ export function OrderTable({ rows, canManage, canDelete, back, children }: { row
               </span>
               <span className="order-status"><em className="ac-tag" data-tone={row.badge.tone}>{row.badge.label}</em></span>
               <span className="order-shipping">
-                <em className="ac-tag" data-tone={row.kargo.sorunlu ? "bad" : row.kargo.durum === "tamam" ? "good" : row.kargo.durum === "kismi" ? "warn" : undefined}>
+                {/*
+                  Teslim edilmiş sipariş en güçlü işareti alıyor: iş
+                  bitti demek. "Kargoda" sakin kalıyor — henüz
+                  izlenmesi gereken bir şey.
+                */}
+                <em className="ac-tag" data-tone={row.kargo.sorunlu ? "bad" : row.kargo.durum === "teslim" ? "good" : row.kargo.durum === "kismi" ? "warn" : undefined}>
                   {row.kargo.sorunlu ? "Sorunlu" : KARGO_ETIKETI[row.kargo.durum]}
                 </em>
               </span>

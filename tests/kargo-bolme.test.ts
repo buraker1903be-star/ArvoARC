@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bolmeSorunu, kalanAdetler, kargoDurumu, otoDurumunuCevir, tedarikciGruplari, izlenmeliMi, izlemeSuresiDoldu, kargoyaVerildiMi, gonderiDurumEtiketi, gonderiSorunlu } from "@/lib/kargo-bolme";
+import { bolmeSorunu, kalanAdetler, kargoDurumu, otoDurumunuCevir, tedarikciGruplari, izlenmeliMi, izlemeSuresiDoldu, kargoyaVerildiMi, gonderiDurumEtiketi, gonderiSorunlu, kargoGorunumu, type SiparisKalemi, type Gonderi } from "@/lib/kargo-bolme";
 
 /*
   Bölünmüş kargo hesabı. Sınanan şey "toplama biliyor mu" değil: bir
@@ -233,4 +233,42 @@ test("SORUNLU gönderi ayırt ediliyor", () => {
   assert.equal(gonderiSorunlu("failed"), true);
   assert.equal(gonderiSorunlu("in_transit"), false);
   assert.equal(gonderiSorunlu("cancelled"), false);
+});
+
+test("TESLİM aşaması: bütün paketler teslim edilince", () => {
+  /*
+    Cron durumu OTO'dan çekip delivered yazıyordu ama listede hâlâ
+    "Kargoda" görünüyordu: sistem biliyor, ekran söylemiyordu.
+  */
+  const kalemler: SiparisKalemi[] = [{ id: "k1", quantity: 2, product_name: "Kupa" }];
+  const teslim: Gonderi[] = [{ id: "g1", status: "delivered", items: [{ order_item_id: "k1", quantity: 2 }] }];
+  assert.equal(kargoGorunumu(kalemler, teslim), "teslim");
+});
+
+test("TEK PAKET teslim edilse de sipariş teslim sayılmıyor", () => {
+  /*
+    Üç paketli siparişte birinin teslimi, müşteri kalanını beklerken
+    "teslim edildi" demek olurdu.
+  */
+  const kalemler: SiparisKalemi[] = [{ id: "k1", quantity: 1, product_name: "Kupa" }, { id: "k2", quantity: 1, product_name: "Tabak" }];
+  const gonderiler: Gonderi[] = [
+    { id: "g1", status: "delivered", items: [{ order_item_id: "k1", quantity: 1 }] },
+    { id: "g2", status: "in_transit", items: [{ order_item_id: "k2", quantity: 1 }] },
+  ];
+  assert.equal(kargoGorunumu(kalemler, gonderiler), "tamam");
+});
+
+test("kargoya verilmemiş sipariş teslim sayılmıyor", () => {
+  const kalemler: SiparisKalemi[] = [{ id: "k1", quantity: 2, product_name: "Kupa" }];
+  assert.equal(kargoGorunumu(kalemler, []), "yok");
+});
+
+test("İPTAL edilen gönderi teslim kararını bozmuyor", () => {
+  // İptal edilen paket yola çıkmadı; teslim edilenlerin arasında sayılmamalı.
+  const kalemler: SiparisKalemi[] = [{ id: "k1", quantity: 1, product_name: "Kupa" }];
+  const gonderiler: Gonderi[] = [
+    { id: "g0", status: "cancelled", items: [{ order_item_id: "k1", quantity: 1 }] },
+    { id: "g1", status: "delivered", items: [{ order_item_id: "k1", quantity: 1 }] },
+  ];
+  assert.equal(kargoGorunumu(kalemler, gonderiler), "teslim");
 });

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { orderBadge, sourceLabel } from "@/lib/commerce-labels";
 import { nextOrderStep } from "@/lib/order-flow";
-import { gonderiSorunlu, kargoDurumu } from "@/lib/kargo-bolme";
+import { gonderiSorunlu, kargoGorunumu } from "@/lib/kargo-bolme";
 import { siparisKari } from "@/lib/siparis-kari";
 import { isBankTransfer } from "@/lib/payment-method";
 import { PanelBildirimi } from "@/components/panel/bildirim";
@@ -233,7 +233,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
       }));
       const siparisKalemleri = (kalemlerBySiparis.get(order.id) ?? []).map((k) => ({ id: k.id, quantity: k.quantity, product_name: "" }));
       return {
-        durum: kargoDurumu(siparisKalemleri, gonderiler),
+        durum: kargoGorunumu(siparisKalemleri, gonderiler),
         sorunlu: gonderiler.some((g) => gonderiSorunlu(g.status)),
       };
     })(),
