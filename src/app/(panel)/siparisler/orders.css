@@ -156,12 +156,14 @@
     durumda"; kâr masaüstünde incelenen bir sayı ve dar ekranda ya
     kırpılır ya ötekileri kırpar.
   */
-  .order-table[data-manage] .order-row{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"check main amount" "check customer status" "check shipping shipping" ". action action";row-gap:6px;padding:12px 14px}
+  .order-table[data-manage] .order-row{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"check main amount" "check customer status" "check shipping action";row-gap:6px;padding:12px 14px}
   .order-table:not([data-manage]) .order-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amount" "customer status" "shipping shipping";row-gap:6px;padding:12px 14px}
   .order-profit{display:none}
   .order-shipping{justify-self:start}
   .order-amount,.order-status{justify-self:end;text-align:right}
-  .order-action{justify-content:flex-start}
+  /* Eylem düğmesi kargonun yanında: kendi satırında dördüncü bir sıra
+     açıyordu ve telefonda satır 151px'e çıkıyordu. */
+  .order-action{justify-content:flex-end;align-items:center}
   .order-action:empty{display:none}
   .order-parties{grid-template-columns:1fr}
   .order-manual-grid{grid-template-columns:1fr}
