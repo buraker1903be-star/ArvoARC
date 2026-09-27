@@ -142,3 +142,42 @@
 /* Sipariş detayı: havale ödemesi bekleyen siparişte tek tık onay / iptal */
 .panel-root .order-transfer{display:grid;gap:8px}
 .panel-root .order-transfer-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+/*
+  GÖNDERİLER. Bir sipariş birden çok pakete bölünebiliyor: kalemler farklı
+  tedarikçilerden çıkıyor ve ayrı depolardan sevk ediliyor. Her paket kendi
+  firması, takip numarası ve durumuyla ayrı bir satır.
+*/
+.shipment-list{display:grid;gap:10px;margin:0 0 18px;padding:0;list-style:none}
+.shipment-list li{padding:13px 15px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+/* İptal edilen gönderi silinmiyor, soluklaşıyor: hangi firmaya ne
+   verildiği geçmişte görünür kalmalı. */
+.shipment-list li[data-durum="cancelled"]{opacity:.55}
+.shipment-list li[data-durum="delivered"]{border-color:color-mix(in srgb,var(--success) 45%,var(--line))}
+.shipment-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.shipment-head b{font-size:13px}
+.shipment-head span{padding:2px 9px;border-radius:999px;background:var(--surface);color:var(--muted);font-size:11px;font-weight:700}
+.shipment-list p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.55}
+.shipment-items{color:var(--ink)!important;font-size:12px}
+.shipment-error{color:var(--danger)!important}
+.shipment-actions{display:flex;align-items:center;gap:12px;margin-top:10px}
+.shipment-actions a{color:var(--accent-500);font-size:12px;font-weight:700;text-decoration:none}
+.shipment-actions a:hover{text-decoration:underline}
+.shipment-actions button{padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer}
+.shipment-actions button:hover{border-color:var(--danger);color:var(--danger)}
+
+/* Yeni gönderi formu tedarikçi başına: aynı depodan çıkanlar bir pakette. */
+.shipment-new{display:grid;gap:14px}
+.shipment-form{padding:15px;border:1px dashed var(--line);border-radius:14px;background:var(--surface)}
+.shipment-form h4{display:flex;align-items:baseline;gap:10px;margin:0 0 12px;font-size:13px}
+.shipment-form h4 small{color:var(--muted);font-size:11px;font-weight:600}
+.shipment-item-picks{display:grid;gap:8px;margin-bottom:13px}
+.shipment-item-picks label{display:flex;align-items:center;gap:10px;font-size:12px}
+.shipment-item-picks span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shipment-item-picks input{width:72px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);font:inherit;font-size:12px}
+.shipment-item-picks em{color:var(--muted);font-size:11px;font-style:normal}
+.shipment-form-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:13px}
+.shipment-form-fields .wide{grid-column:1/-1}
+.shipment-form-fields label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted)}
+.shipment-form-fields input,.shipment-form-fields select{min-height:36px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--ink);font:12px var(--font-body)}
+@media(max-width:700px){.shipment-form-fields{grid-template-columns:minmax(0,1fr)}}

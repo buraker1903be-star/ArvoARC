@@ -1,3 +1,6 @@
+import { kargoDurumu, tedarikciGruplari } from "@/lib/kargo-bolme";
+import { KARGO_FIRMALARI } from "@/lib/kargo-firmalari";
+import { elleGonderiEkle, gonderiIptal } from "./gonderi-actions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
@@ -53,10 +56,12 @@ function AddressCard({title,address}:{title:string;address?:Address}){
 export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string;ok?:string}>}){
   const {id}=await params;const query=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
-  const [{data:order,error},{data:items,error:itemsError},{data:events,error:eventsError}]=await Promise.all([
+  const [{data:order,error},{data:items,error:itemsError},{data:events,error:eventsError},{data:shipments}]=await Promise.all([
     supabase.from("arc_orders").select("id,order_number,source,status,payment_status,customer_name,customer_email,currency,subtotal,tax,shipping,total,metadata,created_at,updated_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
     supabase.from("arc_order_items").select("id,product_name,sku,quantity,unit_price,total").eq("organization_id",organization.id).eq("order_id",id).order("product_name"),
-    supabase.from("arc_order_events").select("id,event_type,event_data,created_by,created_at").eq("organization_id",organization.id).eq("order_id",id).order("created_at",{ascending:false}).limit(50)
+    supabase.from("arc_order_events").select("id,event_type,event_data,created_by,created_at").eq("organization_id",organization.id).eq("order_id",id).order("created_at",{ascending:false}).limit(50),
+    /* Gönderiler ve kalemleri: bir sipariş birden çok firmaya bölünebiliyor. */
+    supabase.from("arc_shipments").select("id,sequence,source,status,carrier_code,carrier_name,tracking_number,tracking_url,supplier,shipped_at,failure_reason,arc_shipment_items(order_item_id,quantity)").eq("organization_id",organization.id).eq("order_id",id).order("sequence")
   ]);
   const canManage=["owner","admin","manager"].includes(membership.role);
   const meta=(order?.metadata??{}) as OrderMeta;
@@ -72,14 +77,27 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   */
   const skus=[...new Set((items??[]).map(item=>item.sku).filter(Boolean))];
   const {data:rateRows}=skus.length
-    ?await supabase.from("arc_product_variants").select("sku,arc_products(tax_rate)").eq("organization_id",organization.id).in("sku",skus)
+    ?await supabase.from("arc_product_variants").select("sku,supplier,arc_products(tax_rate)").eq("organization_id",organization.id).in("sku",skus)
     :{data:[]};
 
   const rateBySku=new Map<string,number>();
-  for(const row of (rateRows??[]) as unknown as Array<{sku:string;arc_products:{tax_rate:number|null}|{tax_rate:number|null}[]|null}>){
+  /* Tedarikçi sipariş kaleminde saklı değil, varyanttan geliyor; gönderi
+     önerisi kalemleri ona göre grupluyor (ayrı depo = ayrı paket). */
+  const supplierBySku=new Map<string,string|null>();
+  for(const row of (rateRows??[]) as unknown as Array<{sku:string;supplier:string|null;arc_products:{tax_rate:number|null}|{tax_rate:number|null}[]|null}>){
     const product=Array.isArray(row.arc_products)?row.arc_products[0]:row.arc_products;
     rateBySku.set(row.sku, product?.tax_rate ?? 20);
+    supplierBySku.set(row.sku,row.supplier??null);
   }
+
+  /* Gönderi bölümünün verisi: kalemler tedarikçileriyle, mevcut gönderiler
+     ve kargoya verilmemiş adetler. */
+  const kargoKalemleri=(items??[]).map(item=>({id:item.id,quantity:item.quantity,product_name:item.product_name,supplier:supplierBySku.get(item.sku)??null}));
+  const gonderiler=((shipments??[]) as Array<{id:string;sequence:number;source:string;status:string;carrier_code:string|null;carrier_name:string|null;tracking_number:string|null;tracking_url:string|null;supplier:string|null;shipped_at:string|null;failure_reason:string|null;arc_shipment_items:{order_item_id:string;quantity:number}[]|null}>)
+    .map(satir=>({...satir,items:satir.arc_shipment_items??[]}));
+  const gruplar=tedarikciGruplari(kargoKalemleri,gonderiler);
+  const kargoDurumuOzet=kargoDurumu(kargoKalemleri,gonderiler);
+  const kalemAdi=new Map((items??[]).map(item=>[item.id,item.product_name]));
 
   /* İndirim payı orantılı düşülür: müşteri indirimli tutarı
      ödedi, matrah da o tutar üzerinden olmalı. */
@@ -361,6 +379,70 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           <span>Ödeme türü <b>{meta.payment_method??"Kredi kartı"}</b></span>
           {meta.coupon_code?<span>İndirim kodu <b>{meta.coupon_code}</b></span>:null}
         </div>
+      </section>
+
+      {/*
+        GÖNDERİLER. Bir siparişin kalemleri farklı tedarikçilerden çıkıyor
+        (Tarzyeri, LR) ve ayrı depolardan sevk edildiği için tek gönderi
+        fiziksel olarak mümkün değil; her parçanın kendi firması ve takip
+        numarası oluyor.
+
+        Bu bölüm şimdilik TEDARİKÇİNİN KENDİ GÖNDERDİĞİ kayıtları alıyor:
+        elimize yalnızca takip numarası geliyor, OTO devreye girmiyor ve
+        bakiye harcanmıyor. tryOTO ile etiket üretme ayrı bir tur.
+      */}
+      <section className="ac ac-pad order-noprint">
+        <div className="ac-head">
+          <div><h3>Gönderiler</h3><p>{gonderiler.length?`${gonderiler.filter(g=>g.status!=="cancelled").length} gönderi · ${kargoDurumuOzet==="tamam"?"tüm ürünler kargoda":kargoDurumuOzet==="kismi"?"bir kısmı kargoda":"henüz kargoya verilmedi"}`:"Bu siparişte henüz gönderi yok."}</p></div>
+        </div>
+
+        {gonderiler.length?<ul className="shipment-list">
+          {gonderiler.map(gonderi=>
+            <li key={gonderi.id} data-durum={gonderi.status}>
+              <div className="shipment-head">
+                <b>{gonderi.sequence}. paket{gonderi.supplier?` · ${gonderi.supplier}`:""}</b>
+                <span>{gonderi.status==="cancelled"?"İptal":gonderi.status==="delivered"?"Teslim edildi":gonderi.source==="manual"?"Tedarikçi gönderdi":"Etiket üretildi"}</span>
+              </div>
+              <p>{gonderi.carrier_name??"Firma belirtilmedi"}{gonderi.tracking_number?` · ${gonderi.tracking_number}`:""}</p>
+              <p className="shipment-items">{gonderi.items.map(kalem=>`${kalemAdi.get(kalem.order_item_id)??"Ürün"} ×${kalem.quantity}`).join(" · ")||"Kalem yok"}</p>
+              {gonderi.failure_reason?<p className="shipment-error">{gonderi.failure_reason}</p>:null}
+              <div className="shipment-actions">
+                {gonderi.tracking_url?<a href={gonderi.tracking_url} target="_blank" rel="noreferrer">Kargo takip ↗</a>:null}
+                {canManage&&gonderi.status!=="cancelled"?<form action={gonderiIptal}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit">İptal et</button></form>:null}
+              </div>
+            </li>)}
+        </ul>:null}
+
+        {/*
+          Yeni gönderi TEDARİKÇİYE GÖRE öneriliyor: aynı depodan çıkanlar
+          bir pakette. Tamamı kargoya verilmiş tedarikçi burada hiç
+          görünmüyor.
+        */}
+        {canManage&&gruplar.length?<div className="shipment-new">
+          {gruplar.map(grup=>
+            <form key={grup.tedarikci??"belirsiz"} action={elleGonderiEkle} className="shipment-form">
+              <input type="hidden" name="order_id" value={order.id}/>
+              <input type="hidden" name="supplier" value={grup.tedarikci??""}/>
+              <h4>{grup.tedarikci??"Tedarikçisi belirsiz"}<small>{grup.toplamAdet} ürün kargoya verilmedi</small></h4>
+              <div className="shipment-item-picks">
+                {grup.kalemler.map(kalem=>
+                  <label key={kalem.id}>
+                    <span>{kalem.ad}</span>
+                    <input type="number" name={`kalem_${kalem.id}`} min={0} max={kalem.kalan} defaultValue={kalem.kalan}/>
+                    <em>/ {kalem.kalan}</em>
+                  </label>)}
+              </div>
+              <div className="shipment-form-fields">
+                <label>Kargo firması<select name="carrier_code" defaultValue="">
+                  <option value="" disabled>Seçin</option>
+                  {KARGO_FIRMALARI.map(firma=><option key={firma.kod} value={firma.kod}>{firma.ad}</option>)}
+                </select></label>
+                <label>Takip numarası<input name="tracking_number" placeholder="Tedarikçiden gelen numara" autoComplete="off"/></label>
+                <label className="wide">Takip adresi (isteğe bağlı)<input name="tracking_url" placeholder="Boş bırakılırsa firmanın sorgu sayfası kullanılır" autoComplete="off"/></label>
+              </div>
+              <button type="submit">Gönderiyi kaydet</button>
+            </form>)}
+        </div>:canManage?<p className="catalog-hint">Siparişteki bütün ürünler kargoya verilmiş.</p>:null}
       </section>
 
       {/*
