@@ -56,8 +56,17 @@ test("SKU: LR kimliğinden taban numara çıkarılıyor", () => {
     "20604". Birebir eşleşme önce deneniyor ki gerçekten "20604-201"
     diye kayıtlı bir ürün varsa kaçırılmasın.
   */
-  assert.deepEqual(skuAdaylari("20604-201"), ["20604-201", "20604"]);
-  assert.deepEqual(skuAdaylari("23113"), ["23113"]);
-  assert.deepEqual(skuAdaylari("  80935-117 "), ["80935-117", "80935"]);
+  assert.deepEqual(skuAdaylari("20604-201"), ["20604-201", "'20604-201", "20604", "'20604"]);
+  assert.deepEqual(skuAdaylari("23113"), ["23113", "'23113"]);
+  assert.deepEqual(skuAdaylari("  80935-117 "), ["80935-117", "'80935-117", "80935", "'80935"]);
   assert.deepEqual(skuAdaylari(""), []);
+});
+
+test("SKU: KESME İŞARETLİ kayıtlar da aday", () => {
+  /*
+    Katalogdaki LR SKU'ları "'20604" diye duruyor — sayıyı metin yapan
+    bir tablo programından geçmişler. İlk taramada 135 üründen 134'ü
+    bu yüzden eşleşmedi (27.09.2026).
+  */
+  assert.ok(skuAdaylari("20604-201").includes("'20604"), "taban numara kesme işaretiyle de aranıyor");
 });

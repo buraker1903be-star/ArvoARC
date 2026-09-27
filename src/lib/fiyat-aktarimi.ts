@@ -63,10 +63,22 @@ export function fiyatKarari(
   numara + varyant eki. ArvoARC'taki SKU'lar taban numara ("20604").
   Önce birebir, sonra tabandan eşleştiriliyor — birebir olanı
   kaçırmamak için o önce deneniyor.
+
+  KESME İŞARETİ. Katalogdaki LR SKU'ları "'20604" diye duruyor: sayıyı
+  metin yapmak için başına kesme işareti koyan bir tablo programından
+  geçmişler (CSV aktarımının klasik izi). İlk taramada 135 üründen
+  134'ü "katalogda bulunamadı" dedi, sebebi buydu (27.09.2026).
+
+  Veriyi düzeltmek yerine EŞLEŞTİRME hoşgörülü: SKU'lar sipariş
+  kalemlerinde, tedarikçi stok eşlemesinde ve dışa aktarımlarda da
+  geçiyor; 15.000 varyantın kimliğini toplu değiştirmek, bu ekranı
+  kurtarmak için başka yerleri kırmak olurdu.
 */
 export function skuAdaylari(lrKimligi: string): string[] {
   const sade = String(lrKimligi ?? "").trim();
   if (!sade) return [];
   const taban = sade.split("-")[0]!.trim();
-  return taban && taban !== sade ? [sade, taban] : [sade];
+  const temel = taban && taban !== sade ? [sade, taban] : [sade];
+  /* Birebir olan önce: "20604", "'20604", "20604-201"… sırası korunuyor. */
+  return temel.flatMap((aday) => [aday, `'${aday}`]);
 }
