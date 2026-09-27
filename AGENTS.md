@@ -51,6 +51,14 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   fonksiyonun döndürdüğü alanlar vitrinin sözleşmesidir.
 - **E-postaya giren her kullanıcı metni HTML'e kaçışla girer** (müşteri adı,
   not, adres).
+- **Panel kenar çubuğu HER İKİ TEMADA DA KOYU.** `--sidebar-from` ve
+  `--sidebar-to` açık temada da koyu lacivert. Oradaki metinler bu yüzden
+  tema belirteci (`--muted`, `--ink`) değil, sabit açık palet değeri
+  (`--n-100`, `--n-400`) kullanır; belirteç açık temada koyulaşır ve
+  koyu zeminde okunmaz. 27.09.2026'da bölüm başlıkları (`SATIŞ`,
+  `KATALOG`…) bu yüzden 3,2:1'deydi ve ilk düzeltme `--muted` dediği
+  için yalnızca koyu temayı kurtardı. Ham palet değeri burada hata
+  değil, doğru olanı.
 - **OTO çağrısının hatası yutulmaz.** 27.09.2026'da üç ayrı yerde boş
   `catch` vardı (konum listesi, etiket bilgisi, firma listesi) ve üçü de
   boş liste dönüyordu. Sonuç: kullanıcının OTO panelinde dört gönderici
