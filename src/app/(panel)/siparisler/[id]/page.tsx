@@ -141,7 +141,6 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         varisSehri:teslimatAdresi.city??"",
         agirlikKg:sorgulananAgirlik,
         ...olcu,
-        kapidaTahsilatKurus:order.payment_status==="paid"?null:order.total,
       })
     :{secenekler:[],hata:null};
 
@@ -476,7 +475,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                   {/* Hacimsel ağırlık gösteriliyor: fiyat gerçek ağırlıkla
                       bunun BÜYÜĞÜNDEN hesaplanıyor ve kullanıcı neden o
                       fiyatı gördüğünü ancak böyle anlıyor. */}
-                  <small>{(kargoAyarSatiri as {address_city?:string|null}|null)?.address_city||"?"} → {teslimatAdresi.city||"?"} · {sorgulananAgirlik} kg · hacimsel {hacimsel} kg{hacimsel>sorgulananAgirlik?" (fiyat buna göre)":""}{order.payment_status==="paid"?"":" · kapıda tahsilat"} · {kargoSecenekleri.length} seçenek</small>
+                  <small>{(kargoAyarSatiri as {address_city?:string|null}|null)?.address_city||"?"} → {teslimatAdresi.city||"?"} · {sorgulananAgirlik} kg · hacimsel {hacimsel} kg{hacimsel>sorgulananAgirlik?" (fiyat buna göre)":""} · {kargoSecenekleri.length} seçenek</small>
                 </form>
                 <form action={otoEtiketUret} className="shipment-oto">
                   <input type="hidden" name="order_id" value={order.id}/>

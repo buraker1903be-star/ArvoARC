@@ -262,7 +262,6 @@ export async function otoEtiketUret(formData: FormData) {
     siparisNo: order.order_number as string,
     sira: gonderi.sequence as number,
     paraBirimi: (order.currency as string) || "TRY",
-    odendi: order.payment_status === "paid",
     musteri: {
       ad: adres.name || (order.customer_name as string) || "",
       telefon: adres.phone || "",

@@ -141,6 +141,16 @@ export const hacimselAgirlik = (enCm: number, boyCm: number, yukseklikCm: number
 /** Kargo poşeti ölçüsü; OTO panelinde de varsayılan kutu bu. */
 export const VARSAYILAN_KUTU = { enCm: 35, boyCm: 30, yukseklikCm: 8 };
 
+/*
+  KAPIDA TAHSİLAT HİÇ GÖNDERİLMİYOR (totalDue yok).
+
+  ArvoARC'ta iki ödeme yöntemi var: PayTR (kart) ve havale/EFT. İkisinde
+  de parayı biz tahsil ediyoruz, kargocu değil. Ödenmemiş bir havale
+  siparişini "kapıda ödeme" sayıp totalDue göndermek canlıda iki hataya
+  yol açtı: fiyatlar kapıda ödeme ücretiyle (codCharge) şişti ve OTO
+  paneli "Kapıda ödeme: Hayır" derken burası tersini söylüyordu.
+*/
+
 /** checkOTODeliveryFee gövdesi. Ağırlık OTO'da kg ve zorunlu. */
 export function fiyatSorgusuGovdesi(girdi: {
   cikisSehri: string;
@@ -149,7 +159,6 @@ export function fiyatSorgusuGovdesi(girdi: {
   enCm?: number;
   boyCm?: number;
   yukseklikCm?: number;
-  kapidaTahsilatKurus?: number | null;
 }): Record<string, unknown> {
   /*
     PAKET ÖLÇÜLERİ GÖNDERİLİYOR. Doküman bunları "isteğe bağlı" sayıyor
@@ -184,8 +193,5 @@ export function fiyatSorgusuGovdesi(girdi: {
       girildiğinde fiyat da düzeliyor.
     */
     weight: girdi.agirlikKg > 0 ? girdi.agirlikKg : 1,
-    ...(girdi.kapidaTahsilatKurus && girdi.kapidaTahsilatKurus > 0
-      ? { totalDue: Math.round(girdi.kapidaTahsilatKurus) / 100 }
-      : {}),
   };
 }

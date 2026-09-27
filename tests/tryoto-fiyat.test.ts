@@ -110,13 +110,16 @@ test("sorgu gövdesi: ağırlık bilinmiyorsa 1 kg", () => {
   const govde = fiyatSorgusuGovdesi({ cikisSehri: "Bursa", varisSehri: "İstanbul", agirlikKg: 0 });
   assert.equal(govde.weight, 1);
   assert.equal(govde.originCity, "Bursa");
-  assert.equal("totalDue" in govde, false, "ödenmiş siparişte kapıda tahsilat gönderilmiyor");
 });
 
-test("kapıda tahsilat kuruştan ondalığa çevriliyor", () => {
-  const govde = fiyatSorgusuGovdesi({ cikisSehri: "A", varisSehri: "B", agirlikKg: 2, kapidaTahsilatKurus: 25100 });
-  assert.equal(govde.totalDue, 251);
-  assert.equal(govde.weight, 2);
+test("KAPIDA TAHSİLAT hiç gönderilmiyor", () => {
+  /*
+    ArvoARC'ta iki ödeme yöntemi var: kart ve havale. İkisinde de parayı
+    biz tahsil ediyoruz. Ödenmemiş havale siparişini "kapıda ödeme" sayıp
+    totalDue göndermek fiyatları codCharge ile şişiriyordu.
+  */
+  const govde = fiyatSorgusuGovdesi({ cikisSehri: "A", varisSehri: "B", agirlikKg: 2 });
+  assert.equal("totalDue" in govde, false);
 });
 
 test("PAKET ÖLÇÜLERİ sorguya giriyor, verilmezse varsayılan kutu", () => {

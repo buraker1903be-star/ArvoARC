@@ -13,7 +13,6 @@ const temel: GovdeGirdisi = {
   siparisNo: "AC-1042",
   sira: 1,
   paraBirimi: "TRY",
-  odendi: true,
   musteri: { ad: "Ayşe Yılmaz", telefon: "5551112233", adres: "Bağdat Cad. 1", sehir: "İstanbul" },
   kalemler: [{ ad: "Kupa", sku: "KUPA-1", adet: 2, birimFiyatKurus: 12550, toplamKurus: 25100 }],
   gondericiKodu: "depo-1",
@@ -25,20 +24,16 @@ test("kuruş ondalığa çevriliyor, kayıp yok", () => {
   assert.deepEqual((govde.items as Array<Record<string, unknown>>)[0].price, 125.5);
 });
 
-test("ÖDENMİŞ siparişte kapıda tahsilat sıfır", () => {
+test("KAPIDA TAHSİLAT YOK: amount_due her zaman sıfır", () => {
   /*
-    amount_due kapıda alınacak tutar. Ödenmiş siparişte toplamı yazmak,
-    kargocunun müşteriden bir kez daha para istemesi demek.
+    ArvoARC'ta iki ödeme yöntemi var: kart ve havale; ikisinde de parayı
+    biz tahsil ediyoruz, kargocu değil. Ödenmemiş havale siparişini
+    "kapıda ödeme" saymak, kargocunun müşteriden para istemesi demekti.
   */
   const govde = createOrderGovdesi(temel);
   assert.equal(govde.amount_due, 0);
   assert.equal(govde.payment_method, "paid");
-});
-
-test("ödenmemiş siparişte kapıda tahsilat toplam kadar", () => {
-  const govde = createOrderGovdesi({ ...temel, odendi: false });
-  assert.equal(govde.amount_due, 251);
-  assert.equal(govde.payment_method, "cod");
+  assert.equal(govde.amount, 251, "sipariş tutarı yine bildiriliyor (sigorta/beyan)");
 });
 
 test("orderId parça numarası taşıyor, parentOrderId sipariş numarası", () => {

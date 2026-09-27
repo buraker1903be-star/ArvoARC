@@ -17,8 +17,6 @@ export interface GovdeGirdisi {
   /** Gönderinin sipariş içindeki sırası (1'den başlar). */
   sira: number;
   paraBirimi: string;
-  /** Siparişin ödeme durumu; ödenmişse OTO'ya tahsilat yok diyoruz. */
-  odendi: boolean;
   musteri: {
     ad: string;
     telefon: string;
@@ -72,12 +70,16 @@ export function createOrderGovdesi(girdi: GovdeGirdisi): Record<string, unknown>
     currency: girdi.paraBirimi,
     amount: tutar(kalemToplami),
     /*
-      amount_due kapıda tahsil edilecek tutar. Sipariş ödenmişse SIFIR;
-      burayı toplamla doldurmak, kargocunun müşteriden bir kez daha para
-      istemesi demek.
+      KAPIDA TAHSİLAT YOK — amount_due her zaman SIFIR.
+
+      ArvoARC'ta iki ödeme yöntemi var: PayTR (kart) ve havale/EFT.
+      İkisinde de parayı biz tahsil ediyoruz, kargocu değil. Ödenmemiş
+      bir havale siparişini "kapıda ödeme" saymak, kargocunun müşteriden
+      para istemesi demekti; üstelik fiyatlar da kapıda ödeme ücretiyle
+      şişiyordu.
     */
-    amount_due: girdi.odendi ? 0 : tutar(kalemToplami),
-    payment_method: girdi.odendi ? "paid" : "cod",
+    amount_due: 0,
+    payment_method: "paid",
     // Arayüz ve bildirim dili; OTO en/ar/tr kabul ediyor.
     language: "tr",
     customer: {
