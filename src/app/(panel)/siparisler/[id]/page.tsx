@@ -1,6 +1,6 @@
 import { gonderiDurumEtiketi, kargoGorunumu, tedarikciGruplari } from "@/lib/kargo-bolme";
 import { KARGO_FIRMALARI } from "@/lib/kargo-firmalari";
-import { elleGonderiEkle, etiketiAl, gonderiIptal, kargoDurumlariniGuncelle, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
+import { elleGonderiEkle, etiketiAl, gonderiIptal, gonderiTeslimEdildi, kargoDurumlariniGuncelle, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
 import { teslimatSecenekleri } from "@/lib/tryoto/ayar";
 import { hacimselAgirlik, VARSAYILAN_KUTU } from "@/lib/tryoto/fiyat";
 import Link from "next/link";
@@ -557,6 +557,26 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                   yok, kalemleri yeniden bölünebilir saymak ikinci kez
                   göndermeye açık bırakırdı.
                 */}
+                {/*
+                  TESLİM EDİLDİ. Cron yalnızca tryOTO gönderilerini
+                  izliyor; tedarikçinin kendi gönderdiği paketten OTO
+                  haberdar değil ve o kayıtlar sonsuza kadar "Kargoda"
+                  kalıyordu. Kargo firmalarının takip sayfasını kazımak
+                  denenmedi: bugün Sürat'ın formunun yalnızca POST
+                  kabul ettiğini, MNG'nin alan adının öldüğünü ölçtük;
+                  tahmine dayalı izleme yanlış "teslim edildi" üretir.
+
+                  OTO gönderilerinde de duruyor — cron gecikirse ya da
+                  OTO durumu geç yazarsa elle kapatmak gerekebiliyor.
+                */}
+                {canManage&&!["cancelled","delivered"].includes(gonderi.status)&&gonderi.tracking_number?(
+                  <form action={gonderiTeslimEdildi}>
+                    <input type="hidden" name="order_id" value={order.id}/>
+                    <input type="hidden" name="shipment_id" value={gonderi.id}/>
+                    <button type="submit" className="shipment-delivered">Teslim edildi</button>
+                  </form>
+                ):null}
+
                 {canManage&&gonderi.status!=="cancelled"&&gonderi.status!=="delivered"?(
                   <form action={gonderiIptal}>
                     <input type="hidden" name="order_id" value={order.id}/>

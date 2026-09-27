@@ -391,3 +391,12 @@
    kart eskiden her durumu "Etiket üretildi" diye gösteriyordu. */
 .shipment-head span[data-durum="failed"]{background:color-mix(in srgb,var(--danger) 16%,transparent);color:var(--danger)}
 .shipment-head span[data-durum="delivered"]{background:color-mix(in srgb,var(--success) 16%,transparent);color:var(--success)}
+
+/* Teslim işaretleme: olumlu ve geri alınabilir bir işlem, iptalin
+   yanında sakin duruyor. */
+.shipment-delivered{
+  padding:4px 10px;border:1px solid color-mix(in srgb,var(--success) 45%,var(--line));
+  border-radius:8px;background:var(--surface);color:var(--success);
+  font-size:11px;font-weight:700;cursor:pointer;
+}
+.shipment-delivered:hover{background:color-mix(in srgb,var(--success) 12%,transparent)}

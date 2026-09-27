@@ -48,6 +48,7 @@ export const BASARILAR: Record<string, string> = {
   etiket: "Etiket üretildi.",
   "etiket-alindi": "Etiket alındı.",
   durum: "Sipariş durumu güncellendi.",
+  teslim: "Gönderi teslim edildi olarak işaretlendi.",
 };
 
 /*

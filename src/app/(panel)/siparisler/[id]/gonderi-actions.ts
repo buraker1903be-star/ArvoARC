@@ -823,3 +823,49 @@ export async function kargoDurumlariniGuncelle(formData: FormData) {
     ? await geriDon(orderId, { saved: `${guncellenen} gönderinin durumu güncellendi` })
     : await geriDon(orderId, { error: "Hiçbir gönderinin durumu alınamadı; kartlardaki sebebe bakın." });
 }
+
+
+/*
+  GÖNDERİYİ ELLE TESLİM EDİLDİ İŞARETLEME.
+
+  Cron yalnızca tryOTO gönderilerini izliyor (source = "oto"): OTO
+  tedarikçinin kendi gönderdiği paketten haberdar değil, sorgulanacak
+  bir OTO siparişi yok. Bu mağazada gönderilerin çoğu öyle — LR kendi
+  yolluyor, Tarzyeri etiketi alıp Sürat'a veriyor — ve o paketler
+  sonsuza kadar "Kargoda" kalıyordu (27.09.2026'da canlıda görüldü:
+  teslim edilmiş üç sipariş hâlâ kargoda görünüyordu).
+
+  Kargo firmalarının takip sayfalarını kazımak denenmedi ve
+  denenmemeli: bugün Sürat'ın formunun yalnızca POST kabul ettiğini,
+  MNG'nin alan adının öldüğünü ölçtük. Tahmine dayalı bir izleme,
+  yanlış "teslim edildi" üretir.
+*/
+export async function gonderiTeslimEdildi(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!MANAGERS.includes(membership.role)) return await geriDon(orderId, { error: "forbidden" });
+  const gonderiId = String(formData.get("shipment_id") ?? "");
+
+  const { data: gonderi } = await supabase.from("arc_shipments")
+    .select("id,status,delivered_at").eq("organization_id", organization.id).eq("id", gonderiId).maybeSingle();
+  if (!gonderi) return await geriDon(orderId, { error: "gonderi-bulunamadi" });
+  if (gonderi.status === "cancelled") {
+    return await geriDon(orderId, { error: "İptal edilmiş gönderi teslim edilmiş sayılamaz." });
+  }
+
+  const { error } = await supabase.from("arc_shipments").update({
+    status: "delivered",
+    /*
+      Teslim anı BİR KEZ yazılıyor: cron da aynı kuralı uyguluyor ve
+      her işaretlemede now() yazmak gerçek teslim zamanını son
+      tıklamanın zamanına kaydırırdı.
+    */
+    ...(gonderi.delivered_at ? {} : { delivered_at: new Date().toISOString() }),
+    failure_reason: null,
+  }).eq("id", gonderiId).eq("organization_id", organization.id);
+  if (error) return await geriDon(orderId, { error: error.message });
+
+  revalidatePath(`/siparisler/${orderId}`);
+  revalidatePath("/siparisler");
+  return await geriDon(orderId, { saved: "teslim" });
+}
