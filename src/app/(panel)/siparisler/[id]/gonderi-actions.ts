@@ -15,6 +15,7 @@ import { createOrderGovdesi, govdeSorunu } from "@/lib/tryoto/siparis-govdesi";
 import { gondericiCoz, gondericiEksigi, type GondericiBilgisi, type MagazaAdresSatiri } from "@/lib/tryoto/gonderici";
 import { durumOzeti, etiketHazir, etiketiCozumle, gonderiOzeti, type EtiketBilgisi } from "@/lib/tryoto/etiket";
 import { kargoBildirimiGonder } from "@/lib/kargo-bildirimi-gonder";
+import { siparisiKargoyaVerildiYap } from "@/lib/siparis-kargo-durumu";
 
 /*
   GÖNDERİ İŞLEMLERİ.
@@ -129,6 +130,7 @@ export async function elleGonderiEkle(formData: FormData) {
     Elle girilen gönderide takip numarası ZATEN dolu: tedarikçi kendi
     gönderdiğinde bize verdiği tek şey o. Bildirim burada gidiyor.
   */
+  await siparisiKargoyaVerildiYap(supabase, organization.id, orderId);
   await kargoBildirimiGonder(supabase, organization.id, orderId, gonderi.id);
 
   revalidatePath(`/siparisler/${orderId}`);
@@ -582,6 +584,7 @@ export async function otoEtiketUret(formData: FormData) {
     numarasız bir "siparişiniz kargoda" e-postası müşteriye hiçbir şey
     söylemez. Gönderim hatası etiketi geçersiz saymıyor.
   */
+  await siparisiKargoyaVerildiYap(supabase, organization.id, orderId);
   await kargoBildirimiGonder(supabase, organization.id, orderId, gonderiId);
 
   revalidatePath(`/siparisler/${orderId}`);
@@ -673,6 +676,7 @@ export async function etiketiAl(formData: FormData) {
   }).eq("id", gonderiId).eq("organization_id", organization.id);
 
   // Takip numarası ilk kez burada gelmiş olabilir: etiket gecikmeli üretiliyor.
+  await siparisiKargoyaVerildiYap(supabase, organization.id, orderId);
   await kargoBildirimiGonder(supabase, organization.id, orderId, gonderiId);
 
   revalidatePath(`/siparisler/${orderId}`);
@@ -739,6 +743,7 @@ export async function kargoDurumlariniGuncelle(formData: FormData) {
     Gönderi kimliği VERİLMİYOR: tek çağrıda birkaç pakete birden takip
     numarası yazılmış olabilir ve her biri için ayrı bildirim gerekiyor.
   */
+  await siparisiKargoyaVerildiYap(supabase, organization.id, orderId);
   await kargoBildirimiGonder(supabase, organization.id, orderId);
 
   revalidatePath(`/siparisler/${orderId}`);

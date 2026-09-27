@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bolmeSorunu, kalanAdetler, kargoDurumu, otoDurumunuCevir, tedarikciGruplari, izlenmeliMi, izlemeSuresiDoldu } from "@/lib/kargo-bolme";
+import { bolmeSorunu, kalanAdetler, kargoDurumu, otoDurumunuCevir, tedarikciGruplari, izlenmeliMi, izlemeSuresiDoldu, kargoyaVerildiMi } from "@/lib/kargo-bolme";
 
 /*
   Bölünmüş kargo hesabı. Sınanan şey "toplama biliyor mu" değil: bir
@@ -178,4 +178,25 @@ test("kargoya verilme tarihi yoksa süre dolmuş sayılmıyor", () => {
   */
   assert.equal(izlemeSuresiDoldu(null, new Date(), 30), false);
   assert.equal(izlemeSuresiDoldu("tarih değil", new Date(), 30), false);
+});
+
+test("KARGOYA VERİLDİ yalnızca her kalem gönderiye girince", () => {
+  /*
+    Bölünmüş kargoda ilk paket çıkınca durumu değiştirmek, müşteriye
+    siparişin tamamı yola çıktı demek olurdu; gelmeyen kalemi kayıp
+    sanar, panelde de kalan kalemin gönderisi unutulur.
+  */
+  assert.equal(kargoyaVerildiMi("processing", "tamam", false), true);
+  assert.equal(kargoyaVerildiMi("processing", "kismi", false), false);
+  assert.equal(kargoyaVerildiMi("processing", "yok", false), false);
+});
+
+test("kapanmış sipariş kargoya verilmiş sayılmıyor", () => {
+  // Parası geri gitmiş sipariş akışta ilerlemez.
+  assert.equal(kargoyaVerildiMi("processing", "tamam", true), false);
+});
+
+test("zaten kargoya verilmiş sipariş tekrar yazılmıyor", () => {
+  // Tekrar yazmak olay geçmişini aynı satırla kirletirdi.
+  assert.equal(kargoyaVerildiMi("fulfilled", "tamam", false), false);
 });

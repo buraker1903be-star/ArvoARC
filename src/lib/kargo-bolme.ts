@@ -142,6 +142,28 @@ export function otoDurumunuCevir(otoDurumu: string | null | undefined): string {
 }
 
 /*
+  SİPARİŞ "KARGOYA VERİLDİ"YE GEÇMELİ Mİ?
+
+  Kural: siparişin BÜTÜN kalemleri bir gönderiye girmiş olmalı. Bölünmüş
+  kargoda ilk paket çıkınca durumu değiştirmek yanlış olurdu — müşteri
+  siparişin tamamının yola çıktığını sanır ve gelmeyen kalemi kayıp
+  bilir. Panelde de kalan kalemler için gönderi oluşturulacağı unutulur.
+
+  Kapanmış sipariş (iptal, iade) akışta ilerlemez: parası geri gitmiş
+  sipariş kargoya verilmiş sayılamaz.
+*/
+export function kargoyaVerildiMi(
+  siparisDurumu: string | null | undefined,
+  kargo: KargoDurumu,
+  kapali: boolean,
+): boolean {
+  if (kapali) return false;
+  // Zaten kargoya verilmişse tekrar yazmak olay geçmişini kirletir.
+  if (siparisDurumu === "fulfilled") return false;
+  return kargo === "tamam";
+}
+
+/*
   İZLENECEK GÖNDERİ. Durumu OTO'ya sorulacak olanlar: taslak henüz OTO'da
   yok, iptal edilen gönderi yola çıkmayacak, teslim edilenin durumu
   değişmez. Üçünü sormak boşa çağrı, üstelik zamanlanmış görevde her

@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { izlemeSuresiDoldu, izlenmeliMi } from "@/lib/kargo-bolme";
 import { gonderiDurumunuYenile } from "@/lib/kargo-durumu-yenile";
 import { kargoBildirimiGonder } from "@/lib/kargo-bildirimi-gonder";
+import { siparisiKargoyaVerildiYap } from "@/lib/siparis-kargo-durumu";
 import { decryptSecret } from "@/lib/payment-credentials";
 
 /*
@@ -165,6 +166,7 @@ export async function GET(request: Request) {
   }
 
   for (const [orderId, magazaId] of bildirilecek) {
+    await siparisiKargoyaVerildiYap(supabase, magazaId, orderId);
     await kargoBildirimiGonder(supabase, magazaId, orderId);
   }
 
