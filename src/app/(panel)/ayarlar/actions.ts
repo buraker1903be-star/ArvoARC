@@ -50,16 +50,23 @@ async function magazaAdiTabani(
   organizationName:string,
 ){
   const {data}=await supabase.from("arc_store_settings").select("store_name").eq("organization_id",organizationId).maybeSingle();
-  if(data?.store_name?.trim())return {};
   /*
-    Kurum adı da boş olabiliyor. O durumda store_name alanı undefined
-    kalıyor, Supabase istemcisi undefined alanları gövdeye HİÇ koymuyor ve
-    INSERT yine "null value in column store_name" ile düşüyor — yani
-    yedeksiz bir kurum adı, düzeltmeyi olduğu gibi geçersiz kılıyor.
-    Sabit ad geçici: kullanıcı Mağaza bilgileri sekmesinden kendi adını
-    yazınca üzerine geçiyor.
+    store_name HER ZAMAN gönderiliyor — satır zaten varken bile.
+
+    "Satır varsa dokunmayalım" denendi ve ÇALIŞMADI (canlıda 27.09.2026).
+    Sebebi Postgres'in davranışı: INSERT … ON CONFLICT DO UPDATE önce
+    INSERT'i değerlendiriyor ve NOT NULL ihlali, çakışma kontrolünden ÖNCE
+    patlıyor. Yani satırın var olması upsert'i kurtarmıyor; gövdede
+    store_name yoksa her seferinde "null value in column store_name"
+    geliyor. Eksik satırları dolduran iki veri migration'ı bu yüzden
+    sorunu çözmedi (ikisi de "No rows returned" dedi: satırlar zaten
+    vardı).
+
+    Mevcut ad aynen geri yazılıyor, yani korunuyor. Kurum adı da boşsa
+    sabit bir ad kullanılıyor; kullanıcı Mağaza bilgileri sekmesinden
+    kendi adını girince üzerine geçiyor.
   */
-  return {store_name:organizationName?.trim()||"Mağaza"};
+  return {store_name:data?.store_name?.trim()||organizationName?.trim()||"Mağaza"};
 }
 
 export async function updateStoreSettings(formData:FormData){
