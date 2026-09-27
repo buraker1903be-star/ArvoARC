@@ -492,6 +492,24 @@ textarea.ac-input{resize:vertical;line-height:1.55}
 /* Sayısal sütunlar sağa yaslı: rakamlar hizalı okunsun. */
 .ac-line > span:nth-child(n+2){text-align:right}
 
+/*
+  DAR EKRANDA ÜÇ SÜTUN: ürün, adet, toplam.
+
+  Dokuz sütunluk fatura dökümü 317px'lik bir alana sığmıyor; sığdırmaya
+  çalışmak satırı 374px'e çıkarıyordu ve taşan kısım kesiliyordu
+  (.panel-root overflow-x:clip). Aradaki altı sütun — birim fiyat,
+  indirim, KDV — faturanın ayrıntısı; telefonda bakan kişinin sorusu
+  "hangi üründen kaç adet, ne tutuyor". Tam döküm masaüstünde ve
+  yazdırmada duruyor.
+
+  Başlık satırı da aynı ızgarayı kullandığı için aynı sütunlar gizleniyor;
+  hizalama bozulmuyor.
+*/
+@media(max-width:760px){
+  .ac-line{grid-template-columns:minmax(0,1fr) 40px minmax(0,auto)}
+  .ac-line > :nth-child(n+3):nth-child(-n+8){display:none}
+}
+
 .ac-line-head{
   border-top:0;
   padding-top:0;
