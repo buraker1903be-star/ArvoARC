@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { maliyetOnizle, maliyetUygula, type MaliyetOnizleme } from "./actions";
+import { maliyetOnizle, maliyetUygula, type FiyatGecisi, type MaliyetOnizleme } from "./actions";
 
 /*
   ALIŞ FİYATI AKTARIMI.
@@ -20,6 +20,14 @@ import { maliyetOnizle, maliyetUygula, type MaliyetOnizleme } from "./actions";
 const para = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 
 export function MaliyetAktarimi() {
+  /*
+    İKİ GEÇİŞ: LR'ın sayfasında girişliyken alış, çıkışken müşteri
+    fiyatı görünüyor. Hangisini yapıştırdığını kullanıcı söylüyor;
+    tahmin etmek, sayfa değişince sessizce yanlış fiyat yazmak demekti.
+  */
+  const [gecis, setGecis] = useState<FiyatGecisi>("alis");
+  /* LR kendi de satıyor: müşteri fiyatı TAVAN, biz altında kalıyoruz. */
+  const [indirim, setIndirim] = useState("30");
   const [metin, setMetin] = useState("");
   const [onizleme, setOnizleme] = useState<MaliyetOnizleme | null>(null);
   const [sonuc, setSonuc] = useState<string | null>(null);
@@ -28,13 +36,16 @@ export function MaliyetAktarimi() {
   const esleştir = () =>
     basla(async () => {
       setSonuc(null);
-      setOnizleme(await maliyetOnizle(metin));
+      setOnizleme(await maliyetOnizle(metin, gecis, Math.round(Number(indirim.replace(",", ".")) * 100) || 0));
     });
 
   const uygula = () =>
     basla(async () => {
       if (!onizleme?.eslesen.length) return;
-      const cevap = await maliyetUygula(onizleme.eslesen.map((s) => ({ sku: s.sku, kurus: s.yeni })));
+      const cevap = await maliyetUygula(
+        onizleme.eslesen.map((s) => ({ sku: s.sku, kurus: s.yeni, satis: s.satis, ustuCizili: s.ustuCizili })),
+        gecis,
+      );
       setSonuc(cevap.hata ?? `${cevap.yazilan} ürünün alış fiyatı güncellendi.`);
       setOnizleme(null);
       setMetin("");
@@ -44,10 +55,37 @@ export function MaliyetAktarimi() {
     <section className="ac ac-pad import-card">
       <div className="ac-head">
         <div>
-          <h3>Alış fiyatı aktarımı</h3>
-          <p>Tedarikçi portalındaki fiyat tablosunu kopyalayıp yapıştırın. Kâr hesabı bu fiyattan yapılıyor.</p>
+          <h3>LR fiyat aktarımı</h3>
+          <p>
+            LR portalındaki fiyat tablosunu kopyalayıp yapıştırın. <b>Girişliyken</b> gördüğünüz alış
+            fiyatını, <b>çıkışken</b> gördüğünüz müşteri fiyatını ayrı ayrı aktarın.
+          </p>
         </div>
       </div>
+
+      <div className="fiyat-gecis">
+        <label className="check-inline">
+          <input type="radio" name="gecis" checked={gecis === "alis"} onChange={() => { setGecis("alis"); setOnizleme(null); }} />
+          <span><b>Alış fiyatı</b><small>LR&apos;a giriş yapmışken görünen; kâr bundan hesaplanıyor</small></span>
+        </label>
+        <label className="check-inline">
+          <input type="radio" name="gecis" checked={gecis === "musteri"} onChange={() => { setGecis("musteri"); setOnizleme(null); }} />
+          <span><b>LR müşteri fiyatı</b><small>Çıkışken görünen; satabileceğiniz tavan</small></span>
+        </label>
+      </div>
+
+      {gecis === "musteri" ? (
+        <label className="fiyat-indirim">
+          LR fiyatının altında kalınacak tutar (₺)
+          <input
+            className="ac-input"
+            inputMode="decimal"
+            value={indirim}
+            onChange={(olay) => { setIndirim(olay.target.value); setOnizleme(null); }}
+          />
+          <small>Satış fiyatı = LR fiyatı − bu tutar. LR fiyatı üstü çizili görünür, yani vitrinde kampanya olur.</small>
+        </label>
+      ) : null}
 
       <label className="wide">
         Yapıştırılan satırlar
@@ -71,7 +109,7 @@ export function MaliyetAktarimi() {
         </button>
         {onizleme?.eslesen.length ? (
           <button className="ac-btn" type="button" onClick={uygula} disabled={calisiyor}>
-            {onizleme.eslesen.length} ürüne uygula
+            {onizleme.eslesen.filter((x) => !x.sorun).length} ürüne uygula
           </button>
         ) : null}
       </div>
@@ -89,8 +127,24 @@ export function MaliyetAktarimi() {
                     <span><b>{satir.ad}</b><small>{satir.sku}</small></span>
                     {/* Eski ve yeni yan yana: yanlış sütun kopyalandıysa
                         fark burada göze çarpar. */}
+                    {/*
+                      Müşteri geçişinde hesaplanan satış fiyatı ve üstü
+                      çizili değer gösteriliyor: kullanıcı vitrinde ne
+                      görüneceğini uygulamadan önce görüyor.
+                    */}
                     <em>
-                      {satir.eski ? para.format(satir.eski / 100) : "—"} → <b>{para.format(satir.yeni / 100)}</b>
+                      {satir.sorun ? (
+                        <span className="fiyat-sorun">{satir.sorun} · atlanacak</span>
+                      ) : satir.satis !== undefined ? (
+                        <>
+                          {satir.eski ? para.format(satir.eski / 100) : "—"} → <b>{para.format(satir.satis / 100)}</b>
+                          {satir.ustuCizili ? <s>{para.format(satir.ustuCizili / 100)}</s> : null}
+                        </>
+                      ) : (
+                        <>
+                          {satir.eski ? para.format(satir.eski / 100) : "—"} → <b>{para.format(satir.yeni / 100)}</b>
+                        </>
+                      )}
                     </em>
                   </li>
                 ))}

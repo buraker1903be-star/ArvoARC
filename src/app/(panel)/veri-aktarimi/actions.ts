@@ -5,6 +5,7 @@ import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { maliyetleriAyristir } from "@/lib/maliyet-aktarimi";
+import { fiyatKarari, skuAdaylari } from "@/lib/fiyat-aktarimi";
 import { copyShopifyImages } from "@/lib/product-images";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { parseMoneyToCents } from "@/lib/money";
@@ -247,25 +248,50 @@ export async function importHistoricalOrders(formData:FormData){
 
 
 /*
-  ALIŞ FİYATI AKTARIMI — iki adım: önce EŞLEŞTİR, sonra UYGULA.
+  LR FİYAT AKTARIMI — iki geçiş, iki adım.
 
-  Tek adımda yazmak tehlikeli: yapıştırılan metin yanlış sütundan
-  kopyalanmış olabilir (satış fiyatı, KDV'li tutar) ve maliyet yanlış
-  girilirse kâr sütunu sessizce yanlış çıkar. Kullanıcı neyin
-  değişeceğini ESKİ ve YENİ değerle görüp onaylıyor.
+  GEÇİŞ, çünkü hangi fiyatın hangisi olduğunu tahmin etmek yerine
+  kullanıcı söylüyor: LR'ın sayfasında girişliyken alış, çıkışken
+  müşteri fiyatı görünüyor. Aynı listeyi iki kez topluyoruz ve her
+  seferinde hangisi olduğunu seçiyoruz. Tahmin etmek, sayfa değişince
+  sessizce yanlış fiyat yazmak demekti.
 
-  LR'ın portalı fiyat listesi indirmiyor; otomatik giriş yapıp kazımak
-  denenmedi: şifre saklamayı gerektirir, portalın kullanım şartlarına
-  aykırı olması olası ve sessizce yanlış fiyat çekerse aynı hatayı
-  gürültüsüzce üretir.
+  ADIM, çünkü tek hamlede yazmak tehlikeli: yapıştırılan metin yanlış
+  sütundan kopyalanmış olabilir. Kullanıcı ESKİ → YENİ değerleri görüp
+  onaylıyor.
+
+  LR kendi de satış yapıyor: müşteri fiyatı TAVAN, satış fiyatı onun
+  altında (lib/fiyat-aktarimi.ts). LR kampanya yapınca tavan düşüyor ve
+  kampanya kendiliğinden vitrine yansıyor.
 */
+export type FiyatGecisi = "alis" | "musteri";
+
 export type MaliyetOnizleme = {
-  eslesen: { sku: string; ad: string; eski: number | null; yeni: number }[];
+  eslesen: {
+    sku: string;
+    ad: string;
+    eski: number | null;
+    yeni: number;
+    /** Müşteri geçişinde hesaplanan satış fiyatı ve üstü çizili değer. */
+    satis?: number;
+    ustuCizili?: number | null;
+    sorun?: string;
+  }[];
   eslesmeyen: string[];
   atlanan: string[];
 };
 
-export async function maliyetOnizle(metin: string): Promise<MaliyetOnizleme> {
+const SORUN_METNI: Record<string, string> = {
+  "tavan-yok": "LR fiyatı okunamadı",
+  "indirim-fiyati-asiyor": "indirim fiyatı sıfıra indiriyor",
+  "maliyetin-altinda": "satış fiyatı maliyetin altına düşüyor",
+};
+
+export async function maliyetOnizle(
+  metin: string,
+  gecis: FiyatGecisi = "alis",
+  indirimKurus = 0,
+): Promise<MaliyetOnizleme> {
   const { supabase, organization, membership } = await requireTenant();
   if (!["owner", "admin", "manager"].includes(membership.role)) {
     return { eslesen: [], eslesmeyen: [], atlanan: ["Bu işlem için yetkiniz yok."] };
@@ -274,34 +300,50 @@ export async function maliyetOnizle(metin: string): Promise<MaliyetOnizleme> {
   const { satirlar, atlanan } = maliyetleriAyristir(metin);
   if (!satirlar.length) return { eslesen: [], eslesmeyen: [], atlanan };
 
-  /* SKU eşleşmesi büyük/küçük harfe duyarsız: portaldan kopyalanan
-     metin farklı yazılmış olabiliyor. */
+  /*
+    LR'ın kimliği "20604-201" biçiminde, bizim SKU "20604": iki aday da
+    sorgulanıyor ve birebir eşleşme öncelikli.
+  */
+  const adaylar = [...new Set(satirlar.flatMap((s) => skuAdaylari(s.sku)))];
   const { data: varyantlar } = await supabase
     .from("arc_product_variants")
-    .select("sku,cost_price,title,arc_products(name)")
+    .select("sku,cost_price,price,compare_at_price,title,arc_products(name)")
     .eq("organization_id", organization.id)
-    .in("sku", satirlar.map((s) => s.sku));
+    .in("sku", adaylar);
 
-  type Varyant = { sku: string; cost_price: number | null; title: string | null; arc_products: { name: string } | { name: string }[] | null };
+  type Varyant = { sku: string; cost_price: number | null; price: number; compare_at_price: number | null; title: string | null; arc_products: { name: string } | { name: string }[] | null };
   const bySku = new Map(((varyantlar ?? []) as unknown as Varyant[]).map((v) => [v.sku, v]));
 
   const eslesen: MaliyetOnizleme["eslesen"] = [];
   const eslesmeyen: string[] = [];
   for (const satir of satirlar) {
-    const varyant = bySku.get(satir.sku);
+    const varyant = skuAdaylari(satir.sku).map((aday) => bySku.get(aday)).find(Boolean);
     if (!varyant) { eslesmeyen.push(satir.sku); continue; }
     const urun = Array.isArray(varyant.arc_products) ? varyant.arc_products[0] : varyant.arc_products;
+    const ad = [urun?.name, varyant.title].filter(Boolean).join(" · ") || varyant.sku;
+
+    if (gecis === "alis") {
+      eslesen.push({ sku: varyant.sku, ad, eski: varyant.cost_price, yeni: satir.kurus });
+      continue;
+    }
+
+    const sonuc = fiyatKarari(satir.kurus, indirimKurus, varyant.cost_price);
+    if ("sorun" in sonuc) {
+      eslesen.push({ sku: varyant.sku, ad, eski: varyant.price, yeni: satir.kurus, sorun: SORUN_METNI[sonuc.sorun] ?? sonuc.sorun });
+      continue;
+    }
     eslesen.push({
-      sku: satir.sku,
-      ad: [urun?.name, varyant.title].filter(Boolean).join(" · ") || satir.sku,
-      eski: varyant.cost_price,
-      yeni: satir.kurus,
+      sku: varyant.sku, ad, eski: varyant.price, yeni: satir.kurus,
+      satis: sonuc.karar.satis, ustuCizili: sonuc.karar.ustuCizili,
     });
   }
   return { eslesen, eslesmeyen, atlanan };
 }
 
-export async function maliyetUygula(satirlar: { sku: string; kurus: number }[]): Promise<{ yazilan: number; hata: string | null }> {
+export async function maliyetUygula(
+  satirlar: { sku: string; kurus: number; satis?: number; ustuCizili?: number | null }[],
+  gecis: FiyatGecisi = "alis",
+): Promise<{ yazilan: number; hata: string | null }> {
   const { supabase, organization, membership } = await requireTenant();
   if (!["owner", "admin", "manager"].includes(membership.role)) {
     return { yazilan: 0, hata: "Bu işlem için yetkiniz yok." };
@@ -311,13 +353,22 @@ export async function maliyetUygula(satirlar: { sku: string; kurus: number }[]):
   let yazilan = 0;
   for (const satir of satirlar) {
     /*
-      Sıfır ve eksi değer yazılmıyor: istemciden gelen listeye
-      güvenilmiyor, önizlemeden sonra değiştirilmiş olabilir.
+      İstemciden gelen listeye güvenilmiyor: önizlemeden sonra
+      değiştirilmiş olabilir. Sıfır ve eksi değer yazılmıyor.
     */
     if (!Number.isInteger(satir.kurus) || satir.kurus <= 0) continue;
+    const yazilacak =
+      gecis === "alis"
+        ? { cost_price: satir.kurus }
+        : /* Sorunlu satır önizlemede satış fiyatı taşımıyor; atlanıyor. */
+          satir.satis && satir.satis > 0
+          ? { price: satir.satis, compare_at_price: satir.ustuCizili ?? null }
+          : null;
+    if (!yazilacak) continue;
+
     const { error, count } = await supabase
       .from("arc_product_variants")
-      .update({ cost_price: satir.kurus, updated_at: new Date().toISOString() }, { count: "exact" })
+      .update({ ...yazilacak, updated_at: new Date().toISOString() }, { count: "exact" })
       .eq("organization_id", organization.id)
       .eq("sku", satir.sku);
     if (error) return { yazilan, hata: error.message };
