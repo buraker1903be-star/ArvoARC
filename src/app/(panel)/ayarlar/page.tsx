@@ -201,7 +201,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
           <div className="payment-title"><div><small>BAĞLANTI DURUMU</small><h4>Hesabınızda açık kargo firmaları</h4></div></div>
           {kargoBaglantisi.durum==="kapali"?<p className="catalog-hint">Entegrasyon kapalı. Etkinleştirip kaydedince firmalar burada listelenir.</p>
           :kargoBaglantisi.durum==="anahtar-yok"?<p className="catalog-hint">Yenileme anahtarı girilmemiş; bağlantı sınanamıyor.</p>
-          :kargoBaglantisi.durum==="hata"?<div className="security-note"><b>Bağlantı kurulamadı.</b><p>{kargoBaglantisi.mesaj}</p></div>
+          :kargoBaglantisi.durum==="hata"?<div className="security-note"><b>Bağlantı kurulamadı.</b><p>{kargoBaglantisi.mesaj}</p>{kargoBaglantisi.ham||kargoBaglantisi.durumKodu?<code>OTO yanıtı{kargoBaglantisi.durumKodu?` (HTTP ${kargoBaglantisi.durumKodu})`:""}: {kargoBaglantisi.ham??"gövdede mesaj yok"}</code>:null}</div>
           :kargoBaglantisi.firmalar.length?<>
             <ul className="tryoto-carriers">
               {kargoBaglantisi.firmalar.map(firma=><li key={firma.kod}><b>{firma.ad}</b><small>{firma.kod}</small>{firma.etkin===false?<span>kapalı</span>:null}</li>)}

@@ -40,7 +40,13 @@ export type BaglantiSonucu =
   | { durum: "kapali" }
   | { durum: "anahtar-yok" }
   | { durum: "basarili"; firmalar: KargoFirmasi[]; konumlar: GondericiKonumu[]; hamYanit: string | null }
-  | { durum: "hata"; mesaj: string };
+  /*
+    Ham mesaj ve durum kodu da taşınıyor. Yalnızca çeviriyi göstermek
+    teşhisi imkânsız kılıyordu: "kimlik doğrulaması reddedildi" hem
+    yanlış anahtardan hem OTO'nun kendi hatasından gelebiliyor ve ikisi
+    ekranda aynı görünüyordu.
+  */
+  | { durum: "hata"; mesaj: string; ham: string | null; durumKodu: number | null };
 
 /**
  * Kayıtlı anahtarla OTO'ya bağlanıp kargo firmalarını getirir.
@@ -94,9 +100,16 @@ export async function baglantiyiSina(magazaId: string, satir: AyarSatiri | null 
       hamYanit: firmalar.length ? null : JSON.stringify(govde).slice(0, 600),
     };
   } catch (hata) {
-    if (hata instanceof OtoHatasi) return { durum: "hata", mesaj: hata.message };
+    if (hata instanceof OtoHatasi) {
+      return { durum: "hata", mesaj: hata.message, ham: hata.hamMesaj, durumKodu: hata.durumKodu ?? null };
+    }
     // Şifre çözme hatası da buraya düşer: anahtar başka bir şifreleme
     // anahtarıyla yazılmışsa okunamaz ve bunu söylemek gerekir.
-    return { durum: "hata", mesaj: hata instanceof Error ? hata.message : "Bağlantı sınanamadı." };
+    return {
+      durum: "hata",
+      mesaj: hata instanceof Error ? hata.message : "Bağlantı sınanamadı.",
+      ham: null,
+      durumKodu: null,
+    };
   }
 }
