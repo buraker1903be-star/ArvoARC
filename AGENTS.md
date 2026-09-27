@@ -51,6 +51,19 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   fonksiyonun döndürdüğü alanlar vitrinin sözleşmesidir.
 - **E-postaya giren her kullanıcı metni HTML'e kaçışla girer** (müşteri adı,
   not, adres).
+- **OTO çağrısının hatası yutulmaz.** 27.09.2026'da üç ayrı yerde boş
+  `catch` vardı (konum listesi, etiket bilgisi, firma listesi) ve üçü de
+  boş liste dönüyordu. Sonuç: kullanıcının OTO panelinde dört gönderici
+  konumu varken ayar ekranı "konum tanımlı değil" diyordu, gönderiler
+  kayıtlı konum olmadan oluştu, OTO siparişi açıp gönderiyi ve etiketi
+  üretmedi ve sebep hiçbir ekranda görünmedi. Hata mesajı durum koduyla
+  birlikte gösterilir; 401 ile 403 ayrı şeylerdir ve HTTP 200 +
+  `success:false` üçüncü bir durumdur.
+- **OTO gönderisi kayıtlı bir GÖNDERİCİ KONUMU ister.** `senderInformation`
+  ile adresi tek tek yazmak siparişi açıyor ama gönderiyi açmıyor; etiket
+  hiç üretilmiyor. Ayrıca `createOrder` içindeki `createShipment:true`
+  bayrağı yoksayılıyor — gönderi ayrı `createShipment` çağrısıyla
+  (`orderId` + `deliveryOptionId`) açılır.
 - **Geri dönüş adresi doğrulanır**: başka bölüme ya da dış adrese
   yönlendirme engellenir, filtre ve sayfa korunur.
 
