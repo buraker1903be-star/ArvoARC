@@ -192,6 +192,16 @@ create table if not exists public.arc_payment_orders (
   updated_at timestamp with time zone not null
 );
 
+create table if not exists public.arc_price_collections (
+  id uuid not null,
+  organization_id uuid not null,
+  kaynak text not null,
+  satirlar jsonb not null,
+  sayfa text,
+  created_at timestamp with time zone not null,
+  uygulandi_at timestamp with time zone
+);
+
 create table if not exists public.arc_product_variants (
   id uuid not null,
   organization_id uuid not null,
@@ -3466,6 +3476,12 @@ alter table public.arc_payment_orders alter column status set default 'awaiting_
 
 alter table public.arc_payment_orders alter column updated_at set default now();
 
+alter table public.arc_price_collections alter column created_at set default now();
+
+alter table public.arc_price_collections alter column id set default gen_random_uuid();
+
+alter table public.arc_price_collections alter column kaynak set default 'lr'::text;
+
 alter table public.arc_product_variants alter column allow_backorder set default true;
 
 alter table public.arc_product_variants alter column attributes set default '{}'::jsonb;
@@ -3770,6 +3786,8 @@ alter table public.arc_payment_orders add constraint arc_payment_orders_pkey PRI
 
 alter table public.arc_payment_orders add constraint arc_payment_orders_status_check CHECK ((status = ANY (ARRAY['awaiting_payment'::text, 'paid'::text, 'failed'::text, 'cancelled'::text])));
 
+alter table public.arc_price_collections add constraint arc_price_collections_pkey PRIMARY KEY (id);
+
 alter table public.arc_product_variants add constraint arc_product_variants_attributes_check CHECK ((jsonb_typeof(attributes) = 'object'::text));
 
 alter table public.arc_product_variants add constraint arc_product_variants_compare_at_price_check CHECK (((compare_at_price IS NULL) OR (compare_at_price >= 0)));
@@ -3966,6 +3984,8 @@ CREATE INDEX arc_payment_orders_org_created_idx ON public.arc_payment_orders USI
 
 CREATE INDEX arc_payment_orders_status_idx ON public.arc_payment_orders USING btree (status, created_at DESC);
 
+CREATE INDEX arc_price_collections_org_idx ON public.arc_price_collections USING btree (organization_id, created_at DESC);
+
 CREATE INDEX arc_variants_org_product_idx ON public.arc_product_variants USING btree (organization_id, product_id);
 
 CREATE INDEX arc_variants_org_stock_idx ON public.arc_product_variants USING btree (organization_id, stock);
@@ -4074,6 +4094,8 @@ alter table public.arc_orders add constraint arc_orders_organization_id_fkey FOR
 
 alter table public.arc_orders add constraint arc_orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id);
 
+alter table public.arc_price_collections add constraint arc_price_collections_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
 alter table public.arc_product_variants add constraint arc_product_variants_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
 alter table public.arc_product_variants add constraint arc_product_variants_product_id_fkey FOREIGN KEY (product_id) REFERENCES arc_products(id) ON DELETE CASCADE;
@@ -4141,6 +4163,8 @@ alter table public.arc_order_items enable row level security;
 alter table public.arc_orders enable row level security;
 
 alter table public.arc_payment_orders enable row level security;
+
+alter table public.arc_price_collections enable row level security;
 
 alter table public.arc_product_variants enable row level security;
 
@@ -4339,6 +4363,19 @@ create policy "arc members read orders" on public.arc_orders as PERMISSIVE for S
 
 create policy arc_orders_customer_select on public.arc_orders as PERMISSIVE for SELECT to authenticated
   using ((user_id = auth.uid()));
+
+create policy arc_price_collections_member_read on public.arc_price_collections as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_price_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid))))));
+
+create policy arc_price_collections_member_update on public.arc_price_collections as PERMISSIVE for UPDATE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_price_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_price_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid))))));
 
 create policy "arc managers manage variants" on public.arc_product_variants as PERMISSIVE for ALL to authenticated
   using ((EXISTS ( SELECT 1

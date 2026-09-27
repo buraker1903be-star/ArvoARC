@@ -166,6 +166,15 @@
       "status",
       "updated_at"
     ],
+    "arc_price_collections": [
+      "created_at",
+      "id",
+      "kaynak",
+      "organization_id",
+      "satirlar",
+      "sayfa",
+      "uygulandi_at"
+    ],
     "arc_product_variants": [
       "allow_backorder",
       "attributes",
