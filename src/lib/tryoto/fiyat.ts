@@ -129,13 +129,38 @@ export function sehriSadelestir(ad: string): string {
     .trim();
 }
 
+/*
+  HACİMSEL AĞIRLIK: en × boy × yükseklik / 3000 (kargo sektörünün standart
+  böleni; OTO paneli de bunu kullanıyor — 35×30×8 için 2.80 gösteriyor).
+  OTO fiyatı gerçek ağırlıkla hacimselin BÜYÜĞÜ üzerinden hesaplıyor,
+  dokümanda da böyle yazıyor.
+*/
+export const hacimselAgirlik = (enCm: number, boyCm: number, yukseklikCm: number): number =>
+  enCm > 0 && boyCm > 0 && yukseklikCm > 0 ? Math.round(((enCm * boyCm * yukseklikCm) / 3000) * 100) / 100 : 0;
+
+/** Kargo poşeti ölçüsü; OTO panelinde de varsayılan kutu bu. */
+export const VARSAYILAN_KUTU = { enCm: 35, boyCm: 30, yukseklikCm: 8 };
+
 /** checkOTODeliveryFee gövdesi. Ağırlık OTO'da kg ve zorunlu. */
 export function fiyatSorgusuGovdesi(girdi: {
   cikisSehri: string;
   varisSehri: string;
   agirlikKg: number;
+  enCm?: number;
+  boyCm?: number;
+  yukseklikCm?: number;
   kapidaTahsilatKurus?: number | null;
 }): Record<string, unknown> {
+  /*
+    PAKET ÖLÇÜLERİ GÖNDERİLİYOR. Doküman bunları "isteğe bağlı" sayıyor
+    ama ölçüsüz sorgu canlıda HİÇ seçenek döndürmedi (27.09.2026): OTO
+    paneli de aynı adımda ölçüyü zorunlu alan olarak istiyor ve hacimsel
+    ağırlığı ondan hesaplıyor. Ölçü verilmeyince firmalar fiyat
+    veremiyor.
+  */
+  const en = girdi.enCm && girdi.enCm > 0 ? girdi.enCm : VARSAYILAN_KUTU.enCm;
+  const boy = girdi.boyCm && girdi.boyCm > 0 ? girdi.boyCm : VARSAYILAN_KUTU.boyCm;
+  const yukseklik = girdi.yukseklikCm && girdi.yukseklikCm > 0 ? girdi.yukseklikCm : VARSAYILAN_KUTU.yukseklikCm;
   return {
     originCity: girdi.cikisSehri,
     destinationCity: girdi.varisSehri,
@@ -146,6 +171,9 @@ export function fiyatSorgusuGovdesi(girdi: {
       seçenek tam olarak o türde işaretli değil. Filtresiz sorgu OTO'nun
       döndürebildiği her şeyi veriyor.
     */
+    length: boy,
+    width: en,
+    height: yukseklik,
     // Tahmini teslim tarihi seçimi kolaylaştırıyor; ek maliyeti yok.
     includeEstimatedDates: true,
     packageCount: 1,

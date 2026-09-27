@@ -225,6 +225,18 @@ export async function otoEtiketUret(formData: FormData) {
   const secenekId = ayrac >= 0 ? secenekHam.slice(0, ayrac) : secenekHam;
   const secilenFirma = ayrac >= 0 ? secenekHam.slice(ayrac + 1).trim() : "";
   const agirlik = Number(String(formData.get("weight") ?? "").trim());
+  /*
+    Ölçüler fiyat sorgusundakiyle AYNI değerlerle gidiyor: OTO fiyatı
+    hacimsel ağırlıktan hesaplıyor ve etiket farklı ölçüyle üretilirse
+    gerçekleşen ücret seçilenden sapar.
+  */
+  const sayi = (ad: string) => {
+    const deger = Number(String(formData.get(ad) ?? "").trim());
+    return Number.isFinite(deger) && deger > 0 ? deger : null;
+  };
+  const enCm = sayi("en");
+  const boyCm = sayi("boy");
+  const yukseklikCm = sayi("yuk");
 
   const ayar = await kargoAyari(supabase, organization.id);
   if (!ayar) return geriDon(orderId, { error: "tryoto-kapali" });
@@ -276,6 +288,9 @@ export async function otoEtiketUret(formData: FormData) {
     gonderici: null,
     teslimatSecenegiId: secenekId || null,
     agirlikKg: Number.isFinite(agirlik) && agirlik > 0 ? agirlik : null,
+    enCm,
+    boyCm,
+    yukseklikCm,
   };
 
   const govdeHatasi = govdeSorunu(girdi);

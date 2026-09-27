@@ -2,6 +2,7 @@ import { kargoDurumu, tedarikciGruplari } from "@/lib/kargo-bolme";
 import { KARGO_FIRMALARI } from "@/lib/kargo-firmalari";
 import { elleGonderiEkle, gonderiIptal, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
 import { teslimatSecenekleri } from "@/lib/tryoto/ayar";
+import { hacimselAgirlik, VARSAYILAN_KUTU } from "@/lib/tryoto/fiyat";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
@@ -54,7 +55,7 @@ function AddressCard({title,address}:{title:string;address?:Address}){
   return <article className="ac order-party"><small>{title}</small>{lines.length?lines.map((line,index)=><p key={index}>{line}</p>):<p className="is-empty">Bilgi bulunmuyor.</p>}</article>;
 }
 
-export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string;ok?:string;agirlik?:string}>}){
+export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string;ok?:string;agirlik?:string;en?:string;boy?:string;yuk?:string}>}){
   const {id}=await params;const query=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const [{data:order,error},{data:items,error:itemsError},{data:events,error:eventsError},{data:shipments}]=await Promise.all([
@@ -118,6 +119,18 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     ve fiyatlar o ağırlıkla geliyor.
   */
   const sorgulananAgirlik=Math.min(Math.max(Number(query.agirlik??"1")||1,0.1),100);
+  /*
+    PAKET ÖLÇÜSÜ de sorguya giriyor. Ölçüsüz sorgu hiç seçenek
+    döndürmüyordu: OTO fiyatı gerçek ağırlıkla hacimsel ağırlığın
+    büyüğünden hesaplıyor ve ölçü olmadan hacimseli bilemiyor.
+    Varsayılan kargo poşeti ölçüsü (OTO panelindeki varsayılanla aynı).
+  */
+  const olcu={
+    enCm:Math.min(Math.max(Number(query.en??VARSAYILAN_KUTU.enCm)||VARSAYILAN_KUTU.enCm,1),200),
+    boyCm:Math.min(Math.max(Number(query.boy??VARSAYILAN_KUTU.boyCm)||VARSAYILAN_KUTU.boyCm,1),200),
+    yukseklikCm:Math.min(Math.max(Number(query.yuk??VARSAYILAN_KUTU.yukseklikCm)||VARSAYILAN_KUTU.yukseklikCm,1),200),
+  };
+  const hacimsel=hacimselAgirlik(olcu.enCm,olcu.boyCm,olcu.yukseklikCm);
   const {data:kargoAyarSatiri}=taslaklar.length
     ?await supabase.from("arc_store_settings").select("tryoto_enabled,tryoto_refresh_token_enc,tryoto_pickup_location_code,tryoto_test_mode,address_city").eq("organization_id",organization.id).maybeSingle()
     :{data:null};
@@ -127,6 +140,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         cikisSehri:String((kargoAyarSatiri as {address_city?:string|null}|null)?.address_city??""),
         varisSehri:teslimatAdresi.city??"",
         agirlikKg:sorgulananAgirlik,
+        ...olcu,
         kapidaTahsilatKurus:order.payment_status==="paid"?null:order.total,
       })
     :{secenekler:[],hata:null};
@@ -455,8 +469,14 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
               {canManage&&gonderi.source==="oto"&&gonderi.status==="draft"?<>
                 <form method="get" className="shipment-weight">
                   <label>Ağırlık (kg)<input name="agirlik" type="number" step="0.1" min="0.1" max="100" defaultValue={sorgulananAgirlik}/></label>
+                  <label>En (cm)<input name="en" type="number" min="1" max="200" defaultValue={olcu.enCm}/></label>
+                  <label>Boy (cm)<input name="boy" type="number" min="1" max="200" defaultValue={olcu.boyCm}/></label>
+                  <label>Yükseklik (cm)<input name="yuk" type="number" min="1" max="200" defaultValue={olcu.yukseklikCm}/></label>
                   <button type="submit">Fiyatları yenile</button>
-                  <small>{(kargoAyarSatiri as {address_city?:string|null}|null)?.address_city||"?"} → {teslimatAdresi.city||"?"} · {sorgulananAgirlik} kg{order.payment_status==="paid"?"":" · kapıda tahsilat"} · {kargoSecenekleri.length} seçenek</small>
+                  {/* Hacimsel ağırlık gösteriliyor: fiyat gerçek ağırlıkla
+                      bunun BÜYÜĞÜNDEN hesaplanıyor ve kullanıcı neden o
+                      fiyatı gördüğünü ancak böyle anlıyor. */}
+                  <small>{(kargoAyarSatiri as {address_city?:string|null}|null)?.address_city||"?"} → {teslimatAdresi.city||"?"} · {sorgulananAgirlik} kg · hacimsel {hacimsel} kg{hacimsel>sorgulananAgirlik?" (fiyat buna göre)":""}{order.payment_status==="paid"?"":" · kapıda tahsilat"} · {kargoSecenekleri.length} seçenek</small>
                 </form>
                 <form action={otoEtiketUret} className="shipment-oto">
                   <input type="hidden" name="order_id" value={order.id}/>
@@ -477,6 +497,9 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                         etiket de onunla üretilmeli, yoksa seçilen fiyatla
                         gerçekleşen fiyat tutmaz. */}
                     <input type="hidden" name="weight" value={sorgulananAgirlik}/>
+                    <input type="hidden" name="en" value={olcu.enCm}/>
+                    <input type="hidden" name="boy" value={olcu.boyCm}/>
+                    <input type="hidden" name="yuk" value={olcu.yukseklikCm}/>
                     <button type="submit">Etiket üret</button>
                   </>:<p className="shipment-error">{kargoFiyatHatasi??"Bu adres için kargo seçeneği dönmedi. Teslimat şehrini ve mağaza ayarlarındaki çıkış şehrini kontrol edin."}</p>}
                 </form></>:null}

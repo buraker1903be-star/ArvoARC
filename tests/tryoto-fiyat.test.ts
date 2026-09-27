@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fiyatSorgusuGovdesi, secenekleriCozumle, sehriSadelestir } from "@/lib/tryoto/fiyat";
+import { fiyatSorgusuGovdesi, hacimselAgirlik, secenekleriCozumle, sehriSadelestir } from "@/lib/tryoto/fiyat";
 
 /*
   Teslimat seçenekleri. Gönderi oluştururken kullanılabilir firmalar
@@ -117,4 +117,27 @@ test("kapıda tahsilat kuruştan ondalığa çevriliyor", () => {
   const govde = fiyatSorgusuGovdesi({ cikisSehri: "A", varisSehri: "B", agirlikKg: 2, kapidaTahsilatKurus: 25100 });
   assert.equal(govde.totalDue, 251);
   assert.equal(govde.weight, 2);
+});
+
+test("PAKET ÖLÇÜLERİ sorguya giriyor, verilmezse varsayılan kutu", () => {
+  /*
+    Ölçüsüz sorgu canlıda hiç seçenek döndürmedi: OTO fiyatı gerçek
+    ağırlıkla hacimsel ağırlığın büyüğünden hesaplıyor ve ölçü olmadan
+    hacimseli bilemiyor. Doküman alanları "isteğe bağlı" sayıyor ama
+    pratikte gerekli.
+  */
+  const varsayilan = fiyatSorgusuGovdesi({ cikisSehri: "A", varisSehri: "B", agirlikKg: 1 });
+  assert.equal(varsayilan.width, 35);
+  assert.equal(varsayilan.length, 30);
+  assert.equal(varsayilan.height, 8);
+
+  const ozel = fiyatSorgusuGovdesi({ cikisSehri: "A", varisSehri: "B", agirlikKg: 1, enCm: 50, boyCm: 40, yukseklikCm: 20 });
+  assert.equal(ozel.width, 50);
+  assert.equal(ozel.height, 20);
+});
+
+test("hacimsel ağırlık OTO panelindeki hesapla aynı", () => {
+  // Panelde 35×30×8 için 2.80 gösteriliyor; bölen 3000.
+  assert.equal(hacimselAgirlik(35, 30, 8), 2.8);
+  assert.equal(hacimselAgirlik(0, 30, 8), 0, "eksik ölçüde hesap yok");
 });

@@ -44,6 +44,14 @@ export interface GovdeGirdisi {
   teslimatSecenegiId?: string | null;
   /** Toplam paket ağırlığı (kg); bilinmiyorsa gönderilmiyor. */
   agirlikKg?: number | null;
+  /*
+    Paket ölçüleri (cm). Fiyat sorgusundakiyle aynı olmalı: OTO ücreti
+    hacimsel ağırlıktan hesaplıyor ve etiket farklı ölçüyle üretilirse
+    gerçekleşen ücret seçilenden sapar.
+  */
+  enCm?: number | null;
+  boyCm?: number | null;
+  yukseklikCm?: number | null;
 }
 
 /** Kuruş → OTO'nun beklediği ondalık tutar. */
@@ -113,6 +121,11 @@ export function createOrderGovdesi(girdi: GovdeGirdisi): Record<string, unknown>
 
   if (girdi.teslimatSecenegiId) govde.deliveryOptionId = girdi.teslimatSecenegiId;
   if (girdi.agirlikKg && girdi.agirlikKg > 0) govde.packageWeight = girdi.agirlikKg;
+  if (girdi.enCm && girdi.boyCm && girdi.yukseklikCm) {
+    govde.boxWidth = girdi.enCm;
+    govde.boxLength = girdi.boyCm;
+    govde.boxHeight = girdi.yukseklikCm;
+  }
   return govde;
 }
 
