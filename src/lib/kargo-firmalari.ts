@@ -21,12 +21,42 @@ export interface KargoFirmasiTanimi {
   takipSablonu: string | null;
 }
 
+/*
+  ŞABLONLAR 27.09.2026'DA TEK TEK AÇILIP SINANDI. Bu bağlantılar
+  müşteriye gidiyor (kargo bildirimi e-postası ve vitrindeki sipariş
+  sayfası); çalışmayan bir bağlantı müşteriyi destek kanalına yolluyor.
+  Sonuçlar satır satır yazılı, çünkü kargo firmalarının adresleri
+  değişiyor ve bir sonraki değişiklikte neyin sınandığı bilinmeli.
+
+  İkisi ÖLÜYDÜ: mngkargo.com.tr takip alt alanı DHL eCommerce'in ana
+  sayfasına, gonderitakip.ptt.gov.tr de PTT ana sayfasına atıyordu.
+*/
 export const KARGO_FIRMALARI: KargoFirmasiTanimi[] = [
+  // ✓ Numarayı alana yazıyor VE sorguyu çalıştırıyor.
   { kod: "yurtici", ad: "Yurtiçi Kargo", takipSablonu: "https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code={no}" },
-  { kod: "surat", ad: "Sürat Kargo", takipSablonu: "https://www.suratkargo.com.tr/KargoTakip/?kargotakipno={no}" },
+  /*
+    Doğru sayfa ama takip formu YALNIZCA POST kabul ediyor
+    (action="/KargoTakip/" method="post"); adresle numara taşımanın yolu
+    yok. Müşteri numarayı yapıştırıyor — e-postada ve vitrinde numara
+    bağlantının hemen yanında yazılı.
+  */
+  { kod: "surat", ad: "Sürat Kargo", takipSablonu: "https://www.suratkargo.com.tr/KargoTakip/" },
+  // ✓ Sorguyu çalıştırıyor.
   { kod: "aras", ad: "Aras Kargo", takipSablonu: "https://kargotakip.araskargo.com.tr/mainpage.aspx?code={no}" },
-  { kod: "mng", ad: "MNG Kargo", takipSablonu: "https://kargotakip.mngkargo.com.tr/?q={no}" },
-  { kod: "ptt", ad: "PTT Kargo", takipSablonu: "https://gonderitakip.ptt.gov.tr/Track/Verify?q={no}" },
+  /*
+    MNG artık DHL eCommerce. Eski adres (kargotakip.mngkargo.com.tr)
+    takip sayfasına değil DHL ANA SAYFASINA atıyordu. Yeni sayfa doğru
+    ama numarayı adresten okumuyor ve ayrıca doğrulama kodu istiyor.
+  */
+  { kod: "mng", ad: "MNG Kargo", takipSablonu: "https://www.dhlecommerce.com.tr/gonderitakip" },
+  /*
+    Eski adres (gonderitakip.ptt.gov.tr/Track/Verify) ana sayfaya
+    yönleniyor. Ana sayfada takip alanı var, yani yönlendirme çalışıyor;
+    yine de bayat alt alana güvenmek yerine hedef doğrudan yazıldı.
+    Numara adresten okunmuyor.
+  */
+  { kod: "ptt", ad: "PTT Kargo", takipSablonu: "https://www.ptt.gov.tr/" },
+  // Sınanmadı: bu mağazada UPS ile gönderi yapılmıyor.
   { kod: "ups", ad: "UPS Kargo", takipSablonu: "https://www.ups.com/track?loc=tr_TR&tracknum={no}" },
   // Şablonu bilinmeyen firma da seçilebilmeli: numara yine kaydedilir,
   // yalnızca tıklanabilir bağlantı olmaz.
