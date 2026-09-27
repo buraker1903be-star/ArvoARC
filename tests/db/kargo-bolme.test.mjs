@@ -207,3 +207,64 @@ describe("bölünmüş kargo · mağaza kapsamı", () => {
       );
     }));
 });
+
+describe("gönderi kaynağı", () => {
+  test("TEDARİKÇİNİN KENDİ gönderdiği kayıt takip numarasız olamıyor", () =>
+    islem(db, async () => {
+      /*
+        Kaynağı "manual" olan gönderinin tek işe yarar bilgisi takip
+        numarası: etiketi yok, OTO kaydı yok, sorgulanamaz. Numarasız
+        kaydedilirse müşteriye söylenecek hiçbir şey olmadan sipariş
+        "kargolandı" görünürdü.
+      */
+      await tohum();
+      await rol(db, "authenticated", UYE);
+      await reddedilir(
+        db,
+        `insert into public.arc_shipments (organization_id, order_id, source, status)
+         values ($1, $2, 'manual', 'created')`,
+        [KURUM, SIPARIS],
+        /takip numarası zorunludur/i,
+      );
+    }));
+
+  test("numara verilince elle gönderi kaydediliyor", () =>
+    islem(db, async () => {
+      await tohum();
+      await rol(db, "authenticated", UYE);
+      const { rows } = await db.query(
+        `insert into public.arc_shipments
+           (organization_id, order_id, source, status, carrier_code, tracking_number, supplier)
+         values ($1, $2, 'manual', 'created', 'yurtici', '1234567890', 'LR') returning id, source, supplier`,
+        [KURUM, SIPARIS],
+      );
+      assert.equal(rows[0].source, "manual");
+      assert.equal(rows[0].supplier, "LR");
+    }));
+
+  test("OTO gönderisi numarasız açılabiliyor (numara sonra düşüyor)", () =>
+    islem(db, async () => {
+      // Önce taslak açılıyor, firma seçilince numara geliyor.
+      await tohum();
+      await rol(db, "authenticated", UYE);
+      const { rows } = await db.query(
+        `insert into public.arc_shipments (organization_id, order_id, source, status)
+         values ($1, $2, 'oto', 'draft') returning id`,
+        [KURUM, SIPARIS],
+      );
+      assert.equal(rows.length, 1);
+    }));
+
+  test("tanınmayan kaynak reddediliyor", () =>
+    islem(db, async () => {
+      await tohum();
+      await rol(db, "authenticated", UYE);
+      await reddedilir(
+        db,
+        `insert into public.arc_shipments (organization_id, order_id, source, status)
+         values ($1, $2, 'baska', 'created')`,
+        [KURUM, SIPARIS],
+        /source_check/i,
+      );
+    }));
+});

@@ -32,6 +32,27 @@ function domainErrorCode(error:{code?:string|null;message?:string}){
   return error.code??error.message??"unknown";
 }
 
+/*
+  arc_store_settings.store_name NOT NULL ve VARSAYILANI YOK; tablodaki öbür
+  zorunlu sütunların hepsinde varsayılan var. Ayar satırı hiç oluşmamış bir
+  mağazada upsert INSERT'e düşüyor ve "null value in column store_name" ile
+  hata veriyor. Canlıda tryOTO anahtarı kaydedilirken çıktı (27.09.2026)
+  ama hata ödeme, satış ve alan adı formlarının hepsinde vardı: yeni bir
+  mağaza hangi ayar sekmesine ÖNCE girerse orada patlıyordu. Yalnızca
+  "Mağaza bilgileri" formu store_name gönderdiği için fark edilmemişti.
+
+  Mevcut satırda ad varsa DOKUNULMUYOR: kullanıcının koyduğu mağaza adını
+  başka bir sekmenin kaydı ezmemeli.
+*/
+async function magazaAdiTabani(
+  supabase:Awaited<ReturnType<typeof requireTenant>>["supabase"],
+  organizationId:string,
+  organizationName:string,
+){
+  const {data}=await supabase.from("arc_store_settings").select("store_name").eq("organization_id",organizationId).maybeSingle();
+  return data?.store_name?{}:{store_name:organizationName};
+}
+
 export async function updateStoreSettings(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))redirect("/ayarlar?error=forbidden");
@@ -75,6 +96,7 @@ export async function updateSalesSettings(formData:FormData){
 
   const {error}=await supabase.from("arc_store_settings").upsert({
     organization_id:organization.id,
+    ...(await magazaAdiTabani(supabase,organization.id,organization.name)),
     order_prefix:prefix,
     shipping_fee:Math.round(shippingFee*100),
     free_shipping_threshold:Math.round(freeThreshold*100),
@@ -136,6 +158,7 @@ export async function updatePaymentSettings(formData:FormData){
      çıkar — PayTR anahtarları hiçbir yere yazılmamış olur. */
   const {error}=await supabase.from("arc_store_settings").upsert({
     organization_id:organization.id,
+    ...(await magazaAdiTabani(supabase,organization.id,organization.name)),
     bank_transfer_enabled:bankTransferEnabled,bank_name:bankName||null,bank_account_holder:bankAccountHolder||null,
     bank_iban:bankIban||null,bank_transfer_instructions:bankTransferInstructions||null,
     paytr_enabled:paytrEnabled,paytr_test_mode:paytrTestMode,paytr_merchant_id:paytrMerchantId||null,
@@ -198,6 +221,7 @@ export async function updatePanelDomainSettings(formData:FormData){
   catch(error){redirect(`/ayarlar?error=${encodeURIComponent(error instanceof Error?error.message:"Vercel alan adı eklenemedi")}`);}
   const {error}=await supabase.from("arc_store_settings").upsert({
     organization_id:organization.id,
+    ...(await magazaAdiTabani(supabase,organization.id,organization.name)),
     panel_custom_domain:panelDomain,panel_domain_status:provision.active?"active":"pending_dns",
     panel_domain_verification_token:`arvo-verification=${randomUUID().replace(/-/g,"")}`,
     panel_domain_verified_at:provision.active?new Date().toISOString():null,updated_at:new Date().toISOString()
@@ -226,6 +250,7 @@ export async function updateStorefrontDomainSettings(formData:FormData){
   const storefrontUrl=customDomain?`https://${customDomain}`:`https://${platformSubdomain}.shop.arvo-os.com`;
   const {error}=await supabase.from("arc_store_settings").upsert({
     organization_id:organization.id,
+    ...(await magazaAdiTabani(supabase,organization.id,organization.name)),
     custom_domain:customDomain||null,platform_subdomain:platformSubdomain||null,
     domain_status:customDomain?(provision?.active?"active":"pending_dns"):"active",domain_verification_token:customDomain?token:null,
     domain_verified_at:customDomain&&provision?.active?new Date().toISOString():customDomain?null:new Date().toISOString(),storefront_url:storefrontUrl,updated_at:new Date().toISOString()
@@ -295,6 +320,7 @@ export async function updateShippingIntegration(formData:FormData){
      ekranda "kaydedildi" yazar, anahtar hiçbir yere yazılmamış olur. */
   const {error}=await supabase.from("arc_store_settings").upsert({
     organization_id:organization.id,
+    ...(await magazaAdiTabani(supabase,organization.id,organization.name)),
     tryoto_enabled:etkin,tryoto_test_mode:testModu,
     tryoto_pickup_location_code:gondericiKodu||null,
     ...(sifreli??{}),

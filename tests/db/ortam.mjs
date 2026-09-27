@@ -16,8 +16,9 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   Bu yüzden yalnızca dökümden SONRA eklenenler kuruluyor ve döküm her
   yenilendiğinde buradaki sürüm ileri alınır.
 
-  27.09.2026'da döküm bölünmüş kargo migration'ını (20260926231939) da
-  içerecek şekilde yenilendi; sürüm onun bir ardına alındı.
+  27.09.2026'da döküm önce bölünmüş kargo (20260926231939), ardından
+  gönderi kaynağı/tedarikçi (20260926235322) migration'ını içerecek şekilde
+  yenilendi; sürüm her seferinde sonuncunun bir ardına alındı.
 
   Not: 19.09.2026 dökümünde yetkiler eksikti (fonksiyonlar oluşturulurken
   Supabase'in varsayılanı onları anon'a açıyor ve dökümdeki "revoke …
@@ -25,7 +26,7 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   fonksiyon yetkilerini olduğu gibi taşıyor, yani o migration'ı yeniden
   uygulamaya gerek kalmadı.
 */
-const ILK_UYGULANAN = "20260926231940";
+const ILK_UYGULANAN = "20260926235323";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;

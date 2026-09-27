@@ -239,10 +239,13 @@
       "order_id",
       "organization_id",
       "oto_order_id",
+      "pickup_location_code",
       "sequence",
       "shipped_at",
       "shipping_cost",
+      "source",
       "status",
+      "supplier",
       "tracking_number",
       "tracking_url",
       "updated_at"

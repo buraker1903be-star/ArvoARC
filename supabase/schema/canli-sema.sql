@@ -275,7 +275,10 @@ create table if not exists public.arc_shipments (
   delivered_at timestamp with time zone,
   created_at timestamp with time zone not null,
   updated_at timestamp with time zone not null,
-  created_by uuid
+  created_by uuid,
+  source text not null,
+  supplier text,
+  pickup_location_code text
 );
 
 create table if not exists public.arc_store_settings (
@@ -575,6 +578,20 @@ begin
       siparis_adedi, gonderilen, new.quantity;
   end if;
 
+  return new;
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION private.arvo_arc_shipment_source_guard()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+begin
+  if new.source = 'manual' and coalesce(trim(new.tracking_number), '') = '' then
+    raise exception 'Tedarikçinin kendi gönderdiği kayıtta kargo takip numarası zorunludur.';
+  end if;
   return new;
 end;
 $function$
@@ -3346,6 +3363,8 @@ alter table public.arc_shipments alter column id set default gen_random_uuid();
 
 alter table public.arc_shipments alter column sequence set default 1;
 
+alter table public.arc_shipments alter column source set default 'oto'::text;
+
 alter table public.arc_shipments alter column status set default 'draft'::text;
 
 alter table public.arc_shipments alter column updated_at set default now();
@@ -3642,6 +3661,8 @@ alter table public.arc_shipments add constraint arc_shipments_pkey PRIMARY KEY (
 
 alter table public.arc_shipments add constraint arc_shipments_sequence_check CHECK ((sequence > 0));
 
+alter table public.arc_shipments add constraint arc_shipments_source_check CHECK ((source = ANY (ARRAY['oto'::text, 'manual'::text])));
+
 alter table public.arc_shipments add constraint arc_shipments_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'created'::text, 'picked_up'::text, 'in_transit'::text, 'delivered'::text, 'cancelled'::text, 'failed'::text])));
 
 alter table public.arc_store_settings add constraint arc_store_settings_accent_color_check CHECK ((accent_color ~ '^#[0-9A-Fa-f]{6}$'::text));
@@ -3817,6 +3838,8 @@ CREATE INDEX arc_shipment_items_order_item_idx ON public.arc_shipment_items USIN
 CREATE INDEX arc_shipments_order_idx ON public.arc_shipments USING btree (order_id, sequence);
 
 CREATE INDEX arc_shipments_org_idx ON public.arc_shipments USING btree (organization_id, status);
+
+CREATE INDEX arc_shipments_supplier_idx ON public.arc_shipments USING btree (organization_id, supplier) WHERE (supplier IS NOT NULL);
 
 CREATE UNIQUE INDEX arc_shipments_tracking_idx ON public.arc_shipments USING btree (organization_id, carrier_code, tracking_number) WHERE (tracking_number IS NOT NULL);
 
@@ -4553,6 +4576,8 @@ CREATE TRIGGER arc_orders_fill_tax AFTER UPDATE OF subtotal, total ON public.arc
 CREATE TRIGGER arc_orders_log_event AFTER UPDATE ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION arc_log_order_event();
 
 CREATE TRIGGER arvo_arc_shipment_item_guard BEFORE INSERT OR UPDATE ON public.arc_shipment_items FOR EACH ROW EXECUTE FUNCTION private.arvo_arc_shipment_item_guard();
+
+CREATE TRIGGER arvo_arc_shipment_source_guard BEFORE INSERT OR UPDATE ON public.arc_shipments FOR EACH ROW EXECUTE FUNCTION private.arvo_arc_shipment_source_guard();
 
 CREATE TRIGGER arvo_arc_shipment_touch BEFORE UPDATE ON public.arc_shipments FOR EACH ROW EXECUTE FUNCTION private.arvo_arc_shipment_touch();
 
