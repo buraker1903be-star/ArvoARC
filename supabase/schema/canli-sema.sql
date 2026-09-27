@@ -1,4 +1,4 @@
--- Canlı şema dışa aktarımı: 2026-09-26
+-- Canlı şema dışa aktarımı: 2026-09-27
 -- scripts/sema-disa-aktar.sql ile üretildi. Elle düzenlemeyin.
 -- Sıra: tipler, sekanslar, tablolar, fonksiyonlar, varsayılanlar,
 -- kısıtlar, yabancı anahtarlar, indeksler, görünümler, RLS, politikalar,
@@ -278,7 +278,8 @@ create table if not exists public.arc_shipments (
   created_by uuid,
   source text not null,
   supplier text,
-  pickup_location_code text
+  pickup_location_code text,
+  customer_notified_at timestamp with time zone
 );
 
 create table if not exists public.arc_store_settings (

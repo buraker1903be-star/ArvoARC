@@ -232,6 +232,7 @@
       "carrier_name",
       "created_at",
       "created_by",
+      "customer_notified_at",
       "delivered_at",
       "delivery_option_id",
       "failure_reason",

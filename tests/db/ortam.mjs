@@ -26,7 +26,13 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   fonksiyon yetkilerini olduğu gibi taşıyor, yani o migration'ı yeniden
   uygulamaya gerek kalmadı.
 */
-const ILK_UYGULANAN = "20260926235323";
+/*
+  27.09.2026 dökümü kargo bildirimi sütununu da içeriyor
+  (arc_shipments.customer_notified_at, 20260927111515), bu yüzden imleç
+  onun ardına alındı; dökümde zaten olan bir migration'ı yeniden
+  uygulamak "column already exists" ile düşerdi.
+*/
+const ILK_UYGULANAN = "20260927111516";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;
