@@ -10,6 +10,7 @@ import { OtoHatasi } from "@/lib/tryoto/hatalar";
 import { otoIstek } from "@/lib/tryoto/istemci";
 import { createOrderGovdesi, govdeSorunu } from "@/lib/tryoto/siparis-govdesi";
 import { gondericiCoz, gondericiEksigi, type GondericiBilgisi, type MagazaAdresSatiri } from "@/lib/tryoto/gonderici";
+import { etiketHazir, etiketiCozumle, type EtiketBilgisi } from "@/lib/tryoto/etiket";
 
 /*
   GÖNDERİ İŞLEMLERİ.
@@ -177,39 +178,66 @@ async function kargoAyari(
 }
 
 /*
-  ETİKET (AWB) BİLGİSİ print ucundan alınıyor.
+  ETİKET (AWB) BİLGİSİ. createOrder yanıtındaki alan adları belgelenmemiş
+  ve canlıda firma adı da takip numarası da boş geldi; belgeli iki uç var
+  ve ikisi de aynı alanları veriyor: print/{orderId} ve orderStatus.
 
-  createOrder yanıtındaki alan adları belgelenmemiş ve canlıda firma adı
-  da takip numarası da boş geldi. print/{orderId} ise belgeli ve üçünü
-  birden veriyor: printAWBURL, trackingNumber, deliveryCompany. Etiket
-  üretiminin hemen ardından çağrılıyor; başarısız olursa gönderi yine
-  oluşmuş sayılıyor ve karttaki düğmeyle sonradan alınabiliyor — kargo
-  firması etiketi bazen birkaç saniye gecikmeyle üretiyor.
+  ÜÇ DENEME sırayla yapılıyor, çünkü tek denemeye güvenmek bizi iki tur
+  körlemesine bıraktı (27.09.2026, etiket hiç gelmedi ve sebep
+  görünmüyordu):
+    1) print + BİZİM kimliğimiz ("AC-1042-1") — createOrder'a verdiğimiz.
+    2) orderStatus + aynı kimlik — print plana göre kapalı olabiliyor,
+       dcList'in ücretsiz hesapta 403 dönmesi gibi.
+    3) print + OTO'nun kendi kimliği (otoId) — print'in hangi kimliği
+       beklediği belgede net değil ve bizimkiyle 404 dönebiliyor.
 
-  orderId olarak BİZİM verdiğimiz kimlik kullanılıyor ("AC-1042-1"):
-  createOrder'a onu gönderdik ve print de onu bekliyor.
+  HATA ARTIK YUTULMUYOR. Eskiden catch boş dönüyordu ve ekranda her
+  durumda "etiket henüz hazır değil" yazıyordu: 404, yetki hatası ve
+  gerçekten gecikmiş etiket ayırt edilemiyordu.
 */
 async function etiketBilgisi(
   magazaId: string,
   anahtar: string,
-  otoSiparisKimligi: string,
-): Promise<{ awbUrl: string | null; takipNo: string | null; firma: string | null } | null> {
-  try {
-    const yanit = await otoIstek<Record<string, unknown>>({
-      magazaId,
-      yenilemeAnahtari: anahtar,
-      yol: `print/${encodeURIComponent(otoSiparisKimligi)}`,
-      yontem: "GET",
-    });
-    const metin = (ad: string) => (typeof yanit[ad] === "string" && (yanit[ad] as string).trim() ? (yanit[ad] as string).trim() : null);
-    return {
-      awbUrl: metin("printAWBURL"),
-      takipNo: metin("trackingNumber") ?? metin("dcTrackingNumber"),
-      firma: metin("deliveryCompany"),
-    };
-  } catch {
-    return null;
+  siparisKimligi: string,
+  otoKimligi?: string | null,
+): Promise<{ bilgi: EtiketBilgisi | null; hata: string | null }> {
+  const denemeler: { print: boolean; kimlik: string }[] = [
+    { print: true, kimlik: siparisKimligi },
+    { print: false, kimlik: siparisKimligi },
+  ];
+  const oto = otoKimligi?.trim();
+  if (oto && oto !== siparisKimligi) denemeler.push({ print: true, kimlik: oto });
+
+  let sonHata: string | null = null;
+  /*
+    AWB'si olmayan ama takip numarası ya da firma taşıyan yanıt SAKLANIYOR:
+    etiket gecikmişken bile takip numarasını kayda yazmak, müşteriye
+    bilgi verebilmek için yeterli.
+  */
+  let kismi: EtiketBilgisi | null = null;
+  for (const deneme of denemeler) {
+    try {
+      const yanit = deneme.print
+        ? await otoIstek<Record<string, unknown>>({
+            magazaId,
+            yenilemeAnahtari: anahtar,
+            yol: `print/${encodeURIComponent(deneme.kimlik)}`,
+            yontem: "GET",
+          })
+        : await otoIstek<Record<string, unknown>>({
+            magazaId,
+            yenilemeAnahtari: anahtar,
+            yol: "orderStatus",
+            govde: { orderId: deneme.kimlik },
+          });
+      const bilgi = etiketiCozumle(yanit);
+      if (etiketHazir(bilgi)) return { bilgi, hata: null };
+      if (!kismi && (bilgi.takipNo || bilgi.firma)) kismi = bilgi;
+    } catch (hata) {
+      sonHata = hata instanceof OtoHatasi ? hata.message : "Etiket bilgisi alınamadı.";
+    }
   }
+  return { bilgi: kismi, hata: sonHata };
 }
 
 /** Gönderinin OTO'daki sipariş kimliği; createOrder'a verilen değerle aynı. */
@@ -384,21 +412,34 @@ export async function otoEtiketUret(formData: FormData) {
       ve takip numarası boş geliyordu. Başarısız olursa gönderi yine
       oluşmuş sayılıyor; kullanıcı karttaki düğmeyle sonradan alabiliyor.
     */
-    const etiket = await etiketBilgisi(
+    /*
+      OTO'nun kendi kimliği ETİKETTEN ÖNCE okunuyor: print ucu bizim
+      kimliğimizle 404 dönerse ikinci deneme onunla yapılıyor.
+    */
+    const otoKimligi = oku(["otoId", "orderId", "id"]);
+    const { bilgi: etiket, hata: etiketHatasi } = await etiketBilgisi(
       organization.id,
       ayar.anahtar,
       otoSiparisKimligi(order.order_number as string, gonderi.sequence as number),
+      otoKimligi,
     );
 
     await supabase.from("arc_shipments").update({
       status: "created",
-      oto_order_id: oku(["otoId", "orderId", "id"]),
+      oto_order_id: otoKimligi,
       delivery_option_id: secenekId || null,
       carrier_name: etiket?.firma ?? oku(["deliveryCompanyName", "deliveryCompany"]) ?? secilenFirma ?? null,
       tracking_number: etiket?.takipNo ?? oku(["trackingNumber", "waybill", "awb"]),
       tracking_url: oku(["trackingLink", "trackingUrl"]),
       awb_url: etiket?.awbUrl ?? oku(["printAWBURL", "awbUrl", "labelUrl"]),
-      failure_reason: etiket ? null : "Etiket adresi henüz alınamadı; karttan “Etiketi al” ile deneyin.",
+      /*
+        Sebep OTO'nun kendi mesajı; yoksa gecikme varsayılıyor. Eskiden
+        her iki durumda da "henüz alınamadı" yazıyordu ve gerçek hata
+        (404, yetki) hiçbir yerde görünmüyordu.
+      */
+      failure_reason: etiketHazir(etiket)
+        ? null
+        : etiketHatasi ?? "Etiket adresi henüz alınamadı; karttan “Etiketi al” ile deneyin.",
       shipped_at: new Date().toISOString(),
     }).eq("id", gonderiId).eq("organization_id", organization.id);
   } catch (hata) {
@@ -435,23 +476,43 @@ export async function etiketiAl(formData: FormData) {
 
   const [{ data: order }, { data: gonderi }] = await Promise.all([
     supabase.from("arc_orders").select("order_number").eq("organization_id", organization.id).eq("id", orderId).maybeSingle(),
-    supabase.from("arc_shipments").select("id,sequence").eq("organization_id", organization.id).eq("id", gonderiId).maybeSingle(),
+    supabase.from("arc_shipments").select("id,sequence,oto_order_id").eq("organization_id", organization.id).eq("id", gonderiId).maybeSingle(),
   ]);
   if (!order || !gonderi) return geriDon(orderId, { error: "gonderi-bulunamadi" });
 
-  const etiket = await etiketBilgisi(
+  const { bilgi: etiket, hata: etiketHatasi } = await etiketBilgisi(
     organization.id,
     ayar.anahtar,
     otoSiparisKimligi(order.order_number as string, gonderi.sequence as number),
+    gonderi.oto_order_id as string | null,
   );
-  if (!etiket?.awbUrl) {
-    return geriDon(orderId, { error: "Etiket henüz hazır değil. Kargo firması oluşturunca tekrar deneyin." });
+
+  /*
+    Etiket gelmese bile TAKİP NUMARASI geldiyse kayda yazılıyor: paket
+    yoldayken müşteriye verilecek bilgi o ve bir sonraki denemeyi
+    beklemesi gereksiz.
+  */
+  const kismi = {
+    ...(etiket?.takipNo ? { tracking_number: etiket.takipNo } : {}),
+    ...(etiket?.firma ? { carrier_name: etiket.firma } : {}),
+  };
+
+  if (!etiketHazir(etiket)) {
+    /*
+      SEBEP OTO'NUN KENDİ MESAJI. Eskiden her durumda "etiket henüz hazır
+      değil" yazıyordu; 404, yetki hatası ve gerçekten gecikmiş etiket
+      ekranda ayırt edilemiyor, beklemekten başka bir şey denenemiyordu.
+    */
+    const mesaj = etiketHatasi ?? "Etiket henüz hazır değil. Kargo firması oluşturunca tekrar deneyin.";
+    await supabase.from("arc_shipments").update({ ...kismi, failure_reason: mesaj })
+      .eq("id", gonderiId).eq("organization_id", organization.id);
+    revalidatePath(`/siparisler/${orderId}`);
+    return geriDon(orderId, { error: mesaj });
   }
 
   await supabase.from("arc_shipments").update({
-    awb_url: etiket.awbUrl,
-    ...(etiket.takipNo ? { tracking_number: etiket.takipNo } : {}),
-    ...(etiket.firma ? { carrier_name: etiket.firma } : {}),
+    awb_url: etiket!.awbUrl,
+    ...kismi,
     failure_reason: null,
   }).eq("id", gonderiId).eq("organization_id", organization.id);
 
