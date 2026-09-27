@@ -153,6 +153,13 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     { label: "Hazırlanıyor", value: counts.processing, note: "Kargoya verilecek", filter: "processing" as const, tone: undefined },
   ];
 
+  /*
+    İade talebi de sayılıyor: o kutu çiplerde karşılığı olmayan tek
+    kutu (iade TALEBİ, iade edilmiş sipariş değil) ve bekleyen bir
+    talep varken şeridi gizlemek o işi görünmez yapardı.
+  */
+  const ozetGorunsun = metrics.some((metric) => metric.value > 0) || pendingReturns > 0;
+
   return <>
     <section className="ac-bar">
       <div>
@@ -168,6 +175,20 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
           gösterebiliyordu (lib/panel-bildirim.ts). */}
       <PanelBildirimi />
 
+      {/*
+        ÖZET ŞERİDİ YALNIZCA İŞ VARKEN GÖRÜNÜYOR.
+
+        Üç kutunun üçü de filtre çipleriyle AYNI bağlantıya ve aynı sayıya
+        gidiyor (?filter=pending / confirmed / processing); çipler zaten
+        44px'te aynı bilgiyi veriyor. Hepsi sıfırken şerit 114px'i sıfır
+        göstermeye harcıyordu: 900px'lik ekranda ilk sipariş satırı 555.
+        pikselde başlıyor, 40 kayıttan 8'i görünüyordu (canlıda ölçüldü,
+        27.09.2026). Şerit gizlenince 11 satır görünüyor.
+
+        Sıfır olmayan bir sayı varsa şerit geri geliyor: o zaman bekleyen
+        iş demektir ve tam da göze çarpması gereken şeydir.
+      */}
+      {ozetGorunsun ? (
       <section className="ac-metrics" aria-label="Sipariş özeti">
         {metrics.map((metric) => (
           <Link prefetch={false} className="ac-metric ac-lift" data-tone={metric.tone} href={listHref(state, { filter: metric.filter, page: 1 })} key={metric.label}>
@@ -182,6 +203,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
           <small>Karar bekliyor</small>
         </Link>
       </section>
+      ) : null}
 
       <section className="ac ac-pad-sm order-toolbar">
         <form className="ac-filter order-search" role="search">

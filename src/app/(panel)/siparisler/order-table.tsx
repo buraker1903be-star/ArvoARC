@@ -52,11 +52,16 @@ export function OrderTable({ rows, canManage, back, children }: { rows: OrderRow
 
   return (
     <section className="ac table order-table" data-manage={canManage ? "" : undefined}>
-      <div className="ac-head ac-pad-sm order-table-head">
-        <div>
-          <h3>Sipariş akışı</h3>
-          <p>Satıra tıklayarak detayı açın{canManage ? "; toplu işlem için kutucukları işaretleyin." : "."}</p>
-        </div>
+      {/*
+        Başlık kaldırıldı: sayfanın kendi başlığı zaten "Siparişler" ve
+        "Sipariş akışı" onun altında ikinci kez aynı şeyi söylüyordu.
+        Blok 82px yer kaplıyordu; 900px'lik ekranda ilk sipariş satırı
+        595. pikselde başlıyor ve 40 kayıttan 4'ü görünüyordu (canlıda
+        ölçüldü, 27.09.2026). İpucu duruyor — yeni kullanıcı için tek
+        cümlelik değeri var — ama tek satıra indi.
+      */}
+      <div className="ac-head order-table-head">
+        <p>Satıra tıklayarak detayı açın{canManage ? "; toplu işlem için kutucukları işaretleyin." : "."}</p>
       </div>
 
       {canManage && chosen.length > 0 ? (
