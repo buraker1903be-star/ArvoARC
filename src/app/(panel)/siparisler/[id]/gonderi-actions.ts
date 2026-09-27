@@ -214,7 +214,16 @@ export async function otoEtiketUret(formData: FormData) {
   const orderId = String(formData.get("order_id") ?? "");
   if (!MANAGERS.includes(membership.role)) return geriDon(orderId, { error: "forbidden" });
   const gonderiId = String(formData.get("shipment_id") ?? "");
-  const secenekId = String(formData.get("delivery_option_id") ?? "").trim();
+  /*
+    Seçenek "id|ad" biçiminde geliyor: firma adı createOrder yanıtından
+    okunamıyor (alan adları belgelenmemiş ve canlıda boş geldi, kart
+    "Etiket üretildi · firma belirtilmedi" diyordu). Kullanıcının seçtiği
+    ad kayda doğrudan yazılıyor; yanıttan bir ad gelirse o tercih ediliyor.
+  */
+  const secenekHam = String(formData.get("delivery_option_id") ?? "").trim();
+  const ayrac = secenekHam.indexOf("|");
+  const secenekId = ayrac >= 0 ? secenekHam.slice(0, ayrac) : secenekHam;
+  const secilenFirma = ayrac >= 0 ? secenekHam.slice(ayrac + 1).trim() : "";
   const agirlik = Number(String(formData.get("weight") ?? "").trim());
 
   const ayar = await kargoAyari(supabase, organization.id);
@@ -297,7 +306,7 @@ export async function otoEtiketUret(formData: FormData) {
       status: "created",
       oto_order_id: oku(["otoId", "orderId", "id"]),
       delivery_option_id: secenekId || null,
-      carrier_name: oku(["deliveryCompanyName", "deliveryCompany"]),
+      carrier_name: oku(["deliveryCompanyName", "deliveryCompany"]) ?? secilenFirma ?? null,
       tracking_number: oku(["trackingNumber", "waybill", "awb"]),
       tracking_url: oku(["trackingLink", "trackingUrl"]),
       awb_url: oku(["printAWBURL", "awbUrl", "labelUrl"]),

@@ -464,7 +464,12 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                   {kargoSecenekleri.length?<>
                     <label>Kargo seçeneği<select name="delivery_option_id" defaultValue={kargoSecenekleri[0]?.id}>
                       {kargoSecenekleri.map(secenek=>
-                        <option key={secenek.id} value={secenek.id}>
+                        /* Değer "id|ad": firma adı createOrder yanıtından
+                           okunamıyor (alan adları sürümden sürüme değişiyor
+                           ve canlıda boş geldi — kart "Etiket üretildi ·
+                           firma belirtilmedi" diyordu). Kullanıcının
+                           EKRANDA GÖRDÜĞÜ ad kayda da o şekilde giriyor. */
+                        <option key={secenek.id} value={`${secenek.id}|${secenek.firmaAdi}`}>
                           {secenek.firmaAdi}{secenek.hizmet?` · ${secenek.hizmet}`:""}{secenek.ucretKurus!==null?` · ${money(secenek.ucretKurus,order.currency)}`:" · fiyat yok"}
                         </option>)}
                     </select></label>
