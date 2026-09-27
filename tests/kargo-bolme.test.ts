@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bolmeSorunu, kalanAdetler, kargoDurumu, otoDurumunuCevir, tedarikciGruplari, izlenmeliMi, izlemeSuresiDoldu, kargoyaVerildiMi } from "@/lib/kargo-bolme";
+import { bolmeSorunu, kalanAdetler, kargoDurumu, otoDurumunuCevir, tedarikciGruplari, izlenmeliMi, izlemeSuresiDoldu, kargoyaVerildiMi, gonderiDurumEtiketi, gonderiSorunlu } from "@/lib/kargo-bolme";
 
 /*
   Bölünmüş kargo hesabı. Sınanan şey "toplama biliyor mu" değil: bir
@@ -199,4 +199,38 @@ test("kapanmış sipariş kargoya verilmiş sayılmıyor", () => {
 test("zaten kargoya verilmiş sipariş tekrar yazılmıyor", () => {
   // Tekrar yazmak olay geçmişini aynı satırla kirletirdi.
   assert.equal(kargoyaVerildiMi("fulfilled", "tamam", false), false);
+});
+
+test("GÖNDERİ DURUMU kartta gerçek değeriyle görünüyor", () => {
+  /*
+    Kart eskiden iptal, teslim ve tedarikçi dışındaki HER durumu
+    "Etiket üretildi" diye gösteriyordu: cron picked_up/in_transit/failed
+    yazıyordu ama ekranda hepsi aynıydı. Kaybolan paket "Etiket
+    üretildi" diye duruyordu.
+  */
+  assert.equal(gonderiDurumEtiketi("failed", "oto"), "Sorunlu");
+  assert.equal(gonderiDurumEtiketi("in_transit", "oto"), "Yolda");
+  assert.equal(gonderiDurumEtiketi("picked_up", "oto"), "Kuryeye teslim edildi");
+  assert.equal(gonderiDurumEtiketi("delivered", "oto"), "Teslim edildi");
+  assert.equal(gonderiDurumEtiketi("cancelled", "oto"), "İptal");
+});
+
+test("tedarikçinin kendi gönderdiği kayıtta 'etiket üretildi' demiyor", () => {
+  // OTO devreye girmiyor, etiketi biz üretmiyoruz.
+  assert.equal(gonderiDurumEtiketi("created", "manual"), "Tedarikçi gönderdi");
+  assert.equal(gonderiDurumEtiketi("created", "oto"), "Etiket üretildi");
+  // Sonraki durumlar kaynaktan bağımsız.
+  assert.equal(gonderiDurumEtiketi("delivered", "manual"), "Teslim edildi");
+});
+
+test("tanınmayan durum olduğu gibi gösteriliyor", () => {
+  // OTO yeni bir durum eklerse ekranda boş değil, ham değer görünür.
+  assert.equal(gonderiDurumEtiketi("yepyeni", "oto"), "yepyeni");
+});
+
+test("SORUNLU gönderi ayırt ediliyor", () => {
+  // OTO'nun returned, lost ve failed durumları buraya düşüyor.
+  assert.equal(gonderiSorunlu("failed"), true);
+  assert.equal(gonderiSorunlu("in_transit"), false);
+  assert.equal(gonderiSorunlu("cancelled"), false);
 });

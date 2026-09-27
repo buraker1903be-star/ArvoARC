@@ -336,3 +336,13 @@
 /* İade tamamlanırken stoğa ekleme seçeneği; forma göre hizalanıyor. */
 .return-restock{display:flex;align-items:center;gap:9px;font-size:12.5px}
 .return-restock input{width:16px;height:16px;margin:0}
+
+/* Sorunlu kargo çipi: olağan dışı bir durumu işaret ediyor, durum
+   çiplerinden ayrışması gerekiyor. */
+.order-chip-danger{border-color:color-mix(in srgb,var(--danger) 40%,var(--line));color:var(--danger)}
+.order-chip-danger .ac-count{background:color-mix(in srgb,var(--danger) 14%,transparent);color:var(--danger)}
+
+/* Gönderi kartında sorunlu durum göze çarpıyor: cron onu yazıyor ama
+   kart eskiden her durumu "Etiket üretildi" diye gösteriyordu. */
+.shipment-head span[data-durum="failed"]{background:color-mix(in srgb,var(--danger) 16%,transparent);color:var(--danger)}
+.shipment-head span[data-durum="delivered"]{background:color-mix(in srgb,var(--success) 16%,transparent);color:var(--success)}

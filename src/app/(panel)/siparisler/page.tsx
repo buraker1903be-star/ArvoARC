@@ -32,7 +32,7 @@ const PERIODS = [
 
 type StatusKey = (typeof STATUS_TABS)[number][0];
 type PeriodKey = (typeof PERIODS)[number][0];
-type ListState = { q: string; filter: StatusKey; period: PeriodKey; page: number };
+type ListState = { q: string; filter: StatusKey; period: PeriodKey; page: number; kargo: "" | "sorunlu" };
 
 
 /* Dönem Türkiye saatine göre gün başından sayılır (UTC+3). */
@@ -51,13 +51,14 @@ function listHref(state: ListState, patch: Partial<ListState>) {
   const query = new URLSearchParams();
   if (next.q) query.set("q", next.q);
   if (next.filter !== "all") query.set("filter", next.filter);
+  if (next.kargo) query.set("kargo", next.kargo);
   if (next.period !== "all") query.set("period", next.period);
   if (next.page > 1) query.set("page", String(next.page));
   const text = query.toString();
   return text ? `/siparisler?${text}` : "/siparisler";
 }
 
-type Params = { error?: string; created?: string; ok?: string; q?: string; filter?: string; period?: string; page?: string; updated?: string; skipped?: string };
+type Params = { q?: string; filter?: string; period?: string; page?: string; kargo?: string };
 
 export default async function Orders({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
@@ -73,7 +74,14 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   const statusFilter: StatusKey = STATUS_TABS.some(([key]) => key === params.filter) ? (params.filter as StatusKey) : "all";
   const period: PeriodKey = PERIODS.some(([key]) => key === params.period) ? (params.period as PeriodKey) : "all";
   const page = Math.min(10_000, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));
-  const state: ListState = { q: search, filter: statusFilter, period, page };
+  /*
+    SORUNLU KARGO SÜZGECİ. Uyarı listesindeki "Sorunlu gönderi" buraya
+    bağlanıyor: OTO'nun returned/lost/failed durumları arc_shipments'ta
+    "failed" oluyor ve o paketi görmenin başka yolu yoktu — gönderiler
+    sipariş detayının içinde yaşıyor, ayrı bir listesi yok.
+  */
+  const kargo: ListState["kargo"] = params.kargo === "sorunlu" ? "sorunlu" : "";
+  const state: ListState = { q: search, filter: statusFilter, period, page, kargo };
   const since = periodStart(period);
   const periodLabel = PERIODS.find(([key]) => key === period)?.[2] ?? "Tüm zamanlar";
 
@@ -97,6 +105,18 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
       .eq("organization_id", organization.id),
   );
   if (statusFilter !== "all") listQuery = listQuery.eq("status", statusFilter);
+  /*
+    Sipariş kimlikleri önce toplanıyor: PostgREST'te ilişkili tabloya
+    göre süzmek select şeklini değiştiriyor ve liste tipini bozardı.
+    Sorunlu gönderi az sayıda olur; sınır 500'de.
+  */
+  if (kargo === "sorunlu") {
+    const { data: sorunlular } = await supabase.from("arc_shipments")
+      .select("order_id").eq("organization_id", organization.id).eq("status", "failed").limit(500);
+    const idler = [...new Set(((sorunlular ?? []) as { order_id: string }[]).map((s) => s.order_id))];
+    /* Hiç yoksa boş liste: .in("id", []) PostgREST'te hata veriyor. */
+    listQuery = idler.length ? listQuery.in("id", idler) : listQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+  }
   const from = (page - 1) * PAGE_SIZE;
 
   /*
@@ -104,12 +124,13 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     çekilir. Tüm katalog değil, kendi ürünlerimiz: manuel sipariş
     telefonla gelen siparişler için, tedarikçi kataloğu için değil.
   */
-  const [listResult, variantsResult, returnsResult, ...countResults] = await Promise.all([
+  const [listResult, variantsResult, returnsResult, sorunluResult, ...countResults] = await Promise.all([
     listQuery.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
     canManage
       ? supabase.from("arc_product_variants").select("id,product_id,sku,price,stock,allow_backorder").eq("organization_id", organization.id).is("supplier", null).order("sku").limit(500)
       : Promise.resolve({ data: [], error: null }),
     supabase.from("arc_return_requests").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).eq("status", "beklemede"),
+    supabase.from("arc_shipments").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).eq("status", "failed"),
     ...STATUS_TABS.map(([key]) => countQuery(key)),
   ]);
 
@@ -121,6 +142,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   const total = listResult.count ?? counts[statusFilter];
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const pendingReturns = returnsResult.count ?? 0;
+  const sorunluKargo = sorunluResult.count ?? 0;
 
   const variants = variantsResult.data ?? [];
   const variantProductIds = [...new Set(variants.map((variant) => variant.product_id))];
@@ -231,6 +253,23 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
             <span className="ac-count">{counts[key].toLocaleString("tr-TR")}</span>
           </Link>
         ))}
+        {/*
+          SORUNLU KARGO çipi yalnızca sorun VARKEN görünüyor. Sıfır
+          gösteren bir çip, bugün üç listede kaldırdığımız gürültünün
+          aynısı olurdu; bu çip zaten olağan dışı bir duruma işaret
+          ediyor.
+        */}
+        {kargo === "sorunlu" || sorunluKargo > 0 ? (
+          <Link
+            prefetch={false}
+            className="ac-btn order-chip-danger"
+            href={listHref(state, { kargo: kargo === "sorunlu" ? "" : "sorunlu", page: 1 })}
+            aria-current={kargo === "sorunlu" ? "page" : undefined}
+          >
+            Sorunlu kargo
+            <span className="ac-count">{sorunluKargo.toLocaleString("tr-TR")}</span>
+          </Link>
+        ) : null}
       </nav>
 
       <OrderTable key={JSON.stringify(params)} rows={rows} canManage={canManage} canDelete={["owner","admin"].includes(membership.role)} back={listHref(state, {})}>

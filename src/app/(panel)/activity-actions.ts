@@ -42,7 +42,7 @@ export async function loadActivity(): Promise<ActivityFeed> {
   const org = organization.id;
   const since = new Date(nowMs() - 7 * DAY).toISOString();
 
-  const [orders, events, returns, movements, negative, payment, pendingReturns, staleTransfers] = await Promise.all([
+  const [orders, events, returns, movements, negative, payment, pendingReturns, staleTransfers, sorunluGonderi] = await Promise.all([
     supabase.from("arc_orders").select("id,order_number,customer_name,total,status,payment_status,created_at").eq("organization_id", org).gte("created_at", since).order("created_at", { ascending: false }).limit(30),
     supabase.from("arc_order_events").select("id,order_id,event_type,event_data,created_at").eq("organization_id", org).gte("created_at", since).order("created_at", { ascending: false }).limit(30),
     supabase.from("arc_return_requests").select("id,status,reason,created_at,arc_orders(order_number,customer_name)").eq("organization_id", org).gte("created_at", since).order("created_at", { ascending: false }).limit(20),
@@ -51,6 +51,13 @@ export async function loadActivity(): Promise<ActivityFeed> {
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", org).in("payment_status", PAYMENT).not("status", "in", "(cancelled,refunded)"),
     supabase.from("arc_return_requests").select("id", { count: "exact", head: true }).eq("organization_id", org).eq("status", "beklemede"),
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", org).in("payment_status", ["pending", "authorized"]).not("status", "in", "(cancelled,refunded)").ilike("metadata->>payment_method", "%havale%").lt("created_at", new Date(nowMs() - TRANSFER_STALE_HOURS * 3_600_000).toISOString()),
+    /*
+      SORUNLU GÖNDERİ. OTO'nun returned, lost ve failed durumları buraya
+      düşüyor: paket kayıp, iade dönüyor ya da teslim edilemedi.
+      Müşteriye takip numarası gitmiş durumda ve kimse haberdar olmazsa
+      iş sessizce asılı kalıyor — uyarı listesinde yoktu.
+    */
+    supabase.from("arc_shipments").select("id", { count: "exact", head: true }).eq("organization_id", org).eq("status", "failed"),
   ]);
 
   if (orders.error && events.error && returns.error && movements.error) {
@@ -133,6 +140,7 @@ export async function loadActivity(): Promise<ActivityFeed> {
     ...(payment.count ? [{ key: "payment", label: "Ödeme bekleyen sipariş", detail: "Ödemesi tamamlanmamış", count: payment.count, href: "/operasyon", tone: "warning" as const }] : []),
     ...(pendingReturns.count ? [{ key: "returns", label: "Bekleyen iade talebi", detail: "Yanıt bekliyor", count: pendingReturns.count, href: "/siparisler/iadeler", tone: "warning" as const }] : []),
     ...(staleTransfers.count ? [{ key: "stale-transfer", label: "Süresi geçen havale", detail: `${TRANSFER_STALE_HOURS} saattir ödenmemiş`, count: staleTransfers.count, href: "/operasyon", tone: "danger" as const }] : []),
+    ...(sorunluGonderi.count ? [{ key: "shipment-failed", label: "Sorunlu gönderi", detail: "Kayıp, iade dönen ya da teslim edilemeyen paket", count: sorunluGonderi.count, href: "/siparisler?kargo=sorunlu", tone: "danger" as const }] : []),
   ];
 
   return { ok: true, items, alerts, loadedAt: nowMs() };

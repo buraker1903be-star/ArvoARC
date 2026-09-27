@@ -142,6 +142,46 @@ export function otoDurumunuCevir(otoDurumu: string | null | undefined): string {
 }
 
 /*
+  GÖNDERİ DURUMUNUN PANELDEKİ KARŞILIĞI.
+
+  Kart durumu şöyle seçiyordu: iptal, teslim edildi, tedarikçi gönderdi
+  ve GERİ KALAN HER ŞEY "Etiket üretildi". Yani cron durumu güncelliyor
+  (picked_up, in_transit, failed) ama ekranda hepsi aynı görünüyordu —
+  kaybolan ya da iade dönen bir paket "Etiket üretildi" diye duruyordu.
+
+  Geçerli küme arc_shipments_status_check'te tanımlı.
+*/
+export const GONDERI_DURUM_ETIKETI: Record<string, string> = {
+  draft: "Taslak",
+  created: "Etiket üretildi",
+  picked_up: "Kuryeye teslim edildi",
+  in_transit: "Yolda",
+  delivered: "Teslim edildi",
+  cancelled: "İptal",
+  failed: "Sorunlu",
+};
+
+/**
+ * Kartta görünecek durum metni.
+ *
+ * Tedarikçinin kendi gönderdiği kayıtta "Etiket üretildi" yanlış: OTO
+ * devreye girmiyor, etiket biz üretmiyoruz. Onun dışındaki durumlar
+ * kaynaktan bağımsız aynı.
+ */
+export function gonderiDurumEtiketi(durum: string, kaynak: string): string {
+  if (durum === "created" && kaynak === "manual") return "Tedarikçi gönderdi";
+  return GONDERI_DURUM_ETIKETI[durum] ?? durum;
+}
+
+/*
+  SORUNLU GÖNDERİ. OTO'nun returned, lost ve failed durumları buraya
+  düşüyor: paket kayıp, iade dönüyor ya da kargo firması teslim
+  edemedi. Müşteriye takip numarası gitmiş durumda ve kimse haberdar
+  olmazsa iş sessizce asılı kalıyor.
+*/
+export const gonderiSorunlu = (durum: string): boolean => durum === "failed";
+
+/*
   SİPARİŞ "KARGOYA VERİLDİ"YE GEÇMELİ Mİ?
 
   Kural: siparişin BÜTÜN kalemleri bir gönderiye girmiş olmalı. Bölünmüş

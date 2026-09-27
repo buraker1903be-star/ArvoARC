@@ -1,4 +1,4 @@
-import { kargoDurumu, tedarikciGruplari } from "@/lib/kargo-bolme";
+import { gonderiDurumEtiketi, kargoDurumu, tedarikciGruplari } from "@/lib/kargo-bolme";
 import { KARGO_FIRMALARI } from "@/lib/kargo-firmalari";
 import { elleGonderiEkle, etiketiAl, gonderiIptal, kargoDurumlariniGuncelle, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
 import { teslimatSecenekleri } from "@/lib/tryoto/ayar";
@@ -476,7 +476,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             <li key={gonderi.id} data-durum={gonderi.status}>
               <div className="shipment-head">
                 <b>{gonderi.sequence}. paket{gonderi.supplier?` · ${gonderi.supplier}`:""}</b>
-                <span>{gonderi.status==="cancelled"?"İptal":gonderi.status==="delivered"?"Teslim edildi":gonderi.source==="manual"?"Tedarikçi gönderdi":"Etiket üretildi"}</span>
+                <span data-durum={gonderi.status}>{gonderiDurumEtiketi(gonderi.status,gonderi.source)}</span>
               </div>
               <p>{gonderi.carrier_name??"Firma belirtilmedi"}{gonderi.tracking_number?` · ${gonderi.tracking_number}`:""}</p>
               <p className="shipment-items">{gonderi.items.map(kalem=>`${kalemAdi.get(kalem.order_item_id)??"Ürün"} ×${kalem.quantity}`).join(" · ")||"Kalem yok"}</p>
