@@ -1,6 +1,7 @@
 import { decryptSecret } from "@/lib/payment-credentials";
 import { firmalariCozumle, type KargoFirmasi } from "./firmalar";
 import { hesabiCozumle, type HesapBilgisi } from "./hesap";
+import { fiyatSorgusuGovdesi, secenekleriCozumle, type TeslimatSecenegi } from "./fiyat";
 import { konumlariCozumle, type GondericiKonumu } from "./konumlar";
 import { OtoHatasi } from "./hatalar";
 import { otoIstek } from "./istemci";
@@ -135,5 +136,35 @@ export async function baglantiyiSina(magazaId: string, satir: AyarSatiri | null 
       ham: null,
       durumKodu: null,
     };
+  }
+}
+
+/*
+  Bir gönderi için teslimat seçenekleri. Sipariş detayında TASLAK gönderi
+  varken çağrılıyor: kullanıcı firmayı fiyatını görerek seçsin.
+
+  Hata sayfayı düşürmüyor, boş liste dönüyor ve sebebi çağırana veriliyor:
+  fiyat alınamaması siparişin geri kalanını okunamaz yapmamalı ve
+  tedarikçinin kendi gönderdiği kayıtlar bundan etkilenmiyor.
+*/
+export async function teslimatSecenekleri(
+  magazaId: string,
+  satir: AyarSatiri | null | undefined,
+  sorgu: { cikisSehri: string; varisSehri: string; agirlikKg: number; kapidaTahsilatKurus?: number | null },
+): Promise<{ secenekler: TeslimatSecenegi[]; hata: string | null }> {
+  if (!satir?.tryoto_enabled || !satir.tryoto_refresh_token_enc) return { secenekler: [], hata: null };
+  if (!sorgu.cikisSehri.trim() || !sorgu.varisSehri.trim()) {
+    return { secenekler: [], hata: "Çıkış ya da varış şehri boş; fiyat sorulamıyor." };
+  }
+  try {
+    const govde = await otoIstek({
+      magazaId,
+      yenilemeAnahtari: decryptSecret(satir.tryoto_refresh_token_enc),
+      yol: "checkOTODeliveryFee",
+      govde: fiyatSorgusuGovdesi(sorgu),
+    });
+    return { secenekler: secenekleriCozumle(govde), hata: null };
+  } catch (hata) {
+    return { secenekler: [], hata: hata instanceof OtoHatasi ? hata.message : "Kargo fiyatları alınamadı." };
   }
 }

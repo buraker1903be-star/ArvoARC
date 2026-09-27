@@ -1,6 +1,7 @@
 import { kargoDurumu, tedarikciGruplari } from "@/lib/kargo-bolme";
 import { KARGO_FIRMALARI } from "@/lib/kargo-firmalari";
-import { elleGonderiEkle, gonderiIptal } from "./gonderi-actions";
+import { elleGonderiEkle, gonderiIptal, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
+import { teslimatSecenekleri } from "@/lib/tryoto/ayar";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
@@ -98,6 +99,29 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   const gruplar=tedarikciGruplari(kargoKalemleri,gonderiler);
   const kargoDurumuOzet=kargoDurumu(kargoKalemleri,gonderiler);
   const kalemAdi=new Map((items??[]).map(item=>[item.id,item.product_name]));
+
+  /*
+    TASLAK gönderi varsa kargo fiyatları sorulur: kullanıcı firmayı
+    fiyatını görerek seçsin. Taslak yoksa OTO'ya hiç dokunulmuyor —
+    her sipariş açılışında fiyat sormak gereksiz çağrı olurdu.
+
+    Çıkış şehri mağaza ayarındaki adres. Gerçek gönderici konumu OTO'da
+    tanımlıysa (pickupLocationCode) sevkiyat oradan çıkıyor ve fiyat bir
+    miktar sapabilir; seçenekleri ve sıralamayı görmek için yeterli.
+  */
+  const taslaklar=gonderiler.filter(g=>g.source==="oto"&&g.status==="draft");
+  const {data:kargoAyarSatiri}=taslaklar.length
+    ?await supabase.from("arc_store_settings").select("tryoto_enabled,tryoto_refresh_token_enc,tryoto_pickup_location_code,tryoto_test_mode,address_city").eq("organization_id",organization.id).maybeSingle()
+    :{data:null};
+  const teslimatAdresi=meta.shipping_address??{};
+  const {secenekler:kargoSecenekleri,hata:kargoFiyatHatasi}=taslaklar.length
+    ?await teslimatSecenekleri(organization.id,kargoAyarSatiri,{
+        cikisSehri:String((kargoAyarSatiri as {address_city?:string|null}|null)?.address_city??""),
+        varisSehri:teslimatAdresi.city??"",
+        agirlikKg:1,
+        kapidaTahsilatKurus:order.payment_status==="paid"?null:order.total,
+      })
+    :{secenekler:[],hata:null};
 
   /* İndirim payı orantılı düşülür: müşteri indirimli tutarı
      ödedi, matrah da o tutar üzerinden olmalı. */
@@ -406,6 +430,27 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
               <p>{gonderi.carrier_name??"Firma belirtilmedi"}{gonderi.tracking_number?` · ${gonderi.tracking_number}`:""}</p>
               <p className="shipment-items">{gonderi.items.map(kalem=>`${kalemAdi.get(kalem.order_item_id)??"Ürün"} ×${kalem.quantity}`).join(" · ")||"Kalem yok"}</p>
               {gonderi.failure_reason?<p className="shipment-error">{gonderi.failure_reason}</p>:null}
+
+              {/*
+                TASLAK gönderi: kalemler ayrıldı, OTO'ya henüz dokunulmadı
+                (bakiye harcanmadı). Firma fiyatıyla birlikte seçiliyor;
+                tek adımda yapılsaydı kullanıcı fiyatı görmeden seçerdi.
+              */}
+              {canManage&&gonderi.source==="oto"&&gonderi.status==="draft"?
+                <form action={otoEtiketUret} className="shipment-oto">
+                  <input type="hidden" name="order_id" value={order.id}/>
+                  <input type="hidden" name="shipment_id" value={gonderi.id}/>
+                  {kargoSecenekleri.length?<>
+                    <label>Kargo seçeneği<select name="delivery_option_id" defaultValue={kargoSecenekleri[0]?.id}>
+                      {kargoSecenekleri.map(secenek=>
+                        <option key={secenek.id} value={secenek.id}>
+                          {secenek.firmaAdi}{secenek.hizmet?` · ${secenek.hizmet}`:""}{secenek.ucretKurus!==null?` · ${money(secenek.ucretKurus,order.currency)}`:" · fiyat yok"}
+                        </option>)}
+                    </select></label>
+                    <label>Ağırlık (kg)<input name="weight" type="number" step="0.1" min="0.1" defaultValue="1"/></label>
+                    <button type="submit">Etiket üret</button>
+                  </>:<p className="shipment-error">{kargoFiyatHatasi??"Bu adres için kargo seçeneği dönmedi. Teslimat şehrini ve mağaza ayarlarındaki çıkış şehrini kontrol edin."}</p>}
+                </form>:null}
               <div className="shipment-actions">
                 {gonderi.tracking_url?<a href={gonderi.tracking_url} target="_blank" rel="noreferrer">Kargo takip ↗</a>:null}
                 {canManage&&gonderi.status!=="cancelled"?<form action={gonderiIptal}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit">İptal et</button></form>:null}
@@ -440,7 +485,17 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                 <label>Takip numarası<input name="tracking_number" placeholder="Tedarikçiden gelen numara" autoComplete="off"/></label>
                 <label className="wide">Takip adresi (isteğe bağlı)<input name="tracking_url" placeholder="Boş bırakılırsa firmanın sorgu sayfası kullanılır" autoComplete="off"/></label>
               </div>
-              <button type="submit">Gönderiyi kaydet</button>
+              {/*
+                İki çalışma biçimi aynı formda, iki ayrı düğmeyle:
+                tedarikçi kendi gönderdiyse takip numarası giriliyor,
+                etiketi biz üretiyorsak yukarıdaki alanlar boş bırakılıp
+                tryOTO'ya gidiliyor. Ayrı formlar aynı kalem seçimini iki
+                kez yaptırırdı.
+              */}
+              <div className="shipment-submit">
+                <button type="submit">Takip numarasıyla kaydet</button>
+                <button type="submit" formAction={otoTaslakOlustur} className="ghost">tryOTO ile etiket üret →</button>
+              </div>
             </form>)}
         </div>:canManage?<p className="catalog-hint">Siparişteki bütün ürünler kargoya verilmiş.</p>:null}
       </section>
