@@ -164,6 +164,45 @@ async function kargoAyari(
   return { anahtar: decryptSecret(ayar.tryoto_refresh_token_enc), gondericiKodu: ayar.tryoto_pickup_location_code };
 }
 
+/*
+  ETİKET (AWB) BİLGİSİ print ucundan alınıyor.
+
+  createOrder yanıtındaki alan adları belgelenmemiş ve canlıda firma adı
+  da takip numarası da boş geldi. print/{orderId} ise belgeli ve üçünü
+  birden veriyor: printAWBURL, trackingNumber, deliveryCompany. Etiket
+  üretiminin hemen ardından çağrılıyor; başarısız olursa gönderi yine
+  oluşmuş sayılıyor ve karttaki düğmeyle sonradan alınabiliyor — kargo
+  firması etiketi bazen birkaç saniye gecikmeyle üretiyor.
+
+  orderId olarak BİZİM verdiğimiz kimlik kullanılıyor ("AC-1042-1"):
+  createOrder'a onu gönderdik ve print de onu bekliyor.
+*/
+async function etiketBilgisi(
+  magazaId: string,
+  anahtar: string,
+  otoSiparisKimligi: string,
+): Promise<{ awbUrl: string | null; takipNo: string | null; firma: string | null } | null> {
+  try {
+    const yanit = await otoIstek<Record<string, unknown>>({
+      magazaId,
+      yenilemeAnahtari: anahtar,
+      yol: `print/${encodeURIComponent(otoSiparisKimligi)}`,
+      yontem: "GET",
+    });
+    const metin = (ad: string) => (typeof yanit[ad] === "string" && (yanit[ad] as string).trim() ? (yanit[ad] as string).trim() : null);
+    return {
+      awbUrl: metin("printAWBURL"),
+      takipNo: metin("trackingNumber") ?? metin("dcTrackingNumber"),
+      firma: metin("deliveryCompany"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Gönderinin OTO'daki sipariş kimliği; createOrder'a verilen değerle aynı. */
+const otoSiparisKimligi = (siparisNo: string, sira: number) => `${siparisNo}-${sira}`;
+
 export async function otoTaslakOlustur(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   const orderId = String(formData.get("order_id") ?? "");
@@ -316,15 +355,26 @@ export async function otoEtiketUret(formData: FormData) {
       }
       return null;
     };
+    /*
+      Etiket bilgisi print ucundan çekiliyor: createOrder yanıtında firma
+      ve takip numarası boş geliyordu. Başarısız olursa gönderi yine
+      oluşmuş sayılıyor; kullanıcı karttaki düğmeyle sonradan alabiliyor.
+    */
+    const etiket = await etiketBilgisi(
+      organization.id,
+      ayar.anahtar,
+      otoSiparisKimligi(order.order_number as string, gonderi.sequence as number),
+    );
+
     await supabase.from("arc_shipments").update({
       status: "created",
       oto_order_id: oku(["otoId", "orderId", "id"]),
       delivery_option_id: secenekId || null,
-      carrier_name: oku(["deliveryCompanyName", "deliveryCompany"]) ?? secilenFirma ?? null,
-      tracking_number: oku(["trackingNumber", "waybill", "awb"]),
+      carrier_name: etiket?.firma ?? oku(["deliveryCompanyName", "deliveryCompany"]) ?? secilenFirma ?? null,
+      tracking_number: etiket?.takipNo ?? oku(["trackingNumber", "waybill", "awb"]),
       tracking_url: oku(["trackingLink", "trackingUrl"]),
-      awb_url: oku(["printAWBURL", "awbUrl", "labelUrl"]),
-      failure_reason: null,
+      awb_url: etiket?.awbUrl ?? oku(["printAWBURL", "awbUrl", "labelUrl"]),
+      failure_reason: etiket ? null : "Etiket adresi henüz alınamadı; karttan “Etiketi al” ile deneyin.",
       shipped_at: new Date().toISOString(),
     }).eq("id", gonderiId).eq("organization_id", organization.id);
   } catch (hata) {
@@ -342,4 +392,45 @@ export async function otoEtiketUret(formData: FormData) {
 
   revalidatePath(`/siparisler/${orderId}`);
   return geriDon(orderId, { saved: "etiket" });
+}
+
+/*
+  Etiketi sonradan alma. Kargo firması AWB'yi bazen birkaç saniye
+  gecikmeyle üretiyor ve ilk çağrıda adres boş dönüyor; bu düğme aynı ucu
+  yeniden soruyor. Takip numarası ve firma adı da burada güncelleniyor —
+  ikisi de print yanıtında geliyor.
+*/
+export async function etiketiAl(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!MANAGERS.includes(membership.role)) return geriDon(orderId, { error: "forbidden" });
+  const gonderiId = String(formData.get("shipment_id") ?? "");
+
+  const ayar = await kargoAyari(supabase, organization.id);
+  if (!ayar) return geriDon(orderId, { error: "tryoto-kapali" });
+
+  const [{ data: order }, { data: gonderi }] = await Promise.all([
+    supabase.from("arc_orders").select("order_number").eq("organization_id", organization.id).eq("id", orderId).maybeSingle(),
+    supabase.from("arc_shipments").select("id,sequence").eq("organization_id", organization.id).eq("id", gonderiId).maybeSingle(),
+  ]);
+  if (!order || !gonderi) return geriDon(orderId, { error: "gonderi-bulunamadi" });
+
+  const etiket = await etiketBilgisi(
+    organization.id,
+    ayar.anahtar,
+    otoSiparisKimligi(order.order_number as string, gonderi.sequence as number),
+  );
+  if (!etiket?.awbUrl) {
+    return geriDon(orderId, { error: "Etiket henüz hazır değil. Kargo firması oluşturunca tekrar deneyin." });
+  }
+
+  await supabase.from("arc_shipments").update({
+    awb_url: etiket.awbUrl,
+    ...(etiket.takipNo ? { tracking_number: etiket.takipNo } : {}),
+    ...(etiket.firma ? { carrier_name: etiket.firma } : {}),
+    failure_reason: null,
+  }).eq("id", gonderiId).eq("organization_id", organization.id);
+
+  revalidatePath(`/siparisler/${orderId}`);
+  return geriDon(orderId, { saved: "etiket-alindi" });
 }

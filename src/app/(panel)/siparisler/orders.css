@@ -207,3 +207,8 @@
 .shipment-weight button:hover{border-color:var(--accent-500);color:var(--accent-500)}
 .shipment-weight small{flex:1;min-width:160px;color:var(--muted);font-size:11px}
 .shipment-oto{border-top:0;margin-top:10px;padding-top:0}
+
+/* Etiket bağlantısı vurgulu: kargoya vermenin ön şartı ve tedarikçiye
+   gönderilecek olan o. Takip bağlantısı yanında ikincil kalıyor. */
+.shipment-awb{color:var(--accent-500)!important;font-weight:800!important}
+.shipment-actions form{display:inline}

@@ -1,6 +1,6 @@
 import { kargoDurumu, tedarikciGruplari } from "@/lib/kargo-bolme";
 import { KARGO_FIRMALARI } from "@/lib/kargo-firmalari";
-import { elleGonderiEkle, gonderiIptal, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
+import { elleGonderiEkle, etiketiAl, gonderiIptal, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
 import { teslimatSecenekleri } from "@/lib/tryoto/ayar";
 import { hacimselAgirlik, VARSAYILAN_KUTU } from "@/lib/tryoto/fiyat";
 import Link from "next/link";
@@ -63,7 +63,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     supabase.from("arc_order_items").select("id,product_name,sku,quantity,unit_price,total").eq("organization_id",organization.id).eq("order_id",id).order("product_name"),
     supabase.from("arc_order_events").select("id,event_type,event_data,created_by,created_at").eq("organization_id",organization.id).eq("order_id",id).order("created_at",{ascending:false}).limit(50),
     /* Gönderiler ve kalemleri: bir sipariş birden çok firmaya bölünebiliyor. */
-    supabase.from("arc_shipments").select("id,sequence,source,status,carrier_code,carrier_name,tracking_number,tracking_url,supplier,shipped_at,failure_reason,arc_shipment_items(order_item_id,quantity)").eq("organization_id",organization.id).eq("order_id",id).order("sequence")
+    supabase.from("arc_shipments").select("id,sequence,source,status,carrier_code,carrier_name,tracking_number,tracking_url,awb_url,supplier,shipped_at,failure_reason,arc_shipment_items(order_item_id,quantity)").eq("organization_id",organization.id).eq("order_id",id).order("sequence")
   ]);
   const canManage=["owner","admin","manager"].includes(membership.role);
   const meta=(order?.metadata??{}) as OrderMeta;
@@ -95,7 +95,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   /* Gönderi bölümünün verisi: kalemler tedarikçileriyle, mevcut gönderiler
      ve kargoya verilmemiş adetler. */
   const kargoKalemleri=(items??[]).map(item=>({id:item.id,quantity:item.quantity,product_name:item.product_name,supplier:supplierBySku.get(item.sku)??null}));
-  const gonderiler=((shipments??[]) as Array<{id:string;sequence:number;source:string;status:string;carrier_code:string|null;carrier_name:string|null;tracking_number:string|null;tracking_url:string|null;supplier:string|null;shipped_at:string|null;failure_reason:string|null;arc_shipment_items:{order_item_id:string;quantity:number}[]|null}>)
+  const gonderiler=((shipments??[]) as Array<{id:string;sequence:number;source:string;status:string;carrier_code:string|null;carrier_name:string|null;tracking_number:string|null;tracking_url:string|null;awb_url:string|null;supplier:string|null;shipped_at:string|null;failure_reason:string|null;arc_shipment_items:{order_item_id:string;quantity:number}[]|null}>)
     .map(satir=>({...satir,items:satir.arc_shipment_items??[]}));
   const gruplar=tedarikciGruplari(kargoKalemleri,gonderiler);
   const kargoDurumuOzet=kargoDurumu(kargoKalemleri,gonderiler);
@@ -503,7 +503,14 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                   </>:<p className="shipment-error">{kargoFiyatHatasi??"Bu adres için kargo seçeneği dönmedi. Teslimat şehrini ve mağaza ayarlarındaki çıkış şehrini kontrol edin."}</p>}
                 </form></>:null}
               <div className="shipment-actions">
+                {/* Etiket Tarzyeri'ne gönderilecek olan; kargoya vermenin ön şartı. */}
+                {gonderi.awb_url?<a href={gonderi.awb_url} target="_blank" rel="noreferrer" className="shipment-awb">Etiketi yazdır ↗</a>:null}
                 {gonderi.tracking_url?<a href={gonderi.tracking_url} target="_blank" rel="noreferrer">Kargo takip ↗</a>:null}
+                {/* Kargo firması AWB'yi bazen gecikmeyle üretiyor; ilk
+                    çağrıda adres boş dönerse buradan yeniden sorulabiliyor. */}
+                {canManage&&gonderi.source==="oto"&&gonderi.status!=="draft"&&gonderi.status!=="cancelled"&&!gonderi.awb_url
+                  ?<form action={etiketiAl}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit">Etiketi al</button></form>
+                  :null}
                 {canManage&&gonderi.status!=="cancelled"?<form action={gonderiIptal}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit">İptal et</button></form>:null}
               </div>
             </li>)}
