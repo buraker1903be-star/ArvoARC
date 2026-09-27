@@ -72,14 +72,12 @@ export default async function Customers({ searchParams }: { searchParams: Promis
   const visible = sorted.slice(from, from + PAGE_SIZE);
 
   const totalSpent = customers.reduce((sum, customer) => sum + customer.spent, 0);
-  const repeat = customers.filter((customer) => customer.paidOrders > 1).length;
-  const newCount = customers.filter((customer) => now - customer.firstOrderAt <= NEW_DAYS * DAY).length;
 
   return <>
     <section className="ac-bar">
       <div>
         <h1>Müşteriler</h1>
-        <p>{customers.length.toLocaleString("tr-TR")} müşteri · {orderCount.toLocaleString("tr-TR")} siparişten oluşturuldu</p>
+        <p>{customers.length.toLocaleString("tr-TR")} müşteri · müşteri başına {money.format(customers.length ? totalSpent / customers.length / 100 : 0)} · {orderCount.toLocaleString("tr-TR")} siparişten oluşturuldu</p>
       </div>
       <div className="ac-bar-actions">
         {canManage ? <a className="ac-btn" href="/api/disari-aktar/musteriler"><Icon name="download" size={15} />CSV indir</a> : null}
@@ -89,20 +87,16 @@ export default async function Customers({ searchParams }: { searchParams: Promis
     <div className="ac-stack">
       {truncated ? <Notice tone="warn" title="Sipariş sayısı çok yüksek">Müşteri görünümü en yeni 20.000 siparişten hesaplandı; daha eski siparişler toplamlara dâhil değil.</Notice> : null}
 
-      <section className="ac-metrics" aria-label="Müşteri özeti">
-        <article className="ac-metric"><span>Toplam müşteri</span><strong>{customers.length.toLocaleString("tr-TR")}</strong><small>Sipariş veren</small></article>
-        <Link prefetch={false} className="ac-metric ac-lift" href={listHref(state, { segment: "repeat", page: 1 })}>
-          <span>Tekrarlayan</span>
-          <strong>{repeat.toLocaleString("tr-TR")}</strong>
-          <small>Müşterilerin %{customers.length ? Math.round((repeat / customers.length) * 100) : 0}’i birden fazla kez aldı</small>
-        </Link>
-        <article className="ac-metric"><span>Müşteri değeri</span><strong>{money.format(customers.length ? totalSpent / customers.length / 100 : 0)}</strong><small>Müşteri başına net harcama</small></article>
-        <Link prefetch={false} className="ac-metric ac-lift" href={listHref(state, { segment: "new", page: 1 })}>
-          <span>Yeni müşteri</span>
-          <strong>{newCount.toLocaleString("tr-TR")}</strong>
-          <small>İlk siparişi son {NEW_DAYS} günde</small>
-        </Link>
-      </section>
+      {/*
+        ÖZET ŞERİDİ KALDIRILDI: dört sayının üçü ekranda zaten vardı.
+        "Toplam müşteri" hem alt başlıkta hem "Tümü" çipinde yazıyor;
+        "Tekrarlayan" ve "Yeni müşteri" kutuları filtre çipleriyle aynı
+        bağlantıya ve aynı sayıya gidiyor. Özgün tek değer müşteri
+        başına harcamaydı, o da alt başlığa taşındı.
+
+        Bedeli 114px'di ve liste ekranlarında aynı kalıbı üç kez
+        ölçtük (siparişler, ürünler, stok — 27.09.2026).
+      */}
 
       <section className="ac ac-pad-sm cust-toolbar">
         <form className="ac-filter cust-search" role="search">

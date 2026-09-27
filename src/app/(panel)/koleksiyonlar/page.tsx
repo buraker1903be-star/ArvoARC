@@ -43,7 +43,7 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
     <section className="ac-bar">
       <div>
         <h1>Koleksiyonlar</h1>
-        <p>Ürünleri mağazada birlikte sergilemek için gruplar.</p>
+        <p>{all.length.toLocaleString("tr-TR")} koleksiyon · {mappedProducts.toLocaleString("tr-TR")} eşlenen ürün · {all.filter(item=>item.source==="shopify").length.toLocaleString("tr-TR")}’si Shopify kaynaklı</p>
       </div>
       {canManage?<div className="ac-bar-actions"><a className="ac-btn ac-btn-primary" href="#yeni-koleksiyon">+ Yeni koleksiyon</a></div>:null}
     </section>
@@ -54,12 +54,13 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
           gösterebiliyordu (lib/panel-bildirim.ts). */}
       <PanelBildirimi />
 
-      <section className="ac-metrics" aria-label="Koleksiyon özeti">
-        <article className="ac-metric"><span>Koleksiyon</span><strong>{all.length.toLocaleString("tr-TR")}</strong><small>Tüm durumlar</small></article>
-        <Link prefetch={false} className="ac-metric ac-lift" href={href({filter:"active"})}><span>Aktif</span><strong>{all.filter(item=>item.status==="active").length.toLocaleString("tr-TR")}</strong><small>Mağazada yayınlanabilir</small></Link>
-        <article className="ac-metric"><span>Eşlenen ürün</span><strong>{mappedProducts.toLocaleString("tr-TR")}</strong><small>En az bir koleksiyonda</small></article>
-        <article className="ac-metric"><span>Shopify kaynaklı</span><strong>{all.filter(item=>item.source==="shopify").length.toLocaleString("tr-TR")}</strong><small>Ürün türünden eşlendi</small></article>
-      </section>
+      {/*
+        ÖZET ŞERİDİ KALDIRILDI. "Koleksiyon" ve "Aktif" kutuları filtre
+        çipleriyle aynı sayıyı (ve aynı bağlantıyı) veriyordu; özgün iki
+        değer — eşlenen ürün ve Shopify kaynaklı sayısı — alt başlığa
+        taşındı. Aynı kalıp bu turda dört ekranda daha ölçüldü
+        (siparişler, ürünler, stok, müşteriler — 27.09.2026).
+      */}
 
       <section className="ac ac-pad-sm module-toolbar">
         <form className="ac-filter module-search" role="search">
