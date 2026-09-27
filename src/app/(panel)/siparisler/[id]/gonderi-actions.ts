@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { bildirimBirak } from "@/lib/panel-bildirim";
+import { basariMetni, hataMetni } from "./mesajlar";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
 import { bolmeSorunu, izlenmeliMi, type Gonderi, type SiparisKalemi } from "@/lib/kargo-bolme";
@@ -32,9 +34,19 @@ const MANAGERS = ["owner", "admin", "manager"];
 
 /* Dönüş tipi never: redirect akışı kesiyor ve derleyici bunu ancak böyle
    biliyor — yoksa sonraki satırlar "değer null olabilir" diye uyarıyor. */
-const geriDon = (orderId: string, sonuc: Record<string, string>): never => {
-  const p = new URLSearchParams(sonuc);
-  redirect(`/siparisler/${orderId}?${p.toString()}`);
+/*
+  İşlem sonucu ÇEREZE yazılıyor, adrese değil: adresteki mesaj dışarıdan
+  uydurulabiliyordu ve sayfa tanımadığı kodu olduğu gibi basıyordu
+  (lib/panel-bildirim.ts). Kod → Türkçe metin çevirisi burada yapılıyor;
+  sayfa artık yalnızca yazılanı gösteriyor.
+
+  Fonksiyon `never` dönüyor çünkü redirect akışı kesiyor; çağıranların
+  `return await geriDon(...)` yazması yalnızca okunurluk içindir.
+*/
+const geriDon = async (orderId: string, sonuc: { error?: string; saved?: string }): Promise<never> => {
+  if (sonuc.error) await bildirimBirak({ hata: hataMetni(sonuc.error) });
+  else if (sonuc.saved) await bildirimBirak({ basari: basariMetni(sonuc.saved) });
+  redirect(`/siparisler/${orderId}`);
 };
 
 /** Formdaki "kalem_<id>" alanlarından seçilen adetler. */
@@ -51,7 +63,7 @@ function secimiOku(formData: FormData): Record<string, number> {
 export async function elleGonderiEkle(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   const orderId = String(formData.get("order_id") ?? "");
-  if (!MANAGERS.includes(membership.role)) return geriDon(orderId, { error: "forbidden" });
+  if (!MANAGERS.includes(membership.role)) return await geriDon(orderId, { error: "forbidden" });
 
   const carrierCode = String(formData.get("carrier_code") ?? "").trim();
   const trackingNumber = String(formData.get("tracking_number") ?? "").trim();
@@ -59,13 +71,13 @@ export async function elleGonderiEkle(formData: FormData) {
   const elleAdres = String(formData.get("tracking_url") ?? "").trim();
   const secim = secimiOku(formData);
 
-  if (!KARGO_FIRMALARI.some((firma) => firma.kod === carrierCode)) return geriDon(orderId, { error: "kargo-firmasi-gecersiz" });
+  if (!KARGO_FIRMALARI.some((firma) => firma.kod === carrierCode)) return await geriDon(orderId, { error: "kargo-firmasi-gecersiz" });
   /*
     Takip numarası burada da isteniyor, veritabanı da istiyor. İkisi
     birden: veritabanı kuralı güvenlik sınırı, buradaki ise kullanıcıya
     Türkçe ve alanı işaret eden bir mesaj verebilmek için.
   */
-  if (!trackingNumber) return geriDon(orderId, { error: "takip-numarasi-gerekli" });
+  if (!trackingNumber) return await geriDon(orderId, { error: "takip-numarasi-gerekli" });
 
   const [{ data: kalemler }, { data: gonderiler }] = await Promise.all([
     supabase.from("arc_order_items").select("id,quantity,product_name").eq("organization_id", organization.id).eq("order_id", orderId),
@@ -75,7 +87,7 @@ export async function elleGonderiEkle(formData: FormData) {
   const mevcutGonderiler: Gonderi[] = ((gonderiler ?? []) as Array<{ id: string; status: string; arc_shipment_items: { order_item_id: string; quantity: number }[] | null }>)
     .map((satir) => ({ id: satir.id, status: satir.status, items: satir.arc_shipment_items ?? [] }));
   const sorun = bolmeSorunu(secim, (kalemler ?? []) as SiparisKalemi[], mevcutGonderiler);
-  if (sorun) return geriDon(orderId, { error: sorun });
+  if (sorun) return await geriDon(orderId, { error: sorun });
 
   // Sipariş içindeki sıra: ekranda "2. paket" diye okunuyor.
   const sonrakiSira = Math.max(0, ...((gonderiler ?? []) as { sequence: number }[]).map((s) => s.sequence)) + 1;
@@ -93,7 +105,7 @@ export async function elleGonderiEkle(formData: FormData) {
     supplier: supplier || null,
     shipped_at: new Date().toISOString(),
   }).select("id").single();
-  if (error || !gonderi) return geriDon(orderId, { error: error?.message ?? "gonderi-olusturulamadi" });
+  if (error || !gonderi) return await geriDon(orderId, { error: error?.message ?? "gonderi-olusturulamadi" });
 
   /*
     Kalemler gönderiden SONRA yazılıyor; tetikleyici gönderinin siparişini
@@ -110,7 +122,7 @@ export async function elleGonderiEkle(formData: FormData) {
   const { error: kalemHatasi } = await supabase.from("arc_shipment_items").insert(satirlar);
   if (kalemHatasi) {
     await supabase.from("arc_shipments").delete().eq("id", gonderi.id).eq("organization_id", organization.id);
-    geriDon(orderId, { error: kalemHatasi.message });
+    await geriDon(orderId, { error: kalemHatasi.message });
   }
 
   /*
@@ -120,7 +132,7 @@ export async function elleGonderiEkle(formData: FormData) {
   await kargoBildirimiGonder(supabase, organization.id, orderId, gonderi.id);
 
   revalidatePath(`/siparisler/${orderId}`);
-  geriDon(orderId, { saved: "gonderi" });
+  await geriDon(orderId, { saved: "gonderi" });
 }
 
 /*
@@ -131,16 +143,16 @@ export async function elleGonderiEkle(formData: FormData) {
 export async function gonderiIptal(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   const orderId = String(formData.get("order_id") ?? "");
-  if (!MANAGERS.includes(membership.role)) return geriDon(orderId, { error: "forbidden" });
+  if (!MANAGERS.includes(membership.role)) return await geriDon(orderId, { error: "forbidden" });
   const gonderiId = String(formData.get("shipment_id") ?? "");
 
   const { error } = await supabase.from("arc_shipments")
     .update({ status: "cancelled" })
     .eq("id", gonderiId).eq("organization_id", organization.id);
-  if (error) return geriDon(orderId, { error: error.message });
+  if (error) return await geriDon(orderId, { error: error.message });
 
   revalidatePath(`/siparisler/${orderId}`);
-  geriDon(orderId, { saved: "gonderi-iptal" });
+  await geriDon(orderId, { saved: "gonderi-iptal" });
 }
 
 /*
@@ -320,7 +332,7 @@ const otoSiparisKimligi = (siparisNo: string, sira: number) => `${siparisNo}-${s
 export async function otoTaslakOlustur(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   const orderId = String(formData.get("order_id") ?? "");
-  if (!MANAGERS.includes(membership.role)) return geriDon(orderId, { error: "forbidden" });
+  if (!MANAGERS.includes(membership.role)) return await geriDon(orderId, { error: "forbidden" });
 
   const supplier = String(formData.get("supplier") ?? "").trim();
   const secim = secimiOku(formData);
@@ -332,7 +344,7 @@ export async function otoTaslakOlustur(formData: FormData) {
   const mevcut: Gonderi[] = ((gonderiler ?? []) as Array<{ id: string; status: string; arc_shipment_items: { order_item_id: string; quantity: number }[] | null }>)
     .map((satir) => ({ id: satir.id, status: satir.status, items: satir.arc_shipment_items ?? [] }));
   const sorun = bolmeSorunu(secim, (kalemler ?? []) as SiparisKalemi[], mevcut);
-  if (sorun) return geriDon(orderId, { error: sorun });
+  if (sorun) return await geriDon(orderId, { error: sorun });
 
   const sonrakiSira = Math.max(0, ...((gonderiler ?? []) as { sequence: number }[]).map((s) => s.sequence)) + 1;
   const { data: gonderi, error } = await supabase.from("arc_shipments").insert({
@@ -343,7 +355,7 @@ export async function otoTaslakOlustur(formData: FormData) {
     status: "draft",
     supplier: supplier || null,
   }).select("id").single();
-  if (error || !gonderi) return geriDon(orderId, { error: error?.message ?? "gonderi-olusturulamadi" });
+  if (error || !gonderi) return await geriDon(orderId, { error: error?.message ?? "gonderi-olusturulamadi" });
 
   const { error: kalemHatasi } = await supabase.from("arc_shipment_items").insert(
     Object.entries(secim).map(([kalemId, adet]) => ({
@@ -355,17 +367,17 @@ export async function otoTaslakOlustur(formData: FormData) {
   );
   if (kalemHatasi) {
     await supabase.from("arc_shipments").delete().eq("id", gonderi.id).eq("organization_id", organization.id);
-    return geriDon(orderId, { error: kalemHatasi.message });
+    return await geriDon(orderId, { error: kalemHatasi.message });
   }
 
   revalidatePath(`/siparisler/${orderId}`);
-  return geriDon(orderId, { saved: "taslak" });
+  return await geriDon(orderId, { saved: "taslak" });
 }
 
 export async function otoEtiketUret(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   const orderId = String(formData.get("order_id") ?? "");
-  if (!MANAGERS.includes(membership.role)) return geriDon(orderId, { error: "forbidden" });
+  if (!MANAGERS.includes(membership.role)) return await geriDon(orderId, { error: "forbidden" });
   const gonderiId = String(formData.get("shipment_id") ?? "");
   /*
     Seçenek "id|ad" biçiminde geliyor: firma adı createOrder yanıtından
@@ -392,7 +404,7 @@ export async function otoEtiketUret(formData: FormData) {
   const yukseklikCm = sayi("yuk");
 
   const ayar = await kargoAyari(supabase, organization.id);
-  if (!ayar) return geriDon(orderId, { error: "tryoto-kapali" });
+  if (!ayar) return await geriDon(orderId, { error: "tryoto-kapali" });
 
   const [{ data: order }, { data: gonderi }] = await Promise.all([
     supabase.from("arc_orders").select("id,order_number,currency,payment_status,customer_name,customer_email,metadata")
@@ -400,8 +412,8 @@ export async function otoEtiketUret(formData: FormData) {
     supabase.from("arc_shipments").select("id,sequence,status,arc_shipment_items(order_item_id,quantity)")
       .eq("organization_id", organization.id).eq("id", gonderiId).maybeSingle(),
   ]);
-  if (!order || !gonderi) return geriDon(orderId, { error: "gonderi-bulunamadi" });
-  if (gonderi.status !== "draft") return geriDon(orderId, { error: "gonderi-zaten-olusturuldu" });
+  if (!order || !gonderi) return await geriDon(orderId, { error: "gonderi-bulunamadi" });
+  if (gonderi.status !== "draft") return await geriDon(orderId, { error: "gonderi-zaten-olusturuldu" });
 
   const satirlar = (gonderi.arc_shipment_items ?? []) as { order_item_id: string; quantity: number }[];
   const { data: kalemler } = await supabase.from("arc_order_items")
@@ -455,10 +467,10 @@ export async function otoEtiketUret(formData: FormData) {
     hangi satırın boş kaldığını aramaya bırakıyordu.
   */
   if (!girdi.gondericiKodu?.trim() && !girdi.gonderici && ayar.adresEksigi) {
-    return geriDon(orderId, { error: `Gönderici adresi eksik (${ayar.adresEksigi}): Ayarlar → Kargo altyapısı bölümünde çıkış adresini doldurun.` });
+    return await geriDon(orderId, { error: `Gönderici adresi eksik (${ayar.adresEksigi}): Ayarlar → Kargo altyapısı bölümünde çıkış adresini doldurun.` });
   }
   const govdeHatasi = govdeSorunu(girdi);
-  if (govdeHatasi) return geriDon(orderId, { error: govdeHatasi });
+  if (govdeHatasi) return await geriDon(orderId, { error: govdeHatasi });
   /*
     KARGO SEÇENEĞİ ZORUNLU. createShipment deliveryOptionId olmadan
     çağrılamıyor; seçenek boşken eskiden sipariş yine oluşturuluyordu ve
@@ -466,7 +478,7 @@ export async function otoEtiketUret(formData: FormData) {
     açılacak bir gönderi hiç yoktu.
   */
   if (!secenekId) {
-    return geriDon(orderId, { error: "Kargo seçeneği seçilmedi: ağırlık ve ölçüyü girip fiyatları yenileyin, sonra bir firma seçin." });
+    return await geriDon(orderId, { error: "Kargo seçeneği seçilmedi: ağırlık ve ölçüyü girip fiyatları yenileyin, sonra bir firma seçin." });
   }
 
   const otoSiparisNo = otoSiparisKimligi(order.order_number as string, gonderi.sequence as number);
@@ -562,7 +574,7 @@ export async function otoEtiketUret(formData: FormData) {
     await supabase.from("arc_shipments").update({ failure_reason: mesaj })
       .eq("id", gonderiId).eq("organization_id", organization.id);
     revalidatePath(`/siparisler/${orderId}`);
-    return geriDon(orderId, { error: mesaj });
+    return await geriDon(orderId, { error: mesaj });
   }
 
   /*
@@ -573,7 +585,7 @@ export async function otoEtiketUret(formData: FormData) {
   await kargoBildirimiGonder(supabase, organization.id, orderId, gonderiId);
 
   revalidatePath(`/siparisler/${orderId}`);
-  return geriDon(orderId, { saved: "etiket" });
+  return await geriDon(orderId, { saved: "etiket" });
 }
 
 /*
@@ -585,17 +597,17 @@ export async function otoEtiketUret(formData: FormData) {
 export async function etiketiAl(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   const orderId = String(formData.get("order_id") ?? "");
-  if (!MANAGERS.includes(membership.role)) return geriDon(orderId, { error: "forbidden" });
+  if (!MANAGERS.includes(membership.role)) return await geriDon(orderId, { error: "forbidden" });
   const gonderiId = String(formData.get("shipment_id") ?? "");
 
   const ayar = await kargoAyari(supabase, organization.id);
-  if (!ayar) return geriDon(orderId, { error: "tryoto-kapali" });
+  if (!ayar) return await geriDon(orderId, { error: "tryoto-kapali" });
 
   const [{ data: order }, { data: gonderi }] = await Promise.all([
     supabase.from("arc_orders").select("order_number").eq("organization_id", organization.id).eq("id", orderId).maybeSingle(),
     supabase.from("arc_shipments").select("id,sequence,oto_order_id,delivery_option_id").eq("organization_id", organization.id).eq("id", gonderiId).maybeSingle(),
   ]);
-  if (!order || !gonderi) return geriDon(orderId, { error: "gonderi-bulunamadi" });
+  if (!order || !gonderi) return await geriDon(orderId, { error: "gonderi-bulunamadi" });
 
   const otoSiparisNo = otoSiparisKimligi(order.order_number as string, gonderi.sequence as number);
   let otoKimligi = gonderi.oto_order_id as string | null;
@@ -650,7 +662,7 @@ export async function etiketiAl(formData: FormData) {
     await supabase.from("arc_shipments").update({ ...kismi, failure_reason: mesaj })
       .eq("id", gonderiId).eq("organization_id", organization.id);
     revalidatePath(`/siparisler/${orderId}`);
-    return geriDon(orderId, { error: mesaj });
+    return await geriDon(orderId, { error: mesaj });
   }
 
   await supabase.from("arc_shipments").update({
@@ -664,7 +676,7 @@ export async function etiketiAl(formData: FormData) {
   await kargoBildirimiGonder(supabase, organization.id, orderId, gonderiId);
 
   revalidatePath(`/siparisler/${orderId}`);
-  return geriDon(orderId, { saved: "etiket-alindi" });
+  return await geriDon(orderId, { saved: "etiket-alindi" });
 }
 
 /*
@@ -688,17 +700,17 @@ export async function etiketiAl(formData: FormData) {
 export async function kargoDurumlariniGuncelle(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   const orderId = String(formData.get("order_id") ?? "");
-  if (!MANAGERS.includes(membership.role)) return geriDon(orderId, { error: "forbidden" });
+  if (!MANAGERS.includes(membership.role)) return await geriDon(orderId, { error: "forbidden" });
 
   const ayar = await kargoAyari(supabase, organization.id);
-  if (!ayar) return geriDon(orderId, { error: "tryoto-kapali" });
+  if (!ayar) return await geriDon(orderId, { error: "tryoto-kapali" });
 
   const [{ data: order }, { data: gonderiler }] = await Promise.all([
     supabase.from("arc_orders").select("order_number").eq("organization_id", organization.id).eq("id", orderId).maybeSingle(),
     supabase.from("arc_shipments").select("id,sequence,status,oto_order_id")
       .eq("organization_id", organization.id).eq("order_id", orderId).eq("source", "oto"),
   ]);
-  if (!order) return geriDon(orderId, { error: "order-not-found" });
+  if (!order) return await geriDon(orderId, { error: "order-not-found" });
 
   /*
     ELLE BASILAN DÜĞME süre sınırı tanımıyor: kullanıcı o gönderiyi
@@ -706,7 +718,7 @@ export async function kargoDurumlariniGuncelle(formData: FormData) {
   */
   const izlenecek = ((gonderiler ?? []) as Array<{ id: string; sequence: number; status: string; oto_order_id: string | null }>)
     .filter((gonderi) => izlenmeliMi(gonderi.status));
-  if (!izlenecek.length) return geriDon(orderId, { error: "Güncellenecek açık bir tryOTO gönderisi yok." });
+  if (!izlenecek.length) return await geriDon(orderId, { error: "Güncellenecek açık bir tryOTO gönderisi yok." });
 
   /*
     Yenileme mantığı ORTAK modülde (lib/kargo-durumu-yenile.ts): aynı işi
@@ -731,6 +743,6 @@ export async function kargoDurumlariniGuncelle(formData: FormData) {
 
   revalidatePath(`/siparisler/${orderId}`);
   return guncellenen
-    ? geriDon(orderId, { saved: `${guncellenen} gönderinin durumu güncellendi` })
-    : geriDon(orderId, { error: "Hiçbir gönderinin durumu alınamadı; kartlardaki sebebe bakın." });
+    ? await geriDon(orderId, { saved: `${guncellenen} gönderinin durumu güncellendi` })
+    : await geriDon(orderId, { error: "Hiçbir gönderinin durumu alınamadı; kartlardaki sebebe bakın." });
 }

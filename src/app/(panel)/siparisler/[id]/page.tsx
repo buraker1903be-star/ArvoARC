@@ -18,6 +18,7 @@ import { nextOrderStep, orderFlow } from "@/lib/order-flow";
 import { describeOrderEvent } from "@/lib/order-events";
 import { Icon } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { PrintButton } from "@/components/panel/print-button";
 import "../orders.css";
 
@@ -30,32 +31,13 @@ const when=(value:string)=>dateTime.format(new Date(value));
 type Address={name?:string;address1?:string;address2?:string;city?:string;province?:string;zip?:string;country?:string;phone?:string};
 type OrderMeta={discount?:number;coupon_code?:string;refunded_at?:string;refunded_amount?:number;refund_reference?:string;billing?:Address;shipping_address?:Address;payment_method?:string;payment_reference?:string;notes?:string;tags?:string;historical_import?:boolean;shipping_carrier?:string;tracking_number?:string;tracking_url?:string;internal_note?:string};
 
-const ERRORS:Record<string,string>={
-  "not-paid":"Bu sipariş ödenmediği için iade edilemez.",
-  "already-refunded":"Bu sipariş zaten iade edilmiş.",
-  "invalid-amount":"Geçerli bir iade tutarı girin: sıfırdan büyük olmalı ve iade edilebilir kalan tutarı aşmamalı. Tamamını iade etmek için alanı boş bırakın.",
-  "refund-failed":"PayTR iade talebini reddetti. Ayrıntı için sunucu günlüklerine bakın.",
-  "refund-recorded-failed":"İade yapıldı ancak sipariş kaydı güncellenemedi. PayTR panelinden doğrulayın; tekrar iade denemeyin.",
-  "transfer-order":"Havale siparişi PayTR'dan iade edilemez. Parayı bankadan iade edip siparişi elle kapatın.",
-  busy:"Bu sipariş için iade zaten işleniyor. Sayfayı yenileyip durumu kontrol edin.",
-  "order-closed":"Bu sipariş kapandığı (iptal ya da iade) için akışta ilerletilemez.",
-  "order-not-found":"Sipariş bulunamadı.",
-  forbidden:"Bu işlem için yetkiniz yok.",
-  "invalid-status":"Geçersiz sipariş durumu.",
-  "invalid-fulfillment":"Kargo bilgileri çok uzun.",
-  "invalid-tracking-url":"Takip bağlantısı https:// ile başlayan geçerli bir adres olmalı.",
-  "save-failed":"Durum kaydedilemedi, tekrar deneyin.",
-  "not-transfer":"Bu sipariş havale ile verilmemiş; kart ödemeleri PayTR bildirimiyle kapanır.",
-  "already-paid":"Bu siparişin ödemesi zaten onaylanmış.",
-  "in-progress":"Bu sipariş az önce başka bir sekmeden ya da kullanıcı tarafından güncellendi. Sayfayı yenileyip tekrar deneyin.",
-};
 
 function AddressCard({title,address}:{title:string;address?:Address}){
   const lines=[address?.name,address?.address1,address?.address2,[address?.zip,address?.city].filter(Boolean).join(" "),address?.province,address?.country,address?.phone].filter(Boolean);
   return <article className="ac order-party"><small>{title}</small>{lines.length?lines.map((line,index)=><p key={index}>{line}</p>):<p className="is-empty">Bilgi bulunmuyor.</p>}</article>;
 }
 
-export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string;ok?:string;agirlik?:string;en?:string;boy?:string;yuk?:string}>}){
+export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{agirlik?:string;en?:string;boy?:string;yuk?:string}>}){
   const {id}=await params;const query=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const [{data:order,error},{data:items,error:itemsError},{data:events,error:eventsError},{data:shipments}]=await Promise.all([
@@ -304,10 +286,10 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     </section>
 
     <div className="ac-stack">
-      {query.saved?<Notice title={query.saved==="fulfillment"?"Kargo ve operasyon bilgileri kaydedildi.":query.saved==="refund"?"İade tamamlandı.":"Sipariş durumu güncellendi."}/>:null}
-      {query.error?<Notice tone="error" title="İşlem tamamlanamadı">{ERRORS[query.error]??query.error}</Notice>:null}
-      {query.ok==="payment"?<Notice title="Havale ödemesi onaylandı.">Sipariş onaylandı; müşterinin e-posta adresi varsa “Ödemeniz alındı” bildirimi gönderildi.</Notice>:null}
-      {query.ok==="cancelled"?<Notice title="Sipariş iptal edildi.">Müşterinin e-posta adresi varsa “Siparişiniz iptal edildi” bildirimi gönderildi.</Notice>:null}
+      {/* İşlem sonucu ÇEREZDEN geliyor. Adres satırındaki ?error= artık
+          okunmuyor: dışarıdan gönderilen bir bağlantı kullanıcıya uydurma
+          bir mesaj gösterebiliyordu (lib/panel-bildirim.ts). */}
+      <PanelBildirimi />
       {transferPending?(
         <div className="order-transfer">
           <Notice tone={transferStale?"error":"warn"} title={transferStale?`Havale ${waitedLabel} ödenmedi · süresi geçti`:`Havale ödemesi bekleniyor · ${waitedLabel}`}>

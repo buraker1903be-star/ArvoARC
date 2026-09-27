@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { bildirimBirak } from "@/lib/panel-bildirim";
+import { basariMetni, hataMetni } from "./mesajlar";
 import { sendEmail } from "@/lib/email/resend";
 import { partialRefundEmail, shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { notifyTransferPaid } from "@/lib/email/transfer-paid";
@@ -12,6 +14,18 @@ import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock"
 import { requireTenant } from "@/lib/tenant";
 import { getStoreBrand } from "@/lib/store-brand";
 
+/*
+  İşlem sonucu ÇEREZE yazılıyor, adrese değil: `?error=` adres satırında
+  taşındığı için dışarıdan uydurulabiliyordu ve sayfa tanımadığı kodu
+  olduğu gibi basıyordu (lib/panel-bildirim.ts). Kod → Türkçe metin
+  çevirisi burada yapılıyor.
+*/
+async function siparise(orderId:string,sonuc:{hata?:string;basari?:string}):Promise<never>{
+  if(sonuc.hata)await bildirimBirak({hata:hataMetni(sonuc.hata)});
+  else if(sonuc.basari)await bildirimBirak({basari:basariMetni(sonuc.basari)});
+  redirect(`/siparisler/${orderId}`);
+}
+
 const roles=new Set(["owner","admin","manager"]);
 const orderStatuses=new Set(["pending","confirmed","processing","fulfilled","cancelled","refunded"]);
 const paymentStatuses=new Set(["pending","authorized","paid","partially_refunded","refunded","failed"]);
@@ -19,14 +33,14 @@ const paymentStatuses=new Set(["pending","authorized","paid","partially_refunded
 export async function updateOrderStatus(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   const orderId=String(formData.get("order_id")??"");
-  if(!roles.has(membership.role))redirect(`/siparisler/${orderId}?error=forbidden`);
+  if(!roles.has(membership.role))return await siparise(orderId,{hata:"forbidden"});
   const status=String(formData.get("status")??"");
   const paymentStatus=String(formData.get("payment_status")??"");
-  if(!orderId||!orderStatuses.has(status)||!paymentStatuses.has(paymentStatus))redirect(`/siparisler/${orderId}?error=invalid-status`);
+  if(!orderId||!orderStatuses.has(status)||!paymentStatuses.has(paymentStatus))return await siparise(orderId,{hata:"invalid-status"});
 
   /* Önceki ödeme durumu da okunur: havalede "ödendi"ye geçiş müşteriye bildirilir. */
   const {data:ownedOrder}=await supabase.from("arc_orders").select("id,status,payment_status,metadata,total,order_number,customer_name,customer_email").eq("organization_id",organization.id).eq("id",orderId).maybeSingle();
-  if(!ownedOrder)redirect(`/siparisler/${orderId}?error=order-not-found`);
+  if(!ownedOrder)return await siparise(orderId,{hata:"order-not-found"});
   /*
     Parayı hareket ettirmeden "iade edildi" işaretlemek, iade
     yetkisiyle aynı: yalnızca sahip ve yönetici. Mağaza yöneticisi
@@ -34,7 +48,7 @@ export async function updateOrderStatus(formData:FormData){
     gerçek iadeye kapanıyordu.
   */
   const marksRefund=(paymentStatus!==ownedOrder.payment_status&&["refunded","partially_refunded"].includes(paymentStatus))||(status==="refunded"&&ownedOrder.status!=="refunded");
-  if(marksRefund&&!["owner","admin"].includes(membership.role))redirect(`/siparisler/${orderId}?error=forbidden`);
+  if(marksRefund&&!["owner","admin"].includes(membership.role))return await siparise(orderId,{hata:"forbidden"});
   const {error}=await supabase.rpc("arc_update_order_status",{p_order_id:orderId,p_status:status,p_payment_status:paymentStatus});
 
   /*
@@ -72,9 +86,9 @@ export async function updateOrderStatus(formData:FormData){
   if(!error&&ownedOrder.payment_status!=="paid"&&paymentStatus==="paid"&&isBankTransfer(ownedOrder.metadata)){
     await notifyTransferPaid(ownedOrder, await getStoreBrand(supabase, organization.id));
   }
-  if(error)redirect(`/siparisler/${orderId}?error=${encodeURIComponent(error.message)}`);
+  if(error)return await siparise(orderId,{hata:error.message});
   revalidatePath("/");revalidatePath("/siparisler");revalidatePath("/stok");revalidatePath("/urunler");revalidatePath(`/siparisler/${orderId}`);
-  redirect(`/siparisler/${orderId}?saved=1`);
+  return await siparise(orderId,{basari:"durum"});
 }
 
 
@@ -83,20 +97,20 @@ type OrderMetadata={shipping_carrier?:string;tracking_number?:string;tracking_ur
 export async function updateFulfillmentDetails(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   const orderId=String(formData.get("order_id")??"");
-  if(!roles.has(membership.role))redirect(`/siparisler/${orderId}?error=forbidden`);
+  if(!roles.has(membership.role))return await siparise(orderId,{hata:"forbidden"});
   const carrier=String(formData.get("shipping_carrier")??"").trim();
   const trackingNumber=String(formData.get("tracking_number")??"").trim();
   const trackingInput=String(formData.get("tracking_url")??"").trim();
   const internalNote=String(formData.get("internal_note")??"").trim();
-  if(carrier.length>100||trackingNumber.length>160||internalNote.length>1000)redirect(`/siparisler/${orderId}?error=invalid-fulfillment`);
+  if(carrier.length>100||trackingNumber.length>160||internalNote.length>1000)return await siparise(orderId,{hata:"invalid-fulfillment"});
   let trackingUrl="";
   if(trackingInput){
     try{const parsed=new URL(trackingInput);if(parsed.protocol!=="https:"||parsed.username||parsed.password)throw new Error();trackingUrl=parsed.toString();}
-    catch{redirect(`/siparisler/${orderId}?error=invalid-tracking-url`);}
+    catch{return await siparise(orderId,{hata:"invalid-tracking-url"});}
   }
 
   const {data:order,error:readError}=await supabase.from("arc_orders").select("metadata").eq("organization_id",organization.id).eq("id",orderId).maybeSingle();
-  if(readError||!order)redirect(`/siparisler/${orderId}?error=order-not-found`);
+  if(readError||!order)return await siparise(orderId,{hata:"order-not-found"});
   const metadata=(order.metadata??{}) as OrderMetadata;
   const {error}=await supabase.from("arc_orders").update({metadata:{...metadata,shipping_carrier:carrier||null,tracking_number:trackingNumber||null,tracking_url:trackingUrl||null,internal_note:internalNote||null},updated_at:new Date().toISOString()}).eq("organization_id",organization.id).eq("id",orderId);
 
@@ -142,9 +156,9 @@ export async function updateFulfillmentDetails(formData:FormData){
       console.error("Kargo bildirimi gönderilemedi:",mailError);
     }
   }
-  if(error)redirect(`/siparisler/${orderId}?error=${encodeURIComponent(error.message)}`);
+  if(error)return await siparise(orderId,{hata:error.message});
   revalidatePath("/siparisler");revalidatePath(`/siparisler/${orderId}`);
-  redirect(`/siparisler/${orderId}?saved=fulfillment`);
+  return await siparise(orderId,{basari:"fulfillment"});
 }
 
 /**
@@ -195,16 +209,16 @@ export async function refundOrder(formData: FormData) {
   const alreadyRefunded = Math.max(0, Number(meta.refunded_amount ?? 0) || 0);
   const remaining = Math.max(0, (order.total ?? 0) - alreadyRefunded);
   if (order.payment_status === "refunded" || remaining <= 0 || (meta.refunded_at && alreadyRefunded <= 0)) {
-    redirect(`/siparisler/${orderId}?error=already-refunded`);
+    return await siparise(orderId,{hata:"already-refunded"});
   }
 
   if (order.payment_status !== "paid" && order.payment_status !== "partially_refunded") {
-    redirect(`/siparisler/${orderId}?error=not-paid`);
+    return await siparise(orderId,{hata:"not-paid"});
   }
 
   /* Havale PayTR'dan geçmediği için PayTR'dan iade edilemez. */
   if (isBankTransfer(meta)) {
-    redirect(`/siparisler/${orderId}?error=transfer-order`);
+    return await siparise(orderId,{hata:"transfer-order"});
   }
 
   /*
@@ -221,12 +235,12 @@ export async function refundOrder(formData: FormData) {
   const rawAmount = String(formData.get("amount") ?? "").trim();
   const requested = Number(rawAmount.replace(",", "."));
   if (rawAmount && (!Number.isFinite(requested) || requested <= 0)) {
-    redirect(`/siparisler/${orderId}?error=invalid-amount`);
+    return await siparise(orderId,{hata:"invalid-amount"});
   }
   const amountKurus = rawAmount ? Math.round(requested * 100) : remaining;
 
   if (amountKurus <= 0 || amountKurus > remaining) {
-    redirect(`/siparisler/${orderId}?error=invalid-amount`);
+    return await siparise(orderId,{hata:"invalid-amount"});
   }
 
   /* PayTR her iadede ayrı referans görmeli; ilk iade eski biçimde kalır. */
@@ -240,7 +254,7 @@ export async function refundOrder(formData: FormData) {
 
   /* Sipariş iade için kilitlenir: çift tıklama ya da ikinci sekme aynı iadeyi PayTR'a iki kez göndermesin (bkz. lib/order-lock). */
   const lockedMeta = await claimOrderLock(supabase, organization.id, order, "refund_lock");
-  if (!lockedMeta) redirect(`/siparisler/${orderId}?error=busy`);
+  if (!lockedMeta) return await siparise(orderId,{hata:"busy"});
 
   const result = await refundPayment({
     supabase,
@@ -253,7 +267,7 @@ export async function refundOrder(formData: FormData) {
   if (!result.ok) {
     await releaseOrderLock(supabase, organization.id, orderId, lockedMeta, "refund_lock");
     console.error("İade başarısız:", order.order_number, result.message);
-    redirect(`/siparisler/${orderId}?error=refund-failed`);
+    return await siparise(orderId,{hata:"refund-failed"});
   }
 
   /*
@@ -293,7 +307,7 @@ export async function refundOrder(formData: FormData) {
       amountKurus,
       error.message,
     );
-    redirect(`/siparisler/${orderId}?error=refund-recorded-failed`);
+    return await siparise(orderId,{hata:"refund-recorded-failed"});
   }
 
   /* Müşteriye bildirim; hata iadeyi geçersiz kılmaz. */
@@ -311,5 +325,5 @@ export async function refundOrder(formData: FormData) {
   }
 
   revalidatePath(`/siparisler/${orderId}`);
-  redirect(`/siparisler/${orderId}?saved=refund`);
+  return await siparise(orderId,{basari:"refund"});
 }

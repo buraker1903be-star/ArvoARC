@@ -1,56 +1,15 @@
 import { requireTenant } from "@/lib/tenant";
-import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
 import { baglantiyiSina } from "@/lib/tryoto/ayar";
 import "../catalog.css";
 
 const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending_dns:"DNS bekleniyor",verifying:"Doğrulanıyor",active:"Aktif",failed:"Bağlantı hatası"};
 
-const SAVED:Record<string,string>={
-  general:"Marka ayarları kaydedildi.",
-  sales:"Satış ayarları kaydedildi.",
-  payments:"Ödeme ayarları kaydedildi.",
-  logo:"Logo yüklendi.",
-  favicon:"Favicon yüklendi.",
-  "logo-removed":"Logo kaldırıldı.",
-  "favicon-removed":"Favicon kaldırıldı.",
-  "panel-domain":"Panel alan adı kaydedildi. DNS kaydını ekleyip doğrulayın.",
-  domain:"Mağaza alan adı kaydedildi.",
-  "panel-domain-verified":"Panel alan adı doğrulandı; güvenli bağlantı etkin.",
-  "storefront-domain-verified":"Mağaza alan adı doğrulandı; güvenli bağlantı etkin.",
-};
-const ERRORS:Record<string,string>={
-  forbidden:"Bu ayarları değiştirmek için yönetici yetkisi gerekir.",
-  "invalid-bank-transfer":"Havale için banka adı, hesap sahibi ve TR ile başlayan 26 haneli IBAN gerekli.",
-  "paytr-merchant-required":"PayTR’ı açmak için mağaza numarası gerekli.",
-  "invalid-installment":"Taksit sayısı 0 ile 12 arasında olmalı.",
-  "invalid-email-sender":"Gönderen adresi geçersiz. Ya düz adres yazın (siparis@alanadiniz.com) ya da \"Mağaza Adı <siparis@alanadiniz.com>\" biçiminde.",
-  "file-required":"Bir dosya seçin.",
-  "invalid-brand-file":"Dosya türü veya boyutu uygun değil.",
-  "settings-required":"Önce marka ayarlarını kaydedin.",
-  "invalid-asset":"Geçersiz dosya.",
-  "invalid-panel-domain":"Geçerli bir alan adı girin (örn. app.markaniz.com).",
-  "panel-storefront-domain-conflict":"Panel ve mağaza aynı alan adını kullanamaz.",
-  "invalid-domain":"Geçerli bir alan adı girin (örn. markaniz.com).",
-  "invalid-subdomain":"Alt alan adı yalnızca küçük harf, rakam ve tire içerebilir.",
-  "domain-required":"Alt alan adı veya özel alan adı girin.",
-  "panel-domain-required":"Önce panel alan adını kaydedin.",
-  /* Kimin kullandığı söylenmez: mağazalar birbirinin varlığını öğrenmemeli. */
-  "domain-in-use":"Bu alan adı başka bir mağazada kullanılıyor. Size ait olduğunu düşünüyorsanız bize bildirin.",
-  "invalid-order-prefix":"Sipariş öneki 1-6 harf olmalı (rakam ve işaret olmaz). Örnek: AC.",
-  "invalid-shipping-fee":"Kargo ücreti 0 ile 100.000 ₺ arasında olmalı.",
-  "invalid-free-threshold":"Ücretsiz kargo eşiği 0 ile 1.000.000 ₺ arasında olmalı.",
-  "invalid-transfer-discount":"Havale indirimi %0 ile %100 arasında olmalı.",
-  "order-prefix-in-use":"Bu sipariş öneki başka bir mağazada kullanılıyor. Sipariş numaraları çakışmasın diye önek mağazaya özel olmalı.",
-};
 /* DNS kaydı henüz yayılmadıysa hata değil, bekleme durumu. */
-const PENDING:Record<string,string>={
-  "panel-dns-not-ready":"Panel DNS kaydı henüz görünmüyor. Kaydın yayılması birkaç dakika sürebilir; sonra tekrar doğrulayın.",
-  "storefront-dns-not-ready":"Mağaza DNS kaydı henüz görünmüyor. Kaydın yayılması birkaç dakika sürebilir; sonra tekrar doğrulayın.",
-};
 
-export default async function Settings({searchParams}:{searchParams:Promise<{saved?:string;error?:string}>}){
-  const query=await searchParams;const {supabase,organization,membership}=await requireTenant();
+export default async function Settings(){
+  const {supabase,organization,membership}=await requireTenant();
   const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
@@ -78,9 +37,9 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
     <section className="ac-bar"><div><h1>Mağaza Ayarları</h1><p>Marka kimliği, alan adları ve ödeme yöntemleri.</p></div></section>
 
     <div className="ac-stack">
-    {query.saved?<Notice title={SAVED[query.saved]??"Mağaza ayarları kaydedildi."}/>:null}
-    {query.error&&PENDING[query.error]?<Notice tone="warn" title="DNS doğrulaması bekliyor">{PENDING[query.error]}</Notice>:null}
-    {query.error&&!PENDING[query.error]?<Notice tone="error" title="Ayarlar kaydedilemedi">{ERRORS[query.error]??query.error}</Notice>:null}
+    {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık okunmuyor:
+        dışarıdan gönderilen bağlantı uydurma mesaj gösterebiliyordu. */}
+    <PanelBildirimi basarililBaslik="Mağaza ayarları kaydedildi" />
 
     <div className="settings-layout">
       <section className="card settings-section">
