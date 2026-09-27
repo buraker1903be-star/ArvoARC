@@ -332,3 +332,7 @@
 
 .return-package{display:block;margin-top:2px;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
 .return-package.is-empty{color:var(--dim);font-style:italic}
+
+/* İade tamamlanırken stoğa ekleme seçeneği; forma göre hizalanıyor. */
+.return-restock{display:flex;align-items:center;gap:9px;font-size:12.5px}
+.return-restock input{width:16px;height:16px;margin:0}

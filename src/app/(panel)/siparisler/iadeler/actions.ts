@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
+import { stogaDonecekler } from "@/lib/iade-stok";
 import { getStoreBrand } from "@/lib/store-brand";
 import { refundPayment } from "@/lib/paytr/refund";
 import { sendEmail } from "@/lib/email/resend";
@@ -276,6 +277,49 @@ export async function resolveReturn(formData: FormData) {
     .eq("id", id);
 
   /*
+    STOĞA GERİ EKLEME.
+
+    İade akışında stok hiç güncellenmiyordu: müşteri ürünü geri
+    gönderiyor, para iade ediliyor, ama sistem ürünü hâlâ satılmış
+    sayıyordu. Sipariş iptalinde stok geri veriliyor
+    (arc_update_order_status) — aynı fiziksel olay, iki farklı sonuç.
+
+    KARAR OPERASYONCUNUN: geri gelen ürün hasarlı ya da açılmışsa
+    stoğa girmemeli ve bunu sistem bilemez. Ekrandaki onay kutusu
+    varsayılan olarak işaretli, çünkü iadelerin çoğu satılabilir
+    dönüyor ve iptal akışı da stoğu soru sormadan geri veriyor.
+
+    HATA PARA İADESİNİ GEÇERSİZ SAYMIYOR: para çoktan gitti. Stok elle
+    de düzeltilebilir, oysa burada hata dönmek operasyoncuyu iadeyi
+    ikinci kez yapmaya iterdi.
+  */
+  let stogaEklenen = 0;
+  if (String(formData.get("stoga_ekle") ?? "") === "on") {
+    const donecekler = stogaDonecekler(request.items);
+    if (donecekler.length) {
+      const { data: varyantlar } = await supabase.from("arc_product_variants")
+        .select("id,sku").eq("organization_id", organization.id)
+        .in("sku", donecekler.map((k) => k.sku));
+      const varyantBySku = new Map(((varyantlar ?? []) as Array<{ id: string; sku: string }>).map((v) => [v.sku, v.id]));
+      for (const kalem of donecekler) {
+        const varyantId = varyantBySku.get(kalem.sku);
+        /* Varyantı bulunamayan SKU atlanıyor: silinmiş ürün olabilir. */
+        if (!varyantId) continue;
+        const { error: stokHatasi } = await supabase.rpc("arc_adjust_inventory", {
+          p_variant_id: varyantId,
+          p_quantity: kalem.adet,
+          p_kind: "return",
+          p_reference_type: "return_request",
+          p_reference_id: id,
+          p_note: `İade: ${order.order_number}`,
+        });
+        if (stokHatasi) console.error("İade stoğa eklenemedi:", kalem.sku, stokHatasi.message);
+        else stogaEklenen += kalem.adet;
+      }
+    }
+  }
+
+  /*
     Sipariş detayındaki iade akışıyla aynı kural (refundOutcome):
     tamamı iade edilen sipariş kapanır, kısmi iadede sipariş olduğu
     adımda kalır. İki akış aynı siparişi farklı duruma bırakmamalı.
@@ -323,5 +367,15 @@ export async function resolveReturn(formData: FormData) {
   }
 
   revalidatePath("/siparisler/iadeler");
-  return await bildirimliDonus("/siparisler/iadeler",{basari:basariMetni("tamamlandi")});
+  /* Stok da değiştiyse o ekranlar tazeleniyor. */
+  if (stogaEklenen) {
+    revalidatePath("/stok");
+    revalidatePath("/urunler");
+    revalidatePath("/");
+  }
+  return await bildirimliDonus("/siparisler/iadeler", {
+    basari: stogaEklenen
+      ? `İade tamamlandı · ${stogaEklenen} ürün stoğa geri eklendi.`
+      : "İade tamamlandı.",
+  });
 }

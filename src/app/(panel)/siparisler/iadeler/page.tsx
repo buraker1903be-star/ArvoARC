@@ -296,6 +296,23 @@ export default async function ReturnsPage({
                       <textarea name="note" rows={2} maxLength={500} placeholder="Değer kaybı kesintisi varsa açıklayın." className="ac-input" />
                     </label>
 
+                    {/*
+                      STOĞA EKLEME KARARI OPERASYONCUNUN: geri gelen ürün
+                      hasarlı ya da açılmışsa stoğa girmemeli ve bunu
+                      sistem bilemez. Varsayılan işaretli, çünkü
+                      iadelerin çoğu satılabilir dönüyor ve sipariş
+                      iptali de stoğu soru sormadan geri veriyor.
+
+                      Tedarikçi ürünlerinde stok zaten her aktarımda
+                      tedarikçi akışından yeniden yazılıyor; orada bu
+                      işaret geçici bir düzeltme, kendi ürünlerimizde
+                      kalıcı.
+                    */}
+                    <label className="check-inline return-restock">
+                      <input type="checkbox" name="stoga_ekle" defaultChecked />
+                      <span>Ürünler satılabilir durumda, stoğa geri ekle</span>
+                    </label>
+
                     <p className="order-hint is-danger">
                       Bu adım PayTR üzerinden gerçek para iadesi başlatır ve
                       geri alınamaz. Ürünü teslim aldığınızdan emin olun.

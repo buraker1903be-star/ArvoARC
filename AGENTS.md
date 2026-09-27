@@ -38,6 +38,13 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
 - **PayTR bildirimine her durumda `OK` dönülür**, ama hata sessizce
   yutulmaz: sipariş bulunamadığında ya da imza tutmadığında günlüğe yazılır.
   `OK` dönmemek PayTR'ın bildirimi tekrarlamasına yol açar.
+- **İade tamamlanınca stok geri eklenir, ama kararı operasyoncu verir.**
+  İade akışı stoğa hiç dokunmuyordu: müşteri ürünü geri gönderiyor,
+  para iade ediliyor, sistem ürünü hâlâ satılmış sayıyordu — oysa
+  sipariş iptalinde stok geri veriliyor (aynı fiziksel olay, iki farklı
+  sonuç). Geri gelen ürün hasarlı olabileceği için ekranda onay kutusu
+  var; hareket `return` türünde ve `reference_type='return_request'`
+  ile kütüğe yazılır. Stok hatası para iadesini geçersiz saymaz.
 - **Kısmi iade siparişi kapatmaz.** Sipariş akışta ilerlemeye devam eder;
   yalnızca iade toplamı sipariş tutarına ulaşınca kapanır. Kargo çıkmadıysa
   kargo bedeli de iadeye girer, çıktıysa girmez. Tahsil edilenden fazlası
