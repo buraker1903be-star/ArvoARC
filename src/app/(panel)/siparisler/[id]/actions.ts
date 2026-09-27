@@ -112,8 +112,19 @@ export async function updateFulfillmentDetails(formData:FormData){
   */
   if(!error&&trackingNumber&&trackingNumber!==metadata.tracking_number){
     try{
+      /*
+        BÖLÜNMÜŞ GÖNDERİSİ OLAN siparişte bu e-posta gönderilmiyor.
+        Paketlerin kendi bildirimi var (lib/kargo-bildirimi-gonder.ts) ve
+        buradaki tek numaralı özet, üç paketli bir siparişte müşteriye
+        yanlış bilgi verirdi: tek takip numarası siparişin tamamını
+        temsil etmiyor. İki yol birlikte çalışsaydı müşteri aynı sipariş
+        için hem paket başına hem toplu bildirim alırdı.
+      */
+      const {count:gonderiSayisi}=await supabase.from("arc_shipments")
+        .select("id",{count:"exact",head:true})
+        .eq("organization_id",organization.id).eq("order_id",orderId).neq("status","cancelled");
       const {data:order}=await supabase.from("arc_orders").select("order_number,customer_name,customer_email").eq("id",orderId).single();
-      if(order?.customer_email){
+      if(order?.customer_email&&!gonderiSayisi){
         await sendEmail({
           to:order.customer_email,
           subject:`Siparişiniz kargoda · ${order.order_number}`,

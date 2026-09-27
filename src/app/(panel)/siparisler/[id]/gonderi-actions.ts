@@ -11,6 +11,7 @@ import { otoIstek } from "@/lib/tryoto/istemci";
 import { createOrderGovdesi, govdeSorunu } from "@/lib/tryoto/siparis-govdesi";
 import { gondericiCoz, gondericiEksigi, type GondericiBilgisi, type MagazaAdresSatiri } from "@/lib/tryoto/gonderici";
 import { durumOzeti, etiketHazir, etiketiCozumle, gonderiOzeti, type EtiketBilgisi } from "@/lib/tryoto/etiket";
+import { kargoBildirimiGonder } from "@/lib/kargo-bildirimi-gonder";
 
 /*
   GÖNDERİ İŞLEMLERİ.
@@ -110,6 +111,12 @@ export async function elleGonderiEkle(formData: FormData) {
     await supabase.from("arc_shipments").delete().eq("id", gonderi.id).eq("organization_id", organization.id);
     geriDon(orderId, { error: kalemHatasi.message });
   }
+
+  /*
+    Elle girilen gönderide takip numarası ZATEN dolu: tedarikçi kendi
+    gönderdiğinde bize verdiği tek şey o. Bildirim burada gidiyor.
+  */
+  await kargoBildirimiGonder(supabase, organization.id, orderId, gonderi.id);
 
   revalidatePath(`/siparisler/${orderId}`);
   geriDon(orderId, { saved: "gonderi" });
@@ -557,6 +564,13 @@ export async function otoEtiketUret(formData: FormData) {
     return geriDon(orderId, { error: mesaj });
   }
 
+  /*
+    Bildirim etiketten SONRA: takip numarası ancak burada doluyor ve
+    numarasız bir "siparişiniz kargoda" e-postası müşteriye hiçbir şey
+    söylemez. Gönderim hatası etiketi geçersiz saymıyor.
+  */
+  await kargoBildirimiGonder(supabase, organization.id, orderId, gonderiId);
+
   revalidatePath(`/siparisler/${orderId}`);
   return geriDon(orderId, { saved: "etiket" });
 }
@@ -645,6 +659,9 @@ export async function etiketiAl(formData: FormData) {
     failure_reason: null,
   }).eq("id", gonderiId).eq("organization_id", organization.id);
 
+  // Takip numarası ilk kez burada gelmiş olabilir: etiket gecikmeli üretiliyor.
+  await kargoBildirimiGonder(supabase, organization.id, orderId, gonderiId);
+
   revalidatePath(`/siparisler/${orderId}`);
   return geriDon(orderId, { saved: "etiket-alindi" });
 }
@@ -718,6 +735,12 @@ export async function kargoDurumlariniGuncelle(formData: FormData) {
         .eq("id", gonderi.id).eq("organization_id", organization.id);
     }
   }
+
+  /*
+    Gönderi kimliği VERİLMİYOR: tek çağrıda birkaç pakete birden takip
+    numarası yazılmış olabilir ve her biri için ayrı bildirim gerekiyor.
+  */
+  await kargoBildirimiGonder(supabase, organization.id, orderId);
 
   revalidatePath(`/siparisler/${orderId}`);
   return guncellenen
