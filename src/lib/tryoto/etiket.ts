@@ -37,3 +37,57 @@ export function etiketiCozumle(govde: unknown): EtiketBilgisi {
 
 /** Etiket kullanılabilir mi: AWB adresi olmadan yazdırılacak bir şey yok. */
 export const etiketHazir = (bilgi: EtiketBilgisi | null): boolean => Boolean(bilgi?.awbUrl);
+
+/*
+  TEŞHİS NOTLARI. Etiket gelmediğinde ekranda yalnızca "etiket adresi boş"
+  yazıyordu ve yanıtın en bilgilendirici alanı — gönderinin OTO'daki
+  DURUMU — hiç gösterilmiyordu (27.09.2026: iki tur bu yüzden kayboldu).
+  Aşağıdaki iki fonksiyon yanıtı ekrana basılabilir tek satıra indiriyor.
+*/
+
+const metinAl = (kayit: Record<string, unknown>, ad: string): string | null => {
+  const deger = kayit[ad];
+  if (typeof deger === "string" && deger.trim()) return deger.trim();
+  if (typeof deger === "number") return String(deger);
+  return null;
+};
+
+/** orderStatus yanıtının özeti: durum, gönderi kimliği, firma. */
+export function durumOzeti(govde: unknown): string | null {
+  if (!govde || typeof govde !== "object" || Array.isArray(govde)) return null;
+  const kayit = govde as Record<string, unknown>;
+  const parcalar = [
+    ["durum", metinAl(kayit, "status")],
+    ["gönderi", metinAl(kayit, "shipmentId")],
+    ["firma", metinAl(kayit, "deliveryCompany")],
+  ]
+    .filter(([, deger]) => deger)
+    .map(([ad, deger]) => `${ad}=${deger}`);
+  return parcalar.length ? parcalar.join(", ") : null;
+}
+
+/**
+ * shipmentTransactions yanıtının özeti.
+ *
+ * Bu ucun tek sorusu var: OTO'da bu siparişe bağlı bir gönderi GERÇEKTEN
+ * var mı? createShipment "başarılı" dönüp gönderi yine oluşmayabiliyor
+ * (kargo firması reddederse OTO bunu Shipment Error Logs'a yazıyor) ve
+ * o durumda beklemek sonuçsuz.
+ */
+export function gonderiOzeti(govde: unknown): string | null {
+  if (!govde || typeof govde !== "object") return null;
+  const liste = (govde as Record<string, unknown>).shipments;
+  if (!Array.isArray(liste)) return null;
+  if (!liste.length) return "OTO'da bu siparişe bağlı gönderi kaydı YOK";
+  return liste
+    .filter((satir): satir is Record<string, unknown> => Boolean(satir) && typeof satir === "object")
+    .map((satir) => {
+      // Alan adı OTO belgesinde "shipmentNumnber" diye yazılı; iki yazım da okunuyor.
+      const no = metinAl(satir, "shipmentNumber") ?? metinAl(satir, "shipmentNumnber");
+      const durum = metinAl(satir, "status");
+      const firma = metinAl(satir, "deliveryCompanyName");
+      return [no && `no=${no}`, durum && `durum=${durum}`, firma && `firma=${firma}`].filter(Boolean).join(", ");
+    })
+    .filter(Boolean)
+    .join(" | ");
+}

@@ -10,7 +10,7 @@ import { OtoHatasi, zatenVarMi } from "@/lib/tryoto/hatalar";
 import { otoIstek } from "@/lib/tryoto/istemci";
 import { createOrderGovdesi, govdeSorunu } from "@/lib/tryoto/siparis-govdesi";
 import { gondericiCoz, gondericiEksigi, type GondericiBilgisi, type MagazaAdresSatiri } from "@/lib/tryoto/gonderici";
-import { etiketHazir, etiketiCozumle, type EtiketBilgisi } from "@/lib/tryoto/etiket";
+import { durumOzeti, etiketHazir, etiketiCozumle, gonderiOzeti, type EtiketBilgisi } from "@/lib/tryoto/etiket";
 
 /*
   GÖNDERİ İŞLEMLERİ.
@@ -272,12 +272,37 @@ async function etiketBilgisi(
       const bilgi = etiketiCozumle(yanit);
       if (etiketHazir(bilgi)) return { bilgi, hata: null };
       if (!kismi && (bilgi.takipNo || bilgi.firma)) kismi = bilgi;
-      // Yanıt geldi ama etiket adresi yok: bu da bir bulgu, hata kadar önemli.
-      notlar.push(`${ad}: yanıt geldi, etiket adresi boş`);
+      /*
+        Yanıt geldi ama etiket adresi yok. DURUM da yazılıyor: yanıtın en
+        bilgilendirici alanı o ve gösterilmediği için iki tur boyunca
+        "etiket adresi boş" cümlesiyle kaldık.
+      */
+      const ozet = durumOzeti(yanit);
+      notlar.push(`${ad}: etiket adresi boş${ozet ? ` (${ozet})` : ""}`);
     } catch (hata) {
       notlar.push(`${ad}: ${hata instanceof OtoHatasi ? hata.message : "istek başarısız"}`);
     }
   }
+  /*
+    SON SORU: OTO'da bu siparişe bağlı bir gönderi gerçekten var mı?
+    createShipment "başarılı" dönüp gönderi yine oluşmayabiliyor — kargo
+    firması reddederse OTO bunu kendi Shipment Error Logs'una yazıyor ve
+    API tarafında hiçbir şey görünmüyor. Cevap "yok" ise beklemek
+    sonuçsuz ve bunu bilmek gerekiyor.
+  */
+  try {
+    const liste = await otoIstek<Record<string, unknown>>({
+      magazaId,
+      yenilemeAnahtari: anahtar,
+      yol: `shipmentTransactions?orderId=${encodeURIComponent(siparisKimligi)}`,
+      yontem: "GET",
+    });
+    const ozet = gonderiOzeti(liste);
+    if (ozet) notlar.push(`gönderi kaydı: ${ozet}`);
+  } catch (hata) {
+    notlar.push(`shipmentTransactions: ${hata instanceof OtoHatasi ? hata.message : "istek başarısız"}`);
+  }
+
   return { bilgi: kismi, hata: notlar.length ? `Etiket alınamadı · ${notlar.join(" · ")}` : null };
 }
 
@@ -487,6 +512,12 @@ export async function otoEtiketUret(formData: FormData) {
     */
     const gonderiKimligi = await gonderiAc(organization.id, ayar.anahtar, otoSiparisNo, secenekId);
     const otoKimligi = gonderiKimligi ?? siparisKimligi;
+    /*
+      createShipment'ın ne döndürdüğü de kayda yazılıyor: "başarılı" dönüp
+      gönderi yine oluşmayabiliyor ve o zaman yanıtta otoId de olmuyor.
+      Bu ayrım olmadan hatanın gönderide mi etikette mi olduğu bilinemiyor.
+    */
+    const gonderiNotu = gonderiKimligi ? `createShipment: otoId=${gonderiKimligi}` : "createShipment: yanıtta otoId yok";
 
     const { bilgi: etiket, hata: etiketHatasi } = await etiketBilgisi(
       organization.id,
@@ -510,7 +541,7 @@ export async function otoEtiketUret(formData: FormData) {
       */
       failure_reason: etiketHazir(etiket)
         ? null
-        : etiketHatasi ?? "Etiket adresi henüz alınamadı; karttan “Etiketi al” ile deneyin.",
+        : [gonderiNotu, etiketHatasi ?? "Etiket adresi henüz alınamadı; karttan “Etiketi al” ile deneyin."].join(" · "),
       shipped_at: new Date().toISOString(),
     }).eq("id", gonderiId).eq("organization_id", organization.id);
   } catch (hata) {

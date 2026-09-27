@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { etiketHazir, etiketiCozumle } from "@/lib/tryoto/etiket";
+import { durumOzeti, etiketHazir, etiketiCozumle, gonderiOzeti } from "@/lib/tryoto/etiket";
 
 /*
   Etiket bilgisi. İki ayrı uç (print ve orderStatus) aynı alanları farklı
@@ -59,4 +59,36 @@ test("etiket ancak AWB adresi varsa hazır", () => {
   assert.equal(etiketHazir({ awbUrl: null, takipNo: "123", firma: "Aras" }), false);
   assert.equal(etiketHazir({ awbUrl: "https://a/b.pdf", takipNo: null, firma: null }), true);
   assert.equal(etiketHazir(null), false);
+});
+
+test("orderStatus özeti DURUMU söylüyor", () => {
+  /*
+    Etiket gelmediğinde ekranda "etiket adresi boş" yazıyordu ve yanıtın
+    en bilgilendirici alanı — gönderinin OTO'daki durumu — hiç
+    görünmüyordu; teşhis iki tur boyunca kayboldu.
+  */
+  assert.equal(
+    durumOzeti({ status: "orderCreated", shipmentId: "S-1", deliveryCompany: "Sürat Kargo" }),
+    "durum=orderCreated, gönderi=S-1, firma=Sürat Kargo",
+  );
+  assert.equal(durumOzeti({ status: "shipmentCreated" }), "durum=shipmentCreated");
+  assert.equal(durumOzeti({ success: true }), null);
+  assert.equal(durumOzeti(null), null);
+});
+
+test("shipmentTransactions özeti gönderinin VAR OLUP OLMADIĞINI söylüyor", () => {
+  /*
+    createShipment "başarılı" dönüp gönderi yine oluşmayabiliyor; kargo
+    firması reddederse OTO bunu kendi hata kütüğüne yazıyor ve API'de
+    hiçbir şey görünmüyor. Boş liste, beklemenin sonuçsuz olduğunu söyler.
+  */
+  assert.match(gonderiOzeti({ success: true, shipments: [] })!, /gönderi kaydı YOK/);
+  // Alan adı OTO belgesinde "shipmentNumnber" diye yazılı; iki yazım da okunuyor.
+  assert.equal(
+    gonderiOzeti({ shipments: [{ shipmentNumnber: "123", status: "created", deliveryCompanyName: "Aras" }] }),
+    "no=123, durum=created, firma=Aras",
+  );
+  assert.equal(gonderiOzeti({ shipments: [{ shipmentNumber: "9" }, { shipmentNumber: "10" }] }), "no=9 | no=10");
+  // Liste hiç yoksa bu uç bir şey söylemiyor; "yok" demek yanlış olurdu.
+  assert.equal(gonderiOzeti({ success: true }), null);
 });
