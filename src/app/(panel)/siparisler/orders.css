@@ -297,3 +297,19 @@
   #kalemler,#gonderiler,#durum,#gecmis{scroll-margin-top:16px}
   /* Dar ekranda başlık zaten yapışkan değil. */
 }
+
+
+/*
+  Silme çubuğu durum çubuğundan AYRI ve kırmızı kenarlı: yanlış düğmeye
+  basmanın bedeli burada geri alınamaz. Durum düğmeleriyle aynı formda
+  olsaydı tek yanlış tıklama kayıtları yok ederdi.
+*/
+.order-bulk-danger{
+  /* YAPIŞKAN DEĞİL: durum çubuğu zaten top:72px'te yapışıyor, ikisi
+     üst üste binerdi. Silme ikincil ve bilerek yapılan bir işlem;
+     ekranda sürekli durması da gerekmiyor. */
+  position:static;
+  border-color:color-mix(in srgb,var(--danger) 45%,var(--line));
+  background:color-mix(in srgb,var(--danger) 8%,var(--surface));
+}
+.order-bulk-danger>b{color:var(--danger)}

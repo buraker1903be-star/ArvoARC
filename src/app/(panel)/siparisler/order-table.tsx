@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { bulkStatus, quickStatus } from "./actions";
+import { bulkStatus, quickStatus, siparisleriSil } from "./actions";
+import { ConfirmSubmit } from "@/components/panel/confirm-submit";
 
 export type OrderRow = {
   id: string;
@@ -36,7 +37,7 @@ const BULK_STEPS = [
   Satırın tamamı detay bağlantısı (ilk hücredeki <a> kaplamayla):
   orta tık ve "yeni sekmede aç" çalışır.
 */
-export function OrderTable({ rows, canManage, back, children }: { rows: OrderRow[]; canManage: boolean; back: string; children?: React.ReactNode }) {
+export function OrderTable({ rows, canManage, canDelete, back, children }: { rows: OrderRow[]; canManage: boolean; canDelete: boolean; back: string; children?: React.ReactNode }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const chosen = rows.filter((row) => selected.has(row.id));
   const allChecked = rows.length > 0 && chosen.length === rows.length;
@@ -80,6 +81,31 @@ export function OrderTable({ rows, canManage, back, children }: { rows: OrderRow
               );
             })}
             <button className="ac-btn" type="button" onClick={() => setSelected(new Set())}>Seçimi temizle</button>
+          </span>
+        </form>
+      ) : null}
+
+      {/*
+        SİLME AYRI FORMDA. Durum düğmeleriyle aynı formda olsaydı yanlış
+        düğmeye basmak kayıtları yok ederdi; ayrıca silme yetkisi daha
+        dar (owner/admin), durum değiştirme manager'a da açık.
+
+        Onay penceresi kaç siparişin silineceğini ve geri alınamayacağını
+        yazıyor — sipariş numaralarıyla, çünkü "3 sipariş" yazan bir
+        uyarı hangi üçü olduğunu söylemiyor.
+      */}
+      {canDelete && chosen.length > 0 ? (
+        <form action={siparisleriSil} className="order-bulk-bar order-bulk-danger">
+          <input type="hidden" name="back" value={back} />
+          {chosen.map((row) => <input key={row.id} type="hidden" name="order_id" value={row.id} />)}
+          <b>Seçilenleri kalıcı olarak sil</b>
+          <span className="order-bulk-actions">
+            <ConfirmSubmit
+              className="ac-btn ac-btn-danger"
+              message={`${chosen.length} sipariş KALICI olarak silinecek:\n\n${chosen.slice(0, 10).map((row) => row.number).join("\n")}${chosen.length > 10 ? `\n… ve ${chosen.length - 10} sipariş daha` : ""}\n\nKalemleri, gönderileri ve işlem geçmişi de silinir. Açık siparişlerin stoğu iade edilir. Bu işlem geri alınamaz.`}
+            >
+              {chosen.length} siparişi sil
+            </ConfirmSubmit>
           </span>
         </form>
       ) : null}

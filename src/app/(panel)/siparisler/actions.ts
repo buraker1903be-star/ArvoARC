@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
@@ -19,7 +18,18 @@ const MANAGERS = ["owner", "admin", "manager"];
 
 /* İşlemden sonra kullanıcı geldiği yere döner: listeden "Onayla →"
    demek filtreyi sıfırlayıp ilk sayfaya atıyordu. */
-const backTo = (formData: FormData, result: Record<string, string>) => backUrl(formData.get("back"), "/siparisler", result);
+/*
+  Sonuç ÇEREZE yazılıyor, adrese değil. backUrl yalnızca GİDİLECEK YOLU
+  doğruluyor (dışarıdan gelen "back" değeriyle başka bir bölüme ya da
+  dış adrese yönlendirme engelleniyor); mesaj artık o adresin
+  parametresi değil.
+
+  27.09.2026: sonuçlar çereze taşınırken burası atlanmıştı ve toplu
+  işlemden sonra hiçbir mesaj görünmüyordu — sayfalar adresten okumayı
+  bıraktığı için sessizce düşüyordu.
+*/
+const backTo = async (formData: FormData, result: { hata?: string; basari?: string }): Promise<never> =>
+  bildirimliDonus(backUrl(formData.get("back"), "/siparisler", {}), result);
 
 const fromDetail = (formData: FormData) =>
   /^\/siparisler\/(?!iadeler$)[A-Za-z0-9-]+$/.test(String(formData.get("back") ?? "").split("?")[0]);
@@ -83,13 +93,13 @@ async function notifyStatus(order: { order_number: string; customer_name: string
 export async function quickStatus(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
 
-  if (!MANAGERS.includes(membership.role)) redirect(backTo(formData, { error: "forbidden" }));
+  if (!MANAGERS.includes(membership.role)) return await backTo(formData, { hata: hataMetni("forbidden") });
 
   const orderId = String(formData.get("order_id") ?? "");
   const status = String(formData.get("status") ?? "");
   const allowed = new Set(["confirmed", "processing", "fulfilled", "cancelled"]);
 
-  if (!orderId || !allowed.has(status)) redirect(backTo(formData, { error: "invalid-status" }));
+  if (!orderId || !allowed.has(status)) return await backTo(formData, { hata: hataMetni("invalid-status") });
 
   const { data: order } = await supabase
     .from("arc_orders")
@@ -104,15 +114,15 @@ export async function quickStatus(formData: FormData) {
     geçiliyordu: ödenmiş siparişin ödeme durumu sessizce
     "Ödeme bekliyor"a düşebiliyordu.
   */
-  if (!order) redirect(backTo(formData, { error: "order-not-found" }));
+  if (!order) return await backTo(formData, { hata: hataMetni("order-not-found") });
 
   /* Kapanmış sipariş akışta ilerletilemez. Düğme zaten gizli;
      bu kontrol elle gönderilen isteğe karşı. */
-  if (isOrderClosed(order.status, order.payment_status)) redirect(backTo(formData, { error: "order-closed" }));
+  if (isOrderClosed(order.status, order.payment_status)) return await backTo(formData, { hata: hataMetni("order-closed") });
 
   /* Yalnızca akıştaki bir sonraki adım ya da iptal (toplu işlemle aynı kural): elle gönderilen istek adım atlatamaz. */
   if (status !== "cancelled" && nextOrderStep(order.status, order.payment_status)?.key !== status) {
-    redirect(backTo(formData, { error: "invalid-status" }));
+    return await backTo(formData, { hata: hataMetni("invalid-status") });
   }
 
   const { error } = await supabase.rpc("arc_update_order_status", {
@@ -122,14 +132,14 @@ export async function quickStatus(formData: FormData) {
     p_payment_status: order.payment_status,
   });
 
-  if (error) redirect(backTo(formData, { error: "save-failed" }));
+  if (error) return await backTo(formData, { hata: hataMetni("save-failed") });
 
   await notifyStatus(order, status, await getStoreBrand(supabase, membership.organization_id));
 
   revalidatePath("/");
   revalidatePath("/siparisler");
   revalidatePath(`/siparisler/${orderId}`);
-  redirect(backTo(formData, fromDetail(formData) ? { saved: "1" } : { ok: "status" }));
+  return await backTo(formData, { basari: "Sipariş durumu güncellendi." });
 }
 
 /**
@@ -143,8 +153,10 @@ export async function quickStatus(formData: FormData) {
 export async function confirmTransferPayment(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   /* Operasyon listesinden de sipariş detayından da çağrılır; kullanıcı geldiği yere döner. */
-  const back = (result: Record<string, string>) => backUrl(formData.get("back"), fromDetail(formData) ? "/siparisler" : "/operasyon", result);
-  if (!MANAGERS.includes(membership.role)) redirect(back({ error: "forbidden" }));
+  /* Sonuç çereze; backUrl yalnızca gidilecek yolu doğruluyor. */
+  const back = async (result: { hata?: string; basari?: string }): Promise<never> =>
+    bildirimliDonus(backUrl(formData.get("back"), fromDetail(formData) ? "/siparisler" : "/operasyon", {}), result);
+  if (!MANAGERS.includes(membership.role)) return await back({ hata: hataMetni("forbidden") });
 
   const orderId = String(formData.get("order_id") ?? "");
   const { data: order } = await supabase
@@ -154,14 +166,14 @@ export async function confirmTransferPayment(formData: FormData) {
     .eq("id", orderId)
     .maybeSingle();
 
-  if (!order) redirect(back({ error: "order-not-found" }));
-  if (!isBankTransfer(order.metadata)) redirect(back({ error: "not-transfer" }));
-  if (order.payment_status === "paid") redirect(back({ error: "already-paid" }));
-  if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) redirect(back({ error: "order-closed" }));
+  if (!order) return await back({ hata: hataMetni("order-not-found") });
+  if (!isBankTransfer(order.metadata)) return await back({ hata: hataMetni("not-transfer") });
+  if (order.payment_status === "paid") return await back({ hata: hataMetni("already-paid") });
+  if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) return await back({ hata: hataMetni("order-closed") });
 
   /* Çift tıklama ya da ikinci sekme: sipariş kilitlenir, müşteriye ikinci "Ödemeniz alındı" gitmez. */
   if (!(await claimOrderLock(supabase, organization.id, { id: orderId, updated_at: order.updated_at, metadata: order.metadata }, "transfer_lock"))) {
-    redirect(back({ error: "in-progress" }));
+    return await back({ hata: hataMetni("in-progress") });
   }
 
   const { error } = await supabase.rpc("arc_update_order_status", {
@@ -169,7 +181,7 @@ export async function confirmTransferPayment(formData: FormData) {
     p_status: order.status === "pending" ? "confirmed" : order.status,
     p_payment_status: "paid",
   });
-  if (error) redirect(back({ error: "save-failed" }));
+  if (error) return await back({ hata: hataMetni("save-failed") });
 
   await notifyTransferPaid(order, await getStoreBrand(supabase, membership.organization_id));
 
@@ -177,7 +189,7 @@ export async function confirmTransferPayment(formData: FormData) {
   revalidatePath("/operasyon");
   revalidatePath("/siparisler");
   revalidatePath(`/siparisler/${orderId}`);
-  redirect(back({ ok: "payment", order: order.order_number }));
+  return await back({ basari: `${order.order_number} · havale ödemesi onaylandı. Müşterinin e-posta adresi varsa bildirim gönderildi.` });
 }
 
 /**
@@ -191,8 +203,10 @@ export async function confirmTransferPayment(formData: FormData) {
 export async function cancelTransferOrder(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   /* Operasyon listesinden de sipariş detayından da çağrılır; kullanıcı geldiği yere döner. */
-  const back = (result: Record<string, string>) => backUrl(formData.get("back"), fromDetail(formData) ? "/siparisler" : "/operasyon", result);
-  if (!MANAGERS.includes(membership.role)) redirect(back({ error: "forbidden" }));
+  /* Sonuç çereze; backUrl yalnızca gidilecek yolu doğruluyor. */
+  const back = async (result: { hata?: string; basari?: string }): Promise<never> =>
+    bildirimliDonus(backUrl(formData.get("back"), fromDetail(formData) ? "/siparisler" : "/operasyon", {}), result);
+  if (!MANAGERS.includes(membership.role)) return await back({ hata: hataMetni("forbidden") });
 
   const orderId = String(formData.get("order_id") ?? "");
   const { data: order } = await supabase
@@ -202,14 +216,14 @@ export async function cancelTransferOrder(formData: FormData) {
     .eq("id", orderId)
     .maybeSingle();
 
-  if (!order) redirect(back({ error: "order-not-found" }));
-  if (!isBankTransfer(order.metadata)) redirect(back({ error: "not-transfer" }));
-  if (order.payment_status === "paid") redirect(back({ error: "already-paid" }));
-  if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) redirect(back({ error: "order-closed" }));
+  if (!order) return await back({ hata: hataMetni("order-not-found") });
+  if (!isBankTransfer(order.metadata)) return await back({ hata: hataMetni("not-transfer") });
+  if (order.payment_status === "paid") return await back({ hata: hataMetni("already-paid") });
+  if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) return await back({ hata: hataMetni("order-closed") });
 
   /* Çift gönderim ya da aynı anda "Ödeme alındı": sipariş kilitlenir, ikinci istek durur. */
   if (!(await claimOrderLock(supabase, organization.id, { id: orderId, updated_at: order.updated_at, metadata: order.metadata }, "transfer_lock"))) {
-    redirect(back({ error: "in-progress" }));
+    return await back({ hata: hataMetni("in-progress") });
   }
 
   const { error } = await supabase.rpc("arc_update_order_status", {
@@ -217,7 +231,7 @@ export async function cancelTransferOrder(formData: FormData) {
     p_status: "cancelled",
     p_payment_status: order.payment_status,
   });
-  if (error) redirect(back({ error: "save-failed" }));
+  if (error) return await back({ hata: hataMetni("save-failed") });
 
   await notifyStatus(order, "cancelled", await getStoreBrand(supabase, membership.organization_id));
 
@@ -225,7 +239,7 @@ export async function cancelTransferOrder(formData: FormData) {
   revalidatePath("/operasyon");
   revalidatePath("/siparisler");
   revalidatePath(`/siparisler/${orderId}`);
-  redirect(back({ ok: "cancelled", order: order.order_number }));
+  return await back({ basari: `${order.order_number} · sipariş iptal edildi. Müşterinin e-posta adresi varsa bildirim gönderildi.` });
 }
 
 /**
@@ -240,20 +254,20 @@ export async function cancelTransferOrder(formData: FormData) {
  */
 export async function bulkStatus(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
-  if (!MANAGERS.includes(membership.role)) redirect(backTo(formData, { error: "forbidden" }));
+  if (!MANAGERS.includes(membership.role)) return await backTo(formData, { hata: hataMetni("forbidden") });
 
   const status = String(formData.get("status") ?? "");
   const ids = [...new Set(formData.getAll("order_id").map(String).filter(Boolean))].slice(0, 100);
 
-  if (!["confirmed", "processing", "fulfilled"].includes(status)) redirect(backTo(formData, { error: "invalid-status" }));
-  if (!ids.length) redirect(backTo(formData, { error: "bulk-empty" }));
+  if (!["confirmed", "processing", "fulfilled"].includes(status)) return await backTo(formData, { hata: hataMetni("invalid-status") });
+  if (!ids.length) return await backTo(formData, { hata: hataMetni("bulk-empty") });
 
   const { data: orders, error } = await supabase
     .from("arc_orders")
     .select("id,status,payment_status,order_number,customer_name,customer_email,metadata")
     .eq("organization_id", organization.id)
     .in("id", ids);
-  if (error) redirect(backTo(formData, { error: "save-failed" }));
+  if (error) return await backTo(formData, { hata: hataMetni("save-failed") });
 
   const eligible = (orders ?? []).filter((order) => nextOrderStep(order.status, order.payment_status)?.key === status);
   const updated: typeof eligible = [];
@@ -272,5 +286,68 @@ export async function bulkStatus(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/siparisler");
-  redirect(backTo(formData, { ok: "bulk", updated: String(updated.length), skipped: String(ids.length - updated.length) }));
+  /* Sayılar MESAJIN İÇİNDE: adres satırında taşınırken dışarıdan
+     uydurulabiliyordu. */
+  return await backTo(formData, {
+    basari: `${updated.length} siparişin durumu güncellendi${ids.length - updated.length ? ` · ${ids.length - updated.length} sipariş atlandı` : ""}.`,
+  });
+}
+
+
+/*
+  SİPARİŞ SİLME (toplu).
+
+  Silme GERİ ALINAMAZ ve kaydı gerçekten yok eder; kalemler, olaylar,
+  gönderiler ve iade talepleri CASCADE ile gider. Bu yüzden veritabanı
+  fonksiyonuyla yapılıyor (public.arc_delete_order): kural sunucuda
+  değil VERİTABANINDA duruyor, yani API'ye doğrudan gelen bir istek de
+  aynı korumadan geçiyor.
+
+  Fonksiyon iki şeyi garantiliyor:
+   - Sipariş açıksa önce iptal ediliyor, böylece STOK GERİ VERİLİYOR.
+     Vitrin satışı stoğu düşürürken hareket kaydı yazmıyor; düz bir
+     DELETE stoğu kalıcı olarak düşük bırakırdı.
+   - Siparişin stok hareketleri siliniyor: yabancı anahtar olmadığı için
+     CASCADE onlara ulaşmıyor, var olmayan siparişi işaret eden satırlar
+     kalırdı.
+
+  Yetki veritabanında owner/admin ile sınırlı; buradaki kontrol yalnızca
+  kullanıcıya erken ve Türkçe cevap vermek için.
+*/
+export async function siparisleriSil(formData: FormData) {
+  const { supabase, membership } = await requireTenant();
+  if (!["owner", "admin"].includes(membership.role)) {
+    return await backTo(formData, { hata: "Sipariş silmek için mağaza sahibi ya da yönetici olmalısınız." });
+  }
+
+  /*
+    Üst sınır 100: toplu işlemle aynı sınır. Tek istekte binlerce kayıt
+    silmek hem zaman aşımına girer hem de yanlış seçimin bedelini
+    büyütür.
+  */
+  const ids = [...new Set(formData.getAll("order_id").map(String).filter(Boolean))].slice(0, 100);
+  if (!ids.length) return await backTo(formData, { hata: "Silinecek sipariş seçilmedi." });
+
+  const silinen: string[] = [];
+  const hatalar: string[] = [];
+  for (const id of ids) {
+    /*
+      Tek tek çağrılıyor: bir siparişin silinememesi ötekileri
+      durdurmamalı ve hangisinin neden düştüğü söylenebilmeli.
+    */
+    const { data, error } = await supabase.rpc("arc_delete_order", { p_order_id: id });
+    if (error) hatalar.push(error.message);
+    else silinen.push(typeof data === "string" ? data : id);
+  }
+
+  revalidatePath("/siparisler");
+  revalidatePath("/operasyon");
+  revalidatePath("/stok");
+
+  if (!silinen.length) {
+    return await backTo(formData, { hata: `Sipariş silinemedi: ${hatalar[0] ?? "bilinmeyen hata"}` });
+  }
+  return await backTo(formData, {
+    basari: `${silinen.length} sipariş silindi${hatalar.length ? ` · ${hatalar.length} sipariş silinemedi` : ""}.`,
+  });
 }
