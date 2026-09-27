@@ -43,7 +43,7 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
     <section className="ac-bar">
       <div>
         <h1>Koleksiyonlar</h1>
-        <p>{all.length.toLocaleString("tr-TR")} koleksiyon · {mappedProducts.toLocaleString("tr-TR")} eşlenen ürün · {all.filter(item=>item.source==="shopify").length.toLocaleString("tr-TR")}’si Shopify kaynaklı</p>
+        <p>{all.length.toLocaleString("tr-TR")} koleksiyon · {mappedProducts.toLocaleString("tr-TR")} eşlenen ürün · {all.filter(item=>item.source==="shopify").length.toLocaleString("tr-TR")}’ü Shopify kaynaklı</p>
       </div>
       {canManage?<div className="ac-bar-actions"><a className="ac-btn ac-btn-primary" href="#yeni-koleksiyon">+ Yeni koleksiyon</a></div>:null}
     </section>
