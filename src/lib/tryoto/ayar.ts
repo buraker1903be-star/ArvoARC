@@ -63,7 +63,14 @@ export async function baglantiyiSina(magazaId: string, satir: AyarSatiri | null 
 
   try {
     const anahtar = decryptSecret(satir.tryoto_refresh_token_enc);
-    const govde = await otoIstek({ magazaId, yenilemeAnahtari: anahtar, yol: "dcList", govde: {} });
+    /*
+      dcList GET; POST gönderilince boş yanıt dönüyordu (canlıda
+      27.09.2026). Uç, OTO'nun DESTEKLEDİĞİ kargo firmalarını listeliyor —
+      kendi sözleşmenizi bağlamak (dcConfig/dcActivation) için gereken kod
+      buradan alınıyor. Gönderi oluştururken KULLANILABİLİR seçenekler
+      ayrı: checkOTODeliveryFee onları fiyatlarıyla döndürüyor.
+    */
+    const govde = await otoIstek({ magazaId, yenilemeAnahtari: anahtar, yol: "dcList", yontem: "GET" });
     const firmalar = firmalariCozumle(govde);
 
     /*

@@ -198,7 +198,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
           <button className="payment-save" type="submit">Kargo ayarlarını kaydet</button>
         </form>
         <article className="payment-method">
-          <div className="payment-title"><div><small>BAĞLANTI DURUMU</small><h4>Hesabınızda açık kargo firmaları</h4></div></div>
+          <div className="payment-title"><div><small>BAĞLANTI DURUMU</small><h4>OTO&apos;nun desteklediği kargo firmaları</h4></div></div>
           {kargoBaglantisi.durum==="kapali"?<p className="catalog-hint">Entegrasyon kapalı. Etkinleştirip kaydedince firmalar burada listelenir.</p>
           :kargoBaglantisi.durum==="anahtar-yok"?<p className="catalog-hint">Yenileme anahtarı girilmemiş; bağlantı sınanamıyor.</p>
           :kargoBaglantisi.durum==="hata"?<div className="security-note"><b>Bağlantı kurulamadı.</b><p>{kargoBaglantisi.mesaj}</p>{kargoBaglantisi.ham||kargoBaglantisi.durumKodu?<code>OTO yanıtı{kargoBaglantisi.durumKodu?` (HTTP ${kargoBaglantisi.durumKodu})`:""}: {kargoBaglantisi.ham??"gövdede mesaj yok"}</code>:null}</div>
@@ -206,8 +206,14 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
             <ul className="tryoto-carriers">
               {kargoBaglantisi.firmalar.map(firma=><li key={firma.kod}><b>{firma.ad}</b><small>{firma.kod}</small>{firma.etkin===false?<span>kapalı</span>:null}</li>)}
             </ul>
-            <p className="catalog-hint">{kargoBaglantisi.firmalar.length} firma bulundu. Gönderi oluştururken bu firmalar arasından seçim yapılır.{kargoBaglantisi.konumlar.length?` ${kargoBaglantisi.konumlar.length} gönderici konumu tanımlı.`:" Gönderici konumu tanımlı değil; adres her gönderide tek tek gönderilecek."}</p>
-          </>:<div className="security-note"><b>Bağlantı kuruldu ama firma listesi okunamadı.</b><p>OTO beklenmedik bir yanıt döndürdü; ham hâli aşağıda. Bu genelde hesapta henüz kargo anlaşması tanımlı olmadığında olur.</p><code>{kargoBaglantisi.hamYanit}</code></div>}
+            {/*
+              Bu liste OTO'nun DESTEKLEDİĞİ firmalar; hesapta hangilerinin
+              fiyat verdiği ayrı bir şey ve gönderi oluştururken
+              checkOTODeliveryFee ile geliyor. İkisini karıştırmamak için
+              metin bunu açıkça söylüyor.
+            */}
+            <p className="catalog-hint">OTO {kargoBaglantisi.firmalar.length} kargo firmasını destekliyor. Gönderi oluştururken hangilerinin fiyat verdiği adrese ve pakete göre belirleniyor.{kargoBaglantisi.konumlar.length?` ${kargoBaglantisi.konumlar.length} gönderici konumu tanımlı.`:" Gönderici konumu tanımlı değil; adres her gönderide tek tek gönderilecek."}</p>
+          </>:<div className="security-note"><b>Firma listesi okunamadı.</b><p>Bağlantı kuruldu ama dcList beklenmedik bir yanıt döndürdü; ham hâli aşağıda.</p><code>{kargoBaglantisi.hamYanit}</code></div>}
         </article>
       </>:<p className="catalog-hint">Kargo entegrasyonunu yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
     </section>
