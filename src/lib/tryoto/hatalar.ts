@@ -94,6 +94,19 @@ export function kullaniciMesaji(hamMesaj: string | null, durumKodu?: number): st
   return eslesen ? eslesen.karsilik : hamMesaj;
 }
 
+/*
+  "Bu sipariş OTO'da zaten var" durumu AYRI tanınıyor: yeniden denemede
+  createOrder bu hatayı veriyor ve akışı durdurmak yanlış — sipariş varsa
+  yapılacak iş GÖNDERİYİ açmak. 27.09.2026'da OTO'da siparişi olup
+  gönderisi olmayan bir kayıt oluştu ve tekrar denemenin tek sonucu bu
+  hataydı; kullanıcı kayda erişemez hâle geldi.
+*/
+export function zatenVarMi(hamMesaj: string | null): boolean {
+  if (!hamMesaj) return false;
+  const kucuk = hamMesaj.toLocaleLowerCase("en-US");
+  return ["already", "duplicate", "exists"].some((iz) => kucuk.includes(iz));
+}
+
 /** OTO çağrısı başarısız olduğunda fırlatılan hata; mesajı ekrana basılabilir. */
 export class OtoHatasi extends Error {
   readonly durumKodu?: number;

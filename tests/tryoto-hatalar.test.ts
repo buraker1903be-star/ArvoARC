@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { kullaniciMesaji, otoHataMetni, OtoHatasi } from "@/lib/tryoto/hatalar";
+import { kullaniciMesaji, otoHataMetni, OtoHatasi, zatenVarMi } from "@/lib/tryoto/hatalar";
 
 /*
   OTO hata çevirisi. Sınanan şey çevirinin güzelliği değil: hatanın
@@ -93,4 +93,17 @@ test("GENEL kelime içeren açıklayıcı mesajlar çevrilmiyor", () => {
   assert.equal(kullaniciMesaji(sinir), sinir);
   const sehir = "Destination city 'Çankaya' is not served by this carrier";
   assert.equal(kullaniciMesaji(sehir), sehir);
+});
+
+test("\"zaten var\" hatası ayrı tanınıyor", () => {
+  /*
+    27.09.2026: OTO'da siparişi olup gönderisi olmayan bir kayıt kaldı.
+    Yeniden denemede createOrder "already exists" diyor ve akışı durdurmak
+    o kaydı erişilemez yapıyordu — yapılacak iş gönderiyi açmak.
+  */
+  assert.equal(zatenVarMi("Order already exists"), true);
+  assert.equal(zatenVarMi("Duplicate orderId"), true);
+  assert.equal(zatenVarMi("An order with this id exists"), true);
+  assert.equal(zatenVarMi("Insufficient balance"), false);
+  assert.equal(zatenVarMi(null), false);
 });

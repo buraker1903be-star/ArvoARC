@@ -6,7 +6,7 @@ import { requireTenant } from "@/lib/tenant";
 import { bolmeSorunu, otoDurumunuCevir, type Gonderi, type SiparisKalemi } from "@/lib/kargo-bolme";
 import { KARGO_FIRMALARI, takipAdresi } from "@/lib/kargo-firmalari";
 import { decryptSecret } from "@/lib/payment-credentials";
-import { OtoHatasi } from "@/lib/tryoto/hatalar";
+import { OtoHatasi, zatenVarMi } from "@/lib/tryoto/hatalar";
 import { otoIstek } from "@/lib/tryoto/istemci";
 import { createOrderGovdesi, govdeSorunu } from "@/lib/tryoto/siparis-govdesi";
 import { gondericiCoz, gondericiEksigi, type GondericiBilgisi, type MagazaAdresSatiri } from "@/lib/tryoto/gonderici";
@@ -175,6 +175,39 @@ async function kargoAyari(
     gonderici: gondericiCoz(ayar),
     adresEksigi: gondericiEksigi(ayar),
   };
+}
+
+/*
+  GÖNDERİ AYRI BİR ÇAĞRIYLA AÇILIYOR: createShipment(orderId,
+  deliveryOptionId).
+
+  Önceden createOrder'a createShipment:true bayrağı konuyordu ve "sipariş
+  ile gönderi tek çağrıda açılır" varsayılıyordu. Canlıda öyle olmadı
+  (27.09.2026): sipariş oluştu — orderStatus onu buluyordu — ama gönderi
+  hiç açılmadı, dolayısıyla AWB de üretilmedi ve print ucu hem bizim
+  numaramızla hem OTO'nun otoId'siyle 404 döndü. Bayrağın sessizce
+  yoksayılması, ekranda "etiket hazır değil" diye görünüyordu.
+
+  Ayrı çağrının asıl kazancı görünürlük: gönderi açılamazsa SEBEBİ
+  geliyor. Yarı yolda kalan sipariş zaten oluşuyordu, farkı yalnızca
+  bunun bilinmesiydi.
+*/
+async function gonderiAc(
+  magazaId: string,
+  anahtar: string,
+  otoSiparisNo: string,
+  teslimatSecenegiId: string,
+): Promise<string | null> {
+  const yanit = await otoIstek<Record<string, unknown>>({
+    magazaId,
+    yenilemeAnahtari: anahtar,
+    yol: "createShipment",
+    govde: { orderId: otoSiparisNo, deliveryOptionId: Number(teslimatSecenegiId) || teslimatSecenegiId },
+  });
+  const kimlik = yanit.otoId;
+  if (typeof kimlik === "string" && kimlik.trim()) return kimlik.trim();
+  if (typeof kimlik === "number") return String(kimlik);
+  return null;
 }
 
 /*
@@ -393,19 +426,41 @@ export async function otoEtiketUret(formData: FormData) {
   }
   const govdeHatasi = govdeSorunu(girdi);
   if (govdeHatasi) return geriDon(orderId, { error: govdeHatasi });
+  /*
+    KARGO SEÇENEĞİ ZORUNLU. createShipment deliveryOptionId olmadan
+    çağrılamıyor; seçenek boşken eskiden sipariş yine oluşturuluyordu ve
+    gönderisiz kalıyordu — ekranda "etiket hazır değil" yazıyor, gerçekte
+    açılacak bir gönderi hiç yoktu.
+  */
+  if (!secenekId) {
+    return geriDon(orderId, { error: "Kargo seçeneği seçilmedi: ağırlık ve ölçüyü girip fiyatları yenileyin, sonra bir firma seçin." });
+  }
+
+  const otoSiparisNo = otoSiparisKimligi(order.order_number as string, gonderi.sequence as number);
 
   try {
     /*
-      createShipment: true — sipariş ve gönderi tek çağrıda açılıyor.
-      Ayrı createShipment çağrısı, araya hata girdiğinde OTO'da gönderisiz
-      bir sipariş bırakıyor ve o sipariş elle temizlenmek zorunda kalıyor.
+      SİPARİŞ ve GÖNDERİ iki ayrı çağrı. createOrder'a createShipment:true
+      koymak yetmiyordu: bayrak sessizce yoksayıldı, sipariş açıldı ama
+      gönderi açılmadı ve AWB hiç üretilmedi (27.09.2026).
     */
-    const yanit = await otoIstek<Record<string, unknown>>({
-      magazaId: organization.id,
-      yenilemeAnahtari: ayar.anahtar,
-      yol: "createOrder",
-      govde: { ...createOrderGovdesi(girdi), createShipment: true },
-    });
+    let yanit: Record<string, unknown> = {};
+    try {
+      yanit = await otoIstek<Record<string, unknown>>({
+        magazaId: organization.id,
+        yenilemeAnahtari: ayar.anahtar,
+        yol: "createOrder",
+        govde: createOrderGovdesi(girdi),
+      });
+    } catch (hata) {
+      /*
+        SİPARİŞ ZATEN VARSA devam ediliyor. Önceki denemeden OTO'da
+        siparişi olup gönderisi olmayan bir kayıt kalmış olabiliyor;
+        durmak, o kaydı erişilemez yapıyordu — yapılacak iş gönderiyi
+        açmak, siparişi yeniden yaratmak değil.
+      */
+      if (!(hata instanceof OtoHatasi && zatenVarMi(hata.hamMesaj))) throw hata;
+    }
 
     const oku = (adlar: string[]): string | null => {
       for (const ad of adlar) {
@@ -424,11 +479,19 @@ export async function otoEtiketUret(formData: FormData) {
       OTO'nun kendi kimliği ETİKETTEN ÖNCE okunuyor: print ucu bizim
       kimliğimizle 404 dönerse ikinci deneme onunla yapılıyor.
     */
-    const otoKimligi = oku(["otoId", "orderId", "id"]);
+    const siparisKimligi = oku(["otoId", "orderId", "id"]);
+
+    /*
+      Gönderi burada açılıyor ve HATASI YUTULMUYOR: açılamazsa etiket de
+      olmayacak, sebebini şimdi söylemek gerekiyor.
+    */
+    const gonderiKimligi = await gonderiAc(organization.id, ayar.anahtar, otoSiparisNo, secenekId);
+    const otoKimligi = gonderiKimligi ?? siparisKimligi;
+
     const { bilgi: etiket, hata: etiketHatasi } = await etiketBilgisi(
       organization.id,
       ayar.anahtar,
-      otoSiparisKimligi(order.order_number as string, gonderi.sequence as number),
+      otoSiparisNo,
       otoKimligi,
     );
 
@@ -484,16 +547,42 @@ export async function etiketiAl(formData: FormData) {
 
   const [{ data: order }, { data: gonderi }] = await Promise.all([
     supabase.from("arc_orders").select("order_number").eq("organization_id", organization.id).eq("id", orderId).maybeSingle(),
-    supabase.from("arc_shipments").select("id,sequence,oto_order_id").eq("organization_id", organization.id).eq("id", gonderiId).maybeSingle(),
+    supabase.from("arc_shipments").select("id,sequence,oto_order_id,delivery_option_id").eq("organization_id", organization.id).eq("id", gonderiId).maybeSingle(),
   ]);
   if (!order || !gonderi) return geriDon(orderId, { error: "gonderi-bulunamadi" });
 
-  const { bilgi: etiket, hata: etiketHatasi } = await etiketBilgisi(
+  const otoSiparisNo = otoSiparisKimligi(order.order_number as string, gonderi.sequence as number);
+  let otoKimligi = gonderi.oto_order_id as string | null;
+
+  let { bilgi: etiket, hata: etiketHatasi } = await etiketBilgisi(
     organization.id,
     ayar.anahtar,
-    otoSiparisKimligi(order.order_number as string, gonderi.sequence as number),
-    gonderi.oto_order_id as string | null,
+    otoSiparisNo,
+    otoKimligi,
   );
+
+  /*
+    ETİKET YOKSA GÖNDERİ HİÇ AÇILMAMIŞ OLABİLİR. 27.09.2026'da tam bu
+    oldu: createOrder'ın createShipment bayrağı yoksayıldı, OTO'da sipariş
+    vardı ama gönderi yoktu ve AWB hiç üretilmedi. O kayıtların tek çıkış
+    yolu bu düğme — "etiketi al" burada "eksik adımı tamamla" anlamına da
+    geliyor, yoksa gönderi kalıcı olarak yarı yolda kalıyordu.
+
+    Gönderi zaten açıksa createShipment "zaten var" diyor; o hata
+    yutuluyor, çünkü istenen durum sağlanmış demektir.
+  */
+  const secenekId = gonderi.delivery_option_id as string | null;
+  if (!etiketHazir(etiket) && secenekId) {
+    try {
+      const yeniKimlik = await gonderiAc(organization.id, ayar.anahtar, otoSiparisNo, secenekId);
+      if (yeniKimlik) otoKimligi = yeniKimlik;
+      ({ bilgi: etiket, hata: etiketHatasi } = await etiketBilgisi(organization.id, ayar.anahtar, otoSiparisNo, otoKimligi));
+    } catch (hata) {
+      if (!(hata instanceof OtoHatasi && zatenVarMi(hata.hamMesaj))) {
+        etiketHatasi = `Gönderi açılamadı · ${hata instanceof OtoHatasi ? hata.message : "OTO isteği başarısız"}`;
+      }
+    }
+  }
 
   /*
     Etiket gelmese bile TAKİP NUMARASI geldiyse kayda yazılıyor: paket
@@ -521,6 +610,7 @@ export async function etiketiAl(formData: FormData) {
   await supabase.from("arc_shipments").update({
     awb_url: etiket!.awbUrl,
     ...kismi,
+    ...(otoKimligi && otoKimligi !== gonderi.oto_order_id ? { oto_order_id: otoKimligi } : {}),
     failure_reason: null,
   }).eq("id", gonderiId).eq("organization_id", organization.id);
 
