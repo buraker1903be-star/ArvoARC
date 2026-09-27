@@ -313,3 +313,22 @@
   background:color-mix(in srgb,var(--danger) 8%,var(--surface));
 }
 .order-bulk-danger>b{color:var(--danger)}
+
+
+/* ---------- İade: geri dönecek yer ---------- */
+/*
+  İade edilen ürünün hangi tedarikçiden ve hangi paketten geldiği artık
+  satırda yazıyor. Önce yalnızca ürün adı ve tutar vardı; operasyoncu
+  her iade için sipariş detayına gidip aramak zorundaydı ve iki
+  tedarikçiyle çalışıldığı için bu her iadede tekrarlanıyordu.
+*/
+.return-suppliers{
+  margin:0 0 12px;padding:9px 12px;
+  border:1px solid color-mix(in srgb,var(--accent-500) 30%,var(--line));
+  border-radius:10px;background:var(--accent-soft);
+  font-size:12.5px;line-height:1.5;
+}
+.return-suppliers em{color:var(--danger);font-style:normal;font-weight:700}
+
+.return-package{display:block;margin-top:2px;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.return-package.is-empty{color:var(--dim);font-style:italic}

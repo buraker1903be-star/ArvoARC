@@ -5,6 +5,7 @@ import { calculateRefund } from "@/lib/refund";
 import { PanelBildirimi } from "@/components/panel/bildirim";
 import { OrdersTabs } from "../orders-tabs";
 import "../orders.css";
+import { iadeTedarikcileri, iadeYonu, type GonderiEslesme, type SiparisKalemiEslesme } from "@/lib/iade-yonlendirme";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,49 @@ export default async function ReturnsPage({
   ]);
 
   if (error) throw new Error(error.message);
+
+  /*
+    İADE NEREYE DÖNECEK? Ekranda yalnızca ürün adı ve tutar vardı;
+    operasyoncu her iade için sipariş detayına gidip hangi tedarikçiden
+    ve hangi paketten geldiğine bakmak zorundaydı. İki tedarikçiyle
+    çalışıldığı için bu her iadede tekrarlanan bir arama demekti.
+
+    Tek turda çekiliyor: iade başına sorgu, elli iadede elli tur olurdu.
+  */
+  const siparisIdleri = [...new Set(((requests ?? []) as Array<{ order_id: string }>).map((r) => r.order_id))];
+  const [{ data: siparisKalemleri }, { data: gonderiSatirlari }] = siparisIdleri.length
+    ? await Promise.all([
+        supabase.from("arc_order_items").select("id,order_id,sku")
+          .eq("organization_id", organization.id).in("order_id", siparisIdleri),
+        supabase.from("arc_shipments").select("id,order_id,sequence,status,carrier_name,tracking_number,arc_shipment_items(order_item_id)")
+          .eq("organization_id", organization.id).in("order_id", siparisIdleri),
+      ])
+    : [{ data: [] }, { data: [] }];
+
+  /* Tedarikçi sipariş kaleminde saklı değil, varyanttan geliyor. */
+  const skular = [...new Set(((siparisKalemleri ?? []) as Array<{ sku: string | null }>).map((k) => k.sku).filter((x): x is string => Boolean(x)))];
+  const { data: varyantlar } = skular.length
+    ? await supabase.from("arc_product_variants").select("sku,supplier").eq("organization_id", organization.id).in("sku", skular)
+    : { data: [] };
+  const tedarikciBySku = new Map(((varyantlar ?? []) as Array<{ sku: string; supplier: string | null }>).map((v) => [v.sku, v.supplier]));
+
+  const kalemlerBySiparis = new Map<string, SiparisKalemiEslesme[]>();
+  for (const kalem of (siparisKalemleri ?? []) as Array<{ id: string; order_id: string; sku: string | null }>) {
+    const liste = kalemlerBySiparis.get(kalem.order_id) ?? [];
+    liste.push({ id: kalem.id, sku: kalem.sku, tedarikci: kalem.sku ? tedarikciBySku.get(kalem.sku) ?? null : null });
+    kalemlerBySiparis.set(kalem.order_id, liste);
+  }
+
+  const gonderilerBySiparis = new Map<string, GonderiEslesme[]>();
+  for (const satir of (gonderiSatirlari ?? []) as Array<{ id: string; order_id: string; sequence: number; status: string; carrier_name: string | null; tracking_number: string | null; arc_shipment_items: { order_item_id: string }[] | null }>) {
+    const liste = gonderilerBySiparis.get(satir.order_id) ?? [];
+    liste.push({
+      id: satir.id, sequence: satir.sequence, status: satir.status,
+      carrier_name: satir.carrier_name, tracking_number: satir.tracking_number,
+      kalemIdleri: (satir.arc_shipment_items ?? []).map((k) => k.order_item_id),
+    });
+    gonderilerBySiparis.set(satir.order_id, liste);
+  }
 
   const counts = Object.fromEntries(TABS.map(([key], index) => [key, countResults[index]?.count ?? 0])) as Record<TabKey, number>;
 
@@ -132,6 +176,12 @@ export default async function ReturnsPage({
 
           const state = STATUS[request.status] ?? { label: request.status };
 
+          /* Kalem sırası korunuyor: satırlar ve yönler aynı dizinle eşleşiyor. */
+          const yonler = items.map((item) =>
+            iadeYonu(item.sku, kalemlerBySiparis.get(request.order_id) ?? [], gonderilerBySiparis.get(request.order_id) ?? []),
+          );
+          const tedarikciler = iadeTedarikcileri(yonler);
+
           return (
             <section className="ac ac-pad return-card" key={request.id}>
               <div className="ac-head">
@@ -151,15 +201,48 @@ export default async function ReturnsPage({
                 {request.note ? ` · ${request.note}` : ""}
               </p>
 
+              {/*
+                TEDARİKÇİ BAŞLIKTA. İki tedarikçiden ürün içeren iade tek
+                paket olarak geri gönderilemez; bunu kalem kalem okumak
+                yerine kartın tepesinde görmek gerekiyor.
+              */}
+              {tedarikciler.length ? (
+                <p className="return-suppliers">
+                  <b>Geri dönecek yer:</b> {tedarikciler.join(" · ")}
+                  {tedarikciler.length > 1 ? <em> — iki ayrı tedarikçi, ayrı gönderilmeli</em> : null}
+                </p>
+              ) : null}
+
               <div className="return-lines">
                 <div className="return-line is-head"><span>ÜRÜN</span><span>ADET</span><span>TUTAR</span></div>
-                {items.map((item, index) => (
-                  <div className="return-line" key={`${item.sku}-${index}`}>
-                    <span><b>{item.name}</b><small>{item.sku}</small></span>
-                    <span>{item.quantity}</span>
-                    <span>{money.format(Number(item.total ?? 0) / 100)}</span>
-                  </div>
-                ))}
+                {items.map((item, index) => {
+                  const yon = yonler[index];
+                  return (
+                    <div className="return-line" key={`${item.sku}-${index}`}>
+                      <span>
+                        <b>{item.name}</b>
+                        <small>{item.sku}</small>
+                        {/*
+                          Ürünün ÇIKTIĞI PAKET: hangi kargoyla gittiği,
+                          iadeyi karşılarken hangi tedarikçiye ve hangi
+                          takip numarasına bakılacağını söylüyor.
+                          Gönderilmemiş ürün için paket UYDURULMUYOR.
+                        */}
+                        {yon?.paket ? (
+                          <small className="return-package">
+                            {yon.paket.sequence}. paket
+                            {yon.paket.firma ? ` · ${yon.paket.firma}` : ""}
+                            {yon.paket.takipNo ? ` · ${yon.paket.takipNo}` : ""}
+                          </small>
+                        ) : (
+                          <small className="return-package is-empty">kargoya verilmemiş</small>
+                        )}
+                      </span>
+                      <span>{item.quantity}</span>
+                      <span>{money.format(Number(item.total ?? 0) / 100)}</span>
+                    </div>
+                  );
+                })}
               </div>
 
               <p className="return-sum">
