@@ -45,3 +45,26 @@ test("tanınmayan gövde boş dönüyor", () => {
   assert.deepEqual(stogaDonecekler("kalem"), []);
   assert.deepEqual(stogaDonecekler([null, 5, "x"]), []);
 });
+
+test("SİPARİŞTEKİ ADETLE SINIRLANIYOR", () => {
+  /*
+    arc_return_requests.items müşterinin tarayıcısından geliyor ve RPC
+    onu doğrulamadan saklıyor. Para tarafı sipariş toplamıyla sınırlı
+    olduğu için korunuyordu; stok tarafında sınır yoktu ve şişirilmiş
+    bir adet stoğu bozardı.
+  */
+  const siparis = [{ sku: "TZ-1", quantity: 2 }];
+  assert.deepEqual(stogaDonecekler([{ sku: "TZ-1", quantity: 9999 }], siparis), [{ sku: "TZ-1", adet: 2 }]);
+  assert.deepEqual(stogaDonecekler([{ sku: "TZ-1", quantity: 1 }], siparis), [{ sku: "TZ-1", adet: 1 }]);
+});
+
+test("SİPARİŞTE OLMAYAN SKU hiç eklenmiyor", () => {
+  // Müşteri başka bir ürünün SKU'sunu gönderebilir.
+  assert.deepEqual(stogaDonecekler([{ sku: "BASKA", quantity: 5 }], [{ sku: "TZ-1", quantity: 2 }]), []);
+});
+
+test("aynı SKU siparişte iki satırdaysa adetler toplanıyor", () => {
+  const siparis = [{ sku: "TZ-1", quantity: 1 }, { sku: "TZ-1", quantity: 2 }];
+  assert.deepEqual(stogaDonecekler([{ sku: "TZ-1", quantity: 3 }], siparis), [{ sku: "TZ-1", adet: 3 }]);
+  assert.deepEqual(stogaDonecekler([{ sku: "TZ-1", quantity: 10 }], siparis), [{ sku: "TZ-1", adet: 3 }]);
+});

@@ -295,7 +295,14 @@ export async function resolveReturn(formData: FormData) {
   */
   let stogaEklenen = 0;
   if (String(formData.get("stoga_ekle") ?? "") === "on") {
-    const donecekler = stogaDonecekler(request.items);
+    /*
+      SİPARİŞİN GERÇEK KALEMLERİ sınır olarak veriliyor: iade talebinin
+      kalemleri müşterinin tarayıcısından geliyor ve RPC onları
+      doğrulamadan saklıyor.
+    */
+    const { data: siparisKalemleri } = await supabase.from("arc_order_items")
+      .select("sku,quantity").eq("organization_id", organization.id).eq("order_id", request.order_id);
+    const donecekler = stogaDonecekler(request.items, (siparisKalemleri ?? []) as Array<{ sku: string | null; quantity: number }>);
     if (donecekler.length) {
       const { data: varyantlar } = await supabase.from("arc_product_variants")
         .select("id,sku").eq("organization_id", organization.id)

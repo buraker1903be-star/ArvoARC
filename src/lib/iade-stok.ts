@@ -25,7 +25,25 @@ export interface StogaDonecek {
  * müşteri tarafında oluşuyor ve kalemler jsonb olarak saklanıyor, yani
  * şekli veritabanı tarafından güvence altında değil.
  */
-export function stogaDonecekler(kalemler: unknown): StogaDonecek[] {
+export interface SiparisKalemi {
+  sku: string | null;
+  quantity: number;
+}
+
+/**
+ * İade talebinin kalemlerinden stoğa dönecekler.
+ *
+ * SİPARİŞİN KALEMLERİYLE SINIRLANIYOR. arc_return_requests.items
+ * müşterinin tarayıcısından geliyor ve RPC onu doğrulamadan saklıyor
+ * (create_arvoculture_return_request → coalesce(p_items, '[]')), yani
+ * istenen SKU ve adet gönderilebilir. Para tarafı sipariş toplamıyla
+ * sınırlı olduğu için korunuyordu; stok tarafında böyle bir sınır
+ * yoktu ve {sku:"X", quantity:9999} stoğu şişirebilirdi.
+ *
+ * `siparisKalemleri` verilmezse sınır uygulanmıyor: eski çağrılar için
+ * değil, yalnızca birim testinde saf davranışı görmek için.
+ */
+export function stogaDonecekler(kalemler: unknown, siparisKalemleri?: SiparisKalemi[]): StogaDonecek[] {
   if (!Array.isArray(kalemler)) return [];
   const toplu = new Map<string, number>();
   for (const ham of kalemler) {
@@ -43,5 +61,24 @@ export function stogaDonecekler(kalemler: unknown): StogaDonecek[] {
     */
     toplu.set(sku, (toplu.get(sku) ?? 0) + adet);
   }
-  return [...toplu.entries()].map(([sku, adet]) => ({ sku, adet }));
+  if (!siparisKalemleri) return [...toplu.entries()].map(([sku, adet]) => ({ sku, adet }));
+
+  /* Siparişte o SKU'dan kaç adet var: aynı SKU birden çok satırda olabilir. */
+  const siparistekiAdet = new Map<string, number>();
+  for (const kalem of siparisKalemleri) {
+    const sku = (kalem.sku ?? "").trim();
+    if (!sku) continue;
+    const adet = Number(kalem.quantity);
+    if (!Number.isFinite(adet) || adet <= 0) continue;
+    siparistekiAdet.set(sku, (siparistekiAdet.get(sku) ?? 0) + adet);
+  }
+
+  const sonuc: StogaDonecek[] = [];
+  for (const [sku, adet] of toplu) {
+    const sinir = siparistekiAdet.get(sku);
+    // Siparişte olmayan SKU hiç eklenmiyor.
+    if (!sinir) continue;
+    sonuc.push({ sku, adet: Math.min(adet, sinir) });
+  }
+  return sonuc;
 }
