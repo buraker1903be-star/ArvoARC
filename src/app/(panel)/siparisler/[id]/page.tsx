@@ -541,7 +541,24 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                 {canManage&&gonderi.source==="oto"&&gonderi.status!=="draft"&&gonderi.status!=="cancelled"&&!gonderi.awb_url
                   ?<form action={etiketiAl}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit">Etiketi al</button></form>
                   :null}
-                {canManage&&gonderi.status!=="cancelled"?<form action={gonderiIptal}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit">İptal et</button></form>:null}
+                {/*
+                  ONAY İSTENİYOR: OTO gönderisinde iptal artık OTO'da da
+                  yapılıyor ve etiket geçersizleşiyor. Teslim edilmiş
+                  gönderide düğme hiç görünmüyor — iptal edilecek bir şey
+                  yok, kalemleri yeniden bölünebilir saymak ikinci kez
+                  göndermeye açık bırakırdı.
+                */}
+                {canManage&&gonderi.status!=="cancelled"&&gonderi.status!=="delivered"?(
+                  <form action={gonderiIptal}>
+                    <input type="hidden" name="order_id" value={order.id}/>
+                    <input type="hidden" name="shipment_id" value={gonderi.id}/>
+                    <ConfirmSubmit message={
+                      gonderi.source==="oto"&&gonderi.status!=="draft"
+                        ? `${gonderi.sequence}. paket OTO'da da iptal edilecek ve üretilen etiket geçersiz olacak. Kurye alıma geldiyse önce kargo firmasıyla görüşün. Devam edilsin mi?`
+                        : `${gonderi.sequence}. paket iptal edilsin mi? Kalemleri yeniden bölünebilir olur.`
+                    }>İptal et</ConfirmSubmit>
+                  </form>
+                ):null}
               </div>
             </li>)}
         </ul>:null}

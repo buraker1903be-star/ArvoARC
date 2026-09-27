@@ -14,6 +14,7 @@ import { otoIstek } from "@/lib/tryoto/istemci";
 import { createOrderGovdesi, govdeSorunu } from "@/lib/tryoto/siparis-govdesi";
 import { gondericiCoz, gondericiEksigi, type GondericiBilgisi, type MagazaAdresSatiri } from "@/lib/tryoto/gonderici";
 import { durumOzeti, etiketHazir, etiketiCozumle, gonderiOzeti, type EtiketBilgisi } from "@/lib/tryoto/etiket";
+import { otodaGonderiyiIptalEt } from "@/lib/tryoto/iptal";
 import { kargoBildirimiGonder } from "@/lib/kargo-bildirimi-gonder";
 import { siparisiKargoyaVerildiYap } from "@/lib/siparis-kargo-durumu";
 
@@ -148,8 +149,56 @@ export async function gonderiIptal(formData: FormData) {
   if (!MANAGERS.includes(membership.role)) return await geriDon(orderId, { error: "forbidden" });
   const gonderiId = String(formData.get("shipment_id") ?? "");
 
+  const [{ data: gonderi }, { data: order }] = await Promise.all([
+    supabase.from("arc_shipments").select("id,sequence,status,source")
+      .eq("organization_id", organization.id).eq("id", gonderiId).maybeSingle(),
+    supabase.from("arc_orders").select("order_number")
+      .eq("organization_id", organization.id).eq("id", orderId).maybeSingle(),
+  ]);
+  if (!gonderi || !order) return await geriDon(orderId, { error: "gonderi-bulunamadi" });
+
+  /*
+    TESLİM EDİLMİŞ GÖNDERİ İPTAL EDİLMEZ. Paket müşteride; "iptal" demek
+    hem yanlış kayıt hem de kalemleri yeniden bölünebilir sayıp ikinci
+    kez göndermeye açık bırakmak olurdu.
+  */
+  if (gonderi.status === "delivered") {
+    return await geriDon(orderId, { error: "Teslim edilmiş gönderi iptal edilemez. İade için iade talebi açın." });
+  }
+
+  /*
+    OTO'DA DA İPTAL EDİLİYOR. Önce yalnızca bizim kayıt işaretleniyordu
+    ve gönderi OTO'da canlı kalıyordu: kurye alıma gelebiliyor,
+    tedarikçi etiketi yapıştırıp gönderebiliyor ve harcanan bakiye geri
+    gelmiyordu. Ayrışma ancak müşteri beklemediği bir paket aldığında
+    fark edilirdi.
+
+    Taslak ve tedarikçinin kendi gönderdiği kayıtlar OTO'ya hiç
+    dokunmamış; onlarda yalnızca yerel iptal doğru olanı.
+  */
+  if (gonderi.source === "oto" && gonderi.status !== "draft") {
+    const ayar = await kargoAyari(supabase, organization.id);
+    if (!ayar) return await geriDon(orderId, { error: "tryoto-kapali" });
+    const sonuc = await otodaGonderiyiIptalEt(
+      organization.id,
+      ayar.anahtar,
+      otoSiparisKimligi(order.order_number as string, gonderi.sequence as number),
+    );
+    /*
+      OTO İPTAL ETMEDİYSE BİZİM KAYIT DA İPTAL EDİLMİYOR. Tersi,
+      panelin "iptal" dediği bir paketin yola çıkması demekti; sebebi
+      kullanıcıya söyleyip kararı ona bırakmak daha doğru.
+    */
+    if (sonuc.durum === "hata") {
+      await supabase.from("arc_shipments").update({ failure_reason: `OTO iptal etmedi · ${sonuc.mesaj}` })
+        .eq("id", gonderiId).eq("organization_id", organization.id);
+      revalidatePath(`/siparisler/${orderId}`);
+      return await geriDon(orderId, { error: `Gönderi OTO'da iptal edilemedi: ${sonuc.mesaj}` });
+    }
+  }
+
   const { error } = await supabase.from("arc_shipments")
-    .update({ status: "cancelled" })
+    .update({ status: "cancelled", failure_reason: null })
     .eq("id", gonderiId).eq("organization_id", organization.id);
   if (error) return await geriDon(orderId, { error: error.message });
 

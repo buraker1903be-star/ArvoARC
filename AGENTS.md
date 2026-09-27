@@ -67,6 +67,13 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   üretmedi ve sebep hiçbir ekranda görünmedi. Hata mesajı durum koduyla
   birlikte gösterilir; 401 ile 403 ayrı şeylerdir ve HTTP 200 +
   `success:false` üçüncü bir durumdur.
+- **Panelde iptal edilen OTO gönderisi OTO'da da iptal edilir.** Önce
+  yalnızca `arc_shipments.status` işaretleniyordu ve gönderi OTO'da
+  canlı kalıyordu: kurye alıma gelebiliyor, tedarikçi etiketi
+  yapıştırıp gönderebiliyor, harcanan bakiye geri gelmiyordu. OTO iptal
+  etmezse BİZİM kayıt da iptal edilmez — tersi, panelin "iptal" dediği
+  bir paketin yola çıkması demek. Taslak ve `source=manual` kayıtlar
+  OTO'ya hiç dokunmadığı için yalnızca yerel iptal edilir.
 - **OTO gönderisi kayıtlı bir GÖNDERİCİ KONUMU ister.** `senderInformation`
   ile adresi tek tek yazmak siparişi açıyor ama gönderiyi açmıyor; etiket
   hiç üretilmiyor. Ayrıca `createOrder` içindeki `createShipment:true`
