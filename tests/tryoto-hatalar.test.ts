@@ -45,6 +45,16 @@ test("mesaj hiç yoksa durum koduna göre konuşuluyor", () => {
   assert.equal(kullaniciMesaji(null), "OTO isteği tamamlanamadı.");
 });
 
+test("403 ile 401 AYRI konuşuyor", () => {
+  /*
+    İkisini "anahtarı kontrol edin" diye okumak yanlış teşhise götürdü:
+    canlıda geçerli bir anahtarla dcList 403 döndü (uç ücretsiz pakette
+    kapalı) ve iki tur anahtar kovalandı.
+  */
+  assert.match(kullaniciMesaji(null, 403), /paketinde kapalı olabilir/);
+  assert.doesNotMatch(kullaniciMesaji(null, 403), /anahtarını kontrol/);
+});
+
 test("OtoHatasi ham mesajı da taşıyor", () => {
   // Kullanıcıya çevirisi gösterilir, günlüğe ham metin yazılır.
   const hata = new OtoHatasi("Insufficient balance", 400);

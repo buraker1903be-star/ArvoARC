@@ -59,8 +59,17 @@ const BILINEN: { iz: string; karsilik: string }[] = [
  */
 export function kullaniciMesaji(hamMesaj: string | null, durumKodu?: number): string {
   if (!hamMesaj) {
-    if (durumKodu === 401 || durumKodu === 403) {
+    /*
+      401 ile 403 AYRI şeyler ve ikisini "anahtarı kontrol edin" diye
+      okumak yanlış teşhise götürüyor: canlıda (27.09.2026) geçerli bir
+      anahtarla dcList 403 döndü — uç ücretsiz pakette kapalı — ve iki tur
+      boyunca anahtar kovalandı. 401 kimlik, 403 yetki/plan sorunu.
+    */
+    if (durumKodu === 401) {
       return "OTO kimlik doğrulaması reddedildi. Mağaza ayarlarındaki yenileme anahtarını kontrol edin.";
+    }
+    if (durumKodu === 403) {
+      return "OTO bu isteği reddetti. Uç, hesabınızın paketinde kapalı olabilir (ücretsiz pakette bazı uçlar kullanılamıyor).";
     }
     if (durumKodu && durumKodu >= 500) return "OTO servisi şu an yanıt vermiyor. Biraz sonra tekrar deneyin.";
     return "OTO isteği tamamlanamadı.";
