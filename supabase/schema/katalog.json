@@ -430,6 +430,7 @@
     "arc_create_order",
     "arc_create_storefront_order",
     "arc_decode_entities",
+    "arc_delete_order",
     "arc_extract_vat",
     "arc_fill_order_tax",
     "arc_find_address",

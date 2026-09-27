@@ -42,6 +42,12 @@ const PANEL = [
   "private.can_manage_organization_assets",
   "public.arc_address_line",
   "public.arc_adjust_inventory",
+  /*
+    Sipariş silme: yalnızca oturumlu kullanıcıya açık, yetkiyi
+    fonksiyonun kendisi daraltıyor (private.arvo_is_org_admin ile
+    owner/admin). anon'a KAPALI olmalı — silme geri alınamaz.
+  */
+  "public.arc_delete_order",
   "public.arc_baslik",
   "public.arc_check_coupon",
   "public.arc_clean",

@@ -27,12 +27,13 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   uygulamaya gerek kalmadı.
 */
 /*
-  27.09.2026 dökümü kargo bildirimi sütununu da içeriyor
-  (arc_shipments.customer_notified_at, 20260927111515), bu yüzden imleç
-  onun ardına alındı; dökümde zaten olan bir migration'ı yeniden
-  uygulamak "column already exists" ile düşerdi.
+  27.09.2026 akşam dökümü o günün BÜTÜN migration'larını içeriyor:
+  kargo bildirimi sütunu, vitrinde kargo takibi (get_arvoculture_my_orders
+  yeniden kuruldu), sipariş silme ve iade kalemlerinin doğrulanması.
+  İmleç sonuncunun ardında; dökümde zaten olan bir migration'ı yeniden
+  uygulamak "already exists" ile düşerdi.
 */
-const ILK_UYGULANAN = "20260927111516";
+const ILK_UYGULANAN = "20260927131920";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;
