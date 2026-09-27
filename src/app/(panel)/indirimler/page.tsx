@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
-import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { createDiscount,deleteDiscount,toggleDiscount } from "./actions";
 import "../catalog.css";
 import "../modules.css";
@@ -9,13 +9,6 @@ const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"});
 const dateTime=new Intl.DateTimeFormat("tr-TR",{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/Istanbul"});
 type Meta={vendor?:string;badge?:string;badge_tone?:string};
 
-const ERRORS:Record<string,string>={
-  forbidden:"Bu işlem için yetkiniz yok.",
-  "invalid-discount":"Kampanya adı, türü ve geçerli bir indirim değeri gerekli.",
-  "23505":"Bu kupon kodu başka bir kampanyada kullanılıyor.",
-  "invalid-date":"Başlangıç veya bitiş tarihi geçersiz.",
-  "invalid-range":"Bitiş tarihi başlangıçtan sonra olmalı.",
-};
 
 function ruleValue(rule:{discount_type:string;value:number}){
   if(rule.discount_type==="percentage")return `%${rule.value}`;
@@ -26,8 +19,7 @@ function ruleType(type:string){
   return type==="percentage"?"Sepette yüzde indirim":type==="fixed_amount"?"Sepette tutar indirimi":"Ücretsiz kargo";
 }
 
-export default async function DiscountsPage({searchParams}:{searchParams:Promise<{created?:string;saved?:string;deleted?:string;error?:string}>}){
-  const params=await searchParams;
+export default async function DiscountsPage(){
   const {supabase,organization,membership}=await requireTenant();
   const [{data:products,error:productError},{data:variants,error:variantError},{data:rules,error:rulesError}]=await Promise.all([
     supabase.from("arc_products").select("id,name,status,metadata").is("supplier",null).limit(500).eq("organization_id",organization.id),
@@ -62,10 +54,8 @@ export default async function DiscountsPage({searchParams}:{searchParams:Promise
     </section>
 
     <div className="ac-stack">
-      {params.created?<Notice title="İndirim paketi oluşturuldu."/>:null}
-      {params.saved?<Notice title="İndirim durumu güncellendi."/>:null}
-      {params.deleted?<Notice title="İndirim paketi silindi."/>:null}
-      {params.error?<Notice tone="error" title="İşlem tamamlanamadı">{ERRORS[params.error]??params.error}</Notice>:null}
+      {/* Sonuç ÇEREZDEN geliyor; adres satırı artık okunmuyor. */}
+      <PanelBildirimi />
 
       <section className="ac-metrics" aria-label="İndirim özeti">
         <article className="ac-metric"><span>Aktif kural</span><strong>{activeRules.length}</strong><small>Sepet ve kargo</small></article>

@@ -3,9 +3,9 @@ import { requireTenant } from "@/lib/tenant";
 import { orderStatusLabel, paymentStatusLabel } from "@/lib/commerce-labels";
 import { isBankTransfer, TRANSFER_STALE_HOURS } from "@/lib/payment-method";
 import { Icon, type IconName } from "@/components/panel/icons";
-import { Notice } from "@/components/panel/notice";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
 import { cancelTransferOrder, confirmTransferPayment } from "../siparisler/actions";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 
 /* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
 function currentTime(){return Date.now();}
@@ -16,15 +16,6 @@ function waitingFor(createdAt:string,now:number){
 }
 import "../modules.css";
 
-const PAYMENT_ERRORS:Record<string,string>={
-  forbidden:"Ödeme onayı için yönetici yetkisi gerekir.",
-  "order-not-found":"Sipariş bulunamadı.",
-  "not-transfer":"Bu sipariş havale ile verilmemiş; kart ödemeleri PayTR bildirimiyle kapanır.",
-  "already-paid":"Bu siparişin ödemesi zaten onaylanmış.",
-  "order-closed":"Sipariş kapanmış ya da ödemesi başarısız; detaydan kontrol edin.",
-  "save-failed":"Ödeme kaydedilemedi. Tekrar deneyin.",
-  "in-progress":"Bu sipariş az önce başka bir sekmeden ya da kullanıcı tarafından güncellendi. Sayfayı yenileyip tekrar deneyin.",
-};
 
 type ProductMeta={image_paths?:string[];images?:string[];images_migrated?:boolean};
 const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"});
@@ -42,8 +33,7 @@ function ActionRow({href,icon,tone,title,detail,side}:{href:string;icon:IconName
   </Link>;
 }
 
-export default async function Operations({searchParams}:{searchParams:Promise<{ok?:string;error?:string;order?:string}>}){
-  const params=await searchParams;
+export default async function Operations(){
   const {supabase,organization,membership}=await requireTenant();
   const canManage=["owner","admin","manager"].includes(membership.role);
   const now=currentTime();
@@ -107,9 +97,10 @@ export default async function Operations({searchParams}:{searchParams:Promise<{o
       </div>
     </section>
 
-    {params.ok==="payment"?<Notice title={`${params.order??"Sipariş"} için havale ödemesi onaylandı.`}>Sipariş onaylandı; müşterinin e-posta adresi varsa “Ödemeniz alındı” bildirimi gönderildi.</Notice>:null}
-    {params.ok==="cancelled"?<Notice title={`${params.order??"Sipariş"} iptal edildi.`}>Müşterinin e-posta adresi varsa “Siparişiniz iptal edildi” bildirimi gönderildi.</Notice>:null}
-    {params.error?<Notice tone="error" title="İşlem tamamlanamadı">{PAYMENT_ERRORS[params.error]??params.error}</Notice>:null}
+    <PanelBildirimi />
+    {/* Buraya hata yazan bir işlem YOK: bu satır yalnızca adres
+        satırına elle ?error= eklenince çalışıyordu, yani dışarıdan
+        uydurulmuş mesajı göstermekten başka işe yaramıyordu. */}
 
     <div className="dash">
       {/* Renk anlamlı: sıfır olan sayaç nötr, dolu olan dikkat. */}

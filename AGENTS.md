@@ -64,6 +64,16 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   hiç üretilmiyor. Ayrıca `createOrder` içindeki `createShipment:true`
   bayrağı yoksayılıyor — gönderi ayrı `createShipment` çağrısıyla
   (`orderId` + `deliveryOptionId`) açılır.
+- **İşlem sonucu adreste taşınmaz.** Mesaj `?error=`/`?saved=` ile
+  gidince dışarıdan gönderilen bir bağlantı, kullanıcıya sistemin
+  ürettiği gibi görünen uydurma bir mesaj gösterebiliyordu; sayfalar
+  tanımadıkları kodu `ERRORS[kod] ?? kod` ile olduğu gibi basıyordu ve
+  şifre sıfırlama ekranı `?neden=` değerini doğrudan yazdırıyordu
+  (27.09.2026). Sonuç kısa ömürlü, tek kullanımlık bir çerezle taşınır
+  (`lib/panel-bildirim.ts`), metni işlem çözer, sayfa yalnızca yazılanı
+  gösterir. Sayı ve sipariş numarası gibi değerler de mesajın içine
+  girer, adrese değil. `tests/panel-bildirim.test.ts` kalıbın geri
+  gelmesini engeller.
 - **Geri dönüş adresi doğrulanır**: başka bölüme ya da dış adrese
   yönlendirme engellenir, filtre ve sayfa korunur.
 

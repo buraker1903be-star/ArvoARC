@@ -4,7 +4,7 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { createProduct, bulkUpdateStatus } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel } from "@/lib/commerce-labels";
-import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { ProductTable, type ProductRow } from "./product-table";
 import "../catalog.css";
 
@@ -28,17 +28,6 @@ type SourceKey = (typeof SOURCES)[number][0];
 type ListState = { q: string; filter: StatusKey; source: SourceKey; page: number };
 type ProductMeta = { images?: string[]; image_paths?: string[]; vendor?: string; type?: string; tags?: string };
 
-const ERRORS: Record<string, string> = {
-  forbidden: "Bu hesap ürün işlemi yetkisine sahip değil.",
-  "invalid-product": "Ürün bilgilerini kontrol edin: ad, SKU ve geçerli bir fiyat gerekli.",
-  "23505": "Bu SKU zaten kullanılıyor.",
-  "invalid-status": "Geçersiz ürün durumu.",
-  "bulk-needs-filter": "Toplu işlem için en az bir tedarikçi veya koleksiyon seçin.",
-  "collection-not-found": "Koleksiyon bulunamadı.",
-  "empty-collection": "Koleksiyonda ürün yok.",
-  "bulk-failed": "Toplu işlem tamamlanamadı.",
-  "bulk-empty": "Toplu işlem için ürün seçilmedi.",
-};
 
 function listHref(state: ListState, patch: Partial<ListState>) {
   const next = { ...state, ...patch };
@@ -224,14 +213,10 @@ export default async function Products({ searchParams }: { searchParams: Promise
     </section>
 
     <div className="ac-stack">
-      {params.created === "1" ? <Notice title="Ürün başarıyla oluşturuldu." /> : null}
-      {params.ok === "bulk" ? <Notice title={`Toplu durum değişikliği uygulandı${params.updated ? ` · ${Number(params.updated)} ürün` : ""}.`} /> : null}
-      {params.ok === "bulk-selected" ? (
-        <Notice title={`${Number(params.updated ?? 0)} ürünün durumu güncellendi.`}>
-          {Number(params.skipped ?? 0) > 0 ? `${Number(params.skipped)} ürün zaten bu durumda olduğu için atlandı.` : null}
-        </Notice>
-      ) : null}
-      {params.error ? <Notice tone="error" title="Ürün işlemi tamamlanamadı">{ERRORS[params.error] ?? `Hata kodu: ${params.error}`}</Notice> : null}
+      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
+          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
+          gösterebiliyordu (lib/panel-bildirim.ts). */}
+      <PanelBildirimi />
 
       <section className="ac-metrics" aria-label="Katalog özeti">
         {metrics.map((metric) => (

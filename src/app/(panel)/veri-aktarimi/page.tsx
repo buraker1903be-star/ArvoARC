@@ -1,21 +1,15 @@
 import { requireTenant } from "@/lib/tenant";
-import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { importActiveProducts, importHistoricalOrders, migrateShopifyImages } from "./actions";
 import { importKindLabel, importStatusLabel } from "@/lib/commerce-labels";
 import "../modules.css";
 
 const dateTime = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
 
-const ERRORS: Record<string, string> = {
-  forbidden: "Aktarım için yetkiniz yok.",
-  "csv-required": "Shopify Products dışa aktarımından bir .csv dosyası seçin.",
-  "orders-csv-required": "Shopify Orders dışa aktarımından bir .csv dosyası seçin.",
-};
 
 const statusTone = (status: string) => (status === "completed" ? undefined : status === "failed" ? "bad" : status === "processing" ? "warn" : "muted");
 
-export default async function ImportPage({ searchParams }: { searchParams: Promise<{ imported?: string; errors?: string; error?: string; images?: string; imageErrors?: string; remaining?: string; orders?: string; orderErrors?: string; orderSkipped?: string }> }) {
-  const params = await searchParams;
+export default async function ImportPage() {
   const { supabase, organization, membership } = await requireTenant();
   const { data: batches, error } = await supabase
     .from("arc_import_batches")
@@ -25,7 +19,6 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
     .limit(20);
   if (error) throw new Error(error.message);
   const canManage = ["owner", "admin", "manager"].includes(membership.role);
-  const count = (value?: string) => Number(value ?? 0);
 
   return <>
     <section className="ac-bar">
@@ -36,10 +29,10 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
     </section>
 
     <div className="ac-stack">
-      {params.imported ? <Notice tone={count(params.errors) ? "warn" : "success"} title={`${count(params.imported)} aktif ürün aktarıldı.`}>{count(params.errors) ? `${count(params.errors)} satır hatalı olduğu için aktarılamadı.` : null}</Notice> : null}
-      {params.orders ? <Notice tone={count(params.orderErrors) ? "warn" : "success"} title={`${count(params.orders)} eski sipariş aktarıldı.`}>{`Hata: ${count(params.orderErrors)} · Atlanan satır: ${count(params.orderSkipped)}`}</Notice> : null}
-      {params.images ? <Notice tone={count(params.imageErrors) ? "warn" : "success"} title={`${count(params.images)} ürünün görselleri ArvoARC depolamasına taşındı.`}>{`Hata: ${count(params.imageErrors)} · Kalan ürün: ${count(params.remaining)}`}</Notice> : null}
-      {params.error ? <Notice tone="error" title="Aktarım başlatılamadı">{ERRORS[params.error] ?? params.error}</Notice> : null}
+      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
+          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
+          gösterebiliyordu (lib/panel-bildirim.ts). */}
+      <PanelBildirimi />
 
       <div className="import-grid">
         <section className="ac ac-pad import-card">

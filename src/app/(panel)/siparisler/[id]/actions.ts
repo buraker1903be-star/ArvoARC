@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { bildirimBirak } from "@/lib/panel-bildirim";
+import { bildirimBirak, bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
 import { sendEmail } from "@/lib/email/resend";
 import { partialRefundEmail, shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
@@ -177,11 +177,11 @@ export async function refundOrder(formData: FormData) {
 
   /* İade yalnızca sahip ve yöneticide: parasal işlem. */
   if (!["owner", "admin"].includes(membership.role)) {
-    redirect("/siparisler?error=forbidden");
+    return await bildirimliDonus("/siparisler",{hata:hataMetni("forbidden")});
   }
 
   const orderId = String(formData.get("order_id") ?? "");
-  if (!orderId) redirect("/siparisler?error=invalid-order");
+  if (!orderId) return await bildirimliDonus("/siparisler",{hata:hataMetni("invalid-order")});
 
   const { data: order } = await supabase
     .from("arc_orders")
@@ -192,7 +192,7 @@ export async function refundOrder(formData: FormData) {
     .eq("id", orderId)
     .single();
 
-  if (!order) redirect("/siparisler?error=invalid-order");
+  if (!order) return await bildirimliDonus("/siparisler",{hata:hataMetni("invalid-order")});
 
   const meta = (order.metadata ?? {}) as Record<string, unknown>;
 

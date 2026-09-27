@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { bildirimliDonus } from "@/lib/panel-bildirim";
+import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { backUrl } from "@/lib/back-url";
 
@@ -14,7 +16,7 @@ function slugify(value: string) {
 
 export async function createProduct(formData: FormData) {
   const { supabase, user, organization, membership } = await requireTenant();
-  if (!MANAGERS.includes(membership.role)) redirect("/urunler?error=forbidden");
+  if (!MANAGERS.includes(membership.role)) return await bildirimliDonus("/urunler",{hata:hataMetni("forbidden")});
 
   const name = String(formData.get("name") ?? "").trim();
   const sku = String(formData.get("sku") ?? "").trim().toUpperCase();
@@ -25,25 +27,25 @@ export async function createProduct(formData: FormData) {
   const stock = Number(formData.get("stock") ?? 0);
   const allowBackorder = formData.get("allow_backorder") === "on";
 
-  if (!name || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isFinite(compareAtPriceInput) || compareAtPriceInput < 0 || !Number.isInteger(stock)) redirect("/urunler?error=invalid-product&yeni=1#yeni-urun");
+  if (!name || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isFinite(compareAtPriceInput) || compareAtPriceInput < 0 || !Number.isInteger(stock)) return await bildirimliDonus("/urunler?yeni=1#yeni-urun",{hata:hataMetni("invalid-product")});
 
   const slug = `${slugify(name)}-${Date.now().toString(36)}`;
   const price = Math.round(priceInput * 100);
   const compareAtPrice = compareAtPriceInput > priceInput ? Math.round(compareAtPriceInput * 100) : null;
   const { data: product, error: productError } = await supabase.from("arc_products").insert({ organization_id: organization.id, name, slug, description, status: status === "active" ? "active" : "draft", source: "native", created_by: user.id }).select("id").single();
-  if (productError) redirect(`/urunler?error=${encodeURIComponent(productError.code ?? "product-create")}&yeni=1#yeni-urun`);
+  if (productError) return await bildirimliDonus("/urunler?yeni=1#yeni-urun",{hata:hataMetni(productError.code ?? "product-create")});
 
   const { error: variantError } = await supabase.from("arc_product_variants").insert({ organization_id: organization.id, product_id: product.id, sku, price, compare_at_price: compareAtPrice, currency: "TRY", stock, allow_backorder: allowBackorder, attributes: {} });
   if (variantError) {
     await supabase.from("arc_products").delete().eq("id", product.id).eq("organization_id", organization.id);
-    redirect(`/urunler?error=${encodeURIComponent(variantError.code ?? "variant-create")}&yeni=1#yeni-urun`);
+    return await bildirimliDonus("/urunler?yeni=1#yeni-urun",{hata:hataMetni(variantError.code ?? "variant-create")});
   }
 
   revalidatePath("/");
   revalidatePath("/urunler");
   /* Yeni ürün doğrudan düzenleyicide açılır: görsel, açıklama ve
      SEO bir sonraki adım. */
-  redirect(`/urunler/${product.id}?saved=created`);
+  return await bildirimliDonus(`/urunler/${product.id}`,{basari:basariMetni("created")});
 }
 
 /**
@@ -90,7 +92,7 @@ export async function bulkUpdateStatus(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
 
   if (!MANAGERS.includes(membership.role)) {
-    redirect("/urunler?error=forbidden");
+    return await bildirimliDonus("/urunler",{hata:hataMetni("forbidden")});
   }
 
   const status = String(formData.get("status") ?? "").trim();
@@ -99,12 +101,12 @@ export async function bulkUpdateStatus(formData: FormData) {
   const currentStatus = String(formData.get("current_status") ?? "").trim();
 
   if (!STATUSES.includes(status)) {
-    redirect("/urunler?error=invalid-status");
+    return await bildirimliDonus("/urunler",{hata:hataMetni("invalid-status")});
   }
 
   // En az bir daraltıcı koşul olmalı.
   if (!supplier && !collectionSlug) {
-    redirect("/urunler?error=bulk-needs-filter");
+    return await bildirimliDonus("/urunler",{hata:hataMetni("bulk-needs-filter")});
   }
 
   let query = supabase
@@ -123,7 +125,7 @@ export async function bulkUpdateStatus(formData: FormData) {
       .eq("slug", collectionSlug)
       .maybeSingle();
 
-    if (!collection) redirect("/urunler?error=collection-not-found");
+    if (!collection) return await bildirimliDonus("/urunler",{hata:hataMetni("collection-not-found")});
 
     const { data: members } = await supabase
       .from("arc_collection_products")
@@ -131,15 +133,17 @@ export async function bulkUpdateStatus(formData: FormData) {
       .eq("collection_id", collection.id);
 
     const ids = (members ?? []).map((row) => row.product_id);
-    if (ids.length === 0) redirect("/urunler?error=empty-collection");
+    if (ids.length === 0) return await bildirimliDonus("/urunler",{hata:hataMetni("empty-collection")});
 
     query = query.in("id", ids);
   }
 
   const { data, error } = await query.select("id");
-  if (error) redirect("/urunler?error=bulk-failed");
+  if (error) return await bildirimliDonus("/urunler",{hata:hataMetni("bulk-failed")});
 
   revalidatePath("/");
   revalidatePath("/urunler");
-  redirect(`/urunler?ok=bulk&updated=${data?.length ?? 0}`);
+  /* Güncellenen sayısı artık ADRESTE değil MESAJDA: sayı adres satırında
+     taşınınca dışarıdan uydurulabiliyordu. */
+  return await bildirimliDonus("/urunler",{basari:`Toplu durum değişikliği uygulandı · ${data?.length ?? 0} ürün.`});
 }

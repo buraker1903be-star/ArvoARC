@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
-import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { createCollection } from "./actions";
 import "../catalog.css";
 import "../modules.css";
@@ -9,16 +9,10 @@ import "../modules.css";
 const STATUS_TABS=[["all","Tümü"],["active","Aktif"],["draft","Taslak"],["archived","Arşiv"]] as const;
 type StatusKey=(typeof STATUS_TABS)[number][0];
 const statusLabels:Record<string,string>={draft:"Taslak",active:"Aktif",archived:"Arşivlenmiş"};
-const ERRORS:Record<string,string>={
-  forbidden:"Bu işlem için yetkiniz yok.",
-  "invalid-collection":"Koleksiyon adı ve bağlantısı zorunlu.",
-  "23505":"Bu bağlantı başka bir koleksiyonda kullanılıyor.",
-  "not-found":"Koleksiyon bulunamadı.",
-};
 
 type Membership={collection_id:string;product_id:string};
 
-export default async function Collections({searchParams}:{searchParams:Promise<{error?:string;q?:string;filter?:string}>}){
+export default async function Collections({searchParams}:{searchParams:Promise<{q?:string;filter?:string}>}){
   const query=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const search=(query.q??"").trim().slice(0,80);
@@ -55,7 +49,10 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
     </section>
 
     <div className="ac-stack">
-      {query.error?<Notice tone="error" title="Koleksiyon işlemi tamamlanamadı">{ERRORS[query.error]??query.error}</Notice>:null}
+      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
+          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
+          gösterebiliyordu (lib/panel-bildirim.ts). */}
+      <PanelBildirimi />
 
       <section className="ac-metrics" aria-label="Koleksiyon özeti">
         <article className="ac-metric"><span>Koleksiyon</span><strong>{all.length.toLocaleString("tr-TR")}</strong><small>Tüm durumlar</small></article>

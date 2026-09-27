@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { bildirimliDonus } from "@/lib/panel-bildirim";
+import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 
 /**
@@ -14,7 +15,7 @@ export async function updateSupplier(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
 
   if (!["owner", "admin"].includes(membership.role)) {
-    redirect("/tedarikci?error=forbidden");
+    return await bildirimliDonus("/tedarikci",{hata:hataMetni("forbidden")});
   }
 
   const code = String(formData.get("code") ?? "").trim();
@@ -29,7 +30,7 @@ export async function updateSupplier(formData: FormData) {
   const buffer = Number(formData.get("stock_buffer") ?? 5);
   const publishDirectly = formData.get("publish_directly") === "on";
 
-  if (!code) redirect("/tedarikci?error=missing-code");
+  if (!code) return await bildirimliDonus("/tedarikci",{hata:hataMetni("missing-code")});
 
   /*
     Sınırlar: negatif kâr oranı zararına satış demektir ve
@@ -37,19 +38,19 @@ export async function updateSupplier(formData: FormData) {
     duruyor; %1000 kâr oranı yazım hatası olma ihtimali yüksek.
   */
   if (!Number.isFinite(margin) || margin < 0 || margin > 500) {
-    redirect("/tedarikci?error=invalid-margin");
+    return await bildirimliDonus("/tedarikci",{hata:hataMetni("invalid-margin")});
   }
   if (!Number.isFinite(shipping) || shipping < 0 || shipping > 100000) {
-    redirect("/tedarikci?error=invalid-shipping");
+    return await bildirimliDonus("/tedarikci",{hata:hataMetni("invalid-shipping")});
   }
   if (!Number.isFinite(round) || round < 0 || round > 99) {
-    redirect("/tedarikci?error=invalid-round");
+    return await bildirimliDonus("/tedarikci",{hata:hataMetni("invalid-round")});
   }
   if (!Number.isFinite(service) || service < 0 || service > 10000) {
-    redirect("/tedarikci?error=invalid-service");
+    return await bildirimliDonus("/tedarikci",{hata:hataMetni("invalid-service")});
   }
   if (!Number.isInteger(buffer) || buffer < 0 || buffer > 100) {
-    redirect("/tedarikci?error=invalid-buffer");
+    return await bildirimliDonus("/tedarikci",{hata:hataMetni("invalid-buffer")});
   }
 
   const { data: saved, error } = await supabase
@@ -79,13 +80,13 @@ export async function updateSupplier(formData: FormData) {
     .eq("code", code)
     .select("code");
 
-  if (error) redirect("/tedarikci?error=save-failed");
+  if (error) return await bildirimliDonus("/tedarikci",{hata:hataMetni("save-failed")});
   /* RLS elerse ya da kod eşleşmezse hata değil 0 satır döner; doğrulanmazsa
      kullanıcı kaydedilmeyen ayarı kaydedilmiş sanır. */
-  if (!saved?.length) redirect("/tedarikci?error=save-failed");
+  if (!saved?.length) return await bildirimliDonus("/tedarikci",{hata:hataMetni("save-failed")});
 
   revalidatePath("/tedarikci");
-  redirect("/tedarikci?ok=saved");
+  return await bildirimliDonus("/tedarikci",{basari:basariMetni("saved")});
 }
 
 /**
@@ -98,11 +99,11 @@ export async function resetCursor(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
 
   if (!["owner", "admin"].includes(membership.role)) {
-    redirect("/tedarikci?error=forbidden");
+    return await bildirimliDonus("/tedarikci",{hata:hataMetni("forbidden")});
   }
 
   const code = String(formData.get("code") ?? "").trim();
-  if (!code) redirect("/tedarikci?error=missing-code");
+  if (!code) return await bildirimliDonus("/tedarikci",{hata:hataMetni("missing-code")});
 
   const { error } = await supabase
     .from("arc_suppliers")
@@ -110,8 +111,8 @@ export async function resetCursor(formData: FormData) {
     .eq("organization_id", organization.id)
     .eq("code", code);
 
-  if (error) redirect("/tedarikci?error=save-failed");
+  if (error) return await bildirimliDonus("/tedarikci",{hata:hataMetni("save-failed")});
 
   revalidatePath("/tedarikci");
-  redirect("/tedarikci?ok=reset");
+  return await bildirimliDonus("/tedarikci",{basari:basariMetni("reset")});
 }

@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { bildirimliDonus } from "@/lib/panel-bildirim";
+import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 
 const allowedRoles = new Set(["owner", "admin", "manager"]);
@@ -47,14 +48,14 @@ type EditableProductMetadata = {
 export async function updateProduct(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   const id = String(formData.get("id") ?? "");
-  if (!allowedRoles.has(membership.role)) redirect(`/urunler/${id}?error=forbidden`);
+  if (!allowedRoles.has(membership.role)) return await bildirimliDonus(`/urunler/${id}`,{hata:hataMetni("forbidden")});
 
   const name = field(formData, "name", 200);
   const description = field(formData, "description", 20000);
   const requestedStatus = field(formData, "status", 20);
   const status = ["active", "draft", "archived"].includes(requestedStatus) ? requestedStatus : "draft";
   const slug = slugify(field(formData, "slug", 180) || name);
-  if (!id || !name || !slug) redirect(`/urunler/${id}?error=invalid-product`);
+  if (!id || !name || !slug) return await bildirimliDonus(`/urunler/${id}`,{hata:hataMetni("invalid-product")});
 
   const { data: currentProduct, error: currentProductError } = await supabase
     .from("arc_products")
@@ -63,7 +64,7 @@ export async function updateProduct(formData: FormData) {
     .eq("organization_id", organization.id)
     .maybeSingle();
 
-  if (currentProductError || !currentProduct) redirect(`/urunler/${id}?error=product-not-found`);
+  if (currentProductError || !currentProduct) return await bildirimliDonus(`/urunler/${id}`,{hata:hataMetni("product-not-found")});
   const currentMetadata = (currentProduct.metadata ?? {}) as EditableProductMetadata;
   const metadata: EditableProductMetadata = {
     ...currentMetadata,
@@ -91,44 +92,44 @@ export async function updateProduct(formData: FormData) {
     .eq("id", id)
     .eq("organization_id", organization.id);
 
-  if (error) redirect(`/urunler/${id}?error=${encodeURIComponent(error.code ?? error.message)}`);
+  if (error) return await bildirimliDonus(`/urunler/${id}`,{hata:hataMetni(error.code ?? error.message)});
   revalidatePath("/");
   revalidatePath("/urunler");
   revalidatePath(`/urunler/${id}`);
-  redirect(`/urunler/${id}?saved=product`);
+  return await bildirimliDonus(`/urunler/${id}`,{basari:basariMetni("product")});
 }
 
 export async function createVariant(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   const productId=String(formData.get("product_id")??"");
-  if(!allowedRoles.has(membership.role))redirect(`/urunler/${productId}?error=forbidden`);
+  if(!allowedRoles.has(membership.role))return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("forbidden")});
   const title=String(formData.get("title")??"").trim()||"Default";
   const sku=String(formData.get("sku")??"").trim().toUpperCase();
   const priceInput=Number(formData.get("price")??0);
   const compareAtPriceInput=Number(formData.get("compare_at_price")??0);
   const stock=Number(formData.get("stock")??0);
   const allowBackorder=formData.get("allow_backorder")==="on";
-  if(!productId||!sku||!Number.isFinite(priceInput)||priceInput<0||!Number.isFinite(compareAtPriceInput)||compareAtPriceInput<0||!Number.isInteger(stock)||stock<0)redirect(`/urunler/${productId}?error=invalid-variant`);
+  if(!productId||!sku||!Number.isFinite(priceInput)||priceInput<0||!Number.isFinite(compareAtPriceInput)||compareAtPriceInput<0||!Number.isInteger(stock)||stock<0)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("invalid-variant")});
 
   const {data:product}=await supabase.from("arc_products").select("id").eq("organization_id",organization.id).eq("id",productId).maybeSingle();
-  if(!product)redirect(`/urunler/${productId}?error=product-not-found`);
+  if(!product)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("product-not-found")});
   const {error}=await supabase.from("arc_product_variants").insert({organization_id:organization.id,product_id:productId,title,sku,price:Math.round(priceInput*100),compare_at_price:compareAtPriceInput>priceInput?Math.round(compareAtPriceInput*100):null,currency:"TRY",stock,allow_backorder:allowBackorder,attributes:{},external_id:null});
-  if(error)redirect(`/urunler/${productId}?error=${encodeURIComponent(error.code??error.message)}`);
+  if(error)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(error.code??error.message)});
   revalidatePath("/");revalidatePath("/urunler");revalidatePath(`/urunler/${productId}`);revalidatePath("/stok");
-  redirect(`/urunler/${productId}?saved=variant-created`);
+  return await bildirimliDonus(`/urunler/${productId}`,{basari:basariMetni("variant-created")});
 }
 
 export async function updateVariant(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
   const productId = String(formData.get("product_id") ?? "");
   const variantId = String(formData.get("variant_id") ?? "");
-  if (!allowedRoles.has(membership.role)) redirect(`/urunler/${productId}?error=forbidden`);
+  if (!allowedRoles.has(membership.role)) return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("forbidden")});
 
   const sku = String(formData.get("sku") ?? "").trim().toUpperCase();
   const priceInput = Number(formData.get("price") ?? 0);
   const compareAtPriceInput = Number(formData.get("compare_at_price") ?? 0);
   const allowBackorder = formData.get("allow_backorder") === "on";
-  if (!productId || !variantId || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isFinite(compareAtPriceInput) || compareAtPriceInput < 0) redirect(`/urunler/${productId}?error=invalid-variant`);
+  if (!productId || !variantId || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isFinite(compareAtPriceInput) || compareAtPriceInput < 0) return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("invalid-variant")});
 
   const { error } = await supabase
     .from("arc_product_variants")
@@ -137,11 +138,11 @@ export async function updateVariant(formData: FormData) {
     .eq("product_id", productId)
     .eq("organization_id", organization.id);
 
-  if (error) redirect(`/urunler/${productId}?error=${encodeURIComponent(error.message)}`);
+  if (error) return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(error.message)});
   revalidatePath("/urunler");
   revalidatePath(`/urunler/${productId}`);
   revalidatePath("/stok");
-  redirect(`/urunler/${productId}?saved=variant`);
+  return await bildirimliDonus(`/urunler/${productId}`,{basari:basariMetni("variant")});
 }
 
 
@@ -152,28 +153,28 @@ type ProductMetadata={image_paths?:string[];images?:string[];[key:string]:unknow
 export async function uploadProductImages(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   const productId=String(formData.get("product_id")??"");
-  if(!allowedRoles.has(membership.role))redirect(`/urunler/${productId}?error=forbidden`);
+  if(!allowedRoles.has(membership.role))return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("forbidden")});
   const files=formData.getAll("images").filter((value):value is File=>value instanceof File&&value.size>0);
-  if(!productId||!files.length||files.length>5)redirect(`/urunler/${productId}?error=invalid-images`);
+  if(!productId||!files.length||files.length>5)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("invalid-images")});
 
   const {data:product,error:productError}=await supabase.from("arc_products").select("metadata").eq("organization_id",organization.id).eq("id",productId).maybeSingle();
-  if(productError||!product)redirect(`/urunler/${productId}?error=product-not-found`);
+  if(productError||!product)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("product-not-found")});
   const metadata=(product.metadata??{}) as ProductMetadata;
   const existing=metadata.image_paths??[];
-  if(existing.length+files.length>8)redirect(`/urunler/${productId}?error=max-8-images`);
+  if(existing.length+files.length>8)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("max-8-images")});
 
   const uploaded:string[]=[];
   for(const [index,file] of files.entries()){
     const extension=imageTypes[file.type.toLowerCase()];
     if(!extension||file.size>maxImageBytes){
       if(uploaded.length)await supabase.storage.from("arc-product-images").remove(uploaded);
-      redirect(`/urunler/${productId}?error=invalid-image-file`);
+      return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("invalid-image-file")});
     }
     const path=`${organization.id}/${productId}/manual-${Date.now()}-${index+1}.${extension}`;
     const {error}=await supabase.storage.from("arc-product-images").upload(path,await file.arrayBuffer(),{contentType:file.type,cacheControl:"31536000",upsert:false});
     if(error){
       if(uploaded.length)await supabase.storage.from("arc-product-images").remove(uploaded);
-      redirect(`/urunler/${productId}?error=${encodeURIComponent(error.message)}`);
+      return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(error.message)});
     }
     uploaded.push(path);
   }
@@ -181,30 +182,30 @@ export async function uploadProductImages(formData:FormData){
   const {error:updateError}=await supabase.from("arc_products").update({metadata:{...metadata,image_paths:[...existing,...uploaded],images:[]}}).eq("organization_id",organization.id).eq("id",productId);
   if(updateError){
     await supabase.storage.from("arc-product-images").remove(uploaded);
-    redirect(`/urunler/${productId}?error=${encodeURIComponent(updateError.message)}`);
+    return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(updateError.message)});
   }
   revalidatePath("/urunler");revalidatePath(`/urunler/${productId}`);
-  redirect(`/urunler/${productId}?saved=images`);
+  return await bildirimliDonus(`/urunler/${productId}`,{basari:basariMetni("images")});
 }
 
 export async function removeProductImage(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   const productId=String(formData.get("product_id")??"");
   const path=String(formData.get("path")??"");
-  if(!allowedRoles.has(membership.role))redirect(`/urunler/${productId}?error=forbidden`);
+  if(!allowedRoles.has(membership.role))return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("forbidden")});
   const prefix=`${organization.id}/${productId}/`;
-  if(!productId||!path.startsWith(prefix))redirect(`/urunler/${productId}?error=invalid-image-path`);
+  if(!productId||!path.startsWith(prefix))return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("invalid-image-path")});
 
   const {data:product,error:productError}=await supabase.from("arc_products").select("metadata").eq("organization_id",organization.id).eq("id",productId).maybeSingle();
-  if(productError||!product)redirect(`/urunler/${productId}?error=product-not-found`);
+  if(productError||!product)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("product-not-found")});
   const metadata=(product.metadata??{}) as ProductMetadata;
   const paths=metadata.image_paths??[];
-  if(!paths.includes(path))redirect(`/urunler/${productId}?error=image-not-found`);
+  if(!paths.includes(path))return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("image-not-found")});
 
   const {error:storageError}=await supabase.storage.from("arc-product-images").remove([path]);
-  if(storageError)redirect(`/urunler/${productId}?error=${encodeURIComponent(storageError.message)}`);
+  if(storageError)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(storageError.message)});
   const {error:updateError}=await supabase.from("arc_products").update({metadata:{...metadata,image_paths:paths.filter(item=>item!==path)}}).eq("organization_id",organization.id).eq("id",productId);
-  if(updateError)redirect(`/urunler/${productId}?error=${encodeURIComponent(updateError.message)}`);
+  if(updateError)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(updateError.message)});
   revalidatePath("/urunler");revalidatePath(`/urunler/${productId}`);
-  redirect(`/urunler/${productId}?saved=image-removed`);
+  return await bildirimliDonus(`/urunler/${productId}`,{basari:basariMetni("image-removed")});
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
-import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { updateCollection } from "../actions";
 import "../../catalog.css";
 import "../../modules.css";
@@ -10,12 +10,6 @@ import "../../modules.css";
 type Membership={product_id:string;position:number|null};
 type ProductRow={id:string;name:string;status:string;source:string|null;metadata:unknown};
 
-const ERRORS:Record<string,string>={
-  forbidden:"Bu işlem için yetkiniz yok.",
-  "invalid-collection":"Koleksiyon adı ve bağlantısı zorunlu.",
-  "23505":"Bu bağlantı başka bir koleksiyonda kullanılıyor.",
-  "not-found":"Koleksiyon bulunamadı.",
-};
 
 function PickerRow({product,checked}:{product:ProductRow;checked:boolean}){
   const meta=(product.metadata??{}) as {vendor?:string;type?:string};
@@ -27,7 +21,7 @@ function PickerRow({product,checked}:{product:ProductRow;checked:boolean}){
   </label>;
 }
 
-export default async function CollectionDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;created?:string;error?:string;q?:string;added?:string;removed?:string}>}){
+export default async function CollectionDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{q?:string}>}){
   const {id}=await params;const query=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const search=(query.q??"").replace(/[,()*\\"%_]/g," ").trim().slice(0,80);
@@ -59,7 +53,6 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
   const members=memberIds.map(productId=>productById.get(productId)).filter((product):product is ProductRow=>Boolean(product));
   const memberSet=new Set(memberIds);
   const candidates=((candidateResult.data??[]) as ProductRow[]).filter(product=>!memberSet.has(product.id));
-  const added=Number(query.added??0),removed=Number(query.removed??0);
 
   return <>
     <section className="ac-bar">
@@ -72,9 +65,10 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
     </section>
 
     <div className="ac-stack">
-      {query.created?<Notice title="Koleksiyon oluşturuldu.">Ürünleri seçip SEO bilgilerini ekledikten sonra durumunu Aktif yapın.</Notice>:null}
-      {query.saved?<Notice title="Koleksiyon kaydedildi.">{added||removed?`${added} ürün eklendi, ${removed} ürün çıkarıldı.`:null}</Notice>:null}
-      {query.error?<Notice tone="error" title="İşlem tamamlanamadı">{ERRORS[query.error]??query.error}</Notice>:null}
+      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
+          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
+          gösterebiliyordu (lib/panel-bildirim.ts). */}
+      <PanelBildirimi />
 
       {canManage?<>
         {/* Ayrı form: kaydetme formunun içine yerleştirilemez (iç içe form). */}

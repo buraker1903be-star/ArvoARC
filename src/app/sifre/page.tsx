@@ -3,6 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { requestPasswordReset } from "./actions";
 import "../login/login.css";
+import { bildirimiOku } from "@/lib/panel-bildirim";
+import { BildirimTemizle } from "@/components/panel/bildirim-temizle";
 
 export const metadata: Metadata = { title: "Şifre belirle" };
 
@@ -11,8 +13,14 @@ const errors: Record<string, string> = {
   "link-expired": "Bağlantının süresi dolmuş ya da daha önce kullanılmış. Yeni bir bağlantı isteyin.",
 };
 
-export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string; sent?: string; neden?: string }> }) {
-  const { error, sent, neden } = await searchParams;
+export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string; sent?: string }> }) {
+  const { error, sent } = await searchParams;
+  /*
+    Ayrıntı ÇEREZDEN okunuyor. Adres satırında taşınırken içeriği
+    dışarıdan belirlenebiliyordu ve bu ekran kimlik avına en açık yer.
+  */
+  const bildirim = await bildirimiOku();
+  const neden = bildirim?.tur === "hata" ? bildirim.metin : null;
   return (
     <main className="login-shell">
       <section className="login-brand">
@@ -33,7 +41,7 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
           ) : (
             <p>Hesabınıza bağlı adrese şifre belirleme bağlantısı gelecek.</p>
           )}
-          {error ? <div className="login-error" role="alert">{errors[error] ?? "İşlem tamamlanamadı."}{neden ? <><br /><small>Ayrıntı: {neden}</small></> : null}</div> : null}
+          {error ? <div className="login-error" role="alert">{errors[error] ?? "İşlem tamamlanamadı."}{neden ? <><br /><small>Ayrıntı: {neden}</small><BildirimTemizle /></> : null}</div> : null}
           <label>E-posta adresi<input name="email" type="email" autoComplete="email" required placeholder="adiniz@kurum.com" /></label>
           <button type="submit">Bağlantı gönder <b>→</b></button>
           <small><Link href="/login">Girişe dön</Link></small>

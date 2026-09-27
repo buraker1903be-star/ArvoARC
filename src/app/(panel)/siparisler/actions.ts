@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { bildirimliDonus } from "@/lib/panel-bildirim";
+import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { getStoreBrand, type StoreBrand } from "@/lib/store-brand";
 import { sendEmail } from "@/lib/email/resend";
@@ -24,17 +26,17 @@ const fromDetail = (formData: FormData) =>
 
 export async function createOrder(formData: FormData) {
   const { supabase, membership } = await requireTenant();
-  if (!MANAGERS.includes(membership.role)) redirect("/siparisler?error=forbidden");
+  if (!MANAGERS.includes(membership.role)) return await bildirimliDonus("/siparisler",{hata:hataMetni("forbidden")});
 
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const customerEmail = String(formData.get("customer_email") ?? "").trim();
   const variantIds = formData.getAll("variant_id").map(String);
   const quantities = formData.getAll("quantity").map((value) => Number(value));
 
-  if (!variantIds.length || variantIds.length !== quantities.length) redirect("/siparisler?error=invalid-order");
+  if (!variantIds.length || variantIds.length !== quantities.length) return await bildirimliDonus("/siparisler",{hata:hataMetni("invalid-order")});
 
   const items = variantIds.map((variantId, index) => ({ variant_id: variantId, quantity: quantities[index] }));
-  if (items.some((item) => !item.variant_id || !Number.isInteger(item.quantity) || item.quantity <= 0)) redirect("/siparisler?error=invalid-order");
+  if (items.some((item) => !item.variant_id || !Number.isInteger(item.quantity) || item.quantity <= 0)) return await bildirimliDonus("/siparisler",{hata:hataMetni("invalid-order")});
 
   const { data, error } = await supabase.rpc("arc_create_order", {
     p_customer_name: customerName,
@@ -43,13 +45,14 @@ export async function createOrder(formData: FormData) {
     p_source: "native",
   });
 
-  if (error) redirect(`/siparisler?error=${encodeURIComponent(error.message)}`);
+  if (error) return await bildirimliDonus(`/siparisler`,{hata:hataMetni(error.message)});
 
   revalidatePath("/");
   revalidatePath("/stok");
   revalidatePath("/siparisler");
   const orderNumber = data?.[0]?.order_number ?? "created";
-  redirect(`/siparisler?created=${encodeURIComponent(orderNumber)}`);
+  /* Sipariş numarası artık ADRESTE değil MESAJDA. */
+  return await bildirimliDonus("/siparisler",{basari:`${orderNumber} numaralı sipariş oluşturuldu.`});
 }
 
 /* Müşteri bildirimi; gönderim hatası durum güncellemesini geçersiz kılmaz. */

@@ -5,6 +5,7 @@ import { inventoryKindLabel } from "@/lib/commerce-labels";
 import { Icon } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
 import "../catalog.css";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 
 const PAGE_SIZE = 50;
 const dateTime = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
@@ -12,11 +13,6 @@ const dateTime = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "shor
 type FilterKey = "all" | "negative" | "zero" | "low" | "available" | "backorder";
 type ListState = { q: string; filter: FilterKey; page: number };
 
-const ERRORS: Record<string, string> = {
-  forbidden: "Stok hareketi için yetkiniz yok.",
-  "invalid-movement": "Miktar 1 veya daha büyük bir tam sayı olmalı.",
-  "variant-not-found": "Bu SKU ile bir varyant bulunamadı.",
-};
 
 function listHref(state: ListState, patch: Partial<ListState>) {
   const next = { ...state, ...patch };
@@ -28,7 +24,7 @@ function listHref(state: ListState, patch: Partial<ListState>) {
   return text ? `/stok?${text}` : "/stok";
 }
 
-export default async function Stock({ searchParams }: { searchParams: Promise<{ error?: string; updated?: string; q?: string; filter?: string; page?: string }> }) {
+export default async function Stock({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string; page?: string }> }) {
   const params = await searchParams;
   const { supabase, organization, membership } = await requireTenant();
   const canManage = ["owner", "admin", "manager"].includes(membership.role);
@@ -144,8 +140,10 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
     </section>
 
     <div className="ac-stack">
-      {params.updated ? <Notice title={params.updated === "1" ? "Stok hareketi kaydedildi." : `Stok hareketi kaydedildi · ${params.updated}`} /> : null}
-      {params.error ? <Notice tone="error" title="Stok hareketi kaydedilemedi">{ERRORS[params.error] ?? params.error}</Notice> : null}
+      <PanelBildirimi />
+      {/* Buraya hata yazan bir işlem YOK: bu satır yalnızca adres
+          satırına elle ?error= eklenince çalışıyordu, yani dışarıdan
+          uydurulmuş mesajı göstermekten başka işe yaramıyordu. */}
 
       <section className="ac-metrics" aria-label="Stok özeti">
         <article className="ac-metric">

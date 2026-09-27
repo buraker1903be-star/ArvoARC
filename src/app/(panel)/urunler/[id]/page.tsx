@@ -6,7 +6,7 @@ import { createVariant, removeProductImage, updateProduct, updateVariant, upload
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel, sourceLabel } from "@/lib/commerce-labels";
 import { Icon } from "@/components/panel/icons";
-import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { SeoFields } from "./seo-fields";
 import "../../catalog.css";
 
@@ -18,29 +18,9 @@ type Meta={
   gtin?:string;mpn?:string;condition?:string;material?:string;color?:string;gender?:string;age_group?:string;badge?:string;badge_tone?:string;
 };
 
-const SAVED:Record<string,string>={
-  created:"Ürün oluşturuldu. Görsel, açıklama ve SEO bilgilerini ekleyerek yayına hazırlayın.",
-  product:"Ürün bilgileri kaydedildi.",
-  variant:"Varyant kaydedildi.",
-  "variant-created":"Yeni varyant eklendi.",
-  images:"Görseller yüklendi.",
-  "image-removed":"Görsel silindi.",
-};
-const ERRORS:Record<string,string>={
-  forbidden:"Bu işlem için yetkiniz yok.",
-  "invalid-product":"Ürün adı ve ürün bağlantısı zorunlu.",
-  "product-not-found":"Ürün bulunamadı.",
-  "invalid-variant":"Varyant bilgilerini kontrol edin: SKU ve geçerli bir fiyat gerekli.",
-  "23505":"Bu SKU veya ürün bağlantısı başka bir kayıtta kullanılıyor.",
-  "invalid-images":"Tek seferde en fazla 5 görsel seçin.",
-  "max-8-images":"Bir üründe en fazla 8 görsel olabilir.",
-  "invalid-image-file":"Yalnızca JPG, PNG, WEBP, GIF veya AVIF; dosya başına en fazla 4 MB.",
-  "invalid-image-path":"Geçersiz görsel.",
-  "image-not-found":"Görsel bulunamadı.",
-};
 
-export default async function ProductDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string}>}){
-  const {id}=await params; const query=await searchParams; const {supabase,organization,membership}=await requireTenant();
+export default async function ProductDetail({params}:{params:Promise<{id:string}>}){
+  const {id}=await params; const {supabase,organization,membership}=await requireTenant();
   const [{data:product,error},{data:variants,error:variantError},{data:settings}]=await Promise.all([
     supabase.from("arc_products").select("id,name,slug,description,status,source,metadata,created_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
     supabase.from("arc_product_variants").select("id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price").eq("organization_id",organization.id).eq("product_id",id).order("title"),
@@ -96,8 +76,10 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
     </section>
 
     <div className="ac-stack">
-      {query.saved?<Notice title={SAVED[query.saved]??"Değişiklikler kaydedildi."}/>:null}
-      {query.error?<Notice tone="error" title="İşlem tamamlanamadı">{ERRORS[query.error]??query.error}</Notice>:null}
+      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
+          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
+          gösterebiliyordu (lib/panel-bildirim.ts). */}
+      <PanelBildirimi />
 
       <section className="ac-metrics product-facts" aria-label="Ürün özeti">
         <article className="ac-metric"><span>Fiyat</span><strong>{prices.length?(minPrice===maxPrice?money.format(minPrice/100):`${money.format(minPrice/100)} – ${money.format(maxPrice/100)}`):"—"}</strong><small>KDV dâhil satış fiyatı</small></article>

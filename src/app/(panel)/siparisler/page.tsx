@@ -3,7 +3,7 @@ import { requireTenant } from "@/lib/tenant";
 import { orderBadge, sourceLabel } from "@/lib/commerce-labels";
 import { nextOrderStep } from "@/lib/order-flow";
 import { isBankTransfer } from "@/lib/payment-method";
-import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { OrderForm } from "./order-form";
 import { OrderTable, type OrderRow } from "./order-table";
 import { OrdersTabs } from "./orders-tabs";
@@ -34,15 +34,6 @@ type StatusKey = (typeof STATUS_TABS)[number][0];
 type PeriodKey = (typeof PERIODS)[number][0];
 type ListState = { q: string; filter: StatusKey; period: PeriodKey; page: number };
 
-const ERRORS: Record<string, string> = {
-  "order-closed": "Bu sipariş kapandığı (iptal ya da iade) için akışta ilerletilemez.",
-  "order-not-found": "Sipariş bulunamadı.",
-  forbidden: "Bu işlem için yetkiniz yok.",
-  "invalid-status": "Geçersiz sipariş durumu.",
-  "invalid-order": "Sipariş bilgileri eksik.",
-  "save-failed": "Durum kaydedilemedi, tekrar deneyin.",
-  "bulk-empty": "Toplu işlem için sipariş seçilmedi.",
-};
 
 /* Dönem Türkiye saatine göre gün başından sayılır (UTC+3). */
 function periodStart(period: PeriodKey) {
@@ -172,14 +163,10 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     </section>
 
     <div className="ac-stack">
-      {params.created ? <Notice title={`${params.created} siparişi oluşturuldu.`} /> : null}
-      {params.ok === "status" ? <Notice title="Sipariş durumu güncellendi." /> : null}
-      {params.ok === "bulk" ? (
-        <Notice title={`${Number(params.updated ?? 0)} sipariş güncellendi.`}>
-          {Number(params.skipped ?? 0) > 0 ? `${Number(params.skipped)} sipariş bu adıma uygun olmadığı için atlandı.` : null}
-        </Notice>
-      ) : null}
-      {params.error ? <Notice tone="error" title="İşlem tamamlanamadı">{ERRORS[params.error] ?? params.error}</Notice> : null}
+      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
+          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
+          gösterebiliyordu (lib/panel-bildirim.ts). */}
+      <PanelBildirimi />
 
       <section className="ac-metrics" aria-label="Sipariş özeti">
         {metrics.map((metric) => (

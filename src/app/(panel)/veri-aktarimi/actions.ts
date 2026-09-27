@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { bildirimliDonus } from "@/lib/panel-bildirim";
+import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { copyShopifyImages } from "@/lib/product-images";
 import { fetchAllRows } from "@/lib/fetch-all";
@@ -19,13 +20,13 @@ function parseCsv(text:string):Row[]{
 
 export async function importActiveProducts(formData:FormData){
   const {supabase,user,organization,membership}=await requireTenant();
-  if(!["owner","admin","manager"].includes(membership.role)) redirect("/veri-aktarimi?error=forbidden");
-  const file=formData.get("file"); if(!(file instanceof File)||!file.name.toLowerCase().endsWith(".csv")) redirect("/veri-aktarimi?error=csv-required");
+  if(!["owner","admin","manager"].includes(membership.role)) return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni("forbidden")});
+  const file=formData.get("file"); if(!(file instanceof File)||!file.name.toLowerCase().endsWith(".csv")) return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni("csv-required")});
   const rows=parseCsv(await file.text()); const groups=new Map<string,Row[]>();
   for(const r of rows){const h=(r.Handle??"").trim();if(h){if(!groups.has(h))groups.set(h,[]);groups.get(h)!.push(r);}}
   const active=[...groups.entries()].filter(([,g])=>g.find(r=>r.Status?.trim())?.Status.trim().toLowerCase()==="active");
   const {data:batch,error:batchError}=await supabase.from("arc_import_batches").insert({organization_id:organization.id,source:"shopify",kind:"products",file_name:file.name,status:"processing",total_rows:active.length,created_by:user.id}).select("id").single();
-  if(batchError) redirect(`/veri-aktarimi?error=${encodeURIComponent(batchError.message)}`);
+  if(batchError) return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni(batchError.message)});
   let imported=0,errors=0;
   for(const [handle,g] of active){try{
     const first=g.find(r=>r.Title?.trim())??g[0]; const description=(first["Body (HTML)"]??"").replace(/<style[^>]*>[\s\S]*?<\/style>/gi,"").trim();
@@ -78,7 +79,10 @@ export async function importActiveProducts(formData:FormData){
     imported++;
   }catch(e){errors++;await supabase.from("arc_import_errors").insert({batch_id:batch.id,organization_id:organization.id,row_key:handle,message:e instanceof Error?e.message:"Import error"});}}
   await supabase.from("arc_import_batches").update({status:errors?"failed":"completed",imported_rows:imported,error_rows:errors,completed_at:new Date().toISOString()}).eq("id",batch.id);
-  revalidatePath("/urunler");revalidatePath("/koleksiyonlar");revalidatePath("/veri-aktarimi");redirect(`/veri-aktarimi?imported=${imported}&errors=${errors}`);
+  revalidatePath("/urunler");revalidatePath("/koleksiyonlar");revalidatePath("/veri-aktarimi");return await bildirimliDonus("/veri-aktarimi",
+    errors
+      ? {uyari:`${imported} aktif ürün aktarıldı. ${errors} satır hatalı olduğu için aktarılamadı.`}
+      : {basari:`${imported} aktif ürün aktarıldı.`});
 }
 
 type ProductMetadata={
@@ -102,14 +106,14 @@ const UNMIGRATED="metadata->>images_migrated.is.null,metadata->>images_migrated.
 
 export async function migrateShopifyImages(){
   const {supabase,organization,membership}=await requireTenant();
-  if(!["owner","admin","manager"].includes(membership.role)) redirect("/veri-aktarimi?error=forbidden");
+  if(!["owner","admin","manager"].includes(membership.role)) return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni("forbidden")});
 
   const [{data:products,error},{count:pendingCount,error:countError}]=await Promise.all([
     supabase.from("arc_products").select("id,metadata").eq("organization_id",organization.id).eq("source","shopify").or(UNMIGRATED)
       .order("metadata->>image_migration_attempted_at",{ascending:true,nullsFirst:true}).order("id").limit(5),
     supabase.from("arc_products").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).eq("source","shopify").or(UNMIGRATED),
   ]);
-  if(error||countError)redirect(`/veri-aktarimi?error=${encodeURIComponent((error??countError)?.message??"images")}`);
+  if(error||countError)return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni((error??countError)?.message??"images")});
 
   const pending=products??[];
   let migrated=0,failed=0;
@@ -129,7 +133,9 @@ export async function migrateShopifyImages(){
   }
 
   revalidatePath("/urunler");revalidatePath("/veri-aktarimi");
-  redirect(`/veri-aktarimi?images=${migrated}&imageErrors=${failed}&remaining=${Math.max(0,(pendingCount??0)-migrated)}`);
+  const kalan=Math.max(0,(pendingCount??0)-migrated);
+  const ozet=`${migrated} ürünün görselleri ArvoARC depolamasına taşındı. Hata: ${failed} · Kalan ürün: ${kalan}`;
+  return await bildirimliDonus("/veri-aktarimi", failed?{uyari:ozet}:{basari:ozet});
 }
 
 /* Türkçe ve İngilizce biçimli tutarlar (bkz. lib/money). */
@@ -158,9 +164,9 @@ function historicalPaymentStatus(row:Row){
 
 export async function importHistoricalOrders(formData:FormData){
   const {supabase,user,organization,membership}=await requireTenant();
-  if(!["owner","admin","manager"].includes(membership.role))redirect("/veri-aktarimi?error=forbidden");
+  if(!["owner","admin","manager"].includes(membership.role))return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni("forbidden")});
   const file=formData.get("file");
-  if(!(file instanceof File)||!file.name.toLowerCase().endsWith(".csv"))redirect("/veri-aktarimi?error=orders-csv-required");
+  if(!(file instanceof File)||!file.name.toLowerCase().endsWith(".csv"))return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni("orders-csv-required")});
 
   const rows=parseCsv(await file.text());
   const groups=new Map<string,Row[]>();
@@ -176,7 +182,7 @@ export async function importHistoricalOrders(formData:FormData){
     organization_id:organization.id,source:"shopify",kind:"orders",file_name:file.name,status:"processing",
     total_rows:groups.size,skipped_rows:skipped,created_by:user.id
   }).select("id").single();
-  if(batchError)redirect(`/veri-aktarimi?error=${encodeURIComponent(batchError.message)}`);
+  if(batchError)return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni(batchError.message)});
 
   /*
     SKU eşlemesi için tüm varyantlar sayfalanarak okunur. Tek istekte
@@ -186,7 +192,7 @@ export async function importHistoricalOrders(formData:FormData){
   let variants:{id:string;sku:string|null}[]=[];
   try{
     ({rows:variants}=await fetchAllRows<{id:string;sku:string|null}>((from,to)=>supabase.from("arc_product_variants").select("id,sku").eq("organization_id",organization.id).order("id").range(from,to) as unknown as PromiseLike<{data:{id:string;sku:string|null}[]|null;error:{message:string}|null}>,100_000));
-  }catch(error){redirect(`/veri-aktarimi?error=${encodeURIComponent(error instanceof Error?error.message:"variants")}`);}
+  }catch(error){return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni(error instanceof Error?error.message:"variants")});}
   const variantBySku=new Map(variants.filter((v):v is {id:string;sku:string}=>Boolean(v.sku)).map(v=>[v.sku.trim().toLowerCase(),v.id]));
   let imported=0,errors=0;
 
@@ -234,5 +240,6 @@ export async function importHistoricalOrders(formData:FormData){
 
   await supabase.from("arc_import_batches").update({status:errors?"failed":"completed",imported_rows:imported,error_rows:errors,completed_at:new Date().toISOString()}).eq("id",batch.id);
   revalidatePath("/siparisler");revalidatePath("/veri-aktarimi");
-  redirect(`/veri-aktarimi?orders=${imported}&orderErrors=${errors}&orderSkipped=${skipped}`);
+  const siparisOzeti=`${imported} eski sipariş aktarıldı. Hata: ${errors} · Atlanan satır: ${skipped}`;
+  return await bildirimliDonus("/veri-aktarimi", errors?{uyari:siparisOzeti}:{basari:siparisOzeti});
 }

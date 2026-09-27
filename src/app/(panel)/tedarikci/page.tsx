@@ -1,5 +1,5 @@
 import { requireTenant } from "@/lib/tenant";
-import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { updateSupplier, resetCursor } from "./actions";
 import "../catalog.css";
 import "../modules.css";
@@ -9,16 +9,6 @@ export const dynamic = "force-dynamic";
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 const dateTime = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
 
-const ERRORS: Record<string, string> = {
-  "invalid-margin": "Kâr oranı 0 ile 500 arasında olmalı.",
-  "invalid-shipping": "Kargo payı geçersiz.",
-  "invalid-round": "Yuvarlama 0 ile 99 kuruş arasında olmalı.",
-  "invalid-service": "Ek hizmet bedeli geçersiz.",
-  "invalid-buffer": "Stok tamponu 0 ile 100 arasında olmalı.",
-  "missing-code": "Tedarikçi kodu eksik.",
-  "save-failed": "Ayarlar kaydedilemedi, tekrar deneyin.",
-  forbidden: "Bu işlem için yetkiniz yok.",
-};
 
 /**
  * Tedarikçi ayarları.
@@ -26,8 +16,7 @@ const ERRORS: Record<string, string> = {
  * Fiyat kuralı, aktarım durumu ve imleç yönetimi. Öncesinde bu
  * ayarları değiştirmek için SQL yazmak gerekiyordu.
  */
-export default async function SuppliersPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const params = await searchParams;
+export default async function SuppliersPage() {
   const { supabase, organization, membership } = await requireTenant();
   const canManage = ["owner", "admin"].includes(membership.role);
 
@@ -44,9 +33,10 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
       </section>
 
       <div className="ac-stack">
-        {params.ok === "saved" ? <Notice title="Tedarikçi ayarları kaydedildi." /> : null}
-        {params.ok === "reset" ? <Notice title="Aktarım imleci sıfırlandı.">Bir sonraki çalıştırma kataloğun başından başlar.</Notice> : null}
-        {params.error ? <Notice tone="error" title="İşlem tamamlanamadı">{ERRORS[params.error] ?? "Beklenmeyen bir hata oluştu."}</Notice> : null}
+        {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
+            okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
+            gösterebiliyordu (lib/panel-bildirim.ts). */}
+        <PanelBildirimi />
 
         {(suppliers ?? []).length === 0 ? (
           <section className="ac list-empty"><b>Tanımlı tedarikçi yok.</b><p>Tedarikçi entegrasyonu kurulduğunda burada görünür.</p></section>

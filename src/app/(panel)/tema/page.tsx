@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Icon } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { requireTenant } from "@/lib/tenant";
 import { ThemeEditor, type Theme } from "./theme-editor";
 import "./theme.css";
@@ -27,24 +28,12 @@ const defaults: Theme = {
   product_card_style: "editorial", product_image_ratio: "portrait",
 };
 
-const SAVED: Record<string, string> = {
-  draft: "Taslak kaydedildi. Mağazada görünmesi için yayınlayın.",
-  hero_image: "Hero görseli yüklendi, taslak kaydedildi.",
-  campaign_image: "Kampanya görseli yüklendi, taslak kaydedildi.",
-};
 
-const ERRORS: Record<string, string> = {
-  forbidden: "Temayı değiştirmek için yönetici yetkisi gerekir.",
-  "required-fields": "Hero ana başlığı ve açıklaması boş bırakılamaz.",
-  "invalid-theme-image": "Bir görsel seçin. PNG, JPG, WebP veya AVIF olmalı ve 4 MB’ı geçmemeli.",
-  "draft-not-found": "Kayıtlı taslak bulunamadı. Önce taslağı kaydedin.",
-};
 
 const dateFormat = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
 const when = (value?: string | null) => (value ? dateFormat.format(new Date(value)) : null);
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ saved?: string; published?: string; error?: string }> }) {
-  const query = await searchParams;
+export default async function Page() {
   const { supabase, organization, membership } = await requireTenant();
   const [{ data: rows, error }, { data: settings }] = await Promise.all([
     supabase.from("arc_store_themes").select("mode,config,version,updated_at,published_at").eq("organization_id", organization.id),
@@ -68,9 +57,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
         </div>
       </section>
 
-      {query.published ? <Notice title="Tema yayına alındı">Değişiklikler artık mağazada görünüyor.</Notice> : null}
-      {query.saved ? <Notice title={SAVED[query.saved] ?? "Kaydedildi."} /> : null}
-      {query.error ? <Notice tone="error" title="İşlem tamamlanamadı">{ERRORS[query.error] ?? query.error}</Notice> : null}
+      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
+          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
+          gösterebiliyordu (lib/panel-bildirim.ts). */}
+      <PanelBildirimi />
 
       <div className="theme-status">
         <span><Icon name="clock" size={14} />Taslak <b>{when(draft?.updated_at) ?? "henüz kaydedilmedi"}</b></span>

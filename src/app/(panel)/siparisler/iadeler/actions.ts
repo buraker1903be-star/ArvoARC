@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { bildirimliDonus } from "@/lib/panel-bildirim";
+import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { getStoreBrand } from "@/lib/store-brand";
 import { refundPayment } from "@/lib/paytr/refund";
@@ -21,7 +22,7 @@ export async function resolveReturn(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
 
   if (!["owner", "admin"].includes(membership.role)) {
-    redirect("/siparisler/iadeler?error=forbidden");
+    return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("forbidden")});
   }
 
   const id = String(formData.get("request_id") ?? "");
@@ -29,7 +30,7 @@ export async function resolveReturn(formData: FormData) {
   const note = String(formData.get("note") ?? "").trim().slice(0, 500);
 
   if (!id || !["onayla", "reddet", "iade-et"].includes(decision)) {
-    redirect("/siparisler/iadeler?error=invalid");
+    return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("invalid")});
   }
 
   const { data: request } = await supabase
@@ -39,16 +40,16 @@ export async function resolveReturn(formData: FormData) {
     .eq("id", id)
     .single();
 
-  if (!request) redirect("/siparisler/iadeler?error=not-found");
+  if (!request) return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("not-found")});
   /*
     Onay ve ret yalnızca bekleyen talepte; para iadesi yalnızca
     onaylanmış talepte yapılabiliyor.
   */
   if (decision === "iade-et" && request.status !== "onaylandi") {
-    redirect("/siparisler/iadeler?error=not-approved");
+    return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("not-approved")});
   }
   if (decision !== "iade-et" && request.status !== "beklemede") {
-    redirect("/siparisler/iadeler?error=already-resolved");
+    return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("already-resolved")});
   }
 
   const order = (Array.isArray(request.arc_orders)
@@ -65,7 +66,7 @@ export async function resolveReturn(formData: FormData) {
     updated_at: string | null;
   } | null;
 
-  if (!order) redirect("/siparisler/iadeler?error=not-found");
+  if (!order) return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("not-found")});
 
   /* --- Ret --- */
   /*
@@ -88,8 +89,8 @@ export async function resolveReturn(formData: FormData) {
       .eq("status", "beklemede")
       .select("id");
 
-    if (rejectError) redirect("/siparisler/iadeler?error=save-failed");
-    if (!rejected?.length) redirect("/siparisler/iadeler?error=already-resolved");
+    if (rejectError) return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("save-failed")});
+    if (!rejected?.length) return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("already-resolved")});
 
     if (order.customer_email) {
       try {
@@ -107,7 +108,7 @@ export async function resolveReturn(formData: FormData) {
     }
 
     revalidatePath("/siparisler/iadeler");
-    redirect("/siparisler/iadeler?ok=reddedildi");
+    return await bildirimliDonus("/siparisler/iadeler",{basari:basariMetni("reddedildi")});
   }
 
   /* --- Onay: para henüz iade edilmiyor --- */
@@ -132,8 +133,8 @@ export async function resolveReturn(formData: FormData) {
       .eq("status", "beklemede")
       .select("id");
 
-    if (approveError) redirect("/siparisler/iadeler?error=save-failed");
-    if (!approved?.length) redirect("/siparisler/iadeler?error=already-resolved");
+    if (approveError) return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("save-failed")});
+    if (!approved?.length) return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("already-resolved")});
 
     if (order.customer_email) {
       try {
@@ -151,7 +152,9 @@ export async function resolveReturn(formData: FormData) {
     }
 
     revalidatePath("/siparisler/iadeler");
-    redirect("/siparisler/iadeler?ok=onaylandi&filter=onaylandi");
+    /* Süzgeç adreste KALIYOR: kullanıcı onayladığı talebi listede görmeli.
+     Adresten çıkan yalnızca mesaj. */
+    return await bildirimliDonus("/siparisler/iadeler?filter=onaylandi",{basari:basariMetni("onaylandi")});
   }
 
   /* --- Ürün teslim alındı: PayTR iadesi --- */
@@ -162,10 +165,10 @@ export async function resolveReturn(formData: FormData) {
     edilmiş sipariş buradan ikinci kez iade edilebiliyordu.
   */
   const orderMeta = (order.metadata ?? {}) as Record<string, unknown>;
-  if (isBankTransfer(orderMeta)) redirect("/siparisler/iadeler?error=transfer-order");
-  if (order.payment_status === "refunded") redirect("/siparisler/iadeler?error=already-refunded");
+  if (isBankTransfer(orderMeta)) return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("transfer-order")});
+  if (order.payment_status === "refunded") return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("already-refunded")});
   if (order.payment_status !== "paid" && order.payment_status !== "partially_refunded") {
-    redirect("/siparisler/iadeler?error=not-paid");
+    return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("not-paid")});
   }
   /* Aynı siparişe birden çok talep olabilir; iade edilen tutar birikir. */
   const alreadyRefunded = Math.max(0, Number(orderMeta.refunded_amount ?? 0) || 0);
@@ -205,7 +208,7 @@ export async function resolveReturn(formData: FormData) {
   const rawAmount = String(formData.get("amount") ?? "").trim();
   const custom = Number(rawAmount.replace(",", "."));
   if (rawAmount && (!Number.isFinite(custom) || custom <= 0)) {
-    redirect("/siparisler/iadeler?error=invalid-amount");
+    return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("invalid-amount")});
   }
   const amountKurus = rawAmount ? Math.round(custom * 100) : breakdown.amount;
 
@@ -215,10 +218,10 @@ export async function resolveReturn(formData: FormData) {
     iadesinde 5.000 ₺'lik siparişin tamamı geçirilebiliyordu.
   */
   if (amountKurus > remaining) {
-    redirect("/siparisler/iadeler?error=over-remaining");
+    return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("over-remaining")});
   }
   if (amountKurus <= 0 || amountKurus > breakdown.amount) {
-    redirect("/siparisler/iadeler?error=invalid-amount");
+    return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("invalid-amount")});
   }
 
   /*
@@ -229,7 +232,7 @@ export async function resolveReturn(formData: FormData) {
     talep toplamda ödenenden fazlasını iade edemez (bkz. lib/order-lock).
   */
   const lockedMeta = await claimOrderLock(supabase, organization.id, { id: request.order_id, updated_at: order.updated_at, metadata: order.metadata }, "refund_lock");
-  if (!lockedMeta) redirect("/siparisler/iadeler?error=busy");
+  if (!lockedMeta) return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("busy")});
 
   const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
 
@@ -244,7 +247,7 @@ export async function resolveReturn(formData: FormData) {
   if (!result.ok) {
     await releaseOrderLock(supabase, organization.id, request.order_id, lockedMeta, "refund_lock");
     console.error("İade başarısız:", order.order_number, result.message);
-    redirect("/siparisler/iadeler?error=refund-failed");
+    return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("refund-failed")});
   }
 
   const refundedTotal = alreadyRefunded + amountKurus;
@@ -300,7 +303,7 @@ export async function resolveReturn(formData: FormData) {
   */
   if (requestError || orderError) {
     console.error("İADE YAPILDI AMA KAYIT GÜNCELLENEMEDİ:", order.order_number, amountKurus, requestError?.message, orderError?.message);
-    redirect("/siparisler/iadeler?error=refund-recorded-failed");
+    return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("refund-recorded-failed")});
   }
 
   if (order.customer_email) {
@@ -320,5 +323,5 @@ export async function resolveReturn(formData: FormData) {
   }
 
   revalidatePath("/siparisler/iadeler");
-  redirect("/siparisler/iadeler?ok=tamamlandi");
+  return await bildirimliDonus("/siparisler/iadeler",{basari:basariMetni("tamamlandi")});
 }

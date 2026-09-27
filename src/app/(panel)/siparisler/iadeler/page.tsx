@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { resolveReturn } from "./actions";
 import { calculateRefund } from "@/lib/refund";
-import { Notice } from "@/components/panel/notice";
+import { PanelBildirimi } from "@/components/panel/bildirim";
 import { OrdersTabs } from "../orders-tabs";
 import "../orders.css";
 
@@ -29,27 +29,7 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number][0];
 
-const OK: Record<string, string> = {
-  "test-iade": "İade kaydedildi ancak bu bir TEST siparişiydi: PayTR'da gerçek para hareketi olmadı.",
-  tamamlandi: "İade tamamlandı ve müşteriye bildirildi.",
-  onaylandi: "Talep onaylandı. Müşteri ürünü gönderdiğinde iadeyi tamamlayın.",
-  reddedildi: "Talep reddedildi ve müşteriye bildirildi.",
-};
 
-const ERRORS: Record<string, string> = {
-  "refund-failed": "PayTR iadeyi reddetti. Sipariş numarası ve tutarı kontrol edin.",
-  "already-resolved": "Bu talep zaten sonuçlandırılmış.",
-  forbidden: "İade işlemi için yönetici yetkisi gerekiyor.",
-  "invalid-amount": "Geçerli bir iade tutarı girin: sıfırdan büyük olmalı ve iade edilen kalemlerin (kargo çıkmadıysa kargo bedeli dahil) toplamını aşmamalı. Hesaplanan tutar için alanı boş bırakın.",
-  "not-approved": "Para iadesi yalnızca onaylanmış talepte yapılabilir.",
-  "already-refunded": "Bu sipariş zaten tamamen iade edilmiş.",
-  "over-remaining": "Bu siparişte daha önce iade yapılmış; tutar, kalan iade edilebilir tutarı aşamaz.",
-  "not-paid": "Sipariş ödenmemiş; para iadesi yapılamaz.",
-  "transfer-order": "Havale siparişi PayTR'dan iade edilemez. Parayı bankadan iade edip siparişi elle kapatın.",
-  busy: "Bu talep için iade zaten işleniyor. Sayfayı yenileyip durumu kontrol edin.",
-  "save-failed": "Karar kaydedilemedi; müşteriye e-posta gönderilmedi. Tekrar deneyin.",
-  "refund-recorded-failed": "İade yapıldı ancak kayıt güncellenemedi. PayTR panelinden doğrulayın; tekrar iade denemeyin.",
-};
 
 /**
  * İade talepleri.
@@ -61,7 +41,7 @@ const ERRORS: Record<string, string> = {
 export default async function ReturnsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; error?: string; filter?: string }>;
+  searchParams: Promise<{ filter?: string }>;
 }) {
   const params = await searchParams;
   const { supabase, organization, membership } = await requireTenant();
@@ -111,8 +91,10 @@ export default async function ReturnsPage({
           ))}
         </nav>
 
-        {params.ok ? <Notice tone={params.ok === "test-iade" ? "warn" : "success"} title={OK[params.ok] ?? "İşlem tamamlandı."} /> : null}
-        {params.error ? <Notice tone="error" title="İşlem tamamlanamadı">{ERRORS[params.error] ?? "Beklenmeyen bir hata oluştu."}</Notice> : null}
+        {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
+            okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
+            gösterebiliyordu (lib/panel-bildirim.ts). */}
+        <PanelBildirimi />
 
         {(requests ?? []).length === 0 ? (
           <section className="ac order-empty">

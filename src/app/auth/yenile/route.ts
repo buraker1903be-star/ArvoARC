@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { BILDIRIM_CEREZI } from "@/lib/panel-bildirim-cerez";
 
 /*
   Şifre bağlantısının dönüş adresi. İki biçimi de kabul eder:
@@ -37,10 +38,25 @@ export async function GET(request: NextRequest) {
   const target = url.clone();
   target.search = "";
   target.pathname = neden ? "/sifre" : "/sifre/yeni";
+  /* Adres önce tamamlanıyor: NextResponse.redirect çağrıldığı andaki
+     adresi alıyor, sonradan eklenen parametreyi görmüyor. */
   if (neden) {
     console.error("ARC_PASSWORD_LINK_ERROR", neden);
     target.searchParams.set("error", "link-expired");
-    target.searchParams.set("neden", neden.slice(0, 80));
+    /*
+      AYRINTI ÇEREZDE, ADRESTE DEĞİL. Önceden ?neden=… olarak taşınıyordu
+      ve sayfa onu olduğu gibi basıyordu; üstelik değerin kaynağı gelen
+      adresin kendi parametresiydi (error_description). Yani herkes
+      şifre sıfırlama ekranına istediği metni yazdırabiliyordu —
+      "Hesabınız askıya alındı, şu numarayı arayın" gibi. Bu ekran
+      kimlik avına en açık yer olduğu için ayrıntı artık adresten
+      okunmuyor.
+    */
+    return NextResponse.redirect(target, {
+      headers: {
+        "set-cookie": `${BILDIRIM_CEREZI}=hata:${encodeURIComponent(neden.slice(0, 80))}; Path=/; Max-Age=60; SameSite=Lax${process.env.NODE_ENV === "production" ? "; Secure" : ""}`,
+      },
+    });
   }
   return NextResponse.redirect(target);
 }

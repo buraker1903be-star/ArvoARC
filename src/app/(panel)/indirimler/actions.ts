@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { bildirimliDonus } from "@/lib/panel-bildirim";
+import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { trLocalToIso } from "@/lib/tr-time";
 
@@ -12,7 +13,7 @@ const cents=(value:FormDataEntryValue|null)=>{const amount=Number(value??0);retu
 
 export async function createDiscount(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
-  if(!allowedRoles.has(membership.role))redirect("/indirimler?error=forbidden");
+  if(!allowedRoles.has(membership.role))return await bildirimliDonus("/indirimler",{hata:hataMetni("forbidden")});
 
   const name=clean(formData,"name",160);
   const code=clean(formData,"code",40).toUpperCase().replace(/[^A-Z0-9_-]/g,"");
@@ -29,13 +30,13 @@ export async function createDiscount(formData:FormData){
 
   const validType=["percentage","fixed_amount","free_shipping"].includes(type);
   const validValue=(type==="percentage"&&value>=1&&value<=100)||(type==="fixed_amount"&&value>0)||(type==="free_shipping"&&value===0);
-  if(!name||!validType||!validValue)redirect("/indirimler?error=invalid-discount");
+  if(!name||!validType||!validValue)return await bildirimliDonus("/indirimler",{hata:hataMetni("invalid-discount")});
 
   /* Tarihler Türkiye saati; geçersiz tarih artık hata ekranı açmıyor. */
   const startsIso=startsAt?trLocalToIso(startsAt):null;
   const endsIso=endsAt?trLocalToIso(endsAt):null;
-  if((startsAt&&!startsIso)||(endsAt&&!endsIso))redirect("/indirimler?error=invalid-date");
-  if(startsIso&&endsIso&&endsIso<=startsIso)redirect("/indirimler?error=invalid-range");
+  if((startsAt&&!startsIso)||(endsAt&&!endsIso))return await bildirimliDonus("/indirimler",{hata:hataMetni("invalid-date")});
+  if(startsIso&&endsIso&&endsIso<=startsIso)return await bildirimliDonus("/indirimler",{hata:hataMetni("invalid-range")});
 
   const {error}=await supabase.from("arc_discounts").insert({
     organization_id:organization.id,name,code:code||null,discount_type:type,value,
@@ -44,25 +45,25 @@ export async function createDiscount(formData:FormData){
     starts_at:startsIso,ends_at:endsIso,
     status,combinable,metadata:{badge:type==="free_shipping"?"Ücretsiz Kargo":type==="percentage"?`%${value} İndirim`:"Sepet İndirimi"}
   });
-  if(error)redirect(`/indirimler?error=${encodeURIComponent(error.code??error.message)}`);
-  revalidatePath("/indirimler");redirect("/indirimler?created=1");
+  if(error)return await bildirimliDonus(`/indirimler`,{hata:hataMetni(error.code??error.message)});
+  revalidatePath("/indirimler");return await bildirimliDonus("/indirimler",{basari:basariMetni("created")});
 }
 
 export async function toggleDiscount(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   const id=clean(formData,"id",80);
-  if(!allowedRoles.has(membership.role))redirect("/indirimler?error=forbidden");
+  if(!allowedRoles.has(membership.role))return await bildirimliDonus("/indirimler",{hata:hataMetni("forbidden")});
   const nextStatus=clean(formData,"next_status",20)==="active"?"active":"paused";
   const {error}=await supabase.from("arc_discounts").update({status:nextStatus,updated_at:new Date().toISOString()}).eq("id",id).eq("organization_id",organization.id);
-  if(error)redirect(`/indirimler?error=${encodeURIComponent(error.code??error.message)}`);
-  revalidatePath("/indirimler");redirect("/indirimler?saved=status");
+  if(error)return await bildirimliDonus(`/indirimler`,{hata:hataMetni(error.code??error.message)});
+  revalidatePath("/indirimler");return await bildirimliDonus("/indirimler",{basari:basariMetni("status")});
 }
 
 export async function deleteDiscount(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   const id=clean(formData,"id",80);
-  if(!allowedRoles.has(membership.role))redirect("/indirimler?error=forbidden");
+  if(!allowedRoles.has(membership.role))return await bildirimliDonus("/indirimler",{hata:hataMetni("forbidden")});
   const {error}=await supabase.from("arc_discounts").delete().eq("id",id).eq("organization_id",organization.id);
-  if(error)redirect(`/indirimler?error=${encodeURIComponent(error.code??error.message)}`);
-  revalidatePath("/indirimler");redirect("/indirimler?deleted=1");
+  if(error)return await bildirimliDonus(`/indirimler`,{hata:hataMetni(error.code??error.message)});
+  revalidatePath("/indirimler");return await bildirimliDonus("/indirimler",{basari:basariMetni("deleted")});
 }
