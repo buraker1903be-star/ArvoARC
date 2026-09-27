@@ -763,6 +763,7 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 .maliyet-giris{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.6;resize:vertical}
 .maliyet-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .maliyet-sonuc{margin:12px 0 0;padding:10px 12px;border-left:2px solid var(--success);background:var(--success-soft);font-size:12.5px}
+.maliyet-sonuc[data-tone="hata"]{border-left-color:var(--danger);background:var(--danger-soft)}
 .maliyet-onizleme{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
 .maliyet-onizleme h4{margin:0 0 10px;font-size:13px}
 .maliyet-onizleme ul{display:grid;gap:6px;margin:0;padding:0;list-style:none;max-height:320px;overflow:auto}
@@ -772,3 +773,14 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 .maliyet-onizleme li em{flex:none;color:var(--muted);font-style:normal;font-variant-numeric:tabular-nums}
 .maliyet-onizleme li em b{color:var(--ink)}
 .maliyet-uyari{margin:12px 0 0;padding:10px 12px;border-left:2px solid var(--accent-500);background:var(--accent-soft);font-size:12px;line-height:1.6}
+
+/* Tarayıcı toplayıcısı: yer imi kodu ve son toplanan liste. */
+.toplayici{margin:0 0 14px;padding:12px;border:1px dashed var(--line-strong);border-radius:10px;background:var(--surface-2)}
+.toplayici>b{display:block;font-size:12.5px}
+.toplayici p{margin:4px 0 0;font-size:12px;line-height:1.6;color:var(--muted)}
+.toplayici ol{margin:8px 0 0;padding-left:18px;font-size:12px;line-height:1.7;color:var(--muted)}
+.toplayici-kod{display:flex;gap:8px;margin-top:10px}
+/* Kod uzun ve tek satır: seçilebilir kalması yeterli, okunması gerekmiyor. */
+.toplayici-kod input{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+.toplayici-liste{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;line-height:1.6}
+.toplayici-liste b{color:var(--ink)}

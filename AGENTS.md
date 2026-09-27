@@ -104,6 +104,22 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   gösterir. Sayı ve sipariş numarası gibi değerler de mesajın içine
   girer, adrese değil. `tests/panel-bildirim.test.ts` kalıbın geri
   gelmesini engeller.
+- **LR fiyatları KULLANICININ TARAYICISINDA toplanıyor.** LR'ın portalı
+  fiyat listesi indirmiyor, fiyatlar yalnızca ekranda görünüyor ve
+  girişliyken alış, çıkışken müşteri fiyatı yazıyor. Sunucudan taramak
+  denenmedi: site Apache Wicket (durum tutuyor, derin bağlantı ana
+  sayfaya atıyor) ve giriş CAS SSO ile tek kullanımlık jetonla yapılıyor;
+  taklit etmek kullanıcının LR ŞİFRESİNİ SAKLAMAYI gerektirirdi. Yerine
+  bir yer imi (`public/fiyat-toplayici.js`) kullanıcının kendi
+  oturumundaki açık sayfayı okuyup satırları `/api/fiyat-toplayici`'ye
+  bırakıyor. İKİ ADIM DA BİLEREK: betik kendiliğinden göndermiyor, panel
+  de kendiliğinden fiyat yazmıyor — sayfa tasarımı değişince yanlış sütun
+  okunabilir ve canlı mağazada yanlış fiyat geri alınamaz bir hatadır.
+  Uç jetonu doğruluyor (`lib/fiyat-toplayici-jeton.ts`: mağaza kimliği +
+  bitiş, PAYMENT_CREDENTIALS_KEY'den alan ayrımıyla türetilmiş anahtarla
+  imzalı; anahtar yoksa 401). Tablonun INSERT politikası yok, yazma
+  servis anahtarıyla uçtan yapılıyor. Kuruşa çevirme tarayıcıda DEĞİL
+  `parseMoneyToCents`'te: kural tek yerde kalsın.
 - **Geri dönüş adresi doğrulanır**: başka bölüme ya da dış adrese
   yönlendirme engellenir, filtre ve sayfa korunur.
 

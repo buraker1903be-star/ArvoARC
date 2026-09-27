@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { maliyetOnizle, maliyetUygula, type FiyatGecisi, type MaliyetOnizleme } from "./actions";
+import {
+  maliyetOnizle,
+  maliyetUygula,
+  sonToplananListe,
+  toplayiciKodu,
+  type FiyatGecisi,
+  type MaliyetOnizleme,
+  type ToplananListe,
+} from "./actions";
 
 /*
   ALIŞ FİYATI AKTARIMI.
@@ -18,6 +26,8 @@ import { maliyetOnizle, maliyetUygula, type FiyatGecisi, type MaliyetOnizleme } 
 */
 
 const para = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
+const zaman = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
+const gun = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Istanbul" });
 
 export function MaliyetAktarimi() {
   /*
@@ -30,13 +40,47 @@ export function MaliyetAktarimi() {
   const [indirim, setIndirim] = useState("30");
   const [metin, setMetin] = useState("");
   const [onizleme, setOnizleme] = useState<MaliyetOnizleme | null>(null);
-  const [sonuc, setSonuc] = useState<string | null>(null);
+  /*
+    Sonuç satırı iyi haberi de kötü haberi de taşıyor; ikisi aynı yeşil
+    çerçevede görünürse hata "oldu" gibi okunuyor.
+  */
+  const [sonuc, setSonuc] = useState<{ metin: string; hata?: boolean } | null>(null);
+  /*
+    TOPLAMA: tarayıcı toplayıcısının bıraktığı liste. Kimliği tutuluyor
+    ki uygulandığında işaretlensin; aynı liste ikinci kez getirildiğinde
+    "uygulandı" yazsın.
+  */
+  const [toplama, setToplama] = useState<ToplananListe | null>(null);
+  const [yerImi, setYerImi] = useState<{ kod: string; bitis: string } | null>(null);
   const [calisiyor, basla] = useTransition();
+
+  /* Geçiş ya da indirim değişince önizleme geçersiz: hesabı onlar belirliyor. */
+  const sifirla = () => { setOnizleme(null); setToplama(null); };
+
+  const indirimKurus = () => Math.round(Number(indirim.replace(",", ".")) * 100) || 0;
 
   const esleştir = () =>
     basla(async () => {
       setSonuc(null);
-      setOnizleme(await maliyetOnizle(metin, gecis, Math.round(Number(indirim.replace(",", ".")) * 100) || 0));
+      setToplama(null);
+      setOnizleme(await maliyetOnizle(metin, gecis, indirimKurus()));
+    });
+
+  const toplananiGetir = () =>
+    basla(async () => {
+      setSonuc(null);
+      const cevap = await sonToplananListe(gecis, indirimKurus());
+      if ("hata" in cevap) { setToplama(null); setOnizleme(null); setSonuc({ metin: cevap.hata, hata: true }); return; }
+      setMetin("");
+      setToplama(cevap);
+      setOnizleme(cevap.onizleme);
+    });
+
+  const yerImiAl = () =>
+    basla(async () => {
+      const cevap = await toplayiciKodu();
+      if ("hata" in cevap) { setSonuc({ metin: cevap.hata, hata: true }); return; }
+      setYerImi(cevap);
     });
 
   const uygula = () =>
@@ -45,9 +89,15 @@ export function MaliyetAktarimi() {
       const cevap = await maliyetUygula(
         onizleme.eslesen.map((s) => ({ sku: s.sku, kurus: s.yeni, satis: s.satis, ustuCizili: s.ustuCizili })),
         gecis,
+        toplama?.toplamaId ?? null,
       );
-      setSonuc(cevap.hata ?? `${cevap.yazilan} ürünün alış fiyatı güncellendi.`);
+      setSonuc(
+        cevap.hata
+          ? { metin: cevap.hata, hata: true }
+          : { metin: `${cevap.yazilan} üründe ${gecis === "alis" ? "alış fiyatı" : "satış fiyatı"} güncellendi.` },
+      );
       setOnizleme(null);
+      setToplama(null);
       setMetin("");
     });
 
@@ -57,19 +107,20 @@ export function MaliyetAktarimi() {
         <div>
           <h3>LR fiyat aktarımı</h3>
           <p>
-            LR portalındaki fiyat tablosunu kopyalayıp yapıştırın. <b>Girişliyken</b> gördüğünüz alış
-            fiyatını, <b>çıkışken</b> gördüğünüz müşteri fiyatını ayrı ayrı aktarın.
+            İki yol var: LR sayfasında <b>tarayıcı toplayıcıyı</b> çalıştırın ya da fiyat tablosunu
+            kopyalayıp yapıştırın. <b>Girişliyken</b> gördüğünüz alış fiyatını, <b>çıkışken</b> gördüğünüz
+            müşteri fiyatını ayrı ayrı aktarın.
           </p>
         </div>
       </div>
 
       <div className="fiyat-gecis">
         <label className="check-inline">
-          <input type="radio" name="gecis" checked={gecis === "alis"} onChange={() => { setGecis("alis"); setOnizleme(null); }} />
+          <input type="radio" name="gecis" checked={gecis === "alis"} onChange={() => { setGecis("alis"); sifirla(); }} />
           <span><b>Alış fiyatı</b><small>LR&apos;a giriş yapmışken görünen; kâr bundan hesaplanıyor</small></span>
         </label>
         <label className="check-inline">
-          <input type="radio" name="gecis" checked={gecis === "musteri"} onChange={() => { setGecis("musteri"); setOnizleme(null); }} />
+          <input type="radio" name="gecis" checked={gecis === "musteri"} onChange={() => { setGecis("musteri"); sifirla(); }} />
           <span><b>LR müşteri fiyatı</b><small>Çıkışken görünen; satabileceğiniz tavan</small></span>
         </label>
       </div>
@@ -81,11 +132,72 @@ export function MaliyetAktarimi() {
             className="ac-input"
             inputMode="decimal"
             value={indirim}
-            onChange={(olay) => { setIndirim(olay.target.value); setOnizleme(null); }}
+            onChange={(olay) => { setIndirim(olay.target.value); sifirla(); }}
           />
           <small>Satış fiyatı = LR fiyatı − bu tutar. LR fiyatı üstü çizili görünür, yani vitrinde kampanya olur.</small>
         </label>
       ) : null}
+
+      {/*
+        TARAYICI TOPLAYICISI. LR'ın portalı fiyat listesi indirmiyor ve
+        girişi CAS SSO ile tek kullanımlık jetonla yapılıyor; sunucudan
+        taramak kullanıcının LR şifresini saklamayı gerektirirdi. Bunun
+        yerine yer imi, KULLANICININ KENDİ OTURUMUNDA açık sayfayı
+        okuyup satırları panele bırakıyor. Yazma kararı yine burada:
+        sayfa tasarımı değişince yanlış sütun okunabilir.
+      */}
+      <div className="toplayici">
+        <b>Tarayıcı toplayıcı</b>
+        <p>
+          Yapıştırmak yerine: LR sayfasını açın, yer imine basın, betik SKU ve fiyatları okuyup buraya
+          bırakır. Şifreniz hiçbir yere yazılmaz — betik yalnızca sizin açtığınız sayfayı okur.
+        </p>
+        <div className="maliyet-actions">
+          <button className="ac-btn" type="button" onClick={toplananiGetir} disabled={calisiyor}>
+            Son toplanan listeyi getir
+          </button>
+          <button className="ac-btn" type="button" onClick={yerImiAl} disabled={calisiyor}>
+            {yerImi ? "Kodu yenile" : "Yer imi kodunu göster"}
+          </button>
+        </div>
+
+        {yerImi ? (
+          <>
+            <ol>
+              <li>Aşağıdaki kodu kopyalayın.</li>
+              <li>Tarayıcıda yeni bir yer imi oluşturun; adres alanına bu kodu yapıştırın, adına “LR fiyat” yazın.</li>
+              <li>LR&apos;ın ürün listesi sayfasında (alış için <b>girişli</b>, tavan için <b>çıkışken</b>) yer imine basın.</li>
+              <li>Açılan kutuda listeyi görün, <b>Panele gönder</b>&apos;e basın, sonra buradan “Son toplanan listeyi getir”.</li>
+            </ol>
+            <div className="toplayici-kod">
+              <input
+                className="ac-input"
+                readOnly
+                value={yerImi.kod}
+                onFocus={(olay) => olay.currentTarget.select()}
+                aria-label="Yer imi kodu"
+              />
+              <button
+                className="ac-btn"
+                type="button"
+                onClick={() => { void navigator.clipboard?.writeText(yerImi.kod); setSonuc({ metin: "Yer imi kodu kopyalandı." }); }}
+              >
+                Kopyala
+              </button>
+            </div>
+            {/* Süre bilerek: sızan bir kod sonsuza kadar geçerli olmasın. */}
+            <p>Kod {gun.format(new Date(yerImi.bitis))} tarihine kadar geçerli; sonra buradan yenilenir.</p>
+          </>
+        ) : null}
+
+        {toplama ? (
+          <div className="toplayici-liste">
+            <b>{zaman.format(new Date(toplama.toplandi))}</b> tarihli liste getirildi · {toplama.okunan} satır okundu
+            {toplama.uygulandi ? <> · <b>bu liste {zaman.format(new Date(toplama.uygulandi))} tarihinde uygulanmış</b></> : null}
+            {toplama.sayfa ? <><br /><small>{toplama.sayfa.slice(0, 120)}</small></> : null}
+          </div>
+        ) : null}
+      </div>
 
       <label className="wide">
         Yapıştırılan satırlar
@@ -114,7 +226,7 @@ export function MaliyetAktarimi() {
         ) : null}
       </div>
 
-      {sonuc ? <p className="maliyet-sonuc">{sonuc}</p> : null}
+      {sonuc ? <p className="maliyet-sonuc" data-tone={sonuc.hata ? "hata" : undefined}>{sonuc.metin}</p> : null}
 
       {onizleme ? (
         <div className="maliyet-onizleme">

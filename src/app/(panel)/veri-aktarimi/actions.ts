@@ -1,11 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { maliyetleriAyristir } from "@/lib/maliyet-aktarimi";
 import { fiyatKarari, skuAdaylari } from "@/lib/fiyat-aktarimi";
+import { gecerliFiyat, satirlariDogrula } from "@/lib/fiyat-toplayici";
+import { jetonAnahtariVar, toplayiciJetonu } from "@/lib/fiyat-toplayici-jeton";
 import { copyShopifyImages } from "@/lib/product-images";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { parseMoneyToCents } from "@/lib/money";
@@ -287,19 +290,19 @@ const SORUN_METNI: Record<string, string> = {
   "maliyetin-altinda": "satış fiyatı maliyetin altına düşüyor",
 };
 
-export async function maliyetOnizle(
-  metin: string,
-  gecis: FiyatGecisi = "alis",
-  indirimKurus = 0,
-): Promise<MaliyetOnizleme> {
-  const { supabase, organization, membership } = await requireTenant();
-  if (!["owner", "admin", "manager"].includes(membership.role)) {
-    return { eslesen: [], eslesmeyen: [], atlanan: ["Bu işlem için yetkiniz yok."] };
-  }
-
-  const { satirlar, atlanan } = maliyetleriAyristir(metin);
-  if (!satirlar.length) return { eslesen: [], eslesmeyen: [], atlanan };
-
+/*
+  EŞLEŞTİRME iki yerden çağrılıyor: yapıştırılan metin ve tarayıcı
+  toplayıcısının bıraktığı liste. Kural tek yerde — ikisini ayrı ayrı
+  yazmak, birinde düzeltilen bir eşleştirme hatasının ötekinde kalması
+  demekti.
+*/
+async function eslestir(
+  supabase: Awaited<ReturnType<typeof requireTenant>>["supabase"],
+  organizationId: string,
+  satirlar: { sku: string; kurus: number }[],
+  gecis: FiyatGecisi,
+  indirimKurus: number,
+): Promise<{ eslesen: MaliyetOnizleme["eslesen"]; eslesmeyen: string[] }> {
   /*
     LR'ın kimliği "20604-201" biçiminde, bizim SKU "20604": iki aday da
     sorgulanıyor ve birebir eşleşme öncelikli.
@@ -308,7 +311,7 @@ export async function maliyetOnizle(
   const { data: varyantlar } = await supabase
     .from("arc_product_variants")
     .select("sku,cost_price,price,compare_at_price,title,arc_products(name)")
-    .eq("organization_id", organization.id)
+    .eq("organization_id", organizationId)
     .in("sku", adaylar);
 
   type Varyant = { sku: string; cost_price: number | null; price: number; compare_at_price: number | null; title: string | null; arc_products: { name: string } | { name: string }[] | null };
@@ -337,12 +340,29 @@ export async function maliyetOnizle(
       satis: sonuc.karar.satis, ustuCizili: sonuc.karar.ustuCizili,
     });
   }
-  return { eslesen, eslesmeyen, atlanan };
+  return { eslesen, eslesmeyen };
+}
+
+export async function maliyetOnizle(
+  metin: string,
+  gecis: FiyatGecisi = "alis",
+  indirimKurus = 0,
+): Promise<MaliyetOnizleme> {
+  const { supabase, organization, membership } = await requireTenant();
+  if (!["owner", "admin", "manager"].includes(membership.role)) {
+    return { eslesen: [], eslesmeyen: [], atlanan: ["Bu işlem için yetkiniz yok."] };
+  }
+
+  const { satirlar, atlanan } = maliyetleriAyristir(metin);
+  if (!satirlar.length) return { eslesen: [], eslesmeyen: [], atlanan };
+
+  return { ...(await eslestir(supabase, organization.id, satirlar, gecis, indirimKurus)), atlanan };
 }
 
 export async function maliyetUygula(
   satirlar: { sku: string; kurus: number; satis?: number; ustuCizili?: number | null }[],
   gecis: FiyatGecisi = "alis",
+  toplamaId: string | null = null,
 ): Promise<{ yazilan: number; hata: string | null }> {
   const { supabase, organization, membership } = await requireTenant();
   if (!["owner", "admin", "manager"].includes(membership.role)) {
@@ -375,7 +395,116 @@ export async function maliyetUygula(
     yazilan += count ?? 0;
   }
 
+  /*
+    Uygulanan toplama İŞARETLENİYOR: aynı liste ikinci kez getirildiğinde
+    ekranda "uygulandı" yazıyor. İşareti atmak, kullanıcının aynı
+    fiyatları ikinci kez yazdığını fark etmemesi demekti.
+  */
+  if (toplamaId) {
+    await supabase
+      .from("arc_price_collections")
+      .update({ uygulandi_at: new Date().toISOString() })
+      .eq("organization_id", organization.id)
+      .eq("id", toplamaId);
+  }
+
   revalidatePath("/urunler");
   revalidatePath("/siparisler");
   return { yazilan, hata: null };
+}
+
+/*
+  TARAYICI TOPLAYICISI.
+
+  Yapıştırma yolu duruyor; toplayıcı onun yerine geçmiyor, önüne
+  geçiyor: kullanıcı LR sayfasında yer imine basıyor, betik SKU ve
+  fiyatları okuyup panele bırakıyor (api/fiyat-toplayici), burada
+  önizleniyor. Fiyat yine tek tıkla yazılmıyor — sayfa tasarımı
+  değişince yanlış sütun okunabilir.
+
+  Yer imi kodu her açılışta yeniden ÜRETİLİYOR, saklanmıyor
+  (lib/fiyat-toplayici-jeton.ts).
+*/
+export async function toplayiciKodu(): Promise<{ kod: string; bitis: string } | { hata: string }> {
+  const { organization, membership } = await requireTenant();
+  if (!["owner", "admin", "manager"].includes(membership.role)) return { hata: "Bu işlem için yetkiniz yok." };
+  if (!jetonAnahtariVar()) {
+    return { hata: "PAYMENT_CREDENTIALS_KEY tanımlı değil; toplayıcı jetonu imzalanamıyor." };
+  }
+
+  /*
+    Adres istekten okunuyor: panel kendi alan adında da, vercel.app
+    adresinde de açılabiliyor ve yer imi hangisinden alındıysa onu
+    çağırmalı. Sabit bir adres yazmak, alan adı bağlanmamış mağazada
+    çalışmayan bir yer imi demekti.
+  */
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return { hata: "Panel adresi okunamadı." };
+  const koken = `${h.get("x-forwarded-proto") ?? "https"}://${host}`;
+
+  const { jeton, bitis } = toplayiciJetonu(organization.id);
+  const ayar = JSON.stringify({
+    uc: `${koken}/api/fiyat-toplayici`,
+    betik: `${koken}/fiyat-toplayici.js`,
+    jeton,
+  });
+  /* Sürüm sorgusu önbelleği atlıyor: toplama kuralı sunucudan güncelleniyor. */
+  const kod =
+    `javascript:(function(){window.ARC_FIYAT=${ayar};` +
+    `var s=document.createElement('script');s.src=window.ARC_FIYAT.betik+'?v='+Date.now();` +
+    `s.onerror=function(){alert('ArvoARC toplayıcısı yüklenemedi.')};document.body.appendChild(s);})();`;
+  return { kod, bitis: bitis.toISOString() };
+}
+
+export type ToplananListe = {
+  toplamaId: string;
+  toplandi: string;
+  uygulandi: string | null;
+  sayfa: string | null;
+  okunan: number;
+  onizleme: MaliyetOnizleme;
+};
+
+export async function sonToplananListe(
+  gecis: FiyatGecisi = "alis",
+  indirimKurus = 0,
+): Promise<ToplananListe | { hata: string }> {
+  const { supabase, organization, membership } = await requireTenant();
+  if (!["owner", "admin", "manager"].includes(membership.role)) return { hata: "Bu işlem için yetkiniz yok." };
+
+  const { data, error } = await supabase
+    .from("arc_price_collections")
+    .select("id,satirlar,sayfa,created_at,uygulandi_at")
+    .eq("organization_id", organization.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return { hata: error.message };
+  if (!data) return { hata: "Henüz toplanmış liste yok. LR sayfasında yer imine basın." };
+
+  const kayit = data as { id: string; satirlar: unknown; sayfa: string | null; created_at: string; uygulandi_at: string | null };
+  const { satirlar } = satirlariDogrula(kayit.satirlar);
+
+  /*
+    Kartta iki fiyat varsa GEÇERLİ olan alınıyor (en düşük): LR kampanya
+    yaptığında eski fiyat üstü çizili duruyor ve yükseği almak indirimi
+    görmezden gelmek olurdu.
+  */
+  const fiyatli = satirlar
+    .map((satir) => ({ sku: satir.sku, kurus: gecerliFiyat(satir.fiyatlar) }))
+    .filter((satir): satir is { sku: string; kurus: number } => satir.kurus !== null);
+
+  const onizleme: MaliyetOnizleme = {
+    ...(await eslestir(supabase, organization.id, fiyatli, gecis, indirimKurus)),
+    atlanan: [],
+  };
+  return {
+    toplamaId: kayit.id,
+    toplandi: kayit.created_at,
+    uygulandi: kayit.uygulandi_at,
+    sayfa: kayit.sayfa,
+    okunan: satirlar.length,
+    onizleme,
+  };
 }
