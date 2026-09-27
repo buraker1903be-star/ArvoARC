@@ -109,6 +109,26 @@ export function secenekleriCozumle(govde: unknown): TeslimatSecenegi[] {
   });
 }
 
+/*
+  ŞEHİR ADI SADELEŞTİRME.
+
+  OTO'nun örnekleri Latin harfli ("Riyadh", "Jeddah") ve şehir adı metin
+  olarak eşleştiriliyor; Türkçe harfler eşleşmeyi bozabiliyor. Bu yüzden
+  sorgu önce girildiği gibi, sonuç boş dönerse SADELEŞTİRİLMİŞ adla
+  yeniden sorulur (lib/tryoto/ayar.ts). Baştan sadeleştirmek yanlış
+  olurdu: OTO Türkçe adı tanıyorsa doğru yazım daha güvenilir.
+*/
+export function sehriSadelestir(ad: string): string {
+  return ad
+    .replace(/İ/g, "I").replace(/ı/g, "i")
+    .replace(/Ş/g, "S").replace(/ş/g, "s")
+    .replace(/Ğ/g, "G").replace(/ğ/g, "g")
+    .replace(/Ü/g, "U").replace(/ü/g, "u")
+    .replace(/Ö/g, "O").replace(/ö/g, "o")
+    .replace(/Ç/g, "C").replace(/ç/g, "c")
+    .trim();
+}
+
 /** checkOTODeliveryFee gövdesi. Ağırlık OTO'da kg ve zorunlu. */
 export function fiyatSorgusuGovdesi(girdi: {
   cikisSehri: string;
@@ -120,12 +140,12 @@ export function fiyatSorgusuGovdesi(girdi: {
     originCity: girdi.cikisSehri,
     destinationCity: girdi.varisSehri,
     /*
-      TÜM SEÇENEKLER İSTENİYOR. deliveryType gönderilmeyince OTO dar bir
-      küme döndürüyordu ve panelde görünen firmaların çoğu listede
-      yoktu (canlıda yalnızca bir marketplace seçeneği geldi).
-      toCustomerDoorstepOrPickupByCustomer ikisini birden kapsıyor.
+      deliveryType GÖNDERİLMİYOR. "toCustomerDoorstepOrPickupByCustomer"
+      denendi ve seçenek sayısı 1'den 0'a düştü (canlıda 27.09.2026):
+      alan "hepsini getir" değil FİLTRE olarak çalışıyor ve hiçbir
+      seçenek tam olarak o türde işaretli değil. Filtresiz sorgu OTO'nun
+      döndürebildiği her şeyi veriyor.
     */
-    deliveryType: "toCustomerDoorstepOrPickupByCustomer",
     // Tahmini teslim tarihi seçimi kolaylaştırıyor; ek maliyeti yok.
     includeEstimatedDates: true,
     packageCount: 1,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fiyatSorgusuGovdesi, secenekleriCozumle } from "@/lib/tryoto/fiyat";
+import { fiyatSorgusuGovdesi, secenekleriCozumle, sehriSadelestir } from "@/lib/tryoto/fiyat";
 
 /*
   Teslimat seçenekleri. Gönderi oluştururken kullanılabilir firmalar
@@ -78,14 +78,28 @@ test("teslim türü çevriliyor: fiyat farkının başlıca sebebi", () => {
   assert.equal(secenekleriCozumle({ deliveryCompany: [{ deliveryOptionId: "x", name: "A", deliveryType: "bilinmeyen" }] })[0].teslimTuru, "bilinmeyen");
 });
 
-test("sorgu TÜM teslim türlerini istiyor", () => {
+test("sorguda deliveryType FİLTRESİ YOK", () => {
   /*
-    deliveryType gönderilmeyince OTO dar bir küme döndürüyordu ve panelde
-    görünen firmaların çoğu listede yoktu.
+    "toCustomerDoorstepOrPickupByCustomer" denendi ve seçenek sayısı
+    1'den 0'a düştü: alan "hepsini getir" değil filtre ve hiçbir seçenek
+    tam olarak o türde işaretli değil. Filtresiz sorgu her şeyi veriyor.
   */
   const govde = fiyatSorgusuGovdesi({ cikisSehri: "A", varisSehri: "B", agirlikKg: 1 });
-  assert.equal(govde.deliveryType, "toCustomerDoorstepOrPickupByCustomer");
+  assert.equal("deliveryType" in govde, false);
   assert.equal(govde.includeEstimatedDates, true);
+});
+
+test("şehir adı sadeleştirme Türkçe harfleri Latin'e çeviriyor", () => {
+  /*
+    OTO'nun örnekleri Latin harfli ve şehir adı metin olarak
+    eşleştiriliyor; ilk sorgu boş dönerse sadeleştirilmiş adla bir kez
+    daha soruluyor.
+  */
+  assert.equal(sehriSadelestir("İstanbul"), "Istanbul");
+  assert.equal(sehriSadelestir("Şanlıurfa"), "Sanliurfa");
+  assert.equal(sehriSadelestir("Çanakkale"), "Canakkale");
+  assert.equal(sehriSadelestir("Muğla"), "Mugla");
+  assert.equal(sehriSadelestir("Ankara"), "Ankara", "değişmeyen ad aynen kalıyor");
 });
 
 test("sorgu gövdesi: ağırlık bilinmiyorsa 1 kg", () => {

@@ -1,7 +1,7 @@
 import { decryptSecret } from "@/lib/payment-credentials";
 import { firmalariCozumle, type KargoFirmasi } from "./firmalar";
 import { hesabiCozumle, type HesapBilgisi } from "./hesap";
-import { fiyatSorgusuGovdesi, secenekleriCozumle, type TeslimatSecenegi } from "./fiyat";
+import { fiyatSorgusuGovdesi, secenekleriCozumle, sehriSadelestir, type TeslimatSecenegi } from "./fiyat";
 import { konumlariCozumle, type GondericiKonumu } from "./konumlar";
 import { OtoHatasi } from "./hatalar";
 import { otoIstek } from "./istemci";
@@ -156,14 +156,34 @@ export async function teslimatSecenekleri(
   if (!sorgu.cikisSehri.trim() || !sorgu.varisSehri.trim()) {
     return { secenekler: [], hata: "Çıkış ya da varış şehri boş; fiyat sorulamıyor." };
   }
-  try {
+  const anahtar = decryptSecret(satir.tryoto_refresh_token_enc);
+  const sor = async (cikis: string, varis: string) => {
     const govde = await otoIstek({
       magazaId,
-      yenilemeAnahtari: decryptSecret(satir.tryoto_refresh_token_enc),
+      yenilemeAnahtari: anahtar,
       yol: "checkOTODeliveryFee",
-      govde: fiyatSorgusuGovdesi(sorgu),
+      govde: fiyatSorgusuGovdesi({ ...sorgu, cikisSehri: cikis, varisSehri: varis }),
     });
-    return { secenekler: secenekleriCozumle(govde), hata: null };
+    return secenekleriCozumle(govde);
+  };
+
+  try {
+    const secenekler = await sor(sorgu.cikisSehri, sorgu.varisSehri);
+    if (secenekler.length) return { secenekler, hata: null };
+
+    /*
+      Boş dönerse şehir adı SADELEŞTİRİLİP bir kez daha soruluyor: OTO'nun
+      örnekleri Latin harfli ("Riyadh") ve şehir adı metin olarak
+      eşleştiriliyor; "İstanbul" eşleşmeyip boş liste dönebiliyor. Baştan
+      sadeleştirmek yanlış olurdu — OTO Türkçe adı tanıyorsa doğru yazım
+      daha güvenilir. Yazım değişmediyse ikinci istek hiç atılmıyor.
+    */
+    const sadeCikis = sehriSadelestir(sorgu.cikisSehri);
+    const sadeVaris = sehriSadelestir(sorgu.varisSehri);
+    if (sadeCikis === sorgu.cikisSehri && sadeVaris === sorgu.varisSehri) {
+      return { secenekler: [], hata: null };
+    }
+    return { secenekler: await sor(sadeCikis, sadeVaris), hata: null };
   } catch (hata) {
     return { secenekler: [], hata: hata instanceof OtoHatasi ? hata.message : "Kargo fiyatları alınamadı." };
   }
