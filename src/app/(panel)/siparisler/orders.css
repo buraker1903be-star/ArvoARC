@@ -8,23 +8,6 @@
 .order-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
 .order-toolbar .order-search{flex:1 1 380px}
 
-/* ---------- Liste başlığı ve sütun şeridi ---------- */
-.order-table-head{padding:10px 16px}
-.order-table-head p{margin:0;color:var(--muted);font-size:12px}
-
-/*
-  SÜTUN BAŞLIKLARI YAPIŞKAN. globals.css'teki .th zaten sticky ama
-  .order-row aynı ağırlıkta position:relative veriyor ve sonra
-  yüklendiği için kazanıyordu; uzun listede kaydırırken hangi sütunun ne
-  olduğu kayboluyordu. top:72px panelin üst şeridinin yüksekliği.
-*/
-.order-row.th{position:sticky;top:72px;z-index:3;background:var(--surface)}
-
-@media(max-width:860px){
-  /* Dar ekranda üst şerit farklı yükseklikte; başlık normal akışta. */
-  .order-row.th{position:static}
-}
-
 /* ---------- Liste ızgarası ---------- */
 .order-table[data-manage] .order-row{
   grid-template-columns:24px minmax(140px,1fr) minmax(180px,1.5fr) 110px 120px minmax(170px,1.2fr) 150px;

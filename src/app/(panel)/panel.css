@@ -377,7 +377,27 @@ html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{b
 /* clip: taşmayı kırpar ama kaydırma kabı oluşturmaz; toplu işlem
    çubuğunun yapışkan konumu bu sayede çalışır. */
 .panel-root .ac.table:is(.order-table,.list-table){overflow:clip}
-:is(.order-table-head,.list-table-head){display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0!important;border-bottom:1px solid var(--line)}
+/*
+  Liste başlığı tek satır. Önce içinde bir h3 vardı ("Katalog",
+  "Varyantlar", "Sipariş akışı") ve üçü de sayfanın kendi başlığının
+  altında aynı şeyi ikinci kez söylüyordu; blok 82px yer kaplıyordu.
+  İpucu cümlesi kaldı — yeni kullanıcı için değeri var.
+*/
+:is(.order-table-head,.list-table-head){display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0!important;padding:10px 16px;border-bottom:1px solid var(--line)}
+:is(.order-table-head,.list-table-head) p{margin:0;color:var(--muted);font-size:12px}
+
+/*
+  SÜTUN BAŞLIKLARI YAPIŞKAN. globals.css'teki .th zaten sticky ama
+  .order-row / .list-row aynı ağırlıkta position:relative veriyor ve
+  sonra yüklendikleri için kazanıyorlardı; uzun listede kaydırırken
+  hangi sütunun ne olduğu kayboluyordu. İki sınıflı seçici ikisini de
+  geçiyor. top:72px panelin üst şeridinin yüksekliği.
+*/
+.ac.table > .th{position:sticky;top:72px;z-index:3;background:var(--surface)}
+@media(max-width:860px){
+  /* Dar ekranda üst şerit farklı yükseklikte; başlık normal akışta. */
+  .ac.table > .th{position:static}
+}
 :is(.order-row,.list-row){
   position:relative;display:grid;align-items:center;gap:12px;min-height:58px;padding:9px 18px;
   border-top:1px solid var(--line-soft);color:var(--ink);font-size:13.5px;font-variant-numeric:tabular-nums;

@@ -122,17 +122,11 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
   const productName = new Map((products ?? []).map((product) => [product.id, product.name]));
   const back = listHref(state, {});
 
-  const metrics = [
-    { key: "negative" as const, label: "Negatif", value: counts.negative, note: "Tedarik gerekli", tone: counts.negative ? "bad" : undefined },
-    { key: "zero" as const, label: "Stok sıfır", value: counts.zero, note: "Satış politikası kontrolü", tone: counts.zero ? "warn" : undefined },
-    { key: "low" as const, label: "Düşük stok", value: counts.low, note: `1–${lowStockThreshold} adet arası`, tone: counts.low ? "warn" : undefined },
-  ];
-
   return <>
     <section className="ac-bar">
       <div>
         <h1>Stok Yönetimi</h1>
-        <p>Tüm değişiklikler hareket olarak kaydedilir.</p>
+        <p>{stockSum.toLocaleString("tr-TR")} adet · {counts.all.toLocaleString("tr-TR")} varyant · tüm değişiklikler hareket olarak kaydedilir.</p>
       </div>
       <div className="ac-bar-actions">
         {canManage ? <a className="ac-btn" href="/api/disari-aktar/stok"><Icon name="download" size={15} />CSV indir</a> : null}
@@ -145,20 +139,21 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
           satırına elle ?error= eklenince çalışıyordu, yani dışarıdan
           uydurulmuş mesajı göstermekten başka işe yaramıyordu. */}
 
-      <section className="ac-metrics" aria-label="Stok özeti">
-        <article className="ac-metric">
-          <span>Toplam stok</span>
-          <strong>{stockSum.toLocaleString("tr-TR")}</strong>
-          <small>{counts.all.toLocaleString("tr-TR")} varyant</small>
-        </article>
-        {metrics.map((metric) => (
-          <Link prefetch={false} className="ac-metric ac-lift" data-tone={metric.tone} href={listHref(state, { filter: metric.key, page: 1 })} key={metric.key}>
-            <span>{metric.label}</span>
-            <strong>{metric.value.toLocaleString("tr-TR")}</strong>
-            <small>{metric.note}</small>
-          </Link>
-        ))}
-      </section>
+      {/*
+        ÖZET ŞERİDİ KALDIRILDI. Negatif / Stok sıfır / Düşük stok
+        kutuları filtre çipleriyle AYNI bağlantıya ve aynı sayıya
+        gidiyordu; toplam stok ve varyant sayısı da sayfanın alt
+        başlığına taşındı.
+
+        Bedeli 114px'di ve bu ekranda en pahalıya mal oluyordu: ilk
+        varyant satırı 685. pikselde başlıyor, 900px'lik ekranda
+        15.740 varyanttan YALNIZCA 3'ü görünüyordu (canlıda ölçüldü,
+        27.09.2026).
+
+        Aksiyon gerektiren durum zaten altındaki uyarı şeridinde
+        duruyor ("… varyantta stok aksiyonu gerekiyor"); kutular o
+        uyarıyı da üçüncü kez tekrarlıyordu.
+      */}
 
       {counts.negative + unavailable > 0 ? (
         <Notice tone="warn" title={`${(counts.negative + unavailable).toLocaleString("tr-TR")} varyantta stok aksiyonu gerekiyor`}>
@@ -185,11 +180,9 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
       </nav>
 
       <section className="ac table list-table stock-list" data-manage={canManage ? "" : undefined}>
-        <div className="ac-head ac-pad-sm list-table-head">
-          <div>
-            <h3>Varyantlar</h3>
-            <p>En düşük stoktan başlayarak{canManage ? "; miktarı yazıp satırdan giriş veya çıkış yapın." : "."}</p>
-          </div>
+        {/* Başlık kaldırıldı: sayfanın kendi başlığı zaten "Stok Yönetimi". */}
+        <div className="ac-head list-table-head">
+          <p>En düşük stoktan başlayarak{canManage ? "; miktarı yazıp satırdan giriş veya çıkış yapın." : "."}</p>
         </div>
         {variants.length ? (
           <>

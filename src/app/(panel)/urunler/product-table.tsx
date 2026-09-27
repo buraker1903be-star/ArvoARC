@@ -50,11 +50,9 @@ export function ProductTable({ rows, canManage, back, total, children }: { rows:
 
   return (
     <section className="ac table list-table product-list" data-manage={canManage ? "" : undefined}>
-      <div className="ac-head ac-pad-sm list-table-head">
-        <div>
-          <h3>Katalog</h3>
-          <p>{total.toLocaleString("tr-TR")} ürün · satıra tıklayarak düzenleyin{canManage ? "; toplu işlem için kutucukları işaretleyin." : "."}</p>
-        </div>
+      {/* Başlık kaldırıldı: sayfanın kendi başlığı zaten "Ürünler". */}
+      <div className="ac-head list-table-head">
+        <p>{total.toLocaleString("tr-TR")} ürün · satıra tıklayarak düzenleyin{canManage ? "; toplu işlem için kutucukları işaretleyin." : "."}</p>
       </div>
 
       {canManage && chosen.length > 0 ? (

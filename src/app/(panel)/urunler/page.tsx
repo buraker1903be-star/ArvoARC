@@ -197,12 +197,6 @@ export default async function Products({ searchParams }: { searchParams: Promise
     };
   });
 
-  const metrics = [
-    { key: "active" as const, label: "Aktif", note: "Mağazada yayında" },
-    { key: "draft" as const, label: "Taslak", note: "Yayına hazırlanıyor" },
-    { key: "archived" as const, label: "Arşiv", note: "Satıştan kaldırıldı" },
-  ];
-
   return <>
     <section className="ac-bar">
       <div>
@@ -218,20 +212,16 @@ export default async function Products({ searchParams }: { searchParams: Promise
           gösterebiliyordu (lib/panel-bildirim.ts). */}
       <PanelBildirimi />
 
-      <section className="ac-metrics" aria-label="Katalog özeti">
-        {metrics.map((metric) => (
-          <Link prefetch={false} className="ac-metric ac-lift" href={listHref(state, { filter: metric.key, page: 1 })} key={metric.key}>
-            <span>{metric.label}</span>
-            <strong>{counts[metric.key].toLocaleString("tr-TR")}</strong>
-            <small>{metric.note}</small>
-          </Link>
-        ))}
-        <article className="ac-metric">
-          <span>Varyant</span>
-          <strong>{(variantCountResult.count ?? 0).toLocaleString("tr-TR")}</strong>
-          <small>Beden, renk ve seçenekler</small>
-        </article>
-      </section>
+      {/*
+        ÖZET ŞERİDİ KALDIRILDI: taşıdığı dört sayının dördü de ekranda
+        zaten vardı. Aktif/Taslak/Arşiv kutuları filtre çipleriyle aynı
+        bağlantıya ve aynı sayıya gidiyordu; varyant sayısı da sayfanın
+        alt başlığında yazıyor ("3.442 ürün · 15.740 varyant").
+
+        Bedeli 114px'di: 900px'lik ekranda ilk ürün satırı 595. pikselde
+        başlıyor ve 3.442 üründen 4'ü görünüyordu (canlıda ölçüldü,
+        27.09.2026).
+      */}
 
       <section className="ac ac-pad-sm catalog-toolbar">
         <form className="ac-filter catalog-search" role="search">
