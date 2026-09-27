@@ -143,7 +143,14 @@ html[data-theme="dark"] body:has(.panel-root){background:#050c1a}
 
 .panel-nav{flex:1;min-height:0;display:flex;flex-direction:column;gap:2px;margin:0 -6px;padding:4px 6px 8px;overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.14) transparent}
 .panel-nav-section{display:flex;flex-direction:column;gap:2px;margin-top:8px}
-.panel-nav-title{margin:0;padding:8px 10px 4px;color:var(--n-500);font-size:10.5px;font-weight:800;letter-spacing:.16em}
+/*
+  Renk TEMA BELİRTECİNDEN geliyor, ham paletten değil. Önce var(--n-500)
+  yazılıydı ve o değer temaya göre değişmediği için koyu kenar çubuğunda
+  3,9:1 kontrast veriyordu (WCAG küçük metin için 4,5 ister; canlıda
+  27.09.2026'da ölçüldü). --muted açık temada zaten n-500'dür, yani açık
+  temada hiçbir şey değişmiyor; koyu temada 7,1:1'e çıkıyor.
+*/
+.panel-nav-title{margin:0;padding:8px 10px 4px;color:var(--muted);font-size:10.5px;font-weight:800;letter-spacing:.16em}
 .panel-nav a{
   position:relative;display:flex;align-items:center;gap:11px;min-height:40px;padding:5px 10px;
   border-radius:11px;color:var(--brand-200);font-size:13.5px;font-weight:600;text-decoration:none;
@@ -164,7 +171,13 @@ html[data-theme="dark"] body:has(.panel-root){background:#050c1a}
 .panel-security{display:flex;align-items:center;gap:10px;padding:6px 10px 8px}
 .panel-security>i{width:26px;height:26px;flex:none;display:grid;place-items:center;border:1px solid color-mix(in srgb,var(--accent-bright) 45%,transparent);border-radius:50%;color:var(--accent-bright);font-style:normal}
 .panel-security b{display:block;color:var(--n-100);font-size:12px}
-.panel-security small{display:block;margin-top:1px;color:var(--n-500);font-size:11px}
+/*
+  Kenar çubuğu HER İKİ TEMADA da koyu lacivert; buradaki orta gri
+  (--n-500 #6e6e73) 11px'de 3,6:1 veriyordu, yani açık temada da
+  okunmuyordu (WCAG küçük metin için 4,5 ister; canlıda 27.09.2026'da
+  ölçüldü). --n-400 aynı ailede bir kademe açık ve 5,6:1 veriyor.
+*/
+.panel-security small{display:block;margin-top:1px;color:var(--n-400);font-size:11px}
 .panel-root :is(.panel-sidebar-toggle,.panel-logout button){
   display:flex;align-items:center;gap:10px;width:100%;min-height:40px;margin:4px 0 0;padding:6px 10px;
   border:1px solid rgba(255,255,255,.08);border-radius:12px;background:transparent;box-shadow:none;
