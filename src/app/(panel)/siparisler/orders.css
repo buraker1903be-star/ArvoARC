@@ -264,8 +264,13 @@
   Çapayla gidilen bölüm yapışkan şeritlerin ALTINDA kalmasın: panelin üst
   şeridi 72px, sayfanın kendi başlığı da yapışkan. Bu olmadan tıklayınca
   bölüm başlığı görünmüyor, doğrudan içeriğin ortasına düşülüyor.
+
+  250px CANLIDA ÖLÇÜLDÜ. Önce 170 yazılmıştı ve 1440x900'de başlıkla
+  şerit arasında yalnızca 5px kalıyordu; üstelik şeridin yüksekliği
+  içeriğe göre değişiyor (dar pencerede 235px ölçüldü, orada başlık
+  tamamen altta kalırdı). 250 ile dört bölümde de 85px pay var.
 */
-#kalemler,#gonderiler,#durum,#gecmis{scroll-margin-top:170px}
+#kalemler,#gonderiler,#durum,#gecmis{scroll-margin-top:250px}
 
 .order-jump{display:flex;flex-wrap:wrap;gap:4px}
 .order-jump a{
