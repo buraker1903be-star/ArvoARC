@@ -50,7 +50,16 @@ async function magazaAdiTabani(
   organizationName:string,
 ){
   const {data}=await supabase.from("arc_store_settings").select("store_name").eq("organization_id",organizationId).maybeSingle();
-  return data?.store_name?{}:{store_name:organizationName};
+  if(data?.store_name?.trim())return {};
+  /*
+    Kurum adı da boş olabiliyor. O durumda store_name alanı undefined
+    kalıyor, Supabase istemcisi undefined alanları gövdeye HİÇ koymuyor ve
+    INSERT yine "null value in column store_name" ile düşüyor — yani
+    yedeksiz bir kurum adı, düzeltmeyi olduğu gibi geçersiz kılıyor.
+    Sabit ad geçici: kullanıcı Mağaza bilgileri sekmesinden kendi adını
+    yazınca üzerine geçiyor.
+  */
+  return {store_name:organizationName?.trim()||"Mağaza"};
 }
 
 export async function updateStoreSettings(formData:FormData){
