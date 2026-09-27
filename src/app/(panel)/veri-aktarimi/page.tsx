@@ -3,6 +3,7 @@ import { PanelBildirimi } from "@/components/panel/bildirim";
 import { importActiveProducts, importHistoricalOrders, migrateShopifyImages } from "./actions";
 import { importKindLabel, importStatusLabel } from "@/lib/commerce-labels";
 import "../modules.css";
+import { MaliyetAktarimi } from "./maliyet-aktarimi";
 
 const dateTime = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
 
@@ -33,6 +34,14 @@ export default async function ImportPage() {
           okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
           gösterebiliyordu (lib/panel-bildirim.ts). */}
       <PanelBildirimi />
+
+      {/*
+        Alış fiyatı aktarımı en üstte: kâr hesabının dayandığı veri bu
+        ve LR gibi tedarikçilerde başka yolu yok — portal fiyat listesi
+        indirmiyor, otomatik kazıma ise şifre saklamayı gerektirir ve
+        sayfa değişince sessizce yanlış fiyat çeker.
+      */}
+      {canManage ? <MaliyetAktarimi /> : null}
 
       <div className="import-grid">
         <section className="ac ac-pad import-card">

@@ -743,3 +743,19 @@ a.is-pending-link{pointer-events:none;opacity:.68}
   font-size:12px;
   color:var(--muted);
 }
+
+/* ---------- Alış fiyatı aktarımı ---------- */
+/* Yapıştırılan tablo: eşit genişlikli yazı tipi, sütunlar göz
+   hizasında kalsın. */
+.maliyet-giris{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.6;resize:vertical}
+.maliyet-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.maliyet-sonuc{margin:12px 0 0;padding:10px 12px;border-left:2px solid var(--success);background:var(--success-soft);font-size:12.5px}
+.maliyet-onizleme{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.maliyet-onizleme h4{margin:0 0 10px;font-size:13px}
+.maliyet-onizleme ul{display:grid;gap:6px;margin:0;padding:0;list-style:none;max-height:320px;overflow:auto}
+.maliyet-onizleme li{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.maliyet-onizleme li>span{display:grid;min-width:0}
+.maliyet-onizleme li small{color:var(--muted);font-size:11px}
+.maliyet-onizleme li em{flex:none;color:var(--muted);font-style:normal;font-variant-numeric:tabular-nums}
+.maliyet-onizleme li em b{color:var(--ink)}
+.maliyet-uyari{margin:12px 0 0;padding:10px 12px;border-left:2px solid var(--accent-500);background:var(--accent-soft);font-size:12px;line-height:1.6}

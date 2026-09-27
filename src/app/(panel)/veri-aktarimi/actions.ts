@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
+import { maliyetleriAyristir } from "@/lib/maliyet-aktarimi";
 import { copyShopifyImages } from "@/lib/product-images";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { parseMoneyToCents } from "@/lib/money";
@@ -242,4 +243,88 @@ export async function importHistoricalOrders(formData:FormData){
   revalidatePath("/siparisler");revalidatePath("/veri-aktarimi");
   const siparisOzeti=`${imported} eski sipariş aktarıldı. Hata: ${errors} · Atlanan satır: ${skipped}`;
   return await bildirimliDonus("/veri-aktarimi", errors?{uyari:siparisOzeti}:{basari:siparisOzeti});
+}
+
+
+/*
+  ALIŞ FİYATI AKTARIMI — iki adım: önce EŞLEŞTİR, sonra UYGULA.
+
+  Tek adımda yazmak tehlikeli: yapıştırılan metin yanlış sütundan
+  kopyalanmış olabilir (satış fiyatı, KDV'li tutar) ve maliyet yanlış
+  girilirse kâr sütunu sessizce yanlış çıkar. Kullanıcı neyin
+  değişeceğini ESKİ ve YENİ değerle görüp onaylıyor.
+
+  LR'ın portalı fiyat listesi indirmiyor; otomatik giriş yapıp kazımak
+  denenmedi: şifre saklamayı gerektirir, portalın kullanım şartlarına
+  aykırı olması olası ve sessizce yanlış fiyat çekerse aynı hatayı
+  gürültüsüzce üretir.
+*/
+export type MaliyetOnizleme = {
+  eslesen: { sku: string; ad: string; eski: number | null; yeni: number }[];
+  eslesmeyen: string[];
+  atlanan: string[];
+};
+
+export async function maliyetOnizle(metin: string): Promise<MaliyetOnizleme> {
+  const { supabase, organization, membership } = await requireTenant();
+  if (!["owner", "admin", "manager"].includes(membership.role)) {
+    return { eslesen: [], eslesmeyen: [], atlanan: ["Bu işlem için yetkiniz yok."] };
+  }
+
+  const { satirlar, atlanan } = maliyetleriAyristir(metin);
+  if (!satirlar.length) return { eslesen: [], eslesmeyen: [], atlanan };
+
+  /* SKU eşleşmesi büyük/küçük harfe duyarsız: portaldan kopyalanan
+     metin farklı yazılmış olabiliyor. */
+  const { data: varyantlar } = await supabase
+    .from("arc_product_variants")
+    .select("sku,cost_price,title,arc_products(name)")
+    .eq("organization_id", organization.id)
+    .in("sku", satirlar.map((s) => s.sku));
+
+  type Varyant = { sku: string; cost_price: number | null; title: string | null; arc_products: { name: string } | { name: string }[] | null };
+  const bySku = new Map(((varyantlar ?? []) as unknown as Varyant[]).map((v) => [v.sku, v]));
+
+  const eslesen: MaliyetOnizleme["eslesen"] = [];
+  const eslesmeyen: string[] = [];
+  for (const satir of satirlar) {
+    const varyant = bySku.get(satir.sku);
+    if (!varyant) { eslesmeyen.push(satir.sku); continue; }
+    const urun = Array.isArray(varyant.arc_products) ? varyant.arc_products[0] : varyant.arc_products;
+    eslesen.push({
+      sku: satir.sku,
+      ad: [urun?.name, varyant.title].filter(Boolean).join(" · ") || satir.sku,
+      eski: varyant.cost_price,
+      yeni: satir.kurus,
+    });
+  }
+  return { eslesen, eslesmeyen, atlanan };
+}
+
+export async function maliyetUygula(satirlar: { sku: string; kurus: number }[]): Promise<{ yazilan: number; hata: string | null }> {
+  const { supabase, organization, membership } = await requireTenant();
+  if (!["owner", "admin", "manager"].includes(membership.role)) {
+    return { yazilan: 0, hata: "Bu işlem için yetkiniz yok." };
+  }
+  if (!satirlar.length) return { yazilan: 0, hata: "Uygulanacak satır yok." };
+
+  let yazilan = 0;
+  for (const satir of satirlar) {
+    /*
+      Sıfır ve eksi değer yazılmıyor: istemciden gelen listeye
+      güvenilmiyor, önizlemeden sonra değiştirilmiş olabilir.
+    */
+    if (!Number.isInteger(satir.kurus) || satir.kurus <= 0) continue;
+    const { error, count } = await supabase
+      .from("arc_product_variants")
+      .update({ cost_price: satir.kurus, updated_at: new Date().toISOString() }, { count: "exact" })
+      .eq("organization_id", organization.id)
+      .eq("sku", satir.sku);
+    if (error) return { yazilan, hata: error.message };
+    yazilan += count ?? 0;
+  }
+
+  revalidatePath("/urunler");
+  revalidatePath("/siparisler");
+  return { yazilan, hata: null };
 }
