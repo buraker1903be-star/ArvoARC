@@ -187,7 +187,10 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
                 {kargoBaglantisi.durum==="basarili"&&kargoBaglantisi.konumlar.length
                   ?<select name="tryoto_pickup_location_code" defaultValue={settings?.tryoto_pickup_location_code??""}>
                       <option value="">Kullanma · adresi her gönderide yaz</option>
-                      {kargoBaglantisi.konumlar.map(konum=><option key={konum.kod} value={konum.kod}>{konum.ad} · {konum.kod}{konum.sehir?` · ${konum.sehir}`:""} ({konum.tur==="depo"?"depo":"şube"})</option>)}
+                      {/* Pasif konumlar da listede: gizlemek, kullanıcının OTO
+                          panelinde gördüğü konumu burada bulamamasına yol
+                          açıyordu. Pasif olduğu yazıyor, seçimi kullanıcının. */}
+                      {kargoBaglantisi.konumlar.map(konum=><option key={konum.kod} value={konum.kod}>{konum.ad} · {konum.kod}{konum.sehir?` · ${konum.sehir}`:""} ({konum.tur==="depo"?"depo":"şube"}{konum.aktif?"":" · PASİF"})</option>)}
                     </select>
                   :<input name="tryoto_pickup_location_code" defaultValue={settings?.tryoto_pickup_location_code??""} placeholder="OTO'da tanımlı konumun kodu (isteğe bağlı)" autoComplete="off"/>}
               </label>
@@ -210,7 +213,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
               <label>Şehir<input name="address_city" defaultValue={settings?.address_city??""} autoComplete="off"/></label>
               <label>Ülke<input name="address_country" defaultValue={settings?.address_country??"TR"} placeholder="TR" autoComplete="off"/></label>
             </div>
-            <div className="security-note"><b>{settings?.tryoto_refresh_token_enc?"Anahtarınız kayıtlı.":"Anahtar henüz girilmedi."}</b><p>Anahtar şifrelenerek saklanır ve hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazın; boş bırakırsanız kayıtlı olan korunur.</p><p>Gönderici konumu <b>isteğe bağlı</b>: OTO panelinde tanımladığınız depo ya da şube burada listelenir. Hiç tanımlamadıysanız boş bırakın — o zaman aşağıdaki çıkış adresi kullanılır, dolayısıyla <b>birinin dolu olması gerekir</b>.</p></div>
+            <div className="security-note"><b>{settings?.tryoto_refresh_token_enc?"Anahtarınız kayıtlı.":"Anahtar henüz girilmedi."}</b><p>Anahtar şifrelenerek saklanır ve hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazın; boş bırakırsanız kayıtlı olan korunur.</p><p>Gönderici konumu <b>seçilmeli</b>: OTO gönderiyi kayıtlı bir konum olmadan oluşturmuyor — sipariş açılıyor, gönderi ve etiket üretilmiyor (27.09.2026). Aşağıdaki çıkış adresi yalnızca konum seçilmediğinde gönderilen yedek bilgidir.</p></div>
           </article>
           <button className="payment-save" type="submit">Kargo ayarlarını kaydet</button>
         </form>
@@ -237,7 +240,15 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
               </ul>
               <p className="catalog-hint">OTO {kargoBaglantisi.firmalar.length} kargo firmasını destekliyor. Gönderi oluştururken hangilerinin fiyat verdiği adrese ve pakete göre belirleniyor.</p>
             </>:<p className="catalog-hint">{kargoBaglantisi.firmaHatasi?`Desteklenen firma listesi alınamadı: ${kargoBaglantisi.firmaHatasi} Bu, gönderi oluşturmayı engellemez — kullanılabilir firmalar adrese ve pakete göre fiyat sorulurken belirleniyor.`:"Desteklenen firma listesi boş döndü. Gönderi oluştururken kullanılabilir firmalar yine de fiyat sorgusuyla belirleniyor."}</p>}
-            <p className="catalog-hint">{kargoBaglantisi.konumlar.length?`${kargoBaglantisi.konumlar.length} gönderici konumu tanımlı.`:"Gönderici konumu tanımlı değil; adres her gönderide tek tek gönderilecek."}</p>
+            {/* Konum listesinin HATASI ayrı gösteriliyor. Boş liste "konum
+                tanımlı değil" diye okunuyordu ve kullanıcının OTO panelinde
+                dört konumu varken ekran bunu söylüyordu; gönderiler kayıtlı
+                konum olmadan oluşturulup etiketsiz kaldı (27.09.2026). */}
+            {kargoBaglantisi.konumHatasi
+              ?<div className="security-note"><b>Gönderici konumları alınamadı.</b><p>{kargoBaglantisi.konumHatasi}</p><p>Kodu OTO panelindeki konum kaydından alıp yukarıdaki alana elle yazabilirsiniz.</p></div>
+              :<p className="catalog-hint">{kargoBaglantisi.konumlar.length
+                  ?`${kargoBaglantisi.konumlar.length} gönderici konumu bulundu${kargoBaglantisi.konumlar.some(k=>k.aktif)?"":" (hepsi pasif)"}. Etiket üretilebilmesi için burada bir konum SEÇİLMELİ: OTO gönderiyi kayıtlı konum olmadan oluşturmuyor.`
+                  :"Gönderici konumu bulunamadı. OTO panelinde Ayarlar → Gönderici Konumları bölümünden tanımlayın."}</p>}
           </>}
         </article>
       </>:<p className="catalog-hint">Kargo entegrasyonunu yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}

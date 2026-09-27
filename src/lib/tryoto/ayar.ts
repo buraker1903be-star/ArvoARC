@@ -41,7 +41,7 @@ export function tryotoAyari(satir: AyarSatiri | null | undefined): TryotoAyari {
 export type BaglantiSonucu =
   | { durum: "kapali" }
   | { durum: "anahtar-yok" }
-  | { durum: "basarili"; hesap: HesapBilgisi | null; firmalar: KargoFirmasi[]; konumlar: GondericiKonumu[]; firmaHatasi: string | null }
+  | { durum: "basarili"; hesap: HesapBilgisi | null; firmalar: KargoFirmasi[]; konumlar: GondericiKonumu[]; firmaHatasi: string | null; konumHatasi: string | null }
   /*
     Ham mesaj ve durum kodu da taşınıyor. Yalnızca çeviriyi göstermek
     teşhisi imkânsız kılıyordu: "kimlik doğrulaması reddedildi" hem
@@ -106,16 +106,29 @@ export async function baglantiyiSina(magazaId: string, satir: AyarSatiri | null 
       firma listesi olmadan seçim hiç yapılamaz.
     */
     let konumlar: GondericiKonumu[] = [];
+    let konumHatasi: string | null = null;
     try {
+      /*
+        DURUM SÜZGECİ YOK. Önce ?status=active soruluyordu; pasif konumlar
+        listede hiç görünmüyor, kullanıcı OTO panelinde gördüğü konumu
+        burada bulamıyordu. Pasif olanlar artık geliyor ve işaretli
+        gösteriliyor.
+      */
       const konumGovdesi = await otoIstek({
         magazaId,
         yenilemeAnahtari: anahtar,
-        yol: "getPickupLocationList?status=active",
+        yol: "getPickupLocationList",
         yontem: "GET",
       });
       konumlar = konumlariCozumle(konumGovdesi);
-    } catch {
-      konumlar = [];
+    } catch (hata) {
+      /*
+        HATA ARTIK YUTULMUYOR. Boş liste "konum tanımlı değil" diye
+        okunuyordu ve kullanıcının OTO panelinde dört konumu varken ayar
+        ekranı bunu söylüyordu; gönderiler kayıtlı konum olmadan
+        oluşturulup etiketsiz kaldı (27.09.2026).
+      */
+      konumHatasi = hata instanceof OtoHatasi ? hata.message : "Gönderici konumları alınamadı.";
     }
     /*
       Liste çözülemediyse ham yanıt ekranda gösteriliyor. "Hiç firma yok"
@@ -123,7 +136,7 @@ export async function baglantiyiSina(magazaId: string, satir: AyarSatiri | null 
       tanınmayan bir sarmalayıcı, çalışan bir hesabı çalışmıyor gibi
       gösterirdi.
     */
-    return { durum: "basarili", hesap, firmalar, konumlar, firmaHatasi };
+    return { durum: "basarili", hesap, firmalar, konumlar, firmaHatasi, konumHatasi };
   } catch (hata) {
     if (hata instanceof OtoHatasi) {
       return { durum: "hata", mesaj: hata.message, ham: hata.hamMesaj, durumKodu: hata.durumKodu ?? null };
