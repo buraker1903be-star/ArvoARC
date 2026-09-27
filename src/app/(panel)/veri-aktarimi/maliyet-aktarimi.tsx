@@ -72,25 +72,39 @@ export function MaliyetAktarimi() {
 
   const indirimKurus = () => Math.round(Number(indirim.replace(",", ".")) * 100) || 0;
 
+  /*
+    Sunucu eylemi hata FIRLATIRSA ekranda hiçbir şey olmuyordu: düğmeye
+    basılıyor, bir şey açılmıyor, sebep yalnızca sunucu günlüğünde
+    kalıyordu (27.09.2026'da toplanan liste tam olarak böyle "kayboldu").
+    Artık sebep kullanıcıya yazılıyor.
+  */
+  const koru = async (isle: () => Promise<void>) => {
+    try {
+      await isle();
+    } catch (hata) {
+      setSonuc({ metin: `İşlem tamamlanamadı: ${hata instanceof Error ? hata.message : String(hata)}`, hata: true });
+    }
+  };
+
   const esleştir = () =>
-    basla(async () => {
+    basla(() => koru(async () => {
       setSonuc(null);
       setToplama(null);
       setOnizleme(await maliyetOnizle(metin, gecis, indirimKurus()));
-    });
+    }));
 
   const toplananiGetir = () =>
-    basla(async () => {
+    basla(() => koru(async () => {
       setSonuc(null);
       const cevap = await sonToplananListe(gecis, indirimKurus());
       if ("hata" in cevap) { setToplama(null); setOnizleme(null); setSonuc({ metin: cevap.hata, hata: true }); return; }
       setMetin("");
       setToplama(cevap);
       setOnizleme(cevap.onizleme);
-    });
+    }));
 
   const lrTara = () =>
-    basla(async () => {
+    basla(() => koru(async () => {
       setSonuc(null);
       /* Girişsiz sayfada görünen MÜŞTERİ fiyatı; geçiş buna sabitleniyor. */
       setGecis("musteri");
@@ -99,17 +113,17 @@ export function MaliyetAktarimi() {
       setMetin("");
       setToplama(cevap);
       setOnizleme(cevap.onizleme);
-    });
+    }));
 
   const yerImiAl = () =>
-    basla(async () => {
+    basla(() => koru(async () => {
       const cevap = await toplayiciKodu();
       if ("hata" in cevap) { setSonuc({ metin: cevap.hata, hata: true }); return; }
       setYerImi(cevap);
-    });
+    }));
 
   const uygula = () =>
-    basla(async () => {
+    basla(() => koru(async () => {
       if (!onizleme?.eslesen.length) return;
       const cevap = await maliyetUygula(
         onizleme.eslesen.map((s) => ({ sku: s.sku, kurus: s.yeni, satis: s.satis, ustuCizili: s.ustuCizili })),
@@ -124,7 +138,7 @@ export function MaliyetAktarimi() {
       setOnizleme(null);
       setToplama(null);
       setMetin("");
-    });
+    }));
 
   return (
     <section className="ac ac-pad import-card">
@@ -304,6 +318,8 @@ export function MaliyetAktarimi() {
 
       {onizleme ? (
         <div className="maliyet-onizleme">
+          {/* Sorgu düştüyse sebebi burada: boş liste "eşleşme yok" gibi okunuyordu. */}
+          {onizleme.hata ? <p className="maliyet-sonuc" data-tone="hata">{onizleme.hata}</p> : null}
           {onizleme.eslesen.length ? (
             <>
               <h4>{onizleme.eslesen.length} ürün eşleşti</h4>

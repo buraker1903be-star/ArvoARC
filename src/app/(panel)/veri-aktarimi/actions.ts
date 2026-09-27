@@ -284,6 +284,8 @@ export type MaliyetOnizleme = {
   }[];
   eslesmeyen: string[];
   atlanan: string[];
+  /* Sorgu düştüyse sebebi; boş liste "eşleşme yok" gibi okunuyordu. */
+  hata?: string | null;
 };
 
 const SORUN_METNI: Record<string, string> = {
@@ -304,20 +306,35 @@ async function eslestir(
   satirlar: { sku: string; kurus: number }[],
   gecis: FiyatGecisi,
   indirimKurus: number,
-): Promise<{ eslesen: MaliyetOnizleme["eslesen"]; eslesmeyen: string[] }> {
+): Promise<{ eslesen: MaliyetOnizleme["eslesen"]; eslesmeyen: string[]; hata: string | null }> {
   /*
     LR'ın kimliği "20604-201" biçiminde, bizim SKU "20604": iki aday da
     sorgulanıyor ve birebir eşleşme öncelikli.
   */
   const adaylar = [...new Set(satirlar.flatMap((s) => skuAdaylari(s.sku)))];
-  const { data: varyantlar } = await supabase
-    .from("arc_product_variants")
-    .select("sku,cost_price,price,compare_at_price,title,arc_products(name)")
-    .eq("organization_id", organizationId)
-    .in("sku", adaylar);
 
   type Varyant = { sku: string; cost_price: number | null; price: number; compare_at_price: number | null; title: string | null; arc_products: { name: string } | { name: string }[] | null };
-  const bySku = new Map(((varyantlar ?? []) as unknown as Varyant[]).map((v) => [v.sku, v]));
+  const bySku = new Map<string, Varyant>();
+
+  /*
+    SKU'lar ÖBEK ÖBEK soruluyor. Adaylar adres satırına yazılıyor
+    (`in.(…)`) ve yüzlerce satırlık bir toplamada adres sunucunun
+    sınırını aşabiliyor; sonuç "hiçbir ürün eşleşmedi" olurdu.
+
+    Sorgunun hatası da artık YUTULMUYOR. Yutulduğunda tek belirti
+    bütün satırların "katalogda bulunamadı" görünmesiydi — yani
+    gerçek bir arıza, veri sorunu gibi okunuyordu.
+  */
+  const OBEK = 150;
+  for (let i = 0; i < adaylar.length; i += OBEK) {
+    const { data, error } = await supabase
+      .from("arc_product_variants")
+      .select("sku,cost_price,price,compare_at_price,title,arc_products(name)")
+      .eq("organization_id", organizationId)
+      .in("sku", adaylar.slice(i, i + OBEK));
+    if (error) return { eslesen: [], eslesmeyen: [], hata: `Ürünler okunamadı: ${error.message}` };
+    for (const varyant of (data ?? []) as unknown as Varyant[]) bySku.set(varyant.sku, varyant);
+  }
 
   const eslesen: MaliyetOnizleme["eslesen"] = [];
   const eslesmeyen: string[] = [];
@@ -342,7 +359,7 @@ async function eslestir(
       satis: sonuc.karar.satis, ustuCizili: sonuc.karar.ustuCizili,
     });
   }
-  return { eslesen, eslesmeyen };
+  return { eslesen, eslesmeyen, hata: null };
 }
 
 export async function maliyetOnizle(
@@ -527,10 +544,9 @@ export async function sonToplananListe(
     .map((satir) => ({ sku: satir.sku, kurus: gecerliFiyat(satir.fiyatlar) }))
     .filter((satir): satir is { sku: string; kurus: number } => satir.kurus !== null);
 
-  const onizleme: MaliyetOnizleme = {
-    ...(await eslestir(supabase, organization.id, fiyatli, gecis, indirimKurus)),
-    atlanan: [],
-  };
+  const eslestirme = await eslestir(supabase, organization.id, fiyatli, gecis, indirimKurus);
+  if (eslestirme.hata) return { hata: eslestirme.hata };
+  const onizleme: MaliyetOnizleme = { ...eslestirme, atlanan: [] };
   return {
     toplamaIdleri: kayitlar.map((k) => k.id),
     toplandi: kayit.created_at,
