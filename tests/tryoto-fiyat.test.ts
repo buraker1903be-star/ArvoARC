@@ -12,8 +12,8 @@ import { fiyatSorgusuGovdesi, secenekleriCozumle } from "@/lib/tryoto/fiyat";
 const yanit = {
   success: true,
   deliveryCompany: [
-    { deliveryOptionId: "opt-2", deliveryCompanyName: "Sürat Kargo", price: 84.9, serviceType: "standard", codCharge: 5 },
-    { deliveryOptionId: "opt-1", deliveryCompanyName: "Yurtiçi Kargo", price: 79.5, serviceType: "standard" },
+    { deliveryOptionId: "opt-2", deliveryOptionName: "Sürat Kargo", deliveryCompanyName: "surat-marketplace", price: 84.9, serviceType: "standard", codCharge: 5, deliveryType: "pickupByCustomer" },
+    { deliveryOptionId: "opt-1", deliveryOptionName: "Yurtiçi Kargo", price: 79.5, serviceType: "standard", deliveryType: "toCustomerDoorstep" },
   ],
 };
 
@@ -59,6 +59,33 @@ test("aynı seçenek iki kez listelenmiyor", () => {
 test("tanınmayan gövde boş dönüyor", () => {
   assert.deepEqual(secenekleriCozumle({ beklenmeyen: 1 }), []);
   assert.deepEqual(secenekleriCozumle(null), []);
+});
+
+test("OKUNABİLİR ad seçiliyor, kod gibi olan değil", () => {
+  /*
+    deliveryCompanyName kod gibi geliyor ("surat-marketplace") ve canlıda
+    ekranda o görünüyordu; deliveryOptionName okunabilir olan.
+  */
+  assert.equal(secenekleriCozumle(yanit)[1].firmaAdi, "Sürat Kargo");
+});
+
+test("teslim türü çevriliyor: fiyat farkının başlıca sebebi", () => {
+  // Aynı firma hem adrese teslim hem şubeden alım dönebiliyor ve
+  // fiyatları farklı; ayrımı göstermemek karşılaştırmayı yanıltıyordu.
+  const secenekler = secenekleriCozumle(yanit);
+  assert.equal(secenekler[0].teslimTuru, "Adrese teslim");
+  assert.equal(secenekler[1].teslimTuru, "Şubeden alım");
+  assert.equal(secenekleriCozumle({ deliveryCompany: [{ deliveryOptionId: "x", name: "A", deliveryType: "bilinmeyen" }] })[0].teslimTuru, "bilinmeyen");
+});
+
+test("sorgu TÜM teslim türlerini istiyor", () => {
+  /*
+    deliveryType gönderilmeyince OTO dar bir küme döndürüyordu ve panelde
+    görünen firmaların çoğu listede yoktu.
+  */
+  const govde = fiyatSorgusuGovdesi({ cikisSehri: "A", varisSehri: "B", agirlikKg: 1 });
+  assert.equal(govde.deliveryType, "toCustomerDoorstepOrPickupByCustomer");
+  assert.equal(govde.includeEstimatedDates, true);
 });
 
 test("sorgu gövdesi: ağırlık bilinmiyorsa 1 kg", () => {

@@ -456,7 +456,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                 <form method="get" className="shipment-weight">
                   <label>Ağırlık (kg)<input name="agirlik" type="number" step="0.1" min="0.1" max="100" defaultValue={sorgulananAgirlik}/></label>
                   <button type="submit">Fiyatları yenile</button>
-                  <small>{(kargoAyarSatiri as {address_city?:string|null}|null)?.address_city||"?"} → {teslimatAdresi.city||"?"} · {sorgulananAgirlik} kg{order.payment_status==="paid"?"":" · kapıda tahsilat"}</small>
+                  <small>{(kargoAyarSatiri as {address_city?:string|null}|null)?.address_city||"?"} → {teslimatAdresi.city||"?"} · {sorgulananAgirlik} kg{order.payment_status==="paid"?"":" · kapıda tahsilat"} · {kargoSecenekleri.length} seçenek</small>
                 </form>
                 <form action={otoEtiketUret} className="shipment-oto">
                   <input type="hidden" name="order_id" value={order.id}/>
@@ -470,7 +470,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                            firma belirtilmedi" diyordu). Kullanıcının
                            EKRANDA GÖRDÜĞÜ ad kayda da o şekilde giriyor. */
                         <option key={secenek.id} value={`${secenek.id}|${secenek.firmaAdi}`}>
-                          {secenek.firmaAdi}{secenek.hizmet?` · ${secenek.hizmet}`:""}{secenek.ucretKurus!==null?` · ${money(secenek.ucretKurus,order.currency)}`:" · fiyat yok"}
+                          {secenek.firmaAdi}{secenek.teslimTuru?` · ${secenek.teslimTuru}`:""}{secenek.hizmet?` · ${secenek.hizmet}`:""}{secenek.ucretKurus!==null?` · ${money(secenek.ucretKurus,order.currency)}`:" · fiyat yok"}{secenek.tahminiTeslim?` · ${secenek.tahminiTeslim}`:""}
                         </option>)}
                     </select></label>
                     {/* Ağırlık gizli: fiyat zaten bu ağırlıkla soruldu ve

@@ -11,10 +11,24 @@
   (AGENTS.md) ve gönderi kaydına da öyle yazılıyor. OTO ondalık döndürüyor.
 */
 
+/*
+  Teslim biçimi. Aynı firma hem adrese teslim hem şubeden alım seçeneği
+  dönebiliyor ve fiyatları farklı; ayrımı göstermemek, OTO panelindeki
+  fiyatla buradakini karşılaştıran kullanıcıyı yanıltıyordu.
+*/
+export const TESLIM_TURU_ADI: Record<string, string> = {
+  toCustomerDoorstep: "Adrese teslim",
+  pickupByCustomer: "Şubeden alım",
+  toCustomerDoorstepOrPickupByCustomer: "Adrese teslim / şubeden alım",
+  locker: "Kargomat",
+};
+
 export interface TeslimatSecenegi {
   id: string;
   firmaAdi: string;
   hizmet: string | null;
+  /** Adrese teslim mi şubeden alım mı; fiyat farkının başlıca sebebi. */
+  teslimTuru: string | null;
   /** Kuruş cinsinden; bilinmiyorsa null. */
   ucretKurus: number | null;
   /** Kapıda ödeme ek ücreti (kuruş). */
@@ -58,7 +72,12 @@ export function secenekleriCozumle(govde: unknown): TeslimatSecenegi[] {
     if (!satir || typeof satir !== "object") continue;
     const s = satir as Record<string, unknown>;
     const id = metin(s, ["deliveryOptionId", "optionId", "id"]);
-    const firmaAdi = metin(s, ["deliveryCompanyName", "deliveryOptionName", "companyName", "name"]);
+    /*
+      deliveryOptionName ÖNCE: okunabilir ad o ("Deliver Now"),
+      deliveryCompanyName ise kod gibi geliyor ("delivernow",
+      "surat-kargo-marketplace") ve canlıda ekranda o görünüyordu.
+    */
+    const firmaAdi = metin(s, ["deliveryOptionName", "deliveryCompanyName", "companyName", "name"]);
     /*
       Kimliği olmayan seçenek gösterilmiyor: createShipment
       deliveryOptionId istiyor, kimliksiz satır seçilince gönderi
@@ -69,7 +88,11 @@ export function secenekleriCozumle(govde: unknown): TeslimatSecenegi[] {
     secenekler.push({
       id,
       firmaAdi,
-      hizmet: metin(s, ["serviceType", "deliveryOptionName", "shippingMethod"]),
+      hizmet: metin(s, ["serviceType", "shippingMethod"]),
+      teslimTuru: (() => {
+        const ham = metin(s, ["deliveryType", "pickupDropoff"]);
+        return ham ? TESLIM_TURU_ADI[ham] ?? ham : null;
+      })(),
       ucretKurus: kurusaCevir(s, ["price", "deliveryFee", "fee", "totalPrice", "amount"]),
       kapidaOdemeKurus: kurusaCevir(s, ["codCharge", "codFee"]),
       tahminiTeslim: metin(s, ["estimatedDeliveryDate", "estimatedDelivery", "deliveryTime"]),
@@ -96,6 +119,16 @@ export function fiyatSorgusuGovdesi(girdi: {
   return {
     originCity: girdi.cikisSehri,
     destinationCity: girdi.varisSehri,
+    /*
+      TÜM SEÇENEKLER İSTENİYOR. deliveryType gönderilmeyince OTO dar bir
+      küme döndürüyordu ve panelde görünen firmaların çoğu listede
+      yoktu (canlıda yalnızca bir marketplace seçeneği geldi).
+      toCustomerDoorstepOrPickupByCustomer ikisini birden kapsıyor.
+    */
+    deliveryType: "toCustomerDoorstepOrPickupByCustomer",
+    // Tahmini teslim tarihi seçimi kolaylaştırıyor; ek maliyeti yok.
+    includeEstimatedDates: true,
+    packageCount: 1,
     /*
       Ağırlık bilinmiyorsa 1 kg varsayılıyor. Sıfır göndermek OTO'da
       doğrulama hatası veriyor ve fiyat hiç gelmiyor; 1 kg en küçük
