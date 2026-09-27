@@ -202,18 +202,26 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
           {kargoBaglantisi.durum==="kapali"?<p className="catalog-hint">Entegrasyon kapalı. Etkinleştirip kaydedince firmalar burada listelenir.</p>
           :kargoBaglantisi.durum==="anahtar-yok"?<p className="catalog-hint">Yenileme anahtarı girilmemiş; bağlantı sınanamıyor.</p>
           :kargoBaglantisi.durum==="hata"?<div className="security-note"><b>Bağlantı kurulamadı.</b><p>{kargoBaglantisi.mesaj}</p>{kargoBaglantisi.ham||kargoBaglantisi.durumKodu?<code>OTO yanıtı{kargoBaglantisi.durumKodu?` (HTTP ${kargoBaglantisi.durumKodu})`:""}: {kargoBaglantisi.ham??"gövdede mesaj yok"}</code>:null}</div>
-          :kargoBaglantisi.firmalar.length?<>
+          :<>
+            {/* Bağlantının dayanağı accountInfo: anahtarı doğruluyor ve
+                bakiyeyi söylüyor. Bakiye gönderi oluşturmanın ön şartı —
+                OTO cüzdanından düşüyor, bitince etiket üretilemiyor. */}
             <ul className="tryoto-carriers">
-              {kargoBaglantisi.firmalar.map(firma=><li key={firma.kod}><b>{firma.ad}</b><small>{firma.kod}</small>{firma.etkin===false?<span>kapalı</span>:null}</li>)}
+              <li><b>{kargoBaglantisi.hesap?.ad??"Hesap"}</b><small>{kargoBaglantisi.hesap?.eposta??"bağlı"}</small></li>
+              {kargoBaglantisi.hesap?.paket?<li><b>{kargoBaglantisi.hesap.paket}</b><small>paket</small></li>:null}
+              {kargoBaglantisi.hesap?.bakiye!==null&&kargoBaglantisi.hesap?.bakiye!==undefined?<li><b>{kargoBaglantisi.hesap.bakiye}</b><small>kalan bakiye</small>{kargoBaglantisi.hesap.bakiye<=0?<span>yetersiz</span>:null}</li>:null}
             </ul>
-            {/*
-              Bu liste OTO'nun DESTEKLEDİĞİ firmalar; hesapta hangilerinin
-              fiyat verdiği ayrı bir şey ve gönderi oluştururken
-              checkOTODeliveryFee ile geliyor. İkisini karıştırmamak için
-              metin bunu açıkça söylüyor.
-            */}
-            <p className="catalog-hint">OTO {kargoBaglantisi.firmalar.length} kargo firmasını destekliyor. Gönderi oluştururken hangilerinin fiyat verdiği adrese ve pakete göre belirleniyor.{kargoBaglantisi.konumlar.length?` ${kargoBaglantisi.konumlar.length} gönderici konumu tanımlı.`:" Gönderici konumu tanımlı değil; adres her gönderide tek tek gönderilecek."}</p>
-          </>:<div className="security-note"><b>Firma listesi okunamadı.</b><p>Bağlantı kuruldu ama dcList beklenmedik bir yanıt döndürdü; ham hâli aşağıda.</p><code>{kargoBaglantisi.hamYanit}</code></div>}
+            {kargoBaglantisi.hesap?.bakiye!==null&&kargoBaglantisi.hesap?.bakiye!==undefined&&kargoBaglantisi.hesap.bakiye<=0
+              ?<div className="security-note"><b>OTO bakiyeniz yok.</b><p>Gönderi oluşturmak cüzdandan düşüyor; bakiye yüklenmeden etiket üretilemez. Tedarikçinin kendi gönderdiği siparişlerde bakiye gerekmez, orada yalnızca takip numarası girilir.</p></div>
+              :null}
+            {kargoBaglantisi.firmalar.length?<>
+              <ul className="tryoto-carriers">
+                {kargoBaglantisi.firmalar.map(firma=><li key={firma.kod}><b>{firma.ad}</b><small>{firma.kod}</small>{firma.etkin===false?<span>kapalı</span>:null}</li>)}
+              </ul>
+              <p className="catalog-hint">OTO {kargoBaglantisi.firmalar.length} kargo firmasını destekliyor. Gönderi oluştururken hangilerinin fiyat verdiği adrese ve pakete göre belirleniyor.</p>
+            </>:<p className="catalog-hint">{kargoBaglantisi.firmaHatasi?`Desteklenen firma listesi alınamadı: ${kargoBaglantisi.firmaHatasi} Bu, gönderi oluşturmayı engellemez — kullanılabilir firmalar adrese ve pakete göre fiyat sorulurken belirleniyor.`:"Desteklenen firma listesi boş döndü. Gönderi oluştururken kullanılabilir firmalar yine de fiyat sorgusuyla belirleniyor."}</p>}
+            <p className="catalog-hint">{kargoBaglantisi.konumlar.length?`${kargoBaglantisi.konumlar.length} gönderici konumu tanımlı.`:"Gönderici konumu tanımlı değil; adres her gönderide tek tek gönderilecek."}</p>
+          </>}
         </article>
       </>:<p className="catalog-hint">Kargo entegrasyonunu yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
     </section>

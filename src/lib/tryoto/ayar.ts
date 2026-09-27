@@ -1,5 +1,6 @@
 import { decryptSecret } from "@/lib/payment-credentials";
 import { firmalariCozumle, type KargoFirmasi } from "./firmalar";
+import { hesabiCozumle, type HesapBilgisi } from "./hesap";
 import { konumlariCozumle, type GondericiKonumu } from "./konumlar";
 import { OtoHatasi } from "./hatalar";
 import { otoIstek } from "./istemci";
@@ -39,7 +40,7 @@ export function tryotoAyari(satir: AyarSatiri | null | undefined): TryotoAyari {
 export type BaglantiSonucu =
   | { durum: "kapali" }
   | { durum: "anahtar-yok" }
-  | { durum: "basarili"; firmalar: KargoFirmasi[]; konumlar: GondericiKonumu[]; hamYanit: string | null }
+  | { durum: "basarili"; hesap: HesapBilgisi | null; firmalar: KargoFirmasi[]; konumlar: GondericiKonumu[]; firmaHatasi: string | null }
   /*
     Ham mesaj ve durum kodu da taşınıyor. Yalnızca çeviriyi göstermek
     teşhisi imkânsız kılıyordu: "kimlik doğrulaması reddedildi" hem
@@ -63,15 +64,36 @@ export async function baglantiyiSina(magazaId: string, satir: AyarSatiri | null 
 
   try {
     const anahtar = decryptSecret(satir.tryoto_refresh_token_enc);
+
     /*
-      dcList GET; POST gönderilince boş yanıt dönüyordu (canlıda
-      27.09.2026). Uç, OTO'nun DESTEKLEDİĞİ kargo firmalarını listeliyor —
-      kendi sözleşmenizi bağlamak (dcConfig/dcActivation) için gereken kod
-      buradan alınıyor. Gönderi oluştururken KULLANILABİLİR seçenekler
-      ayrı: checkOTODeliveryFee onları fiyatlarıyla döndürüyor.
+      BAĞLANTININ DAYANAĞI accountInfo. Önce dcList kullanılıyordu ve
+      yanlış seçimdi: o uç planla sınırlı ve ücretsiz hesapta HTTP 403
+      döndü (27.09.2026), yani geçerli bir anahtar "bağlantı kurulamadı"
+      diye okundu. accountInfo hem anahtarı doğruluyor hem paket adını ve
+      BAKİYEYİ veriyor — gönderi oluşturmak OTO cüzdanından düşüyor.
     */
-    const govde = await otoIstek({ magazaId, yenilemeAnahtari: anahtar, yol: "dcList", yontem: "GET" });
-    const firmalar = firmalariCozumle(govde);
+    const hesapGovdesi = await otoIstek({
+      magazaId,
+      yenilemeAnahtari: anahtar,
+      yol: "accountInfo",
+      yontem: "GET",
+    });
+    const hesap = hesabiCozumle(hesapGovdesi);
+
+    /*
+      Firma listesi artık bağlantıyı belirlemiyor: dcList plana göre
+      kapalı olabiliyor ve olmaması gönderi oluşturmayı engellemiyor
+      (kullanılabilir seçenekler checkOTODeliveryFee'den, fiyatlarıyla
+      birlikte geliyor). Hatası ayrıca gösteriliyor, yutulmuyor.
+    */
+    let firmalar: KargoFirmasi[] = [];
+    let firmaHatasi: string | null = null;
+    try {
+      const govde = await otoIstek({ magazaId, yenilemeAnahtari: anahtar, yol: "dcList", yontem: "GET" });
+      firmalar = firmalariCozumle(govde);
+    } catch (hata) {
+      firmaHatasi = hata instanceof OtoHatasi ? hata.message : "Kargo firması listesi alınamadı.";
+    }
 
     /*
       Gönderici konumları da çekiliyor: createOrder'a verilecek kodu
@@ -100,12 +122,7 @@ export async function baglantiyiSina(magazaId: string, satir: AyarSatiri | null 
       tanınmayan bir sarmalayıcı, çalışan bir hesabı çalışmıyor gibi
       gösterirdi.
     */
-    return {
-      durum: "basarili",
-      firmalar,
-      konumlar,
-      hamYanit: firmalar.length ? null : JSON.stringify(govde).slice(0, 600),
-    };
+    return { durum: "basarili", hesap, firmalar, konumlar, firmaHatasi };
   } catch (hata) {
     if (hata instanceof OtoHatasi) {
       return { durum: "hata", mesaj: hata.message, ham: hata.hamMesaj, durumKodu: hata.durumKodu ?? null };
