@@ -81,6 +81,10 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     .map(satir=>({...satir,items:satir.arc_shipment_items??[]}));
   const gruplar=tedarikciGruplari(kargoKalemleri,gonderiler);
   const kargoDurumuOzet=kargoDurumu(kargoKalemleri,gonderiler);
+  /* İptal edilen gönderi ne özette ne sayımda: yola çıkmayacak bir
+     paketin takip numarasını göstermek yanlış bilgi. */
+  const acikGonderiler=gonderiler.filter(g=>g.status!=="cancelled");
+  const takipliGonderiSayisi=acikGonderiler.filter(g=>g.tracking_number?.trim()).length;
   const kalemAdi=new Map((items??[]).map(item=>[item.id,item.product_name]));
 
   /*
@@ -263,7 +267,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   const transferStale=transferPending&&waitedHours>=TRANSFER_STALE_HOURS;
 
   return <>
-    <section className="ac-bar">
+    <section className="ac-bar order-detail-bar">
       <div>
         <Link prefetch={false} className="order-back order-noprint" href="/siparisler">← Siparişler</Link>
         <h1>{order.order_number}</h1>
@@ -338,7 +342,24 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
       <section className="ac-metrics order-facts" aria-label="Sipariş özeti">
         <article className="ac-metric"><span>Toplam</span><strong>{money(order.total,order.currency)}</strong><small>{discount>0?`${money(discount,order.currency)} indirim uygulandı`:"KDV dâhil"}</small></article>
         <article className="ac-metric" data-tone={order.payment_status==="paid"?"good":["pending","authorized"].includes(order.payment_status)?"warn":["failed","refunded","partially_refunded"].includes(order.payment_status)?"bad":undefined}><span>Ödeme</span><strong>{paymentStatusLabel(order.payment_status)}</strong><small>{meta.payment_method??"Kredi kartı"}</small></article>
-        <article className="ac-metric"><span>Kargo</span><strong>{meta.shipping_carrier||"—"}</strong><small>{meta.tracking_number?`Takip: ${meta.tracking_number}`:"Takip numarası girilmedi"}</small></article>
+        {/*
+          KARGO KUTUSU GÖNDERİLERDEN OKUYOR. Önceden siparişin eski tek
+          numaralı alanına (metadata.tracking_number) bakıyordu ve
+          bölünmüş kargoda üç paket yoldayken bile "Takip numarası
+          girilmedi" yazıyordu — özet şeridi, ekranın en çok bakılan
+          yeri, yanlış bilgi veriyordu.
+        */}
+        <article className="ac-metric" data-tone={kargoDurumuOzet==="tamam"?"good":kargoDurumuOzet==="kismi"?"warn":undefined}>
+          <span>Kargo</span>
+          <strong>{acikGonderiler.length?(acikGonderiler.length>1?`${acikGonderiler.length} paket`:acikGonderiler[0].carrier_name||"1 paket"):meta.shipping_carrier||"—"}</strong>
+          <small>{
+            acikGonderiler.length
+              ? (takipliGonderiSayisi
+                  ? `${takipliGonderiSayisi} takip numarası · ${kargoDurumuOzet==="tamam"?"tüm ürünler kargoda":"bir kısmı kargoda"}`
+                  : "takip numarası bekleniyor")
+              : meta.tracking_number?`Takip: ${meta.tracking_number}`:"Henüz kargoya verilmedi"
+          }</small>
+        </article>
         <article className="ac-metric"><span>Kalemler</span><strong>{itemCount} adet</strong><small>{items?.length??0} kalem</small></article>
       </section>
 
@@ -569,19 +590,43 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           ):<p className="order-hint">{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</p>}
         </div>
 
+        {/*
+          ESKİ TEK NUMARALI KARGO ALANI.
+
+          Gönderi kaydı varken bu alanlar YANILTICI: takip numarası artık
+          paket başına tutuluyor (Gönderiler bölümü) ve buraya yazılan
+          tek numara siparişin tamamını temsil etmiyor. İki ayrı yerde
+          takip numarası tutmak, hangisinin müşteriye gittiğini de
+          belirsiz yapıyordu.
+
+          Bu yüzden gönderi varken yalnızca DAHİLİ NOT kalıyor; takip
+          alanları gönderisi olmayan siparişler için duruyor.
+        */}
         <div className="ac ac-pad">
-          <div className="ac-head"><div><h3>Kargo ve operasyon</h3><p>Takip numarası girildiğinde müşteriye e-posta gider.</p></div></div>
+          <div className="ac-head"><div><h3>{gonderiler.length?"Operasyon notu":"Kargo ve operasyon"}</h3><p>{gonderiler.length?"Takip numaraları Gönderiler bölümünde, paket başına tutuluyor.":"Takip numarası girildiğinde müşteriye e-posta gider."}</p></div></div>
           {canManage?(
             <form action={updateFulfillmentDetails} className="order-form-grid">
               <input type="hidden" name="order_id" value={order.id}/>
-              <label>Kargo firması<input name="shipping_carrier" defaultValue={meta.shipping_carrier??""} maxLength={100} className="ac-input"/></label>
-              <label>Takip numarası<input name="tracking_number" defaultValue={meta.tracking_number??""} maxLength={160} className="ac-input"/></label>
-              <label>Takip bağlantısı<input name="tracking_url" type="url" defaultValue={meta.tracking_url??""} placeholder="https://..." className="ac-input"/></label>
+              {gonderiler.length?(
+                <>
+                  {/* Var olan değerler korunuyor: alan gizlendiği için
+                      boş gönderilirse kayıtlı numara silinirdi. */}
+                  <input type="hidden" name="shipping_carrier" value={meta.shipping_carrier??""}/>
+                  <input type="hidden" name="tracking_number" value={meta.tracking_number??""}/>
+                  <input type="hidden" name="tracking_url" value={meta.tracking_url??""}/>
+                </>
+              ):(
+                <>
+                  <label>Kargo firması<input name="shipping_carrier" defaultValue={meta.shipping_carrier??""} maxLength={100} className="ac-input"/></label>
+                  <label>Takip numarası<input name="tracking_number" defaultValue={meta.tracking_number??""} maxLength={160} className="ac-input"/></label>
+                  <label>Takip bağlantısı<input name="tracking_url" type="url" defaultValue={meta.tracking_url??""} placeholder="https://..." className="ac-input"/></label>
+                </>
+              )}
               <label>İç operasyon notu<textarea name="internal_note" defaultValue={meta.internal_note??""} maxLength={1000} rows={3} className="ac-input"/></label>
-              <button className="ac-btn ac-btn-primary" type="submit">Kargo bilgilerini kaydet</button>
+              <button className="ac-btn ac-btn-primary" type="submit">{gonderiler.length?"Notu kaydet":"Kargo bilgilerini kaydet"}</button>
             </form>
           ):<p className="order-hint">{meta.shipping_carrier||"Kargo firması yok"} · {meta.tracking_number||"Takip numarası yok"}</p>}
-          {meta.tracking_url?<p className="order-track"><a className="ac-btn" href={meta.tracking_url} target="_blank" rel="noreferrer"><Icon name="external" size={15}/>Kargo takibini aç</a></p>:null}
+          {meta.tracking_url&&!gonderiler.length?<p className="order-track"><a className="ac-btn" href={meta.tracking_url} target="_blank" rel="noreferrer"><Icon name="external" size={15}/>Kargo takibini aç</a></p>:null}
         </div>
       </section>
 

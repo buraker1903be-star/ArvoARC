@@ -132,6 +132,8 @@
 /* Yazdırma: sipariş belgesi (müşteri, adresler, kalemler, toplamlar). */
 @media print{
   .order-noprint{display:none!important}
+  /* Yapışkan başlık yazdırmada her sayfanın tepesinde tekrar ederdi. */
+  .order-detail-bar{position:static;margin:0;padding-inline:0;box-shadow:none}
   .order-parties{grid-template-columns:repeat(3,1fr)}
   .order-facts{display:none}
 }
@@ -217,3 +219,31 @@
    sorgulamak gereksiz OTO çağrısı olurdu. */
 .shipment-refresh{margin-left:auto;padding:7px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 .shipment-refresh:hover{border-color:var(--accent-500);color:var(--accent-500)}
+
+
+/* ---------- Detay: yapışkan başlık ---------- */
+/*
+  Sipariş detayı uzun bir sayfa (kalemler, gönderiler, durum, iade,
+  geçmiş) ve birincil eylem — "Kargoya ver", "Ödeme alındı" — en üstteydi:
+  aşağıda çalışırken düğmeye ulaşmak için başa dönmek gerekiyordu.
+
+  top:72px panelin kendi üst şeridinin yüksekliği; sayfanın sekme şeridi
+  olmadığı için o seviye boş.
+*/
+.order-detail-bar{
+  position:sticky;top:72px;z-index:6;
+  /* Altındaki içerik şeridin altından geçerken görünmesin. */
+  background:var(--bg);
+  /* Kenarlardan taşan içeriği örtmek için yanlara da uzanıyor. */
+  margin:0 calc(var(--s5) * -1);
+  padding-inline:var(--s5);
+  box-shadow:0 1px 0 var(--line-soft);
+}
+
+@media (max-width:860px){
+  /*
+    Dar ekranda panelin üst şeridi farklı yükseklikte ve yapışkan başlık
+    ekranın önemli bir kısmını yiyor; orada normal akışta kalıyor.
+  */
+  .order-detail-bar{position:static;margin:0;padding-inline:0;box-shadow:none}
+}
