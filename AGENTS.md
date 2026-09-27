@@ -104,22 +104,29 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   gösterir. Sayı ve sipariş numarası gibi değerler de mesajın içine
   girer, adrese değil. `tests/panel-bildirim.test.ts` kalıbın geri
   gelmesini engeller.
-- **LR fiyatları KULLANICININ TARAYICISINDA toplanıyor.** LR'ın portalı
-  fiyat listesi indirmiyor, fiyatlar yalnızca ekranda görünüyor ve
-  girişliyken alış, çıkışken müşteri fiyatı yazıyor. Sunucudan taramak
-  denenmedi: site Apache Wicket (durum tutuyor, derin bağlantı ana
-  sayfaya atıyor) ve giriş CAS SSO ile tek kullanımlık jetonla yapılıyor;
-  taklit etmek kullanıcının LR ŞİFRESİNİ SAKLAMAYI gerektirirdi. Yerine
-  bir yer imi (`public/fiyat-toplayici.js`) kullanıcının kendi
-  oturumundaki açık sayfayı okuyup satırları `/api/fiyat-toplayici`'ye
-  bırakıyor. İKİ ADIM DA BİLEREK: betik kendiliğinden göndermiyor, panel
-  de kendiliğinden fiyat yazmıyor — sayfa tasarımı değişince yanlış sütun
-  okunabilir ve canlı mağazada yanlış fiyat geri alınamaz bir hatadır.
-  Uç jetonu doğruluyor (`lib/fiyat-toplayici-jeton.ts`: mağaza kimliği +
-  bitiş, PAYMENT_CREDENTIALS_KEY'den alan ayrımıyla türetilmiş anahtarla
-  imzalı; anahtar yoksa 401). Tablonun INSERT politikası yok, yazma
-  servis anahtarıyla uçtan yapılıyor. Kuruşa çevirme tarayıcıda DEĞİL
-  `parseMoneyToCents`'te: kural tek yerde kalsın.
+- **LR fiyatları İKİ YOLDAN geliyor ve ikisi de fiyatı KENDİ YAZMIYOR.**
+  Müşteri fiyatı (bizim tavanımız) LR'ın `/cms/<ÜLKE>/<dil>/…` kategori
+  sayfalarında GİRİŞSİZ görünüyor: sunucu kendisi tarıyor
+  (`lib/lr/*`, `api/cron/lr-fiyatlari`, günde bir). Alış fiyatı yalnızca
+  girişli sayfada; orası CAS SSO'nun arkasında ve taklit etmek
+  kullanıcının LR ŞİFRESİNİ SAKLAMAYI gerektirirdi, o yüzden bir yer imi
+  (`public/fiyat-toplayici.js`) kullanıcının kendi oturumundaki açık
+  sayfayı okuyup `/api/fiyat-toplayici`'ye bırakıyor. Her iki yol da
+  listeyi `arc_price_collections`'a koyuyor; fiyatı panelde insan
+  onaylıyor — LR kalıbı değiştirdiği gün bütün kataloğa yanlış fiyat
+  yazmak demek olurdu.
+  **Karttaki üç sayıdan yalnızca biri fiyattır** (27.09.2026'da ölçüldü):
+  `<del>` indirimden önceki fiyat, `div.hint` içindeki parantezli sayı
+  LİTRE fiyatı, geçerli fiyat ise `div.price` içindeki `<span>`. Litre
+  fiyatı büyük ambalajlarda üründen düşük çıkıyor; elenmezse ürün onun
+  fiyatına satılırdı.
+  Sayfa getirme `lib/lr/istek.ts`: yönlendirmeler elle izleniyor ve
+  çerez taşınıyor (çerezsiz istek 404 dönüyor), yalnızca `*.lrworld.com`
+  adreslerine gidiliyor. Yer imi ucu jetonu doğruluyor
+  (`lib/fiyat-toplayici-jeton.ts`: mağaza kimliği + bitiş,
+  PAYMENT_CREDENTIALS_KEY'den alan ayrımıyla türetilmiş anahtarla imzalı;
+  anahtar yoksa 401). Tablonun INSERT politikası yok, yazma servis
+  anahtarıyla. Kuruşa çevirme tarayıcıda DEĞİL `parseMoneyToCents`'te.
 - **Geri dönüş adresi doğrulanır**: başka bölüme ya da dış adrese
   yönlendirme engellenir, filtre ve sayfa korunur.
 

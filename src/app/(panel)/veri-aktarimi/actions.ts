@@ -9,6 +9,8 @@ import { maliyetleriAyristir } from "@/lib/maliyet-aktarimi";
 import { fiyatKarari, skuAdaylari } from "@/lib/fiyat-aktarimi";
 import { gecerliFiyat, satirlariDogrula } from "@/lib/fiyat-toplayici";
 import { jetonAnahtariVar, toplayiciJetonu } from "@/lib/fiyat-toplayici-jeton";
+import { lrTaramasiniKaydet } from "@/lib/lr/kaydet";
+import { createServiceClient } from "@/lib/paytr/service-client";
 import { copyShopifyImages } from "@/lib/product-images";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { parseMoneyToCents } from "@/lib/money";
@@ -507,4 +509,34 @@ export async function sonToplananListe(
     okunan: satirlar.length,
     onizleme,
   };
+}
+
+/*
+  LR'I ŞİMDİ TARA.
+
+  Müşteri fiyatı (bizim TAVANIMIZ) LR'ın kategori sayfalarında GİRİŞSİZ
+  görünüyor, yani sunucu kendi okuyabiliyor: bu geçiş için yer imi
+  gerekmiyor. Yer imi yalnızca girişli sayfadaki ALIŞ fiyatları için
+  kaldı — orası CAS SSO'nun arkasında ve şifre saklamak gerekirdi.
+
+  Yazma yine iki adımlı: tarama listeyi bırakıyor, fiyatı kullanıcı
+  onaylıyor. Zamanlanmış tarama api/cron/lr-fiyatlari'nda.
+*/
+export async function lrdanTara(indirimKurus = 0): Promise<ToplananListe | { hata: string }> {
+  const { organization, membership } = await requireTenant();
+  if (!["owner", "admin", "manager"].includes(membership.role)) return { hata: "Bu işlem için yetkiniz yok." };
+
+  /*
+    Bütün katalog tek turda: 27.09.2026'da 82 sayfa 23,7 saniye sürdü,
+    145 ürün çıktı. Süre bütçesi bunun üstünde ama sayfanın 60 sn'lik
+    sınırının altında; dolarsa gezilen kadarı kaydediliyor.
+  */
+  const sonuc = await lrTaramasiniKaydet(createServiceClient(), [organization.id], {
+    enFazlaSayfa: 120,
+    sureMs: 35_000,
+  });
+  if (sonuc.hata) return { hata: sonuc.hata };
+
+  /* Bırakılan liste normal yoldan okunuyor; geçiş her zaman müşteri fiyatı. */
+  return await sonToplananListe("musteri", indirimKurus);
 }

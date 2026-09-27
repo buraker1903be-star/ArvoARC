@@ -784,3 +784,11 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 .toplayici-kod input{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
 .toplayici-liste{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;line-height:1.6}
 .toplayici-liste b{color:var(--ink)}
+/* Sürüklenecek yer imi düğmesi: tıklanacak değil, taşınacak bir şey
+   olduğu görünsün. */
+.toplayici-suruk{display:flex;align-items:center;gap:10px;margin-top:10px}
+.toplayici-suruk a{display:inline-block;padding:8px 14px;border-radius:8px;background:var(--brand-500);color:#fff;font-weight:650;font-size:12.5px;text-decoration:none;cursor:grab}
+.toplayici-suruk a:active{cursor:grabbing}
+.toplayici-suruk small{color:var(--muted);font-size:11.5px}
+.toplayici details{margin-top:10px;font-size:12px;color:var(--muted)}
+.toplayici summary{cursor:pointer}

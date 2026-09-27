@@ -3,6 +3,12 @@ import { PanelBildirimi } from "@/components/panel/bildirim";
 import { importActiveProducts, importHistoricalOrders, migrateShopifyImages } from "./actions";
 import { importKindLabel, importStatusLabel } from "@/lib/commerce-labels";
 import "../modules.css";
+
+/*
+  LR taraması bu sayfanın sunucu işleminden çalışıyor ve onlarca sayfa
+  geziyor; varsayılan süre sınırı taramayı ortasında kesiyordu.
+*/
+export const maxDuration = 60;
 import { MaliyetAktarimi } from "./maliyet-aktarimi";
 
 const dateTime = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });

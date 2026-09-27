@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["fra1"],
+  "regions": [
+    "fra1"
+  ],
   "crons": [
     {
       "path": "/api/tedarikci/ice-aktar",
@@ -9,6 +11,10 @@
     {
       "path": "/api/cron/kargo-durumlari",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/lr-fiyatlari",
+      "schedule": "0 6 * * *"
     }
   ]
 }

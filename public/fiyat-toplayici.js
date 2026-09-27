@@ -85,7 +85,7 @@
       if (etiket === "DEL" || etiket === "S" || etiket === "STRIKE") return true;
       try {
         if (/line-through/.test(window.getComputedStyle(gecerli).textDecorationLine || "")) return true;
-      } catch (hata) {
+      } catch {
         /* Stil okunamadıysa etiket denetimi yeterli. */
       }
     }

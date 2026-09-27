@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   maliyetOnizle,
   maliyetUygula,
+  lrdanTara,
   sonToplananListe,
   toplayiciKodu,
   type FiyatGecisi,
@@ -57,6 +58,18 @@ export function MaliyetAktarimi() {
   /* Geçiş ya da indirim değişince önizleme geçersiz: hesabı onlar belirliyor. */
   const sifirla = () => { setOnizleme(null); setToplama(null); };
 
+  /*
+    Yer imi bağlantısının adresi DOM üzerinden veriliyor: React
+    "javascript:" ile başlayan bir href'i güvenlik gereği basmıyor.
+    Sürükleyip bırakmak, kodu kopyalamaktan çok daha kolay — tarayıcılar
+    adres alanına yapıştırılan "javascript:" önekini siliyor ve yer imi
+    çalışmıyor (kullanıcı 27.09.2026'da tam burada takıldı).
+  */
+  const yerImiBagi = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    if (yerImiBagi.current && yerImi) yerImiBagi.current.href = yerImi.kod;
+  }, [yerImi]);
+
   const indirimKurus = () => Math.round(Number(indirim.replace(",", ".")) * 100) || 0;
 
   const esleştir = () =>
@@ -70,6 +83,18 @@ export function MaliyetAktarimi() {
     basla(async () => {
       setSonuc(null);
       const cevap = await sonToplananListe(gecis, indirimKurus());
+      if ("hata" in cevap) { setToplama(null); setOnizleme(null); setSonuc({ metin: cevap.hata, hata: true }); return; }
+      setMetin("");
+      setToplama(cevap);
+      setOnizleme(cevap.onizleme);
+    });
+
+  const lrTara = () =>
+    basla(async () => {
+      setSonuc(null);
+      /* Girişsiz sayfada görünen MÜŞTERİ fiyatı; geçiş buna sabitleniyor. */
+      setGecis("musteri");
+      const cevap = await lrdanTara(indirimKurus());
       if ("hata" in cevap) { setToplama(null); setOnizleme(null); setSonuc({ metin: cevap.hata, hata: true }); return; }
       setMetin("");
       setToplama(cevap);
@@ -139,6 +164,28 @@ export function MaliyetAktarimi() {
       ) : null}
 
       {/*
+        OTOMATİK TARAMA. Müşteri fiyatı (tavanımız) LR'ın kategori
+        sayfalarında girişsiz görünüyor: sunucu kendi okuyabiliyor,
+        yer imi gerekmiyor. Kullanıcı yer imi kurmakta takıldığı için
+        önce bu geliyor (27.09.2026).
+      */}
+      <div className="toplayici">
+        <b>LR&apos;ı şimdi tara · müşteri fiyatları</b>
+        <p>
+          Hiçbir kurulum gerekmiyor. Sunucu LR&apos;ın herkese açık kategori sayfalarını okur ve
+          <b> müşteri fiyatlarını</b> getirir — satabileceğiniz tavan bu. Bütün katalog yaklaşık
+          <b> yarım dakika</b> sürüyor (82 sayfa, 145 ürün). Liste her gece kendiliğinden tazelenir;
+          fiyat yine siz onaylamadan yazılmaz.
+        </p>
+        <div className="maliyet-actions">
+          <button className="ac-btn ac-btn-primary" type="button" onClick={lrTara} disabled={calisiyor}>
+            {calisiyor ? "Taranıyor…" : "LR'dan fiyatları çek"}
+          </button>
+        </div>
+        <p>Alış fiyatları LR&apos;a giriş yapınca görünüyor; onlar için aşağıdaki yer imi gerekiyor.</p>
+      </div>
+
+      {/*
         TARAYICI TOPLAYICISI. LR'ın portalı fiyat listesi indirmiyor ve
         girişi CAS SSO ile tek kullanımlık jetonla yapılıyor; sunucudan
         taramak kullanıcının LR şifresini saklamayı gerektirirdi. Bunun
@@ -164,11 +211,37 @@ export function MaliyetAktarimi() {
         {yerImi ? (
           <>
             <ol>
-              <li>Aşağıdaki kodu kopyalayın.</li>
-              <li>Tarayıcıda yeni bir yer imi oluşturun; adres alanına bu kodu yapıştırın, adına “LR fiyat” yazın.</li>
-              <li>LR&apos;ın ürün listesi sayfasında (alış için <b>girişli</b>, tavan için <b>çıkışken</b>) yer imine basın.</li>
-              <li>Açılan kutuda listeyi görün, <b>Panele gönder</b>&apos;e basın, sonra buradan “Son toplanan listeyi getir”.</li>
+              <li>
+                Yer imi çubuğunu açın: Chrome&apos;da <b>⌘⇧B</b>, Safari&apos;de <b>Görünüm → Sık Kullanılanlar
+                Çubuğunu Göster</b>.
+              </li>
+              <li>
+                Aşağıdaki mavi düğmeyi <b>sürükleyip çubuğa bırakın</b>. (Kopyalayıp yapıştırmak çoğu tarayıcıda
+                çalışmaz: adres alanına yapıştırırken “javascript:” öneki silinir.)
+              </li>
+              <li>LR&apos;a <b>giriş yapın</b> ve ürün listesi sayfasını açın — buradaki fiyatlar sizin alış fiyatlarınız.</li>
+              <li>Çubuktaki düğmeye basın, açılan kutuda listeyi görün, <b>Panele gönder</b>&apos;e basın.</li>
+              <li>Buraya dönüp <b>Son toplanan listeyi getir</b>, geçiş olarak <b>Alış fiyatı</b>.</li>
             </ol>
+            {/*
+              Sürüklenecek bağlantı. Tıklamak panelin kendi sayfasında
+              toplayıcıyı çalıştırırdı: burada ürün kartı yok, kutu boş
+              açılır ve kullanıcı yer imini kurduğunu sanırdı.
+            */}
+            <p className="toplayici-suruk">
+              <a ref={yerImiBagi} href="#" draggable onClick={(olay) => { olay.preventDefault(); setSonuc({ metin: "Bu düğmeye burada tıklanmaz: sürükleyip yer imi çubuğuna bırakın." }); }}>
+                LR fiyatlarını topla
+              </a>
+              <small>↑ bu düğmeyi yer imi çubuğuna sürükleyin</small>
+            </p>
+            <details>
+              <summary>Sürükleyemiyorum, kodu elle kuracağım</summary>
+              <p>
+                Chrome: yer imi çubuğuna sağ tık → <b>Sayfa ekle…</b> → Ad: “LR fiyat”, URL: aşağıdaki kod.
+                Yapıştırdıktan sonra adresin <b>javascript:</b> ile başladığını doğrulayın; başlamıyorsa
+                başına elle yazın.
+              </p>
+            </details>
             <div className="toplayici-kod">
               <input
                 className="ac-input"
