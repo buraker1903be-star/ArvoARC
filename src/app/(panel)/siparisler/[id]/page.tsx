@@ -1,6 +1,6 @@
 import { kargoDurumu, tedarikciGruplari } from "@/lib/kargo-bolme";
 import { KARGO_FIRMALARI } from "@/lib/kargo-firmalari";
-import { elleGonderiEkle, etiketiAl, gonderiIptal, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
+import { elleGonderiEkle, etiketiAl, gonderiIptal, kargoDurumlariniGuncelle, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
 import { teslimatSecenekleri } from "@/lib/tryoto/ayar";
 import { hacimselAgirlik, VARSAYILAN_KUTU } from "@/lib/tryoto/fiyat";
 import Link from "next/link";
@@ -439,6 +439,16 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
       <section className="ac ac-pad order-noprint">
         <div className="ac-head">
           <div><h3>Gönderiler</h3><p>{gonderiler.length?`${gonderiler.filter(g=>g.status!=="cancelled").length} gönderi · ${kargoDurumuOzet==="tamam"?"tüm ürünler kargoda":kargoDurumuOzet==="kismi"?"bir kısmı kargoda":"henüz kargoya verilmedi"}`:"Bu siparişte henüz gönderi yok."}</p></div>
+          {/*
+            Durum OTO'dan ÇEKİLİYOR, webhook'la gelmiyor: OTO'nun webhook
+            yükünün şekli belgelenmemiş ve tahmine dayalı bir uç nokta,
+            yanlış eşleşen bir bildirimin gönderiyi "teslim edildi"
+            yapması demekti. Siparişteki bütün açık gönderiler tek
+            düğmeyle güncelleniyor.
+          */}
+          {canManage&&gonderiler.some(g=>g.source==="oto"&&!["draft","cancelled","delivered"].includes(g.status))
+            ?<form action={kargoDurumlariniGuncelle}><input type="hidden" name="order_id" value={order.id}/><button type="submit" className="shipment-refresh">Kargo durumlarını güncelle</button></form>
+            :null}
         </div>
 
         {gonderiler.length?<ul className="shipment-list">

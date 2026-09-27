@@ -212,3 +212,8 @@
    gönderilecek olan o. Takip bağlantısı yanında ikincil kalıyor. */
 .shipment-awb{color:var(--accent-500)!important;font-weight:800!important}
 .shipment-actions form{display:inline}
+
+/* Durum çekme düğmesi kart başlığında, ikincil: her açılışta kendiliğinden
+   sorgulamak gereksiz OTO çağrısı olurdu. */
+.shipment-refresh{margin-left:auto;padding:7px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.shipment-refresh:hover{border-color:var(--accent-500);color:var(--accent-500)}

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
-import { bolmeSorunu, type Gonderi, type SiparisKalemi } from "@/lib/kargo-bolme";
+import { bolmeSorunu, otoDurumunuCevir, type Gonderi, type SiparisKalemi } from "@/lib/kargo-bolme";
 import { KARGO_FIRMALARI, takipAdresi } from "@/lib/kargo-firmalari";
 import { decryptSecret } from "@/lib/payment-credentials";
 import { OtoHatasi } from "@/lib/tryoto/hatalar";
@@ -433,4 +433,80 @@ export async function etiketiAl(formData: FormData) {
 
   revalidatePath(`/siparisler/${orderId}`);
   return geriDon(orderId, { saved: "etiket-alindi" });
+}
+
+/*
+  KARGO DURUMLARINI GÜNCELLEME.
+
+  OTO'nun webhook'u da var ama gönderdiği yükün şekli belgelenmemiş;
+  tahmine dayalı bir uç nokta yazmak, yanlış eşleşen bir bildirimin
+  gönderiyi "teslim edildi" yapması demekti. orderStatus ucu ise belgeli
+  ve tek çağrıda durumu, takip adresini, etiket adresini ve firmayı
+  veriyor — düğmeyle çekmek hem güvenli hem yeterli.
+
+  Siparişteki BÜTÜN açık OTO gönderileri birlikte güncelleniyor: tek tek
+  düğmeye basmak, üç paketli bir siparişte üç tur demekti. Taslak ve iptal
+  edilenler atlanıyor (OTO'da karşılıkları yok), teslim edilenler de
+  (durumu değişmez).
+
+  Bir gönderinin hatası ötekileri durdurmuyor: biri OTO'da bulunamazsa
+  kalanların durumu yine güncelleniyor ve sonuç mesajında kaç tanesinin
+  güncellendiği yazıyor.
+*/
+export async function kargoDurumlariniGuncelle(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!MANAGERS.includes(membership.role)) return geriDon(orderId, { error: "forbidden" });
+
+  const ayar = await kargoAyari(supabase, organization.id);
+  if (!ayar) return geriDon(orderId, { error: "tryoto-kapali" });
+
+  const [{ data: order }, { data: gonderiler }] = await Promise.all([
+    supabase.from("arc_orders").select("order_number").eq("organization_id", organization.id).eq("id", orderId).maybeSingle(),
+    supabase.from("arc_shipments").select("id,sequence,status,oto_order_id")
+      .eq("organization_id", organization.id).eq("order_id", orderId).eq("source", "oto"),
+  ]);
+  if (!order) return geriDon(orderId, { error: "order-not-found" });
+
+  const izlenecek = ((gonderiler ?? []) as Array<{ id: string; sequence: number; status: string; oto_order_id: string | null }>)
+    .filter((gonderi) => !["draft", "cancelled", "delivered"].includes(gonderi.status));
+  if (!izlenecek.length) return geriDon(orderId, { error: "Güncellenecek açık bir tryOTO gönderisi yok." });
+
+  let guncellenen = 0;
+  for (const gonderi of izlenecek) {
+    try {
+      const yanit = await otoIstek<Record<string, unknown>>({
+        magazaId: organization.id,
+        yenilemeAnahtari: ayar.anahtar,
+        yol: "orderStatus",
+        govde: { orderId: otoSiparisKimligi(order.order_number as string, gonderi.sequence) },
+      });
+      const metin = (ad: string) => (typeof yanit[ad] === "string" && (yanit[ad] as string).trim() ? (yanit[ad] as string).trim() : null);
+      const yeniDurum = otoDurumunuCevir(metin("status"));
+      await supabase.from("arc_shipments").update({
+        status: yeniDurum,
+        /*
+          Teslim anı bir kez yazılıyor: her güncellemede now() yazmak,
+          gerçek teslim zamanını son tıklamanın zamanına kaydırırdı.
+        */
+        ...(yeniDurum === "delivered" && gonderi.status !== "delivered" ? { delivered_at: new Date().toISOString() } : {}),
+        ...(metin("trackingUrl") ? { tracking_url: metin("trackingUrl") } : {}),
+        ...(metin("dcTrackingNumber") ? { tracking_number: metin("dcTrackingNumber") } : {}),
+        ...(metin("printAWBURL") ? { awb_url: metin("printAWBURL") } : {}),
+        ...(metin("deliveryCompany") ? { carrier_name: metin("deliveryCompany") } : {}),
+        ...(metin("otoId") ? { oto_order_id: metin("otoId") } : {}),
+        failure_reason: null,
+      }).eq("id", gonderi.id).eq("organization_id", organization.id);
+      guncellenen += 1;
+    } catch (hata) {
+      const mesaj = hata instanceof OtoHatasi ? hata.message : "Durum alınamadı.";
+      await supabase.from("arc_shipments").update({ failure_reason: mesaj })
+        .eq("id", gonderi.id).eq("organization_id", organization.id);
+    }
+  }
+
+  revalidatePath(`/siparisler/${orderId}`);
+  return guncellenen
+    ? geriDon(orderId, { saved: `${guncellenen} gönderinin durumu güncellendi` })
+    : geriDon(orderId, { error: "Hiçbir gönderinin durumu alınamadı; kartlardaki sebebe bakın." });
 }
