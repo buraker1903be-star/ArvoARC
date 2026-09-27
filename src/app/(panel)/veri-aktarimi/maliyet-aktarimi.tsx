@@ -114,7 +114,7 @@ export function MaliyetAktarimi() {
       const cevap = await maliyetUygula(
         onizleme.eslesen.map((s) => ({ sku: s.sku, kurus: s.yeni, satis: s.satis, ustuCizili: s.ustuCizili })),
         gecis,
-        toplama?.toplamaId ?? null,
+        toplama?.toplamaIdleri ?? [],
       );
       setSonuc(
         cevap.hata
@@ -266,6 +266,7 @@ export function MaliyetAktarimi() {
         {toplama ? (
           <div className="toplayici-liste">
             <b>{zaman.format(new Date(toplama.toplandi))}</b> tarihli liste getirildi · {toplama.okunan} satır okundu
+            {toplama.toplamaSayisi > 1 ? <> · {toplama.toplamaSayisi} ayrı gönderim birleştirildi</> : null}
             {toplama.uygulandi ? <> · <b>bu liste {zaman.format(new Date(toplama.uygulandi))} tarihinde uygulanmış</b></> : null}
             {toplama.sayfa ? <><br /><small>{toplama.sayfa.slice(0, 120)}</small></> : null}
           </div>

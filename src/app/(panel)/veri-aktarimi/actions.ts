@@ -364,7 +364,7 @@ export async function maliyetOnizle(
 export async function maliyetUygula(
   satirlar: { sku: string; kurus: number; satis?: number; ustuCizili?: number | null }[],
   gecis: FiyatGecisi = "alis",
-  toplamaId: string | null = null,
+  toplamaIdleri: string[] = [],
 ): Promise<{ yazilan: number; hata: string | null }> {
   const { supabase, organization, membership } = await requireTenant();
   if (!["owner", "admin", "manager"].includes(membership.role)) {
@@ -402,12 +402,12 @@ export async function maliyetUygula(
     ekranda "uygulandı" yazıyor. İşareti atmak, kullanıcının aynı
     fiyatları ikinci kez yazdığını fark etmemesi demekti.
   */
-  if (toplamaId) {
+  if (toplamaIdleri.length) {
     await supabase
       .from("arc_price_collections")
       .update({ uygulandi_at: new Date().toISOString() })
       .eq("organization_id", organization.id)
-      .eq("id", toplamaId);
+      .in("id", toplamaIdleri);
   }
 
   revalidatePath("/urunler");
@@ -460,11 +460,14 @@ export async function toplayiciKodu(): Promise<{ kod: string; bitis: string } | 
 }
 
 export type ToplananListe = {
-  toplamaId: string;
+  /** Birleştirilen toplamalar; uygulandığında hepsi işaretleniyor. */
+  toplamaIdleri: string[];
   toplandi: string;
   uygulandi: string | null;
   sayfa: string | null;
   okunan: number;
+  /** Kaç ayrı toplamadan geldi (LR'da kategori kategori gezilince artıyor). */
+  toplamaSayisi: number;
   onizleme: MaliyetOnizleme;
 };
 
@@ -475,18 +478,45 @@ export async function sonToplananListe(
   const { supabase, organization, membership } = await requireTenant();
   if (!["owner", "admin", "manager"].includes(membership.role)) return { hata: "Bu işlem için yetkiniz yok." };
 
-  const { data, error } = await supabase
-    .from("arc_price_collections")
-    .select("id,satirlar,sayfa,created_at,uygulandi_at")
-    .eq("organization_id", organization.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) return { hata: error.message };
-  if (!data) return { hata: "Henüz toplanmış liste yok. LR sayfasında yer imine basın." };
+  /*
+    UYGULANMAMIŞ TOPLAMALAR BİRLEŞTİRİLİYOR. LR'ın tek sayfasında bütün
+    katalog yok: kullanıcı kategori kategori gezip her sayfada "Panele
+    gönder" diyor. Yalnızca sonuncuyu getirmek, her sayfadan sonra ayrı
+    ayrı uygulamak demekti.
 
-  const kayit = data as { id: string; satirlar: unknown; sayfa: string | null; created_at: string; uygulandi_at: string | null };
-  const { satirlar } = satirlariDogrula(kayit.satirlar);
+    Hepsi uygulanmışsa sonuncusu yine gösteriliyor: "getir" düğmesinin
+    sessizce hiçbir şey yapmaması, bir şeyin bozulduğu izlenimi verirdi.
+  */
+  const sorgu = () =>
+    supabase
+      .from("arc_price_collections")
+      .select("id,satirlar,sayfa,created_at,uygulandi_at")
+      .eq("organization_id", organization.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+  const { data: bekleyen, error } = await sorgu().is("uygulandi_at", null);
+  if (error) return { hata: error.message };
+
+  type Kayit = { id: string; satirlar: unknown; sayfa: string | null; created_at: string; uygulandi_at: string | null };
+  let kayitlar = (bekleyen ?? []) as Kayit[];
+  if (!kayitlar.length) {
+    const { data: sonuncu, error: sonHata } = await sorgu().limit(1);
+    if (sonHata) return { hata: sonHata.message };
+    kayitlar = (sonuncu ?? []) as Kayit[];
+  }
+  if (!kayitlar.length) return { hata: "Henüz toplanmış liste yok. LR sayfasında yer imine basın." };
+
+  /*
+    Eskiden yeniye: aynı ürün iki sayfada görünürse EN YENİ okuma
+    kazanıyor (kayıtlar tarihe göre tersten geliyor).
+  */
+  const birlesik = new Map<string, { sku: string; ad: string; fiyatlar: number[] }>();
+  for (const kayit of [...kayitlar].reverse()) {
+    for (const satir of satirlariDogrula(kayit.satirlar).satirlar) birlesik.set(satir.sku, satir);
+  }
+  const satirlar = [...birlesik.values()];
+  const kayit = kayitlar[0];
 
   /*
     Kartta iki fiyat varsa GEÇERLİ olan alınıyor (en düşük): LR kampanya
@@ -502,11 +532,12 @@ export async function sonToplananListe(
     atlanan: [],
   };
   return {
-    toplamaId: kayit.id,
+    toplamaIdleri: kayitlar.map((k) => k.id),
     toplandi: kayit.created_at,
     uygulandi: kayit.uygulandi_at,
     sayfa: kayit.sayfa,
     okunan: satirlar.length,
+    toplamaSayisi: kayitlar.length,
     onizleme,
   };
 }
