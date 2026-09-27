@@ -54,7 +54,7 @@ function AddressCard({title,address}:{title:string;address?:Address}){
   return <article className="ac order-party"><small>{title}</small>{lines.length?lines.map((line,index)=><p key={index}>{line}</p>):<p className="is-empty">Bilgi bulunmuyor.</p>}</article>;
 }
 
-export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string;ok?:string}>}){
+export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{saved?:string;error?:string;ok?:string;agirlik?:string}>}){
   const {id}=await params;const query=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const [{data:order,error},{data:items,error:itemsError},{data:events,error:eventsError},{data:shipments}]=await Promise.all([
@@ -110,6 +110,14 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     miktar sapabilir; seçenekleri ve sıralamayı görmek için yeterli.
   */
   const taslaklar=gonderiler.filter(g=>g.source==="oto"&&g.status==="draft");
+  /*
+    FİYAT AĞIRLIĞA GÖRE DEĞİŞİYOR ve ağırlık adresten okunamıyor. Önce
+    sabit 1 kg ile soruluyordu: kullanıcı kartta ağırlığı değiştirse bile
+    liste aynı kalıyor, seçilen fiyatla gerçekleşen fiyat tutmuyordu.
+    Ağırlık artık adres çubuğunda; değiştirince sayfa yeniden yükleniyor
+    ve fiyatlar o ağırlıkla geliyor.
+  */
+  const sorgulananAgirlik=Math.min(Math.max(Number(query.agirlik??"1")||1,0.1),100);
   const {data:kargoAyarSatiri}=taslaklar.length
     ?await supabase.from("arc_store_settings").select("tryoto_enabled,tryoto_refresh_token_enc,tryoto_pickup_location_code,tryoto_test_mode,address_city").eq("organization_id",organization.id).maybeSingle()
     :{data:null};
@@ -118,7 +126,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     ?await teslimatSecenekleri(organization.id,kargoAyarSatiri,{
         cikisSehri:String((kargoAyarSatiri as {address_city?:string|null}|null)?.address_city??""),
         varisSehri:teslimatAdresi.city??"",
-        agirlikKg:1,
+        agirlikKg:sorgulananAgirlik,
         kapidaTahsilatKurus:order.payment_status==="paid"?null:order.total,
       })
     :{secenekler:[],hata:null};
@@ -436,7 +444,20 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                 (bakiye harcanmadı). Firma fiyatıyla birlikte seçiliyor;
                 tek adımda yapılsaydı kullanıcı fiyatı görmeden seçerdi.
               */}
-              {canManage&&gonderi.source==="oto"&&gonderi.status==="draft"?
+              {/*
+                FİYAT SORGUSU NEYE GÖRE YAPILDI — açıkça yazılı. OTO
+                panelindeki fiyatla buradaki farklı çıkabiliyor: orada
+                paket ölçüleri ve teslim biçimi (şubeye teslim / adresten
+                alım) tek tek seçiliyor, burada yalnızca şehir ve ağırlık
+                gönderiliyor. Sayıyı sebebini söylemeden göstermek, farkı
+                hata sanmaya yol açıyordu.
+              */}
+              {canManage&&gonderi.source==="oto"&&gonderi.status==="draft"?<>
+                <form method="get" className="shipment-weight">
+                  <label>Ağırlık (kg)<input name="agirlik" type="number" step="0.1" min="0.1" max="100" defaultValue={sorgulananAgirlik}/></label>
+                  <button type="submit">Fiyatları yenile</button>
+                  <small>{(kargoAyarSatiri as {address_city?:string|null}|null)?.address_city||"?"} → {teslimatAdresi.city||"?"} · {sorgulananAgirlik} kg{order.payment_status==="paid"?"":" · kapıda tahsilat"}</small>
+                </form>
                 <form action={otoEtiketUret} className="shipment-oto">
                   <input type="hidden" name="order_id" value={order.id}/>
                   <input type="hidden" name="shipment_id" value={gonderi.id}/>
@@ -447,10 +468,13 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                           {secenek.firmaAdi}{secenek.hizmet?` · ${secenek.hizmet}`:""}{secenek.ucretKurus!==null?` · ${money(secenek.ucretKurus,order.currency)}`:" · fiyat yok"}
                         </option>)}
                     </select></label>
-                    <label>Ağırlık (kg)<input name="weight" type="number" step="0.1" min="0.1" defaultValue="1"/></label>
+                    {/* Ağırlık gizli: fiyat zaten bu ağırlıkla soruldu ve
+                        etiket de onunla üretilmeli, yoksa seçilen fiyatla
+                        gerçekleşen fiyat tutmaz. */}
+                    <input type="hidden" name="weight" value={sorgulananAgirlik}/>
                     <button type="submit">Etiket üret</button>
                   </>:<p className="shipment-error">{kargoFiyatHatasi??"Bu adres için kargo seçeneği dönmedi. Teslimat şehrini ve mağaza ayarlarındaki çıkış şehrini kontrol edin."}</p>}
-                </form>:null}
+                </form></>:null}
               <div className="shipment-actions">
                 {gonderi.tracking_url?<a href={gonderi.tracking_url} target="_blank" rel="noreferrer">Kargo takip ↗</a>:null}
                 {canManage&&gonderi.status!=="cancelled"?<form action={gonderiIptal}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit">İptal et</button></form>:null}
