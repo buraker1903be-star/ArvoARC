@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bolmeSorunu, kalanAdetler, kargoDurumu, otoDurumunuCevir, tedarikciGruplari } from "@/lib/kargo-bolme";
+import { bolmeSorunu, kalanAdetler, kargoDurumu, otoDurumunuCevir, tedarikciGruplari, izlenmeliMi, izlemeSuresiDoldu } from "@/lib/kargo-bolme";
 
 /*
   Bölünmüş kargo hesabı. Sınanan şey "toplama biliyor mu" değil: bir
@@ -144,4 +144,38 @@ test("tedarikçisi BELİRSİZ kalem gizlenmiyor, sonda duruyor", () => {
 test("boş tedarikçi adı belirsiz sayılıyor", () => {
   const gruplar = tedarikciGruplari([{ id: "x", quantity: 1, product_name: "X", supplier: "   " }], []);
   assert.equal(gruplar[0].tedarikci, null);
+});
+
+test("İZLENECEK GÖNDERİ: taslak, iptal ve teslim sorulmuyor", () => {
+  /*
+    Üçünü sormak boşa çağrı; zamanlanmış görevde her turda tekrarlanan
+    boşa çağrı ve sıra gerçek gönderilere kalmıyor.
+  */
+  assert.equal(izlenmeliMi("draft"), false);
+  assert.equal(izlenmeliMi("cancelled"), false);
+  assert.equal(izlenmeliMi("delivered"), false);
+  assert.equal(izlenmeliMi("created"), true);
+  assert.equal(izlenmeliMi("in_transit"), true);
+});
+
+test("İZLEME SÜRESİ dolan gönderi sorulmuyor", () => {
+  /*
+    Durumu ilerlemeyen gönderi sonsuza kadar sorulmamalı: kargo firması
+    kaydı düşürmüş olabilir ve her tur onu yeniden sorarsa kota ve sıra
+    gerçek gönderilere kalmaz.
+  */
+  const simdi = new Date("2026-09-27T12:00:00Z");
+  assert.equal(izlemeSuresiDoldu("2026-09-20T12:00:00Z", simdi, 30), false, "7 günlük gönderi izlenir");
+  assert.equal(izlemeSuresiDoldu("2026-08-01T12:00:00Z", simdi, 30), true, "57 günlük gönderi izlenmez");
+  // Sınırın tam üstü henüz dolmamış sayılıyor.
+  assert.equal(izlemeSuresiDoldu("2026-08-28T12:00:00Z", simdi, 30), false);
+});
+
+test("kargoya verilme tarihi yoksa süre dolmuş sayılmıyor", () => {
+  /*
+    Tarihi olmayan kaydı elemek, yeni oluşturulmuş bir gönderiyi hiç
+    sormamak olurdu; tanınmayan tarih de aynı şekilde.
+  */
+  assert.equal(izlemeSuresiDoldu(null, new Date(), 30), false);
+  assert.equal(izlemeSuresiDoldu("tarih değil", new Date(), 30), false);
 });

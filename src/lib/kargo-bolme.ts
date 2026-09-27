@@ -141,6 +141,35 @@ export function otoDurumunuCevir(otoDurumu: string | null | undefined): string {
   return OTO_DURUM_ESLEME[otoDurumu] ?? "in_transit";
 }
 
+/*
+  İZLENECEK GÖNDERİ. Durumu OTO'ya sorulacak olanlar: taslak henüz OTO'da
+  yok, iptal edilen gönderi yola çıkmayacak, teslim edilenin durumu
+  değişmez. Üçünü sormak boşa çağrı, üstelik zamanlanmış görevde her
+  turda tekrarlanan bir boşa çağrı.
+*/
+export const izlenmeliMi = (durum: string): boolean => !["draft", "cancelled", "delivered"].includes(durum);
+
+/*
+  İZLEME SÜRESİ. Kargoya verilmiş ama durumu bir türlü ilerlemeyen
+  gönderi sonsuza kadar sorulmamalı: kargo firması kaydı düşürmüş ya da
+  gönderi iade olmuş olabilir ve zamanlanmış görev o kaydı her turda
+  yeniden sorarak hem kotayı hem sırayı yiyor. Sınırdan sonrası elle
+  bakılacak iş.
+
+  Gün sınırı çağırana bırakılıyor: elle basılan düğme sınır tanımıyor
+  (kullanıcı bilerek soruyor), zamanlanmış görev tanıyor.
+*/
+export function izlemeSuresiDoldu(
+  kargoyaVerilme: string | null | undefined,
+  simdi: Date,
+  gunSiniri: number,
+): boolean {
+  if (!kargoyaVerilme) return false;
+  const tarih = new Date(kargoyaVerilme);
+  if (Number.isNaN(tarih.getTime())) return false;
+  return simdi.getTime() - tarih.getTime() > gunSiniri * 24 * 60 * 60 * 1000;
+}
+
 /** Bir gönderi önerisi: aynı tedarikçinin kargoya verilmemiş kalemleri. */
 export interface TedarikciGrubu {
   tedarikci: string | null;

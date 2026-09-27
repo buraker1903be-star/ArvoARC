@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
-import { bolmeSorunu, otoDurumunuCevir, type Gonderi, type SiparisKalemi } from "@/lib/kargo-bolme";
+import { bolmeSorunu, izlenmeliMi, type Gonderi, type SiparisKalemi } from "@/lib/kargo-bolme";
+import { gonderiDurumunuYenile } from "@/lib/kargo-durumu-yenile";
 import { KARGO_FIRMALARI, takipAdresi } from "@/lib/kargo-firmalari";
 import { decryptSecret } from "@/lib/payment-credentials";
 import { OtoHatasi, zatenVarMi } from "@/lib/tryoto/hatalar";
@@ -699,41 +700,27 @@ export async function kargoDurumlariniGuncelle(formData: FormData) {
   ]);
   if (!order) return geriDon(orderId, { error: "order-not-found" });
 
+  /*
+    ELLE BASILAN DÜĞME süre sınırı tanımıyor: kullanıcı o gönderiyi
+    bilerek soruyor. Sınırı yalnızca zamanlanmış görev uyguluyor.
+  */
   const izlenecek = ((gonderiler ?? []) as Array<{ id: string; sequence: number; status: string; oto_order_id: string | null }>)
-    .filter((gonderi) => !["draft", "cancelled", "delivered"].includes(gonderi.status));
+    .filter((gonderi) => izlenmeliMi(gonderi.status));
   if (!izlenecek.length) return geriDon(orderId, { error: "Güncellenecek açık bir tryOTO gönderisi yok." });
 
+  /*
+    Yenileme mantığı ORTAK modülde (lib/kargo-durumu-yenile.ts): aynı işi
+    zamanlanmış görev de yapıyor ve iki kopya er geç birbirinden sapardı.
+  */
   let guncellenen = 0;
   for (const gonderi of izlenecek) {
-    try {
-      const yanit = await otoIstek<Record<string, unknown>>({
-        magazaId: organization.id,
-        yenilemeAnahtari: ayar.anahtar,
-        yol: "orderStatus",
-        govde: { orderId: otoSiparisKimligi(order.order_number as string, gonderi.sequence) },
-      });
-      const metin = (ad: string) => (typeof yanit[ad] === "string" && (yanit[ad] as string).trim() ? (yanit[ad] as string).trim() : null);
-      const yeniDurum = otoDurumunuCevir(metin("status"));
-      await supabase.from("arc_shipments").update({
-        status: yeniDurum,
-        /*
-          Teslim anı bir kez yazılıyor: her güncellemede now() yazmak,
-          gerçek teslim zamanını son tıklamanın zamanına kaydırırdı.
-        */
-        ...(yeniDurum === "delivered" && gonderi.status !== "delivered" ? { delivered_at: new Date().toISOString() } : {}),
-        ...(metin("trackingUrl") ? { tracking_url: metin("trackingUrl") } : {}),
-        ...(metin("dcTrackingNumber") ? { tracking_number: metin("dcTrackingNumber") } : {}),
-        ...(metin("printAWBURL") ? { awb_url: metin("printAWBURL") } : {}),
-        ...(metin("deliveryCompany") ? { carrier_name: metin("deliveryCompany") } : {}),
-        ...(metin("otoId") ? { oto_order_id: metin("otoId") } : {}),
-        failure_reason: null,
-      }).eq("id", gonderi.id).eq("organization_id", organization.id);
-      guncellenen += 1;
-    } catch (hata) {
-      const mesaj = hata instanceof OtoHatasi ? hata.message : "Durum alınamadı.";
-      await supabase.from("arc_shipments").update({ failure_reason: mesaj })
-        .eq("id", gonderi.id).eq("organization_id", organization.id);
-    }
+    const sonuc = await gonderiDurumunuYenile(supabase, organization.id, ayar.anahtar, {
+      id: gonderi.id,
+      sequence: gonderi.sequence,
+      status: gonderi.status,
+      siparisNo: order.order_number as string,
+    });
+    if (sonuc.guncellendi) guncellenen += 1;
   }
 
   /*
