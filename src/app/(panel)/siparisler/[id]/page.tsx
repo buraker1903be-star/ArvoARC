@@ -553,10 +553,26 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                     <input type="hidden" name="order_id" value={order.id}/>
                     <input type="hidden" name="shipment_id" value={gonderi.id}/>
                     <ConfirmSubmit message={
-                      gonderi.source==="oto"&&gonderi.status!=="draft"
+                      gonderi.source==="oto"&&!["draft","failed"].includes(gonderi.status)
                         ? `${gonderi.sequence}. paket OTO'da da iptal edilecek ve üretilen etiket geçersiz olacak. Kurye alıma geldiyse önce kargo firmasıyla görüşün. Devam edilsin mi?`
                         : `${gonderi.sequence}. paket iptal edilsin mi? Kalemleri yeniden bölünebilir olur.`
                     }>İptal et</ConfirmSubmit>
+                  </form>
+                ):null}
+
+                {/*
+                  YİNE DE KAPAT. OTO iptali reddettiyse kayıt kilitli
+                  kalıyordu: kalemler "kargoda" sayıldığı için müşteriye
+                  yeniden gönderilemiyordu. Düğme yalnızca o hata
+                  yazılıysa çıkıyor ve sebebi kayda not düşüyor —
+                  sessizce ayrışmak yerine açık bir karar.
+                */}
+                {canManage&&gonderi.status!=="cancelled"&&gonderi.failure_reason?.startsWith("OTO iptal etmedi")?(
+                  <form action={gonderiIptal}>
+                    <input type="hidden" name="order_id" value={order.id}/>
+                    <input type="hidden" name="shipment_id" value={gonderi.id}/>
+                    <input type="hidden" name="zorla" value="on"/>
+                    <ConfirmSubmit message={`${gonderi.sequence}. paket OTO'da iptal EDİLMEDİ. Kargo firmasıyla görüşüp paketin durdurulduğundan emin olduysanız bu kaydı kapatabilirsiniz; kalemleri yeniden bölünebilir olur. Devam edilsin mi?`}>Yine de kapat</ConfirmSubmit>
                   </form>
                 ):null}
               </div>

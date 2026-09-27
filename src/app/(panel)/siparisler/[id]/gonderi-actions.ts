@@ -176,7 +176,20 @@ export async function gonderiIptal(formData: FormData) {
     Taslak ve tedarikçinin kendi gönderdiği kayıtlar OTO'ya hiç
     dokunmamış; onlarda yalnızca yerel iptal doğru olanı.
   */
-  if (gonderi.source === "oto" && gonderi.status !== "draft") {
+  /*
+    ZORLA KAPATMA. OTO iptali CANLI bir gönderiyi durdurmak içindir.
+    Sorunlu (failed) gönderide durduracak bir şey yok: paket kayıp,
+    iade dönüyor ya da teslim edilemedi. Orada OTO'ya sormak boşuna ve
+    büyük olasılıkla hata döner — o hata da yerel iptali engellerdi,
+    yani kalemler kilitli kalır ve müşteriye yeniden gönderilemezdi.
+
+    Canlı bir gönderide OTO reddederse kullanıcı sebebi görüp bilerek
+    zorlayabiliyor; sessizce ayrışmak yerine açık bir karar.
+  */
+  const zorla = String(formData.get("zorla") ?? "") === "on";
+  const otodaCanli = gonderi.source === "oto" && !["draft", "failed"].includes(gonderi.status as string);
+
+  if (otodaCanli && !zorla) {
     const ayar = await kargoAyari(supabase, organization.id);
     if (!ayar) return await geriDon(orderId, { error: "tryoto-kapali" });
     const sonuc = await otodaGonderiyiIptalEt(
@@ -193,12 +206,22 @@ export async function gonderiIptal(formData: FormData) {
       await supabase.from("arc_shipments").update({ failure_reason: `OTO iptal etmedi · ${sonuc.mesaj}` })
         .eq("id", gonderiId).eq("organization_id", organization.id);
       revalidatePath(`/siparisler/${orderId}`);
-      return await geriDon(orderId, { error: `Gönderi OTO'da iptal edilemedi: ${sonuc.mesaj}` });
+      return await geriDon(orderId, {
+        error: `Gönderi OTO'da iptal edilemedi: ${sonuc.mesaj} Kargo firmasıyla görüştüyseniz karttaki “Yine de kapat” ile bu kaydı kapatabilirsiniz.`,
+      });
     }
   }
 
   const { error } = await supabase.from("arc_shipments")
-    .update({ status: "cancelled", failure_reason: null })
+    .update({
+      status: "cancelled",
+      /*
+        Zorla kapatmada sebep SİLİNMİYOR: kaydın OTO'da iptal
+        edilmediği bilgisi kalmalı, yoksa geçmişe bakan kişi paketin
+        durdurulduğunu sanır.
+      */
+      failure_reason: zorla ? `Panelden zorla kapatıldı · OTO'da iptal edilmemiş olabilir` : null,
+    })
     .eq("id", gonderiId).eq("organization_id", organization.id);
   if (error) return await geriDon(orderId, { error: error.message });
 
