@@ -51,7 +51,7 @@ const PENDING:Record<string,string>={
 
 export default async function Settings({searchParams}:{searchParams:Promise<{saved?:string;error?:string}>}){
   const query=await searchParams;const {supabase,organization,membership}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
   /* Ödemenin gittiği hesap (IBAN, PayTR) yalnızca owner/admin: bkz. actions.ts PAYMENT_ROLES. */
@@ -193,7 +193,24 @@ export default async function Settings({searchParams}:{searchParams:Promise<{sav
               </label>
               <div className="check-stack"><label className="check-inline"><input type="checkbox" name="tryoto_test_mode" defaultChecked={settings?.tryoto_test_mode??true}/> Test (sandbox) hesabı</label></div>
             </div>
-            <div className="security-note"><b>{settings?.tryoto_refresh_token_enc?"Anahtarınız kayıtlı.":"Anahtar henüz girilmedi."}</b><p>Anahtar şifrelenerek saklanır ve hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazın; boş bırakırsanız kayıtlı olan korunur.</p><p>Gönderici konumu <b>isteğe bağlı</b>: OTO panelinde tanımladığınız depo ya da şube burada listelenir. Hiç tanımlamadıysanız boş bırakın — gönderi oluştururken adres tek tek gönderilir.</p></div>
+            {/* ÇIKIŞ ADRESİ. OTO'ya gönderici ya tanımlı bir konumun
+                koduyla ya adresin tek tek yazılmasıyla veriliyor; ikinci
+                yol için bu alanlar gerekiyordu ve girilebilecekleri hiçbir
+                ekran yoktu — etiket üretimi "gönderici bilgisi yok" diyip
+                duruyordu. Ad olarak YASAL UNVAN isteniyor: etikette
+                müşterinin gördüğü gönderici bu. */}
+            <h5 className="payment-subtitle">Çıkış (gönderici) adresi</h5>
+            <p>Yukarıda bir gönderici konumu seçtiyseniz bu alanlar kullanılmaz; OTO&apos;da tanımlı konum yoksa etiket bu adresle üretilir.</p>
+            <div className="payment-fields">
+              <label className="wide">Gönderici unvanı<input name="legal_name" defaultValue={settings?.legal_name??""} placeholder="Etikette görünecek yasal unvan" autoComplete="off"/></label>
+              <label>Telefon<input name="contact_phone" defaultValue={settings?.contact_phone??""} placeholder="5xx xxx xx xx" autoComplete="off"/></label>
+              <label>E-posta<input name="contact_email" type="email" defaultValue={settings?.contact_email??""} placeholder="kargo@magaza.com" autoComplete="off"/></label>
+              <label className="wide">Adres<input name="address_line" defaultValue={settings?.address_line??""} placeholder="Mahalle, cadde, no" autoComplete="off"/></label>
+              <label>İlçe<input name="address_district" defaultValue={settings?.address_district??""} autoComplete="off"/></label>
+              <label>Şehir<input name="address_city" defaultValue={settings?.address_city??""} autoComplete="off"/></label>
+              <label>Ülke<input name="address_country" defaultValue={settings?.address_country??"TR"} placeholder="TR" autoComplete="off"/></label>
+            </div>
+            <div className="security-note"><b>{settings?.tryoto_refresh_token_enc?"Anahtarınız kayıtlı.":"Anahtar henüz girilmedi."}</b><p>Anahtar şifrelenerek saklanır ve hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazın; boş bırakırsanız kayıtlı olan korunur.</p><p>Gönderici konumu <b>isteğe bağlı</b>: OTO panelinde tanımladığınız depo ya da şube burada listelenir. Hiç tanımlamadıysanız boş bırakın — o zaman aşağıdaki çıkış adresi kullanılır, dolayısıyla <b>birinin dolu olması gerekir</b>.</p></div>
           </article>
           <button className="payment-save" type="submit">Kargo ayarlarını kaydet</button>
         </form>

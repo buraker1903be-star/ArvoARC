@@ -9,6 +9,7 @@ import { decryptSecret } from "@/lib/payment-credentials";
 import { OtoHatasi } from "@/lib/tryoto/hatalar";
 import { otoIstek } from "@/lib/tryoto/istemci";
 import { createOrderGovdesi, govdeSorunu } from "@/lib/tryoto/siparis-govdesi";
+import { gondericiCoz, gondericiEksigi, type GondericiBilgisi, type MagazaAdresSatiri } from "@/lib/tryoto/gonderici";
 
 /*
   GÖNDERİ İŞLEMLERİ.
@@ -146,22 +147,33 @@ export async function gonderiIptal(formData: FormData) {
   Taslak kayıt OTO bakiyesi harcamıyor; harcama 2. adımda oluyor.
 */
 
-type MagazaKargoAyari = {
+type MagazaKargoAyari = MagazaAdresSatiri & {
   tryoto_enabled: boolean | null;
   tryoto_refresh_token_enc: string | null;
   tryoto_pickup_location_code: string | null;
 };
 
+/*
+  Ayarla birlikte MAĞAZANIN ÇIKIŞ ADRESİ de okunuyor: OTO'ya gönderici ya
+  tanımlı bir konumun koduyla ya adresin tek tek yazılmasıyla veriliyor ve
+  ikinci yol daha önce hiç kurulmamıştı — konum kodu boş olan hesapta
+  etiket üretimi "gönderici bilgisi yok" diyip duruyordu.
+*/
 async function kargoAyari(
   supabase: Awaited<ReturnType<typeof requireTenant>>["supabase"],
   organizationId: string,
-): Promise<{ anahtar: string; gondericiKodu: string | null } | null> {
+): Promise<{ anahtar: string; gondericiKodu: string | null; gonderici: GondericiBilgisi | null; adresEksigi: string | null } | null> {
   const { data } = await supabase.from("arc_store_settings")
-    .select("tryoto_enabled,tryoto_refresh_token_enc,tryoto_pickup_location_code")
+    .select("tryoto_enabled,tryoto_refresh_token_enc,tryoto_pickup_location_code,legal_name,store_name,contact_phone,contact_email,address_line,address_district,address_city,address_country")
     .eq("organization_id", organizationId).maybeSingle();
   const ayar = data as MagazaKargoAyari | null;
   if (!ayar?.tryoto_enabled || !ayar.tryoto_refresh_token_enc) return null;
-  return { anahtar: decryptSecret(ayar.tryoto_refresh_token_enc), gondericiKodu: ayar.tryoto_pickup_location_code };
+  return {
+    anahtar: decryptSecret(ayar.tryoto_refresh_token_enc),
+    gondericiKodu: ayar.tryoto_pickup_location_code,
+    gonderici: gondericiCoz(ayar),
+    adresEksigi: gondericiEksigi(ayar),
+  };
 }
 
 /*
@@ -323,7 +335,11 @@ export async function otoEtiketUret(formData: FormData) {
       };
     }),
     gondericiKodu: ayar.gondericiKodu,
-    gonderici: null,
+    /*
+      Konum kodu varsa gövdeye YALNIZCA o giriyor (OTO ikisini birlikte
+      kabul etmiyor); yoksa mağazanın çıkış adresi tek tek gidiyor.
+    */
+    gonderici: ayar.gondericiKodu?.trim() ? null : ayar.gonderici,
     teslimatSecenegiId: secenekId || null,
     agirlikKg: Number.isFinite(agirlik) && agirlik > 0 ? agirlik : null,
     enCm,
@@ -331,6 +347,14 @@ export async function otoEtiketUret(formData: FormData) {
     yukseklikCm,
   };
 
+  /*
+    Adres eksikse HANGİ ALANIN eksik olduğu söyleniyor. Genel "gönderici
+    bilgisi yok" mesajı, adresin girildiği yeri bilen kullanıcıyı bile
+    hangi satırın boş kaldığını aramaya bırakıyordu.
+  */
+  if (!girdi.gondericiKodu?.trim() && !girdi.gonderici && ayar.adresEksigi) {
+    return geriDon(orderId, { error: `Gönderici adresi eksik (${ayar.adresEksigi}): Ayarlar → Kargo altyapısı bölümünde çıkış adresini doldurun.` });
+  }
   const govdeHatasi = govdeSorunu(girdi);
   if (govdeHatasi) return geriDon(orderId, { error: govdeHatasi });
 

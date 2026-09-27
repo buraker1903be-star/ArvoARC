@@ -87,5 +87,11 @@ test("eksik bilgi Türkçe ve alan adıyla söyleniyor", () => {
   // "şehri" aranıyor, "şehir" değil: mesajda ek almış hâli geçiyor ve
   // /şehir/ hiç eşleşmiyor (JS'nin /i bayrağı da bunu çözmez).
   assert.match(govdeSorunu({ ...temel, musteri: { ...temel.musteri, sehir: "" } })!, /şehri/);
-  assert.match(govdeSorunu({ ...temel, gondericiKodu: null, gonderici: null })!, /gönderici konum kodu/);
+  /*
+    Mesaj İKİ YOLU da söylüyor: eskiden yalnızca konum kodu öneriliyordu
+    ve OTO'da hiç konum tanımlamamış hesapta çıkmaz bir yola gönderiyordu.
+  */
+  const gondericiYok = govdeSorunu({ ...temel, gondericiKodu: null, gonderici: null })!;
+  assert.match(gondericiYok, /çıkış adresini/);
+  assert.match(gondericiYok, /gönderici konumu/);
 });

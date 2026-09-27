@@ -315,6 +315,10 @@ export async function updateShippingIntegration(formData:FormData){
   const etkin=formData.get("tryoto_enabled")==="on";
   const testModu=formData.get("tryoto_test_mode")==="on";
   const gondericiKodu=String(formData.get("tryoto_pickup_location_code")??"").trim();
+  /* Çıkış adresi: konum kodu yoksa etiket bununla üretiliyor. Boş alan
+     null yazılıyor, boş metin değil — gondericiCoz her ikisini de eksik
+     sayıyor ama null, "hiç girilmedi"yi ekranda da doğru gösteriyor. */
+  const adresAlani=(ad:string)=>String(formData.get(ad)??"").trim()||null;
   const yenilemeAnahtari=String(formData.get("tryoto_refresh_token")??"").trim();
 
   /* Kayıtlı anahtar var mı: "etkin ama anahtarsız" bir yapılandırma
@@ -339,6 +343,13 @@ export async function updateShippingIntegration(formData:FormData){
     ...(await magazaAdiTabani(supabase,organization.id,organization.name)),
     tryoto_enabled:etkin,tryoto_test_mode:testModu,
     tryoto_pickup_location_code:gondericiKodu||null,
+    legal_name:adresAlani("legal_name"),
+    contact_phone:adresAlani("contact_phone"),
+    contact_email:adresAlani("contact_email"),
+    address_line:adresAlani("address_line"),
+    address_district:adresAlani("address_district"),
+    address_city:adresAlani("address_city"),
+    address_country:adresAlani("address_country"),
     ...(sifreli??{}),
     updated_at:new Date().toISOString()
   },{onConflict:"organization_id"});

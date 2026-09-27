@@ -144,7 +144,12 @@ export function govdeSorunu(girdi: GovdeGirdisi): string | null {
   if (!girdi.musteri.adres.trim()) return "Teslimat adresi boş.";
   if (!girdi.musteri.sehir.trim()) return "Teslimat şehri boş.";
   if (!girdi.gondericiKodu?.trim() && !girdi.gonderici) {
-    return "Gönderici bilgisi yok: mağaza ayarlarında gönderici konum kodu tanımlayın.";
+    /*
+      İKİ YOL DA söyleniyor. Eskiden yalnızca konum kodu öneriliyordu ve
+      OTO'da hiç konum tanımlamamış bir hesapta mesaj çıkmaz bir yola
+      gönderiyordu: adresi tek tek yazmak da kabul ediliyor.
+    */
+    return "Gönderici bilgisi yok: mağaza ayarlarında çıkış adresini doldurun ya da OTO'da tanımlı bir gönderici konumu seçin.";
   }
   return null;
 }
