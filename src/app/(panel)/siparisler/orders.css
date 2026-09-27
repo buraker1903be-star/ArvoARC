@@ -257,3 +257,38 @@
   */
   .order-detail-bar{position:static;margin:0;padding-inline:0;box-shadow:none}
 }
+
+
+/* ---------- Detay: bölüm atlama ve katlanan kayıtlar ---------- */
+/*
+  Çapayla gidilen bölüm yapışkan şeritlerin ALTINDA kalmasın: panelin üst
+  şeridi 72px, sayfanın kendi başlığı da yapışkan. Bu olmadan tıklayınca
+  bölüm başlığı görünmüyor, doğrudan içeriğin ortasına düşülüyor.
+*/
+#kalemler,#gonderiler,#durum,#gecmis{scroll-margin-top:170px}
+
+.order-jump{display:flex;flex-wrap:wrap;gap:4px}
+.order-jump a{
+  padding:6px 11px;border:1px solid var(--line);border-radius:999px;
+  color:var(--muted);font-size:12px;font-weight:700;text-decoration:none;
+}
+.order-jump a:hover{border-color:var(--accent-500);color:var(--accent-500)}
+
+/*
+  İptal edilen gönderiler: kayıt duruyor ama tek satır. Tam kart
+  çizildiğinde on iptal kaydı 1.218px yer kaplıyordu.
+*/
+.shipment-cancelled{margin-top:12px;border:1px dashed var(--line);border-radius:12px}
+.shipment-cancelled summary{
+  padding:10px 14px;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;
+}
+.shipment-cancelled ul{display:grid;gap:8px;margin:0;padding:0 14px 12px;list-style:none}
+.shipment-cancelled li{display:grid;gap:2px;opacity:.75;font-size:12px}
+.shipment-cancelled b{font-size:12px}
+.shipment-cancelled span{color:var(--muted);font-variant-numeric:tabular-nums}
+.shipment-cancelled small{color:var(--muted);font-size:11px;line-height:1.5}
+
+@media(max-width:860px){
+  #kalemler,#gonderiler,#durum,#gecmis{scroll-margin-top:16px}
+  /* Dar ekranda başlık zaten yapışkan değil. */
+}

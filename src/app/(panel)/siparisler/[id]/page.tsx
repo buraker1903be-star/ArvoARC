@@ -84,6 +84,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   /* İptal edilen gönderi ne özette ne sayımda: yola çıkmayacak bir
      paketin takip numarasını göstermek yanlış bilgi. */
   const acikGonderiler=gonderiler.filter(g=>g.status!=="cancelled");
+  const iptalGonderiler=gonderiler.filter(g=>g.status==="cancelled");
   const takipliGonderiSayisi=acikGonderiler.filter(g=>g.tracking_number?.trim()).length;
   const kalemAdi=new Map((items??[]).map(item=>[item.id,item.product_name]));
 
@@ -278,6 +279,22 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             aynı siparişe farklı isim vermesin. */}
         <em className="ac-tag" data-tone={badge.tone}>{badge.label}</em>
         <span className="order-noprint"><PrintButton /></span>
+        {/*
+          BÖLÜM ATLAMA ŞERİDİ. Sayfa 4.600px, yani beş ekran boyu
+          (canlıda ölçüldü, 27.09.2026) ve en çok kullanılan bölüm —
+          Gönderiler — ortada kalıyor.
+
+          Sekme değil ÇAPA kullanılıyor: bu sayfadaki her form bir sunucu
+          işlemi ve kaydettikten sonra sayfaya geri yönlendiriyor. Sekme
+          olsaydı her kayıttan sonra ilk sekmeye dönerdi; ayrıca yazdırma
+          ve sayfa içi arama (Ctrl+F) gizli sekmeleri bulamazdı.
+        */}
+        <nav className="order-jump order-noprint" aria-label="Bölümler">
+          <a href="#kalemler">Kalemler</a>
+          <a href="#gonderiler">Gönderiler</a>
+          <a href="#durum">Durum</a>
+          <a href="#gecmis">Geçmiş</a>
+        </nav>
         {canManage&&next?(
           <form action={quickStatus} className="order-noprint">
             <input type="hidden" name="order_id" value={order.id}/>
@@ -378,7 +395,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
 
       {/* Sipariş kalemleri tam genişlikte: dokuz sütunlu fatura
           dökümü yan panelle birlikte sığmıyordu. */}
-      <section className="ac ac-pad">
+      <section id="kalemler" className="ac ac-pad">
         <div className="ac-head"><div><h3>Sipariş kalemleri</h3><p>{items?.length??0} kalem · birim fiyatlar KDV hariç</p></div></div>
         {/*
           Fatura düzeni. Her satırda birim fiyat, indirim, KDV
@@ -439,9 +456,9 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         elimize yalnızca takip numarası geliyor, OTO devreye girmiyor ve
         bakiye harcanmıyor. tryOTO ile etiket üretme ayrı bir tur.
       */}
-      <section className="ac ac-pad order-noprint">
+      <section id="gonderiler" className="ac ac-pad order-noprint">
         <div className="ac-head">
-          <div><h3>Gönderiler</h3><p>{gonderiler.length?`${gonderiler.filter(g=>g.status!=="cancelled").length} gönderi · ${kargoDurumuOzet==="tamam"?"tüm ürünler kargoda":kargoDurumuOzet==="kismi"?"bir kısmı kargoda":"henüz kargoya verilmedi"}`:"Bu siparişte henüz gönderi yok."}</p></div>
+          <div><h3>Gönderiler</h3><p>{acikGonderiler.length?`${acikGonderiler.length} gönderi · ${kargoDurumuOzet==="tamam"?"tüm ürünler kargoda":kargoDurumuOzet==="kismi"?"bir kısmı kargoda":"henüz kargoya verilmedi"}`:"Bu siparişte henüz gönderi yok."}</p></div>
           {/*
             Durum OTO'dan ÇEKİLİYOR, webhook'la gelmiyor: OTO'nun webhook
             yükünün şekli belgelenmemiş ve tahmine dayalı bir uç nokta,
@@ -454,8 +471,8 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             :null}
         </div>
 
-        {gonderiler.length?<ul className="shipment-list">
-          {gonderiler.map(gonderi=>
+        {acikGonderiler.length?<ul className="shipment-list">
+          {acikGonderiler.map(gonderi=>
             <li key={gonderi.id} data-durum={gonderi.status}>
               <div className="shipment-head">
                 <b>{gonderi.sequence}. paket{gonderi.supplier?` · ${gonderi.supplier}`:""}</b>
@@ -530,6 +547,30 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         </ul>:null}
 
         {/*
+          İPTAL EDİLENLER KATLANIYOR ve TEK SATIRA İNİYOR.
+
+          İptal edilmiş gönderide taslak formu, fiyat alanı ve etiket
+          düğmesi anlamsız; yine de tam kart çiziliyordu. Bu siparişte on
+          iptal kaydı 1.218px yer kaplıyordu — sayfanın dörtte biri
+          (canlıda ölçüldü, 27.09.2026). Kayıtlar SİLİNMİYOR: hangi
+          denemenin neden düştüğü sorusunun cevabı onlarda.
+        */}
+        {iptalGonderiler.length?(
+          <details className="shipment-cancelled">
+            <summary>{iptalGonderiler.length} iptal edilen gönderi</summary>
+            <ul>
+              {iptalGonderiler.map(gonderi=>
+                <li key={gonderi.id}>
+                  <b>{gonderi.sequence}. paket{gonderi.supplier?` · ${gonderi.supplier}`:""}</b>
+                  {gonderi.tracking_number?<span>{gonderi.tracking_number}</span>:null}
+                  {gonderi.failure_reason?<small>{gonderi.failure_reason}</small>:null}
+                </li>
+              )}
+            </ul>
+          </details>
+        ):null}
+
+        {/*
           Yeni gönderi TEDARİKÇİYE GÖRE öneriliyor: aynı depodan çıkanlar
           bir pakette. Tamamı kargoya verilmiş tedarikçi burada hiç
           görünmüyor.
@@ -576,7 +617,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         alt alta dizilmişti ve takip numarası girmek için en aşağı
         inmek gerekiyordu.
       */}
-      <section className="ac-split-even order-noprint">
+      <section id="durum" className="ac-split-even order-noprint">
         <div className="ac ac-pad">
           <div className="ac-head"><div><h3>Sipariş durumu</h3><p>Akıştaki konumu ve ödeme durumu.</p></div></div>
           {canManage?(
@@ -664,7 +705,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         </section>
       ):null}
 
-      <section className="ac ac-pad order-noprint">
+      <section id="gecmis" className="ac ac-pad order-noprint">
         <div className="ac-head"><div><h3>İşlem geçmişi</h3><p>Bu siparişte yapılan değişiklikler.</p></div><span className="ac-count">{timeline.length}</span></div>
         <ol className="order-timeline">
           {timeline.map(item=>(
