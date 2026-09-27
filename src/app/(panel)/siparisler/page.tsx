@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { orderBadge, sourceLabel } from "@/lib/commerce-labels";
 import { nextOrderStep } from "@/lib/order-flow";
+import { gonderiSorunlu, kargoDurumu } from "@/lib/kargo-bolme";
+import { siparisKari } from "@/lib/siparis-kari";
 import { isBankTransfer } from "@/lib/payment-method";
 import { PanelBildirimi } from "@/components/panel/bildirim";
 import { OrderForm } from "./order-form";
@@ -156,6 +158,46 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     return { id: variant.id, label: `${product?.name ?? "Ürün"} · ${variant.sku} · stok ${variant.stock}${variant.allow_backorder ? " · stoksuz satış açık" : ""}` };
   });
 
+  /*
+    KÂR ve KARGO DURUMU listedeki siparişler için tek turda çekiliyor.
+    Sipariş başına sorgu, elli satırda elli tur demekti.
+
+    Kâr varyantın BUGÜNKÜ maliyetinden hesaplanıyor: sipariş anındaki
+    maliyet saklanmıyor (lib/siparis-kari.ts).
+  */
+  const listeIdleri = (listResult.data ?? []).map((order) => order.id);
+  const [{ data: listeKalemleri }, { data: listeGonderileri }] = listeIdleri.length
+    ? await Promise.all([
+        supabase.from("arc_order_items").select("id,order_id,variant_id,sku,quantity,total")
+          .eq("organization_id", organization.id).in("order_id", listeIdleri),
+        supabase.from("arc_shipments").select("order_id,status,arc_shipment_items(order_item_id,quantity)")
+          .eq("organization_id", organization.id).in("order_id", listeIdleri),
+      ])
+    : [{ data: [] }, { data: [] }];
+
+  type ListeKalemi = { id: string; order_id: string; variant_id: string | null; sku: string | null; quantity: number; total: number };
+  const kalemler = (listeKalemleri ?? []) as ListeKalemi[];
+  const varyantIdleri = [...new Set(kalemler.map((k) => k.variant_id).filter((x): x is string => Boolean(x)))];
+  const { data: maliyetler } = varyantIdleri.length
+    ? await supabase.from("arc_product_variants").select("id,cost_price").eq("organization_id", organization.id).in("id", varyantIdleri)
+    : { data: [] };
+  const maliyetById = new Map(((maliyetler ?? []) as Array<{ id: string; cost_price: number | null }>).map((v) => [v.id, v.cost_price]));
+
+  const kalemlerBySiparis = new Map<string, ListeKalemi[]>();
+  for (const kalem of kalemler) {
+    const liste = kalemlerBySiparis.get(kalem.order_id) ?? [];
+    liste.push(kalem);
+    kalemlerBySiparis.set(kalem.order_id, liste);
+  }
+
+  type ListeGonderi = { order_id: string; status: string; arc_shipment_items: { order_item_id: string; quantity: number }[] | null };
+  const gonderilerBySiparis = new Map<string, ListeGonderi[]>();
+  for (const gonderi of (listeGonderileri ?? []) as ListeGonderi[]) {
+    const liste = gonderilerBySiparis.get(gonderi.order_id) ?? [];
+    liste.push(gonderi);
+    gonderilerBySiparis.set(gonderi.order_id, liste);
+  }
+
   const rows: OrderRow[] = (listResult.data ?? []).map((order) => ({
     id: order.id,
     number: order.order_number,
@@ -167,6 +209,36 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     badge: orderBadge(order.status, order.payment_status),
     next: nextOrderStep(order.status, order.payment_status),
     transfer: isBankTransfer(order.metadata),
+    kar: (() => {
+      const kalem = kalemlerBySiparis.get(order.id) ?? [];
+      const sonuc = siparisKari(
+        kalem.map((k) => ({
+          toplamKurus: k.total,
+          adet: k.quantity,
+          maliyetKurus: k.variant_id ? maliyetById.get(k.variant_id) ?? null : null,
+        })),
+        order.status,
+        order.payment_status,
+      );
+      return sonuc ? { tutar: money.format(sonuc.kurus / 100), oran: sonuc.oran, eksi: sonuc.kurus < 0 } : null;
+    })(),
+    kargo: (() => {
+      /*
+        Kargo durumu gönderilerden TÜRETİLİYOR, ayrı bir sütunda
+        tutulmuyor: sipariş detayındaki özetle aynı fonksiyon
+        (kargoDurumu), iki ekran aynı siparişe farklı şey demesin.
+      */
+      const gonderiler = (gonderilerBySiparis.get(order.id) ?? []).map((g) => ({
+        id: g.order_id,
+        status: g.status,
+        items: g.arc_shipment_items ?? [],
+      }));
+      const siparisKalemleri = (kalemlerBySiparis.get(order.id) ?? []).map((k) => ({ id: k.id, quantity: k.quantity, product_name: "" }));
+      return {
+        durum: kargoDurumu(siparisKalemleri, gonderiler),
+        sorunlu: gonderiler.some((g) => gonderiSorunlu(g.status)),
+      };
+    })(),
   }));
 
   const metrics = [

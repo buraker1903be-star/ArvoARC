@@ -8,22 +8,59 @@
 .order-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
 .order-toolbar .order-search{flex:1 1 380px}
 
-/* ---------- Liste ızgarası ---------- */
+/* ---------- Liste ızgarası ----------
+   Sütunlar: seçim · sipariş+tarih · müşteri · tutar · kâr · operasyon ·
+   kargo · eylem. Kaynak kendi sütununda 110px yer kaplıyordu ve
+   müşterinin altına indi: satırda sorulan soru "kim, ne kadar, ne
+   durumda"; kaynak ancak ayrım gerektiğinde bakılan bir ayrıntı.
+
+   Tutar ve kâr SABİT genişlikte ve sağa yaslı: rakamlar alt alta
+   hizalanmazsa göz onları karşılaştıramıyor.
+*/
 .order-table[data-manage] .order-row{
-  grid-template-columns:24px minmax(140px,1fr) minmax(180px,1.5fr) 110px 120px minmax(170px,1.2fr) 150px;
-  grid-template-areas:"check main customer source amount status action";
+  grid-template-columns:24px minmax(150px,1.1fr) minmax(170px,1.4fr) 116px 116px 150px 112px 128px;
+  grid-template-areas:"check main customer amount profit status shipping action";
 }
 .order-table:not([data-manage]) .order-row{
-  grid-template-columns:minmax(140px,1fr) minmax(180px,1.5fr) 110px 120px minmax(170px,1.2fr);
-  grid-template-areas:"main customer source amount status";
+  grid-template-columns:minmax(150px,1.1fr) minmax(170px,1.4fr) 116px 116px 150px 112px;
+  grid-template-areas:"main customer amount profit status shipping";
 }
 .order-check{grid-area:check}
 .order-cell-main{grid-area:main}
 .order-cell-customer{grid-area:customer}
-.order-cell-source{grid-area:source;color:var(--muted)}
-.order-amount{grid-area:amount;font-weight:700}
+.order-amount{grid-area:amount;justify-self:end;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.order-profit{grid-area:profit;display:grid;justify-items:end;text-align:right}
 .order-status{grid-area:status}
+.order-shipping{grid-area:shipping}
 .order-action{grid-area:action;display:flex;justify-content:flex-end}
+
+/* Kâr: tutar üstte, oran altta. Zarar kırmızı — asıl görülmesi
+   gereken şey o; kâr sakin duruyor, her satırda yeşil bir leke
+   göz yorardı. */
+.order-profit b{font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.order-profit b[data-eksi]{color:var(--danger)}
+.order-profit b.is-empty{color:var(--dim);font-weight:600}
+.order-profit small{margin-top:2px;color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+
+/* Kaynak ve havale etiketi müşterinin altında, ikincil. */
+.order-cell-customer small{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.order-transfer-tag{
+  padding:1px 7px;border:1px solid color-mix(in srgb,var(--accent-500) 35%,var(--line));
+  border-radius:999px;color:var(--accent-strong);font-size:10.5px;font-style:normal;font-weight:700;
+}
+
+@media(max-width:1180px){
+  /* Dar masaüstünde kâr sütunu düşüyor: tutar ve durum önce gelir. */
+  .order-table[data-manage] .order-row{
+    grid-template-columns:24px minmax(140px,1.1fr) minmax(150px,1.3fr) 110px 140px 104px 120px;
+    grid-template-areas:"check main customer amount status shipping action";
+  }
+  .order-table:not([data-manage]) .order-row{
+    grid-template-columns:minmax(140px,1.1fr) minmax(150px,1.3fr) 110px 140px 104px;
+    grid-template-areas:"main customer amount status shipping";
+  }
+  .order-profit{display:none}
+}
 
 /* Manuel sipariş */
 .order-create>summary b{display:block;color:var(--ink);font-size:15px}
@@ -113,9 +150,16 @@
   .order-parties>:first-child{grid-column:1/-1}
 }
 @media(max-width:900px){
-  .order-table[data-manage] .order-row{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"check main amount" "check customer status" ". action action";row-gap:6px;padding:12px 14px}
-  .order-table:not([data-manage]) .order-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amount" "customer status";row-gap:6px;padding:12px 14px}
-  .order-cell-source{display:none}
+  /*
+    Telefonda satır ÜÇ SATIRA açılıyor: sipariş+tutar, müşteri+operasyon,
+    kargo. Kâr burada yok — ekranda sorulan soru "hangi sipariş, ne
+    durumda"; kâr masaüstünde incelenen bir sayı ve dar ekranda ya
+    kırpılır ya ötekileri kırpar.
+  */
+  .order-table[data-manage] .order-row{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"check main amount" "check customer status" "check shipping shipping" ". action action";row-gap:6px;padding:12px 14px}
+  .order-table:not([data-manage]) .order-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amount" "customer status" "shipping shipping";row-gap:6px;padding:12px 14px}
+  .order-profit{display:none}
+  .order-shipping{justify-self:start}
   .order-amount,.order-status{justify-self:end;text-align:right}
   .order-action{justify-content:flex-start}
   .order-action:empty{display:none}
@@ -139,7 +183,6 @@
 }
 
 /* Havale siparişi etiketi: ödeme panelden onaylanır */
-.panel-root .order-transfer-tag{margin-left:6px;vertical-align:middle}
 
 /* Sipariş detayı: havale ödemesi bekleyen siparişte tek tık onay / iptal */
 .panel-root .order-transfer{display:grid;gap:8px}

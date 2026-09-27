@@ -17,6 +17,27 @@ export type OrderRow = {
   next: { key: string; label: string } | null;
   /** Havale siparişi: ödeme panelden onaylanır. */
   transfer?: boolean;
+  /*
+    KÂR. Maliyeti eksik, iptal edilmiş ya da iadeli siparişte null:
+    yarım bir sayı, sayı olmamasından daha yanıltıcı olurdu
+    (lib/siparis-kari.ts).
+  */
+  kar: { tutar: string; oran: number; eksi: boolean } | null;
+  /*
+    KARGO. Gönderilerden türetiliyor, ayrı sütunda tutulmuyor; sipariş
+    detayındaki özetle aynı fonksiyondan geliyor.
+  */
+  kargo: { durum: "yok" | "kismi" | "tamam"; sorunlu: boolean };
+};
+
+/*
+  KARGO SÜTUNUNUN METNİ. "yok" ayrı bir renk almıyor: kargoya
+  verilmemiş olmak yeni siparişin olağan hâli, uyarı değil.
+*/
+const KARGO_ETIKETI: Record<OrderRow["kargo"]["durum"], string> = {
+  yok: "Verilmedi",
+  kismi: "Kısmen",
+  tamam: "Kargoda",
 };
 
 const BULK_STEPS = [
@@ -118,9 +139,10 @@ export function OrderTable({ rows, canManage, canDelete, back, children }: { row
             ) : null}
             <span className="order-cell-main">SİPARİŞ</span>
             <span className="order-cell-customer">MÜŞTERİ</span>
-            <span className="order-cell-source">KAYNAK</span>
             <span className="order-amount">TUTAR</span>
-            <span className="order-status">DURUM</span>
+            <span className="order-profit">KÂR</span>
+            <span className="order-status">OPERASYON</span>
+            <span className="order-shipping">KARGO</span>
             {canManage ? <span className="order-action" /> : null}
           </div>
           {rows.map((row) => (
@@ -134,11 +156,35 @@ export function OrderTable({ rows, canManage, canDelete, back, children }: { row
               </span>
               <span className="order-cell-customer">
                 <b>{row.customer}</b>
-                {row.email ? <small>{row.email}</small> : null}
+                {/*
+                  Kaynak ve havale etiketi müşterinin altına indi:
+                  kendi sütununda 110px yer kaplıyordu ve satırda
+                  sorulan soru "kim, ne kadar, ne durumda" — kaynak
+                  ancak ayrım gerektiğinde bakılan bir ayrıntı.
+                */}
+                <small>
+                  {row.source}
+                  {row.transfer ? <em className="order-transfer-tag">Havale</em> : null}
+                </small>
               </span>
-              <span className="order-cell-source">{row.source}{row.transfer ? <em className="ac-tag order-transfer-tag">Havale</em> : null}</span>
               <span className="order-amount">{row.total}</span>
+              <span className="order-profit">
+                {row.kar ? (
+                  <>
+                    <b data-eksi={row.kar.eksi ? "" : undefined}>{row.kar.tutar}</b>
+                    <small>%{row.kar.oran.toLocaleString("tr-TR")}</small>
+                  </>
+                ) : (
+                  /* Sebep başlıkta: maliyet eksik mi, sipariş kapalı mı. */
+                  <b className="is-empty" title="Maliyeti eksik ya da sipariş kapandı (iptal / iade)">—</b>
+                )}
+              </span>
               <span className="order-status"><em className="ac-tag" data-tone={row.badge.tone}>{row.badge.label}</em></span>
+              <span className="order-shipping">
+                <em className="ac-tag" data-tone={row.kargo.sorunlu ? "bad" : row.kargo.durum === "tamam" ? "good" : row.kargo.durum === "kismi" ? "warn" : undefined}>
+                  {row.kargo.sorunlu ? "Sorunlu" : KARGO_ETIKETI[row.kargo.durum]}
+                </em>
+              </span>
               {canManage ? (
                 <span className="order-action">
                   {row.next ? (
