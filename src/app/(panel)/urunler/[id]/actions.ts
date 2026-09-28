@@ -5,26 +5,13 @@ import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { matrisiKur, seceneginDegerleri } from "@/lib/varyant-matrisi";
+import { bosSlug, slugla } from "@/lib/slug";
+import { kopyaAdi, kopyaKodlari, kopyaSlugTabani, skuAdaylari, slugSirasi } from "@/lib/urun-kopyasi";
 
 const allowedRoles = new Set(["owner", "admin", "manager"]);
 
 const field = (formData: FormData, name: string, maxLength: number) =>
   String(formData.get(name) ?? "").trim().slice(0, maxLength);
-
-const slugify = (value: string) =>
-  value
-    .toLocaleLowerCase("tr-TR")
-    .replace(/[çÇ]/g, "c")
-    .replace(/[ğĞ]/g, "g")
-    .replace(/[ıİ]/g, "i")
-    .replace(/[öÖ]/g, "o")
-    .replace(/[şŞ]/g, "s")
-    .replace(/[üÜ]/g, "u")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 160);
 
 type EditableProductMetadata = {
   subtitle?: string;
@@ -56,7 +43,7 @@ export async function updateProduct(formData: FormData) {
   const description = field(formData, "description", 20000);
   const requestedStatus = field(formData, "status", 20);
   const status = ["active", "draft", "archived"].includes(requestedStatus) ? requestedStatus : "draft";
-  const slug = slugify(field(formData, "slug", 180) || name);
+  const slug = slugla(field(formData, "slug", 180) || name);
   if (!id || !name || !slug) return await bildirimliDonus(`/urunler/${id}`,{hata:hataMetni("invalid-product")});
 
   const { data: currentProduct, error: currentProductError } = await supabase
@@ -305,4 +292,145 @@ export async function varyantMatrisi(formData: FormData) {
   return await bildirimliDonus(donus, {
     basari: `${satirlar.length} varyant eklendi${atlanan ? `; ${atlanan} birleşim üründe zaten vardı` : ""}.`,
   });
+}
+
+/*
+  ÜRÜN KOPYALAMA.
+
+  Benzer ürün eklemenin en kısa yolu var olanı çoğaltmak: on beş alanı
+  (marka, tür, SEO, Merchant bilgileri) yeniden doldurmak yerine
+  değişen ikisini düzeltmek.
+
+  KOPYA HER ZAMAN TASLAK. Kaynak yayındaysa kopyası da yayına girerdi
+  ve mağazada bir anda ikinci, yarım düzenlenmiş bir ürün belirirdi.
+
+  SKU'LAR YENİDEN ÜRETİLİYOR. SKU salon genelinde kimlik gibi
+  kullanılıyor (stok/actions.ts .eq("sku", …).maybeSingle(), fiyat
+  aktarımı yazmayı .eq("sku", …) ile yapıyor), yani kaynağın kodlarını
+  taşımak kopyayı oluşturur oluşturmaz stok ekranını bozardı.
+
+  GÖRSELLER DEPODA ÇOĞALTILIYOR, yol paylaşılmıyor. Aynı nesneyi iki
+  ürün gösterseydi birinden görseli silmek ötekinin galerisini de
+  boşaltırdı (removeProductImage nesneyi depodan siliyor).
+*/
+export async function urunuKopyala(formData: FormData) {
+  const { supabase, user, organization, membership } = await requireTenant();
+  const kaynakId = String(formData.get("product_id") ?? "");
+  const donus = `/urunler/${kaynakId}`;
+  if (!allowedRoles.has(membership.role)) return await bildirimliDonus(donus, { hata: hataMetni("forbidden") });
+  if (!kaynakId) return await bildirimliDonus("/urunler", { hata: hataMetni("product-not-found") });
+
+  const [{ data: kaynak, error: kaynakHatasi }, { data: kaynakVaryantlar, error: varyantHatasi }] = await Promise.all([
+    supabase.from("arc_products").select("id,name,slug,description,metadata,source,supplier,supplier_product_code,tax_rate").eq("organization_id", organization.id).eq("id", kaynakId).maybeSingle(),
+    supabase.from("arc_product_variants").select("sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price,supplier,supplier_sku").eq("organization_id", organization.id).eq("product_id", kaynakId),
+  ]);
+  if (kaynakHatasi || !kaynak) return await bildirimliDonus(donus, { hata: hataMetni("product-not-found") });
+  if (varyantHatasi) return await bildirimliDonus(donus, { hata: hataMetni(varyantHatasi.message) });
+  const varyantlar = kaynakVaryantlar ?? [];
+
+  /* Boş adres: kopyanın adresi kaynağınkinden türüyor, "…-kopya-2" gibi. */
+  const slugTabani = kopyaSlugTabani(kaynak.name, kaynak.slug);
+  const { data: benzerSluglar, error: slugHatasi } = await supabase
+    .from("arc_products").select("slug").eq("organization_id", organization.id).ilike("slug", `${slugTabani}%`).limit(300);
+  /* Hata YUTULMUYOR: boş liste saymak "…-kopya" adresini serbest
+     sanıp tekil kısıta çarpmak demekti (organization_id, slug). */
+  if (slugHatasi) return await bildirimliDonus(donus, { hata: hataMetni(slugHatasi.message) });
+  const alinmisSluglar = (benzerSluglar ?? []).map((satir) => String(satir.slug ?? ""));
+  const yeniSlug = bosSlug(slugTabani, alinmisSluglar);
+  if (!yeniSlug) return await bildirimliDonus(donus, { hata: hataMetni("copy-slug-full") });
+  const yeniAd = kopyaAdi(kaynak.name, slugSirasi(slugTabani, yeniSlug) || 1);
+
+  /*
+    Kod adayları TEK sorguda denetleniyor: varyant başına bir sorgu,
+    yirmi varyantlı üründe yirmi tur demekti.
+  */
+  const tumAdaylar = [...new Set(varyantlar.flatMap((varyant) => skuAdaylari(String(varyant.sku ?? ""))))];
+  let alinmisKodlar: string[] = [];
+  if (tumAdaylar.length) {
+    const { data: doluKodlar, error: kodHatasi } = await supabase
+      .from("arc_product_variants").select("sku").eq("organization_id", organization.id).in("sku", tumAdaylar);
+    if (kodHatasi) return await bildirimliDonus(donus, { hata: hataMetni(kodHatasi.message) });
+    alinmisKodlar = (doluKodlar ?? []).map((satir) => String(satir.sku ?? ""));
+  }
+  const { esleme, cozulemeyen } = kopyaKodlari(varyantlar.map((varyant) => String(varyant.sku ?? "")), alinmisKodlar);
+  if (cozulemeyen.length) return await bildirimliDonus(donus, { hata: hataMetni("copy-sku-full") });
+
+  const meta = (kaynak.metadata ?? {}) as ProductMetadata;
+  /* Görsel yolları kopyada YENİ: depodaki nesneler aşağıda çoğaltılıyor. */
+  const { data: yeniUrun, error: urunHatasi } = await supabase.from("arc_products").insert({
+    organization_id: organization.id,
+    name: yeniAd,
+    slug: yeniSlug,
+    description: kaynak.description,
+    status: "draft",
+    source: kaynak.source,
+    supplier: kaynak.supplier,
+    supplier_product_code: kaynak.supplier_product_code,
+    tax_rate: kaynak.tax_rate,
+    metadata: { ...meta, image_paths: [] },
+    created_by: user.id,
+  }).select("id").single();
+  if (urunHatasi || !yeniUrun) return await bildirimliDonus(donus, { hata: hataMetni(urunHatasi?.code ?? urunHatasi?.message ?? "product-create") });
+
+  if (varyantlar.length) {
+    const { error } = await supabase.from("arc_product_variants").insert(
+      varyantlar.map((varyant) => ({
+        organization_id: organization.id,
+        product_id: yeniUrun.id,
+        title: varyant.title,
+        sku: esleme.get(String(varyant.sku ?? "").trim().toUpperCase()) ?? String(varyant.sku ?? ""),
+        price: varyant.price,
+        compare_at_price: varyant.compare_at_price,
+        currency: varyant.currency ?? "TRY",
+        /* Stok TAŞINMIYOR: depoda ikinci bir ürün belirdi diye mal
+           çoğalmıyor. Kopya sıfırdan sayılıyor. */
+        stock: 0,
+        allow_backorder: varyant.allow_backorder,
+        attributes: varyant.attributes ?? {},
+        cost_price: varyant.cost_price,
+        supplier: varyant.supplier,
+        supplier_sku: varyant.supplier_sku,
+        external_id: null,
+      })),
+    );
+    /*
+      Varyantsız bir ürün satılamaz (fiyat ve stok varyantta). Yarım
+      kopya bırakmaktansa ürün satırı geri alınıyor.
+    */
+    if (error) {
+      await supabase.from("arc_products").delete().eq("organization_id", organization.id).eq("id", yeniUrun.id);
+      return await bildirimliDonus(donus, { hata: hataMetni(error.code ?? error.message) });
+    }
+  }
+
+  /*
+    Görseller: depodaki nesneler kopyanın klasörüne çoğaltılıyor.
+    Tedarikçi CDN adresleri (http…) olduğu gibi taşınıyor, onlar bizim
+    deponuzda değil. Çoğaltma düşerse ürün KALIYOR ve uyarı veriliyor:
+    on beş alanı doldurulmuş bir kopyayı görsel yüzünden silmek,
+    kullanıcıyı işin başına döndürürdü.
+  */
+  const kaynakYollari = (meta.image_paths ?? []).slice(0, 8);
+  const yeniYollar: string[] = [];
+  let gorselUyarisi = "";
+  for (const [sira, yol] of kaynakYollari.entries()) {
+    if (yol.startsWith("http")) { yeniYollar.push(yol); continue; }
+    const uzanti = yol.split(".").pop() ?? "jpg";
+    const hedef = `${organization.id}/${yeniUrun.id}/kopya-${Date.now()}-${sira + 1}.${uzanti}`;
+    const { error } = await supabase.storage.from("arc-product-images").copy(yol, hedef);
+    if (error) { gorselUyarisi = "Görseller kopyalanamadı; ürüne elle yükleyin."; break; }
+    yeniYollar.push(hedef);
+  }
+  if (yeniYollar.length) {
+    const { error } = await supabase.from("arc_products").update({ metadata: { ...meta, image_paths: yeniYollar, images: [] } }).eq("organization_id", organization.id).eq("id", yeniUrun.id);
+    if (error) gorselUyarisi = "Görseller kopyalandı ama ürüne bağlanamadı; elle yükleyin.";
+  }
+
+  revalidatePath("/");
+  revalidatePath("/urunler");
+  revalidatePath("/stok");
+  const sonuc = `“${yeniAd}” taslak olarak oluşturuldu${varyantlar.length ? `; ${varyantlar.length} varyant yeni SKU ile kopyalandı` : ""}.`;
+  /* Kopyanın kendi sayfasına gidiliyor: kopyalamanın ardından gelen
+     iş her zaman onu düzenlemek. */
+  return await bildirimliDonus(`/urunler/${yeniUrun.id}`, gorselUyarisi ? { uyari: `${sonuc} ${gorselUyarisi}` } : { basari: sonuc });
 }

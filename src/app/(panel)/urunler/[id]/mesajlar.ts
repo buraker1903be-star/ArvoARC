@@ -16,6 +16,9 @@ export const ERRORS:Record<string,string>={
   "invalid-image-file":"Yalnızca JPG, PNG, WEBP, GIF veya AVIF; dosya başına en fazla 4 MB.",
   "invalid-image-path":"Geçersiz görsel.",
   "image-not-found":"Görsel bulunamadı.",
+  /* Kopyalama: iki sınır da "aynı üründen çok fazla kopya" demek. */
+  "copy-slug-full":"Bu üründen çok fazla kopya var; eski kopyaları arşivleyin.",
+  "copy-sku-full":"Varyant kodları için boş numara kalmadı; eski kopyaları temizleyin.",
 };
 
 export const BASARILAR: Record<string, string> = {

@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { hataMetni } from "./mesajlar";
+import { slugla } from "@/lib/slug";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
 
 const allowedRoles=new Set(["owner","admin","manager"]);
-const slugify=(value:string)=>value.toLocaleLowerCase("tr-TR").replace(/[çÇ]/g,"c").replace(/[ğĞ]/g,"g").replace(/[ıİ]/g,"i").replace(/[öÖ]/g,"o").replace(/[şŞ]/g,"s").replace(/[üÜ]/g,"u").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,160);
 const field=(formData:FormData,name:string,max:number)=>String(formData.get(name)??"").trim().slice(0,max);
 /* Kimlik listeleri URL'ye yazıldığı için 150'lik parçalarla gönderilir. */
 const chunked=<T,>(items:T[],size=150)=>Array.from({length:Math.ceil(items.length/size)},(_,index)=>items.slice(index*size,index*size+size));
@@ -16,7 +16,7 @@ export async function createCollection(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   if(!allowedRoles.has(membership.role))return await bildirimliDonus("/koleksiyonlar",{hata:hataMetni("forbidden")});
   const title=field(formData,"title",160);
-  const slug=slugify(field(formData,"slug",180)||title);
+  const slug=slugla(field(formData,"slug",180)||title);
   if(!title||!slug)return await bildirimliDonus("/koleksiyonlar",{hata:hataMetni("invalid-collection")});
   const {data,error}=await supabase.from("arc_collections").insert({
     organization_id:organization.id,title,slug,description:"",status:"draft",source:"native",seo_title:title,seo_description:"",metadata:{}
@@ -33,7 +33,7 @@ export async function updateCollection(formData:FormData){
   const id=field(formData,"id",80);
   if(!allowedRoles.has(membership.role))return await bildirimliDonus(`/koleksiyonlar/${id}`,{hata:hataMetni("forbidden")});
   const title=field(formData,"title",160);
-  const slug=slugify(field(formData,"slug",180)||title);
+  const slug=slugla(field(formData,"slug",180)||title);
   const description=field(formData,"description",10000);
   const seoTitle=field(formData,"seo_title",70);
   const seoDescription=field(formData,"seo_description",180);

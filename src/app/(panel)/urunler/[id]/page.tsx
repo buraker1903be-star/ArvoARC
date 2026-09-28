@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
-import { createVariant, removeProductImage, updateProduct, updateVariant, uploadProductImages, varyantMatrisi } from "./actions";
+import { createVariant, removeProductImage, updateProduct, updateVariant, uploadProductImages, urunuKopyala, varyantMatrisi } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel, sourceLabel } from "@/lib/commerce-labels";
 import { Icon } from "@/components/panel/icons";
@@ -75,6 +75,17 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
       <div className="product-head-actions">
         <em className="ac-tag" data-tone={statusTone}>{productStatusLabel(product.status)}</em>
         {storeHref?<a className="ac-btn" href={storeHref} target="_blank" rel="noreferrer"><Icon name="external" size={15}/>Mağazada gör</a>:null}
+        {/*
+          Kopyalama ONAY İSTEMİYOR: yeni bir taslak üretiyor, hiçbir
+          şeyi bozmuyor ve yanlışlıkla basılırsa kopya arşivlenip
+          geçiliyor. ConfirmSubmit geri alınamayan işler için.
+        */}
+        {canManage?(
+          <form action={urunuKopyala}>
+            <input type="hidden" name="product_id" value={product.id}/>
+            <button className="ac-btn" type="submit" title="Varyantları ve görselleriyle taslak bir kopya oluşturur">Kopyala</button>
+          </form>
+        ):null}
       </div>
     </section>
 

@@ -5,13 +5,13 @@ import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { backUrl } from "@/lib/back-url";
+/* Eskiden bu dosyanın kendi slugify'ı vardı ve NOKTASIZ ı'yı düşürüyordu:
+   "Kırmızı Elbise" burada "k-rm-z-elbise", düzenleyicide
+   "kirmizi-elbise" oluyordu (bkz. lib/slug.ts). */
+import { slugla } from "@/lib/slug";
 
 const MANAGERS = ["owner", "admin", "manager"];
 const STATUSES = ["active", "draft", "archived"];
-
-function slugify(value: string) {
-  return value.toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
 
 export async function createProduct(formData: FormData) {
   const { supabase, user, organization, membership } = await requireTenant();
@@ -28,7 +28,7 @@ export async function createProduct(formData: FormData) {
 
   if (!name || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isFinite(compareAtPriceInput) || compareAtPriceInput < 0 || !Number.isInteger(stock)) return await bildirimliDonus("/urunler?yeni=1#yeni-urun",{hata:hataMetni("invalid-product")});
 
-  const slug = `${slugify(name)}-${Date.now().toString(36)}`;
+  const slug = `${slugla(name, 140)}-${Date.now().toString(36)}`;
   const price = Math.round(priceInput * 100);
   const compareAtPrice = compareAtPriceInput > priceInput ? Math.round(compareAtPriceInput * 100) : null;
   const { data: product, error: productError } = await supabase.from("arc_products").insert({ organization_id: organization.id, name, slug, description, status: status === "active" ? "active" : "draft", source: "native", created_by: user.id }).select("id").single();
