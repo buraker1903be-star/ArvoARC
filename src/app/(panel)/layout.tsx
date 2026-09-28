@@ -12,6 +12,7 @@ import { SidebarToggle } from "@/components/panel/sidebar-toggle";
 import { SkipLink } from "@/components/panel/skip-link";
 import { ThemeToggle } from "@/components/panel/theme-toggle";
 import { TopbarSearch } from "@/components/panel/topbar-search";
+import { KomutPaleti } from "@/components/panel/komut-paleti";
 import { Suspense } from "react";
 import { activityUnread } from "./activity-actions";
 import "./panel-tokens.css";
@@ -54,6 +55,12 @@ export default async function PanelLayout({ children }: Readonly<{ children: Rea
     <div className={navCollapsed ? "panel-root is-nav-collapsed" : "panel-root"}>
       <SkipLink />
       <NavProgress />
+      {/*
+        Komut paleti (⌘K / Ctrl+K / "/"). Yerleşimde duruyor ki her
+        sayfadan açılabilsin ve sayfa değişince kapanıp yeniden
+        kurulmasın.
+      */}
+      <KomutPaleti />
 
       <aside id="panel-sidebar" className="panel-sidebar">
         <Link prefetch={false} className="panel-brand" href="/" aria-label="ArvoARC — Genel Bakış">

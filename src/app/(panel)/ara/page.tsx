@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
-import { orderBadge, productStatusLabel } from "@/lib/commerce-labels";
+import { panelAra, type AramaSonucu } from "@/lib/panel-arama";
 import { Icon, type IconName } from "@/components/panel/icons";
 import "./search.css";
 
-const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
-const shortDate = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Istanbul" });
+/* Biçimlendirme lib/panel-arama.ts'te: tutar ve tarih metinleri sonuçla birlikte geliyor. */
 
 type Hit = { key: string; href: string; icon: IconName; title: string; detail: string; side?: React.ReactNode };
 
@@ -46,81 +45,30 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     </>;
   }
 
-  const like = `%${term}%`;
-  const [ordersResult, productsResult, skuResult, collectionsResult] = await Promise.all([
-    supabase.from("arc_orders").select("id,order_number,customer_name,customer_email,total,status,payment_status,created_at").eq("organization_id", organization.id).or(`order_number.ilike.${like},customer_name.ilike.${like},customer_email.ilike.${like}`).order("created_at", { ascending: false }).limit(60),
-    supabase.from("arc_products").select("id,name,status,metadata").eq("organization_id", organization.id).ilike("name", like).order("updated_at", { ascending: false }).limit(8),
-    supabase.from("arc_product_variants").select("product_id,sku").eq("organization_id", organization.id).ilike("sku", like).limit(20),
-    supabase.from("arc_collections").select("id,title,slug,status").eq("organization_id", organization.id).ilike("title", like).order("title").limit(5),
-  ]);
-  for (const result of [ordersResult, productsResult, skuResult, collectionsResult]) if (result.error) throw new Error(result.error.message);
+  /*
+    Sorgular lib/panel-arama.ts'te ve ⌘K komut paletiyle PAYLAŞILIYOR.
+    İkinci bir kopya yazmak, birinde düzeltilen bir sorgunun ötekinde
+    eskimesi demekti.
+  */
+  const sonuc = await panelAra(supabase, organization.id, term);
 
-  /* SKU ile eşleşen ama adı eşleşmeyen ürünler de gösterilir. */
-  const nameMatches = productsResult.data ?? [];
-  const skuByProduct = new Map((skuResult.data ?? []).map((row) => [row.product_id, row.sku]));
-  const missingIds = [...skuByProduct.keys()].filter((id) => !nameMatches.some((product) => product.id === id)).slice(0, 8);
-  const { data: skuProducts } = missingIds.length
-    ? await supabase.from("arc_products").select("id,name,status,metadata").eq("organization_id", organization.id).in("id", missingIds)
-    : { data: [] };
-  const products = [...nameMatches, ...(skuProducts ?? [])].slice(0, 10);
-
-  const orders = ordersResult.data ?? [];
-  const orderHits: Hit[] = orders.slice(0, 8).map((order) => {
-    const badge = orderBadge(order.status, order.payment_status);
-    return {
-      key: order.id,
-      href: `/siparisler/${order.id}`,
-      icon: "box",
-      title: `${order.order_number} · ${order.customer_name || order.customer_email || "Misafir müşteri"}`,
-      detail: shortDate.format(new Date(order.created_at)),
-      side: <><strong className="sr-amount">{money.format(order.total / 100)}</strong><em className="ac-tag" data-tone={badge.tone}>{badge.label}</em></>,
-    };
+  const rozet = (deger?: { metin: string; ton?: string }) =>
+    deger ? <em className="ac-tag" data-tone={deger.ton}>{deger.metin}</em> : null;
+  const hit = (satir: AramaSonucu, ikon: IconName, yanTarz?: string): Hit => ({
+    key: satir.anahtar,
+    href: satir.yol,
+    icon: ikon,
+    title: satir.baslik,
+    detail: satir.detay,
+    side: <>{satir.yan ? <span className={yanTarz}>{satir.yan}</span> : null}{rozet(satir.rozet)}</>,
   });
 
-  /* Müşteriler siparişlerden türetilir (müşteri listesiyle aynı anahtar). */
-  const customers = new Map<string, { key: string; name: string; email: string; orders: number }>();
-  for (const order of orders) {
-    const email = (order.customer_email ?? "").trim().toLocaleLowerCase("tr-TR");
-    const name = (order.customer_name ?? "").trim() || "İsimsiz müşteri";
-    const needle = term.toLocaleLowerCase("tr-TR");
-    if (!name.toLocaleLowerCase("tr-TR").includes(needle) && !email.includes(needle)) continue;
-    const key = email || `name:${name.toLocaleLowerCase("tr-TR")}`;
-    const entry = customers.get(key);
-    if (entry) entry.orders++;
-    else customers.set(key, { key, name, email, orders: 1 });
-  }
-  const customerHits: Hit[] = [...customers.values()].slice(0, 6).map((customer) => ({
-    key: customer.key,
-    href: `/musteriler/${encodeURIComponent(customer.key)}`,
-    icon: "users",
-    title: customer.name,
-    detail: customer.email || "E-posta yok",
-    side: <span className="sr-muted">{customer.orders}+ sipariş</span>,
-  }));
+  const orderHits = sonuc.siparisler.map((satir) => hit(satir, "box", "sr-amount"));
+  const customerHits = sonuc.musteriler.map((satir) => hit(satir, "users", "sr-muted"));
+  const productHits = sonuc.urunler.map((satir) => hit(satir, "tag"));
+  const collectionHits = sonuc.koleksiyonlar.map((satir) => hit(satir, "layers"));
 
-  const productHits: Hit[] = products.map((product) => {
-    const meta = (product.metadata ?? {}) as { vendor?: string };
-    const sku = skuByProduct.get(product.id);
-    return {
-      key: product.id,
-      href: `/urunler/${product.id}`,
-      icon: "tag",
-      title: product.name,
-      detail: [sku ? `SKU ${sku}` : null, meta.vendor].filter(Boolean).join(" · ") || "Ürün",
-      side: <em className="ac-tag" data-tone={product.status === "active" ? undefined : product.status === "draft" ? "warn" : "muted"}>{productStatusLabel(product.status)}</em>,
-    };
-  });
-
-  const collectionHits: Hit[] = (collectionsResult.data ?? []).map((collection) => ({
-    key: collection.id,
-    href: `/koleksiyonlar/${collection.id}`,
-    icon: "layers",
-    title: collection.title,
-    detail: `/${collection.slug}`,
-    side: <em className="ac-tag" data-tone={collection.status === "active" ? undefined : "muted"}>{collection.status === "active" ? "Aktif" : collection.status === "draft" ? "Taslak" : "Arşiv"}</em>,
-  }));
-
-  const total = orderHits.length + customerHits.length + productHits.length + collectionHits.length;
+  const total = sonuc.toplam;
   const encoded = encodeURIComponent(term);
 
   return <>
@@ -133,7 +81,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
 
     <div className="ac-stack">
       {total ? <>
-        <Section title="Siparişler" hits={orderHits} more={orders.length > 8 ? { href: `/siparisler?q=${encoded}`, label: "Tüm siparişlerde" } : undefined} />
+        <Section title="Siparişler" hits={orderHits} more={sonuc.dahaFazlaSiparis ? { href: `/siparisler?q=${encoded}`, label: "Tüm siparişlerde" } : undefined} />
         <Section title="Müşteriler" hits={customerHits} more={{ href: `/musteriler?q=${encoded}`, label: "Müşteri listesinde" }} />
         <Section title="Ürünler" hits={productHits} more={{ href: `/urunler?q=${encoded}`, label: "Katalogda" }} />
         <Section title="Koleksiyonlar" hits={collectionHits} />
