@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
@@ -56,13 +55,25 @@ export async function createProduct(formData: FormData) {
  */
 export async function bulkSetStatus(formData: FormData) {
   const { supabase, organization, membership } = await requireTenant();
-  const back = (result: Record<string, string>) => backUrl(formData.get("back"), "/urunler", result);
-  if (!MANAGERS.includes(membership.role)) redirect(back({ error: "forbidden" }));
+  /*
+    SONUÇ ÇEREZE, adres satırına değil.
+
+    Bu eylem redirect(backUrl(..., {error})) kullanıyordu; sayfa ise
+    çerezi okuyan PanelBildirimi'ni çiziyor. Yani "seçilenleri yayınla"
+    hiçbir mesaj göstermiyordu — başarısızlıkta bile. Karşıtlığı aynı
+    dosyada duruyordu: hemen aşağıdaki bulkUpdateStatus (filtreye
+    uyanlar) bildirimliDonus kullanıyor ve mesajı görünüyor.
+
+    backUrl duruyor ama yalnızca GİDİLECEK YOLU doğrulamak için.
+  */
+  const back = (sonuc: { hata?: string; basari?: string }) =>
+    bildirimliDonus(backUrl(formData.get("back"), "/urunler", {}), sonuc);
+  if (!MANAGERS.includes(membership.role)) return await back({ hata: hataMetni("forbidden") });
 
   const status = String(formData.get("status") ?? "");
   const ids = [...new Set(formData.getAll("product_id").map(String).filter(Boolean))].slice(0, 100);
-  if (!STATUSES.includes(status)) redirect(back({ error: "invalid-status" }));
-  if (!ids.length) redirect(back({ error: "bulk-empty" }));
+  if (!STATUSES.includes(status)) return await back({ hata: hataMetni("invalid-status") });
+  if (!ids.length) return await back({ hata: hataMetni("bulk-empty") });
 
   const { data, error } = await supabase
     .from("arc_products")
@@ -71,12 +82,19 @@ export async function bulkSetStatus(formData: FormData) {
     .in("id", ids)
     .neq("status", status)
     .select("id");
-  if (error) redirect(back({ error: "bulk-failed" }));
+  if (error) return await back({ hata: hataMetni("bulk-failed") });
 
   const updated = data?.length ?? 0;
+  const skipped = ids.length - updated;
   revalidatePath("/");
   revalidatePath("/urunler");
-  redirect(back({ ok: "bulk-selected", updated: String(updated), skipped: String(ids.length - updated) }));
+  /* Atlananlar SÖYLENİYOR: aynı durumdaki ürünler güncellenmiyor ve
+     "5 seçtim, 2 değişti" farkı açıklanmazsa eksik işlem sanılıyor. */
+  return await back({
+    basari:
+      `${updated.toLocaleString("tr-TR")} ürünün durumu güncellendi.` +
+      (skipped > 0 ? ` ${skipped.toLocaleString("tr-TR")} ürün zaten bu durumdaydı, atlandı.` : ""),
+  });
 }
 
 /**

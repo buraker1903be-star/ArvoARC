@@ -144,10 +144,17 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
     </section>
 
     <div className="ac-stack">
+      {/*
+        Stok hareketinin sonucu BURADA görünüyor.
+
+        Bir dönem burada "buraya hata yazan bir işlem YOK" yazıyordu ve
+        kusuru tam o varsayım korudu: adjustInventory sonucu adres
+        satırına yazıyordu (?updated= / ?error=), bu şerit ise çerezi
+        okuyor. Yani giriş de çıkış da, başarı da hata da hiç
+        görünmüyordu — kullanıcı adedin değişip değişmediğini listeyi
+        gözleyerek anlamak zorundaydı. Eylem çereze taşındı.
+      */}
       <PanelBildirimi />
-      {/* Buraya hata yazan bir işlem YOK: bu satır yalnızca adres
-          satırına elle ?error= eklenince çalışıyordu, yani dışarıdan
-          uydurulmuş mesajı göstermekten başka işe yaramıyordu. */}
 
       {/*
         ÖZET ŞERİDİ KALDIRILDI. Negatif / Stok sıfır / Düşük stok
