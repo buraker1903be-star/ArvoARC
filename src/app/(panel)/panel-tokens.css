@@ -1,0 +1,120 @@
+/* ============================================================
+   ArvoARC Panel — Tasarım jetonları
+   TEK KAYNAK. Panelde geçen her renk, boşluk, yarıçap, gölge ve
+   geçiş buradan gelir; modül CSS'lerine sabit değer yazılmaz.
+
+   NEDEN AYRI DOSYA. Jetonlar panel.css'in içinde, 700 satırlık
+   kabuk yerleşiminin başında duruyordu; ayrıca design.css kendi
+   :root'unda aynı adların bir kopyasını taşıyordu. İkisi çakışmıyordu
+   (.panel-root sınıfı :root'u özgüllükle yeniyor) ama dosyayı okuyan
+   hangisinin geçerli olduğunu bilemiyordu. Boşluk ölçeği (--s1…--s7),
+   --r3 ve geçiş süreleri ise YALNIZCA design.css'te vardı: iki dosya
+   birlikte okunmadan panelin ölçüsü anlaşılmıyordu.
+
+   Karanlık mod: <html data-theme="dark">. Jeton seviyesinde çözülür,
+   bileşenler tema bilmez.
+   ============================================================ */
+
+.panel-root{
+  /* gece mavisi */
+  --brand-50:#eef1f6;--brand-100:#d9dfea;--brand-200:#b3bfd3;--brand-300:#8497b5;--brand-400:#536b91;
+  --brand-500:#2c4368;--brand-600:#1b3050;--brand-700:#13243f;--brand-800:#0b1b2e;--brand-900:#08142a;--brand-950:#050c1a;
+  /* şampanya altını — 500 dekoratif; metinde AA için 600+ */
+  --accent-50:#fbf8f1;--accent-100:#f5eddb;--accent-200:#eadbb8;--accent-300:#dcc28c;--accent-400:#c9a66a;
+  --accent-500:#b28a49;--accent-600:#8e6d33;--accent-700:#74582a;--accent-800:#5a4421;--accent-900:#3f3017;
+  /* iOS nötr gri */
+  --n-0:#fff;--n-50:#f9f9fb;--n-100:#f2f2f7;--n-200:#e5e5ea;--n-300:#d1d1d6;--n-400:#a1a1a6;
+  --n-500:#6e6e73;--n-600:#515154;--n-700:#3a3a3c;--n-800:#1f2433;--n-900:#0b1b2e;
+
+  --bg:var(--n-100);--surface:#fff;--surface-2:var(--n-50);--surface-raised:#fff;
+  --sidebar-from:#0e2139;--sidebar-to:#050c1a;
+  --ink:var(--n-900);--ink-soft:var(--n-700);--muted:var(--n-500);--dim:var(--n-400);
+  --line:var(--n-200);--line-soft:#efeff3;--line-strong:var(--n-300);
+  --accent:var(--accent-600);--accent-strong:var(--accent-800);--accent-soft:var(--accent-100);--accent-bright:var(--accent-400);
+
+  --success:#2f7d57;--success-soft:#e7f3ec;
+  --warning:#a8741c;--warning-soft:#faf0dc;
+  --danger:#b83c3c;--danger-soft:#f9e9e7;
+  --info:#2f5f9e;--info-soft:#e8eff8;
+
+  --shadow-sm:0 1px 2px rgba(11,27,46,.04),0 4px 14px rgba(11,27,46,.035);
+  --shadow-md:0 2px 6px rgba(11,27,46,.04),0 16px 38px rgba(11,27,46,.08);
+  --shadow-lg:0 28px 70px rgba(5,12,26,.18);
+  --r-sm:10px;--r-md:14px;--r-lg:18px;--r-xl:24px;--r-pill:999px;
+
+  --font-body:var(--font-system);
+  --ease-spring:cubic-bezier(.22,1,.36,1);
+  --ease-sheet:cubic-bezier(.32,.72,0,1);
+  --glass-bg:color-mix(in srgb,var(--surface) 76%,transparent);
+  --glass-strong:color-mix(in srgb,var(--surface) 86%,transparent);
+  --glass-blur:saturate(180%) blur(22px);
+  --sidebar-w:264px;
+
+  /* Eski ArvoARC adları → yeni palet. globals.css ve design.css bu adları
+     kullanıyor; burada yeniden bağlanınca eski sayfalar da yeni
+     renklere ve karanlık moda kendiliğinden geçiyor. */
+  --navy:var(--brand-800);--navy-2:var(--brand-600);
+  --green:var(--accent-600);--green-dark:var(--accent-700);--lime:var(--accent-300);
+  --paper:var(--bg);--paper-2:var(--surface-2);--surface-soft:var(--surface-2);--ink-2:var(--ink-soft);
+  --radius-sm:var(--r-sm);--radius:var(--r-lg);--radius-lg:var(--r-xl);--shadow:var(--shadow-sm);
+  --c-ink:var(--ink);--c-ink-2:var(--ink-soft);--c-ink-3:var(--muted);
+  --c-bg:var(--bg);--c-surface:var(--surface);--c-surface-2:var(--surface-2);
+  --c-line:var(--line);--c-line-2:var(--line-strong);
+  --c-brand:var(--brand-700);--c-accent:var(--accent);
+  --c-good:var(--success);--c-good-bg:var(--success-soft);
+  --c-warn:var(--warning);--c-warn-bg:var(--warning-soft);
+  --c-bad:var(--danger);--c-bad-bg:var(--danger-soft);
+  --e1:var(--shadow-sm);--e2:var(--shadow-md);--r1:var(--r-sm);--r2:var(--r-lg);
+  /* Yazı ölçeği: en küçük 11px. Eski panelde 7–9px etiketler vardı. */
+  --t-micro:11px;--t-sm:12.5px;--t-base:13.5px;--t-lg:16px;--t-xl:28px;--t-num:28px;
+
+
+  /* --- Boşluk ölçeği ---------------------------------------
+     Dörtlü adımlar; ara değer yok. Tutarsız boşluk, panelin
+     dağınık görünmesinin başlıca sebebiydi. (Eskiden design.css
+     :root'unda duruyordu; panelde .panel-root onu eziyor ama bu
+     on bir token orada YOKTU, yani ölçek iki ayrı dosyadan
+     geliyordu.) */
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;
+  --r3:var(--r-pill);
+  /* Tek eğri, iki süre: akıcılık tutarlılıktan gelir. */
+  --ease:cubic-bezier(.2,.8,.2,1);--fast:140ms;--slow:240ms;
+
+  min-height:100dvh;
+  color:var(--ink);
+  font-family:var(--font-body);
+  background:radial-gradient(circle at 70% -15%,rgba(255,255,255,.75),transparent 30rem),var(--bg);
+  color-scheme:light;
+  font-synthesis:none;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+  overflow-x:hidden;
+  overflow-x:clip;
+  scrollbar-color:color-mix(in srgb,var(--ink) 20%,transparent) transparent;
+}
+
+html[data-theme="dark"] .panel-root{
+  --bg:var(--brand-950);--surface:#0e1829;--surface-2:#0a1322;--surface-raised:#122036;
+  --sidebar-from:#08142a;--sidebar-to:#03070f;
+  --ink:#f2f2f7;--ink-soft:#d1d1d6;--muted:#a1a1a6;--dim:#6e6e73;
+  --line:#1f2b40;--line-soft:#172234;--line-strong:#2c3a52;
+  /* koyu zeminde koyu altın okunmuyor: vurgu parlak altına geçer */
+  --accent:var(--accent-400);--accent-strong:var(--accent-300);--accent-soft:#2a2215;--accent-100:#2a2215;--accent-200:#3a2f1c;
+  --success:#5bbf8a;--success-soft:#12301f;
+  --warning:#e0b056;--warning-soft:#3a2c10;
+  --danger:#f07a6f;--danger-soft:#3a1716;
+  --info:#7ea8e6;--info-soft:#132844;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.2),0 6px 18px rgba(0,0,0,.14);
+  --shadow-md:0 16px 40px rgba(0,0,0,.3);
+  --shadow-lg:0 28px 70px rgba(0,0,0,.5);
+  --green:var(--accent-400);--green-dark:var(--accent-300);
+  background:radial-gradient(circle at 70% -15%,color-mix(in srgb,var(--accent-bright) 7%,transparent),transparent 30rem),var(--bg);
+  color-scheme:dark;
+}
+
+/* Sayfanın esneyerek kaydığı kenarlarda gövde zemini görünür. */
+body:has(.panel-root){background:#f2f2f7}
+html[data-theme="dark"] body:has(.panel-root){background:#050c1a}

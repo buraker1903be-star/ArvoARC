@@ -14,6 +14,8 @@ import { ThemeToggle } from "@/components/panel/theme-toggle";
 import { TopbarSearch } from "@/components/panel/topbar-search";
 import { Suspense } from "react";
 import { activityUnread } from "./activity-actions";
+import "./panel-tokens.css";
+import "./design.css";
 import "./panel.css";
 import "./dashboard.css";
 import "./activity.css";
