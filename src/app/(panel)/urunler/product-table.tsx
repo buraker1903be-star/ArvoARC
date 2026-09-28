@@ -23,6 +23,8 @@ export type ProductRow = {
   stockTone?: string;
   status: string;
   statusLabel: string;
+  /** Zamanlanmış yayın varsa rozetin başlığında okunuyor. */
+  statusHint?: string;
   statusTone?: string;
   bestSeller: boolean;
 };
@@ -178,7 +180,9 @@ export function ProductTable({ rows, canManage, back, katalogBos, children }: { 
               </span>
               <span className="pl-stock"><em className="stock-pill" data-tone={row.stockTone}>{row.stock.toLocaleString("tr-TR")} adet</em></span>
               <span className="pl-status">
-                <em className="ac-tag" data-tone={row.statusTone}>{row.statusLabel}</em>
+                {/* Zamanlama rozete İŞARET olarak iniyor: yeni bir sütun
+                    açmak listeden satır çalardı, saat imi 0px maliyetli. */}
+                <em className="ac-tag" data-tone={row.statusHint?"warn":row.statusTone} title={row.statusHint}>{row.statusLabel}{row.statusHint?" ⏱":""}</em>
                 {row.bestSeller ? <small>Çok satan</small> : null}
               </span>
             </div>

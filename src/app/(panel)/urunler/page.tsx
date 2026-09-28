@@ -4,6 +4,7 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { createProduct, bulkUpdateStatus } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel } from "@/lib/commerce-labels";
+import { yayinOzeti } from "@/lib/yayin-plani";
 import { PanelBildirimi } from "@/components/panel/bildirim";
 import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
 import { gorunumleriOku } from "../gorunumler/oku";
@@ -92,7 +93,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
   };
 
   /* Açıklama listede gösterilmiyor; uzun HTML'i çekmemek için seçilmiyor. */
-  let listQuery = scoped(supabase.from("arc_products").select("id,name,status,source,supplier,metadata,created_at", { count: "exact" }).eq("organization_id", organization.id));
+  let listQuery = scoped(supabase.from("arc_products").select("id,name,status,source,supplier,metadata,created_at,publish_at,unpublish_at", { count: "exact" }).eq("organization_id", organization.id));
   if (statusFilter !== "all") listQuery = listQuery.eq("status", statusFilter);
   const from = (page - 1) * PAGE_SIZE;
 
@@ -206,7 +207,15 @@ export default async function Products({ searchParams }: { searchParams: Promise
       stock: totalStock,
       stockTone: totalStock < 0 ? "bad" : totalStock === 0 ? "warn" : undefined,
       status: product.status,
+      /*
+        ZAMANLANMIŞ ÜRÜN LİSTEDE AYIRT EDİLİYOR. Planı olan bir taslak,
+        planı olmayandan görünüşte farksızdı: "hangi ürünler
+        zamanlanmış" sorusunun ekranda karşılığı yoktu. Rozetin
+        BAŞLIĞINA yazılıyor, yeni bir sütun açılmıyor — liste
+        yoğunluğu bu panelde ölçülerek kazanıldı.
+      */
       statusLabel: productStatusLabel(product.status),
+      statusHint: yayinOzeti(product.publish_at, product.unpublish_at) || undefined,
       statusTone: product.status === "active" ? undefined : product.status === "draft" ? "warn" : "muted",
       bestSeller: bestSellerIds.has(product.id),
     };

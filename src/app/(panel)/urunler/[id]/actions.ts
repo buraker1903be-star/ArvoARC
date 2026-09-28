@@ -6,6 +6,8 @@ import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { matrisiKur, seceneginDegerleri } from "@/lib/varyant-matrisi";
 import { bosSlug, slugla } from "@/lib/slug";
+import { trLocalToIso } from "@/lib/tr-time";
+import { yayinPlani, type UrunDurumu } from "@/lib/yayin-plani";
 import { kopyaAdi, kopyaKodlari, kopyaSlugTabani, skuAdaylari, slugSirasi } from "@/lib/urun-kopyasi";
 
 const allowedRoles = new Set(["owner", "admin", "manager"]);
@@ -42,9 +44,24 @@ export async function updateProduct(formData: FormData) {
   const name = field(formData, "name", 200);
   const description = field(formData, "description", 20000);
   const requestedStatus = field(formData, "status", 20);
-  const status = ["active", "draft", "archived"].includes(requestedStatus) ? requestedStatus : "draft";
+  const istenenDurum = (["active", "draft", "archived"].includes(requestedStatus) ? requestedStatus : "draft") as UrunDurumu;
   const slug = slugla(field(formData, "slug", 180) || name);
   if (!id || !name || !slug) return await bildirimliDonus(`/urunler/${id}`,{hata:hataMetni("invalid-product")});
+
+  /*
+    ZAMANLANMIŞ YAYIN. Alanlar Türkiye saati soruyor, sütunlar an
+    tutuyor; çeviri burada. Boş alan "plan yok" demek — tarayıcı boş
+    alanı boş gönderir ve "kullanıcı temizledi"den ayrışmaz, o yüzden
+    ekran kayıtlı zamanı alana YAZIYOR (trIsoToLocal).
+  */
+  const yayinAlani = field(formData, "publish_at", 40);
+  const bitisAlani = field(formData, "unpublish_at", 40);
+  const yayinIso = yayinAlani ? trLocalToIso(yayinAlani) : null;
+  const bitisIso = bitisAlani ? trLocalToIso(bitisAlani) : null;
+  if ((yayinAlani && !yayinIso) || (bitisAlani && !bitisIso)) return await bildirimliDonus(`/urunler/${id}`,{hata:hataMetni("invalid-date")});
+  const plan = yayinPlani({ durum: istenenDurum, publishAt: yayinIso, unpublishAt: bitisIso, simdi: new Date().toISOString() });
+  if (plan.hata) return await bildirimliDonus(`/urunler/${id}`,{hata:plan.hata});
+  const status = plan.durum;
 
   const { data: currentProduct, error: currentProductError } = await supabase
     .from("arc_products")
@@ -84,7 +101,7 @@ export async function updateProduct(formData: FormData) {
 
   const { error } = await supabase
     .from("arc_products")
-    .update({ name, slug, description, status, metadata, updated_at: new Date().toISOString() })
+    .update({ name, slug, description, status, metadata, publish_at: plan.publishAt, unpublish_at: plan.unpublishAt, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("organization_id", organization.id);
 
@@ -92,7 +109,9 @@ export async function updateProduct(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/urunler");
   revalidatePath(`/urunler/${id}`);
-  return await bildirimliDonus(`/urunler/${id}`,{basari:basariMetni("product")});
+  /* Plan sessizce değişmedi: nedeni söyleniyor, yoksa kullanıcı
+     kaydettiği zamanlamanın durduğunu sanırdı. */
+  return await bildirimliDonus(`/urunler/${id}`, plan.not ? { uyari: `${basariMetni("product")} ${plan.not}` } : { basari: basariMetni("product") });
 }
 
 export async function createVariant(formData:FormData){
@@ -368,6 +387,10 @@ export async function urunuKopyala(formData: FormData) {
     supplier_product_code: kaynak.supplier_product_code,
     tax_rate: kaynak.tax_rate,
     metadata: { ...meta, image_paths: [] },
+    /* Plan KOPYALANMIYOR: kaynağın kampanya saati geldiğinde yarım
+       düzenlenmiş kopya da mağazaya çıkardı. */
+    publish_at: null,
+    unpublish_at: null,
     created_by: user.id,
   }).select("id").single();
   if (urunHatasi || !yeniUrun) return await bildirimliDonus(donus, { hata: hataMetni(urunHatasi?.code ?? urunHatasi?.message ?? "product-create") });

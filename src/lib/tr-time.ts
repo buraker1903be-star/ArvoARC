@@ -25,3 +25,18 @@ export function trLocalToIso(value: string) {
   if (local.getUTCMonth() !== Number(month) - 1 || local.getUTCDate() !== Number(day) || Number(hour) > 23 || Number(minute) > 59) return null;
   return new Date(ms).toISOString();
 }
+
+/**
+ * ISO anını datetime-local alanına yazılacak Türkiye saatine çevirir
+ * ("2026-09-20T10:00"). trLocalToIso'nun tersi: alan doldurulmadan
+ * kaydedilen bir form, kayıtlı zamanı SİLİYORDU — tarayıcı boş alanı
+ * boş gönderir ve "kullanıcı temizledi" ile ayrışmazdı.
+ */
+export function trIsoToLocal(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const an = new Date(iso);
+  if (Number.isNaN(an.getTime())) return "";
+  /* Türkiye ofseti eklenip UTC alanları okunuyor: sunucu UTC'de
+     çalıştığı için getHours() yerel saati vermiyor. */
+  return new Date(an.getTime() + TR_OFFSET).toISOString().slice(0, 16);
+}

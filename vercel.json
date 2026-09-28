@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/lr-fiyatlari",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/yayin-zamani",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -8,6 +8,8 @@ import { productStatusLabel, sourceLabel } from "@/lib/commerce-labels";
 import { Icon } from "@/components/panel/icons";
 import { PanelBildirimi } from "@/components/panel/bildirim";
 import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
+import { trIsoToLocal } from "@/lib/tr-time";
+import { yayinOzeti } from "@/lib/yayin-plani";
 import { SeoFields } from "./seo-fields";
 import "../../catalog.css";
 
@@ -25,7 +27,7 @@ type Meta={
 export default async function ProductDetail({params}:{params:Promise<{id:string}>}){
   const {id}=await params; const {supabase,organization,membership}=await requireTenant();
   const [{data:product,error},{data:variants,error:variantError},{data:settings}]=await Promise.all([
-    supabase.from("arc_products").select("id,name,slug,description,status,source,metadata,created_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
+    supabase.from("arc_products").select("id,name,slug,description,status,source,metadata,created_at,publish_at,unpublish_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
     supabase.from("arc_product_variants").select("id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price").eq("organization_id",organization.id).eq("product_id",id).order("title"),
     supabase.from("arc_store_settings").select("storefront_url").eq("organization_id",organization.id).maybeSingle(),
   ]);
@@ -64,6 +66,7 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
   }catch{storeHref=null;}
 
   const statusTone=product.status==="active"?undefined:product.status==="draft"?"warn":"muted";
+  const planOzeti=yayinOzeti(product.publish_at,product.unpublish_at);
 
   return <>
     <section className="ac-bar">
@@ -100,6 +103,12 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
         <article className="ac-metric" data-tone={totalStock<0?"bad":totalStock===0?"warn":undefined}><span>Toplam stok</span><strong>{totalStock.toLocaleString("tr-TR")} adet</strong><small>{backorderCount?`${backorderCount} varyantta stoksuz satış açık`:"Stoksuz satış kapalı"}</small></article>
         <article className="ac-metric"><span>Varyant</span><strong>{variantList.length}</strong><small>Beden, renk ve seçenekler</small></article>
         <article className="ac-metric"><span>Görsel</span><strong>{imageEntries.length} / 8</strong><small>{imageEntries.length?"İlk görsel kapak olarak kullanılır":"Kapak görseli eksik"}</small></article>
+        {/*
+          Zamanlama kutusu YALNIZCA plan varken. Boşken "—" gösteren
+          beşinci bir kutu, bugün bu panelden kaldırdığımız gürültünün
+          aynısı olurdu.
+        */}
+        {planOzeti?<article className="ac-metric" data-tone="warn"><span>Zamanlama</span><strong>{product.status==="draft"?"Yayına girecek":"Yayından çıkacak"}</strong><small>{planOzeti}</small></article>:null}
       </section>
 
       <div className="product-layout">
@@ -141,6 +150,15 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
                 <label>Marka<input name="vendor" defaultValue={meta.vendor??""} maxLength={120} placeholder="Örn. ARVOCULTURE"/></label>
                 <label>Ürün türü<input name="type" defaultValue={meta.type??""} maxLength={120} placeholder="Örn. Kişisel bakım"/></label>
                 <label>Durum<select name="status" defaultValue={product.status}><option value="active">Aktif</option><option value="draft">Taslak</option><option value="archived">Arşivlenmiş</option></select></label>
+                {/*
+                  Zamanlama Durum'un YANINDA: ikisi aynı soruyu
+                  cevaplıyor ("bu ürün ne zaman mağazada olacak") ve
+                  ayrı bölümlere konsaydı çelişkili doldurulurdu.
+                  Kayıtlı zaman alana yazılıyor — yazılmasaydı forma
+                  dokunmadan Kaydet'e basmak planı silerdi.
+                */}
+                <label>Yayına girme (Türkiye saati)<input name="publish_at" type="datetime-local" defaultValue={trIsoToLocal(product.publish_at)}/><small>Taslak ürün bu anda kendiliğinden yayına girer</small></label>
+                <label>Yayından çıkma (Türkiye saati)<input name="unpublish_at" type="datetime-local" defaultValue={trIsoToLocal(product.unpublish_at)}/><small>Kampanya bitince ürün taslağa döner</small></label>
                 {/*
                   Shopify CSV'sinde SKU'su olmayan ürünlerde şart: içe
                   aktarım kimliği yeniden üretip elle düzeltilmiş kaydın

@@ -203,6 +203,7 @@
       "metadata",
       "name",
       "organization_id",
+      "publish_at",
       "slug",
       "source",
       "status",
@@ -210,6 +211,7 @@
       "supplier_product_code",
       "supplier_synced_at",
       "tax_rate",
+      "unpublish_at",
       "updated_at"
     ],
     "arc_return_requests": [

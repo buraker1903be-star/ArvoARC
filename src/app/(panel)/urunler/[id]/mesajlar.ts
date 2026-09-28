@@ -17,6 +17,7 @@ export const ERRORS:Record<string,string>={
   "invalid-image-path":"Geçersiz görsel.",
   "image-not-found":"Görsel bulunamadı.",
   /* Kopyalama: iki sınır da "aynı üründen çok fazla kopya" demek. */
+  "invalid-date":"Tarih geçersiz. Gün, ay ve saati kontrol edin.",
   "copy-slug-full":"Bu üründen çok fazla kopya var; eski kopyaları arşivleyin.",
   "copy-sku-full":"Varyant kodları için boş numara kalmadı; eski kopyaları temizleyin.",
 };
