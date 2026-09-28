@@ -223,7 +223,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
         27.09.2026).
       */}
 
-      <section className="ac ac-pad-sm catalog-toolbar">
+      <section className="ac ac-pad-sm list-toolbar">
         <form className="ac-filter catalog-search" role="search">
           {statusFilter !== "all" ? <input type="hidden" name="filter" value={statusFilter} /> : null}
           {source !== "all" ? <input type="hidden" name="source" value={source} /> : null}
@@ -283,7 +283,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
         <details className="ac ac-pad catalog-details">
           <summary><span><b>Filtreye göre toplu durum değişikliği</b><small>Bir tedarikçinin veya koleksiyonun tüm ürünlerini tek seferde açıp kapatın</small></span></summary>
           <form action={bulkUpdateStatus} className="catalog-form is-narrow">
-            <p className="catalog-hint">Listede seçerek toplu işlem yapabilirsiniz; bu form ise filtreye uyan <b>tüm</b> ürünleri değiştirir. En az bir tedarikçi veya koleksiyon seçilmesi zorunlu: filtresiz işlem tüm kataloğu değiştirir ve geri alması zordur.</p>
+            <p className="list-hint">Listede seçerek toplu işlem yapabilirsiniz; bu form ise filtreye uyan <b>tüm</b> ürünleri değiştirir. En az bir tedarikçi veya koleksiyon seçilmesi zorunlu: filtresiz işlem tüm kataloğu değiştirir ve geri alması zordur.</p>
             <label>Tedarikçi<select name="supplier" className="ac-input"><option value="">Seçiniz</option><option value="tarzyeri">Tarzyeri</option></select></label>
             <label>Koleksiyon (isteğe bağlı, slug)<input name="collection" placeholder="örnek: erkek-t-shirt" className="ac-input" /></label>
             <label>Yalnızca şu durumdakiler<select name="current_status" className="ac-input"><option value="">Hepsi</option><option value="draft">Taslak</option><option value="active">Yayında</option><option value="archived">Arşiv</option></select></label>

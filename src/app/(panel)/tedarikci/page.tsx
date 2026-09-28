@@ -89,18 +89,18 @@ export default async function SuppliersPage() {
                     Örnek: {money.format(200)} alış{service ? ` + ${money.format(service / 100)} hizmet` : ""} · %{margin} kâr · {money.format(shipping / 100)} kargo payı →
                     <strong>{money.format(previewPrice(20000, margin, shipping, round, service) / 100)}</strong> satış
                   </p>
-                  <p className="module-hint">Tedarikçi stoğu tampon değerin altına düştüğünde ürün satışa kapanır ve vitrinde “Tükendi” görünür; siparişi iletene kadar tükenme riskine karşı güvenlik payıdır. Fiyat değişikliği yalnızca yeni aktarımlarda uygulanır.</p>
+                  <p className="list-hint">Tedarikçi stoğu tampon değerin altına düştüğünde ürün satışa kapanır ve vitrinde “Tükendi” görünür; siparişi iletene kadar tükenme riskine karşı güvenlik payıdır. Fiyat değişikliği yalnızca yeni aktarımlarda uygulanır.</p>
 
                   <div className="supplier-reset">
                     <form action={resetCursor}>
                       <input type="hidden" name="code" value={supplier.code} />
                       <button type="submit" className="ac-btn">Aktarım imlecini sıfırla</button>
                     </form>
-                    <p className="module-hint">Mevcut ürünlerin fiyatını yeni kurala göre güncellemek için imleci sıfırlayın; bir sonraki aktarım kataloğu baştan dolaşır.</p>
+                    <p className="list-hint">Mevcut ürünlerin fiyatını yeni kurala göre güncellemek için imleci sıfırlayın; bir sonraki aktarım kataloğu baştan dolaşır.</p>
                   </div>
                 </>
               ) : (
-                <p className="module-hint">Ayarları değiştirmek için yönetici yetkisi gerekiyor.</p>
+                <p className="list-hint">Ayarları değiştirmek için yönetici yetkisi gerekiyor.</p>
               )}
             </section>
           );

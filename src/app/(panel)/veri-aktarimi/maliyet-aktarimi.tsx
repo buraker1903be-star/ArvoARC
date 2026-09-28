@@ -336,7 +336,7 @@ export function MaliyetAktarimi() {
           spellCheck={false}
         />
       </label>
-      <p className="order-hint">
+      <p className="list-hint">
         Her satırda bir ürün: SKU ve alış fiyatı. Aradaki ürün adı yok sayılır; ayırıcı sekme, virgül,
         noktalı virgül ya da boşluk olabilir. <b>Satış fiyatını değil, sizin ödediğiniz tutarı yapıştırın.</b>
       </p>

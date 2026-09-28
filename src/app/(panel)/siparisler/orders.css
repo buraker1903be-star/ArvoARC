@@ -4,9 +4,9 @@
    (Veri listeleri); burada yalnızca siparişe özgü düzen.
    ============================================================ */
 
-/* ---------- Araç şeridi: arama + dönem ---------- */
-.order-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
-.order-toolbar .order-search{flex:1 1 380px}
+/* ---------- Araç şeridi: arama + dönem ----------
+   Çubuğun kendisi panel.css'te; burada yalnızca arama genişliği. */
+.list-toolbar .order-search{flex:1 1 380px}
 
 /* ---------- Liste ızgarası ----------
    Sütunlar: seçim · sipariş+tarih · müşteri · tutar · kâr · operasyon ·
@@ -108,8 +108,8 @@
 /* Formlar */
 .order-form-grid{display:grid;gap:12px}
 .order-form-grid.is-narrow{max-width:440px}
-.order-hint{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
-.order-hint.is-danger{color:var(--danger)}
+/* İpucu satırının kendisi panel.css'te; burada yalnızca uyarı tonu. */
+.list-hint.is-danger{color:var(--danger)}
 .order-track{margin:14px 0 0}
 
 /* İşlem geçmişi: zaman çizelgesi */

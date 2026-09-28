@@ -348,6 +348,17 @@ html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{b
 .list-empty{padding:40px 20px;text-align:center}
 .list-empty b{display:block;color:var(--ink);font-size:15px}
 .list-empty p{max-width:520px;margin:6px auto 0;color:var(--muted);font-size:13.5px;line-height:1.55}
+/*
+  Liste üstü araç çubuğu ve ipucu satırı.
+
+  Üç modül bunu ayrı ayrı yazmıştı (.order-toolbar / .catalog-toolbar /
+  .module-toolbar) ve üçü BİREBİR aynıydı; ipucu satırının üç kopyası
+  yalnızca kenar boşluğunda ayrılıyordu. Modüller yalnızca kendi arama
+  kutusunun genişliğini ekliyor.
+*/
+.list-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.list-hint{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
+
 /* Stok miktarı rozeti */
 .stock-pill{display:inline-flex;align-items:center;width:max-content;padding:3px 9px;border-radius:999px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line);color:var(--ink-soft);font-size:12px;font-style:normal;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;text-decoration:none}
 .stock-pill[data-tone="warn"]{background:var(--warning-soft);box-shadow:none;color:var(--warning)}

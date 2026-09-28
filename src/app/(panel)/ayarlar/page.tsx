@@ -66,7 +66,7 @@ export default async function Settings(){
           <label>Dil / bölge<select name="locale" defaultValue={settings?.locale??"tr-TR"}><option value="tr-TR">Türkçe · Türkiye</option><option value="en-US">English · United States</option></select></label>
           <label>Düşük stok eşiği<input name="low_stock_threshold" type="number" min="0" max="10000" step="1" defaultValue={settings?.low_stock_threshold??5} required/></label>
           <button type="submit">Marka ayarlarını kaydet</button>
-        </form>:<p className="catalog-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
+        </form>:<p className="list-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
       </section>
 
       {/* Satış ayarları: sütunlar vardı ama hiçbir form onları yazmıyordu,
@@ -78,9 +78,9 @@ export default async function Settings(){
           <label>Ücretsiz kargo eşiği (₺)<input name="free_shipping_threshold" type="number" min="0" max="1000000" step="0.01" defaultValue={((settings?.free_shipping_threshold??200000)/100).toFixed(2)} required/></label>
           <label>Havale indirimi (%)<input name="bank_transfer_discount_percent" type="number" min="0" max="100" step="0.1" defaultValue={settings?.bank_transfer_discount_percent??3} required/></label>
           <label>Sipariş numarası öneki<input name="order_prefix" maxLength={6} pattern="[A-Za-z]{1,6}" defaultValue={settings?.order_prefix??"AC"} required/></label>
-          <p className="catalog-hint">Sepet tutarı eşiği geçerse kargo alınmaz. Eşik, indirim uygulanmadan önceki ara toplamla karşılaştırılır. Önek her mağazada farklı olmalı: sipariş numaraları çakışırsa ödeme bildirimleri yanlış siparişe düşebilir.</p>
+          <p className="list-hint">Sepet tutarı eşiği geçerse kargo alınmaz. Eşik, indirim uygulanmadan önceki ara toplamla karşılaştırılır. Önek her mağazada farklı olmalı: sipariş numaraları çakışırsa ödeme bildirimleri yanlış siparişe düşebilir.</p>
           <button type="submit">Satış ayarlarını kaydet</button>
-        </form>:<p className="catalog-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
+        </form>:<p className="list-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
       </section>
 
       <section className="domain-stack">
@@ -178,8 +178,8 @@ export default async function Settings(){
         </form>
         <article className="payment-method">
           <div className="payment-title"><div><small>BAĞLANTI DURUMU</small><h4>OTO&apos;nun desteklediği kargo firmaları</h4></div></div>
-          {kargoBaglantisi.durum==="kapali"?<p className="catalog-hint">Entegrasyon kapalı. Etkinleştirip kaydedince firmalar burada listelenir.</p>
-          :kargoBaglantisi.durum==="anahtar-yok"?<p className="catalog-hint">Yenileme anahtarı girilmemiş; bağlantı sınanamıyor.</p>
+          {kargoBaglantisi.durum==="kapali"?<p className="list-hint">Entegrasyon kapalı. Etkinleştirip kaydedince firmalar burada listelenir.</p>
+          :kargoBaglantisi.durum==="anahtar-yok"?<p className="list-hint">Yenileme anahtarı girilmemiş; bağlantı sınanamıyor.</p>
           :kargoBaglantisi.durum==="hata"?<div className="security-note"><b>Bağlantı kurulamadı.</b><p>{kargoBaglantisi.mesaj}</p>{kargoBaglantisi.ham||kargoBaglantisi.durumKodu?<code>OTO yanıtı{kargoBaglantisi.durumKodu?` (HTTP ${kargoBaglantisi.durumKodu})`:""}: {kargoBaglantisi.ham??"gövdede mesaj yok"}</code>:null}</div>
           :<>
             {/* Bağlantının dayanağı accountInfo: anahtarı doğruluyor ve
@@ -197,20 +197,20 @@ export default async function Settings(){
               <ul className="tryoto-carriers">
                 {kargoBaglantisi.firmalar.map(firma=><li key={firma.kod}><b>{firma.ad}</b><small>{firma.kod}</small>{firma.etkin===false?<span>kapalı</span>:null}</li>)}
               </ul>
-              <p className="catalog-hint">OTO {kargoBaglantisi.firmalar.length} kargo firmasını destekliyor. Gönderi oluştururken hangilerinin fiyat verdiği adrese ve pakete göre belirleniyor.</p>
-            </>:<p className="catalog-hint">{kargoBaglantisi.firmaHatasi?`Desteklenen firma listesi alınamadı: ${kargoBaglantisi.firmaHatasi} Bu, gönderi oluşturmayı engellemez — kullanılabilir firmalar adrese ve pakete göre fiyat sorulurken belirleniyor.`:"Desteklenen firma listesi boş döndü. Gönderi oluştururken kullanılabilir firmalar yine de fiyat sorgusuyla belirleniyor."}</p>}
+              <p className="list-hint">OTO {kargoBaglantisi.firmalar.length} kargo firmasını destekliyor. Gönderi oluştururken hangilerinin fiyat verdiği adrese ve pakete göre belirleniyor.</p>
+            </>:<p className="list-hint">{kargoBaglantisi.firmaHatasi?`Desteklenen firma listesi alınamadı: ${kargoBaglantisi.firmaHatasi} Bu, gönderi oluşturmayı engellemez — kullanılabilir firmalar adrese ve pakete göre fiyat sorulurken belirleniyor.`:"Desteklenen firma listesi boş döndü. Gönderi oluştururken kullanılabilir firmalar yine de fiyat sorgusuyla belirleniyor."}</p>}
             {/* Konum listesinin HATASI ayrı gösteriliyor. Boş liste "konum
                 tanımlı değil" diye okunuyordu ve kullanıcının OTO panelinde
                 dört konumu varken ekran bunu söylüyordu; gönderiler kayıtlı
                 konum olmadan oluşturulup etiketsiz kaldı (27.09.2026). */}
             {kargoBaglantisi.konumHatasi
               ?<div className="security-note"><b>Gönderici konumları alınamadı.</b><p>{kargoBaglantisi.konumHatasi}</p><p>Kodu OTO panelindeki konum kaydından alıp yukarıdaki alana elle yazabilirsiniz.</p></div>
-              :<p className="catalog-hint">{kargoBaglantisi.konumlar.length
+              :<p className="list-hint">{kargoBaglantisi.konumlar.length
                   ?`${kargoBaglantisi.konumlar.length} gönderici konumu bulundu${kargoBaglantisi.konumlar.some(k=>k.aktif)?"":" (hepsi pasif)"}. Etiket üretilebilmesi için burada bir konum SEÇİLMELİ: OTO gönderiyi kayıtlı konum olmadan oluşturmuyor.`
                   :"Gönderici konumu bulunamadı. OTO panelinde Ayarlar → Gönderici Konumları bölümünden tanımlayın."}</p>}
           </>}
         </article>
-      </>:<p className="catalog-hint">Kargo entegrasyonunu yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
+      </>:<p className="list-hint">Kargo entegrasyonunu yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
     </section>
 
     <section className="card settings-section payment-section">
@@ -248,7 +248,7 @@ export default async function Settings(){
           <div className="security-note"><b>Önce alan adınızı doğrulatın.</b><p>E-posta sağlayıcısı, sahipliğini kanıtlamadığınız bir alan adından gönderim yapmaz. Doğrulama tamamlanmadan bu alanı doldurursanız e-postalar gönderilemez ve müşterileriniz sipariş onayı alamaz. Alan adı doğrulaması için bizimle iletişime geçin.</p></div>
         </article>
         <button className="payment-save" type="submit">Ödeme ayarlarını kaydet</button>
-      </form>:<p className="catalog-hint">Ödeme hesaplarını (IBAN, PayTR) yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
+      </form>:<p className="list-hint">Ödeme hesaplarını (IBAN, PayTR) yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
     </section>
     </div>
   </>;

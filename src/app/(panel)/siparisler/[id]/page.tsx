@@ -671,7 +671,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                 <button type="submit" formAction={otoTaslakOlustur} className="ghost">tryOTO ile etiket üret →</button>
               </div>
             </form>)}
-        </div>:canManage?<p className="catalog-hint">Siparişteki bütün ürünler kargoya verilmiş.</p>:null}
+        </div>:canManage?<p className="list-hint">Siparişteki bütün ürünler kargoya verilmiş.</p>:null}
       </section>
 
       {/*
@@ -687,10 +687,10 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
               <input type="hidden" name="order_id" value={order.id}/>
               <label>Sipariş durumu<select name="status" defaultValue={order.status} className="ac-input">{orderStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
               <label>Ödeme durumu<select name="payment_status" defaultValue={order.payment_status} className="ac-input">{paymentStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-              <p className="order-hint">Ödeme durumu normalde PayTR bildirimiyle güncellenir; elle değiştirmek muhasebe kayıtlarıyla uyumsuzluk yaratabilir.</p>
+              <p className="list-hint">Ödeme durumu normalde PayTR bildirimiyle güncellenir; elle değiştirmek muhasebe kayıtlarıyla uyumsuzluk yaratabilir.</p>
               <button className="ac-btn ac-btn-primary" type="submit">Durumu kaydet</button>
             </form>
-          ):<p className="order-hint">{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</p>}
+          ):<p className="list-hint">{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</p>}
         </div>
 
         {/*
@@ -728,7 +728,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
               <label>İç operasyon notu<textarea name="internal_note" defaultValue={meta.internal_note??""} maxLength={1000} rows={3} className="ac-input"/></label>
               <button className="ac-btn ac-btn-primary" type="submit">{gonderiler.length?"Notu kaydet":"Kargo bilgilerini kaydet"}</button>
             </form>
-          ):<p className="order-hint">{meta.shipping_carrier||"Kargo firması yok"} · {meta.tracking_number||"Takip numarası yok"}</p>}
+          ):<p className="list-hint">{meta.shipping_carrier||"Kargo firması yok"} · {meta.tracking_number||"Takip numarası yok"}</p>}
           {meta.tracking_url&&!gonderiler.length?<p className="order-track"><a className="ac-btn" href={meta.tracking_url} target="_blank" rel="noreferrer"><Icon name="external" size={15}/>Kargo takibini aç</a></p>:null}
         </div>
       </section>
@@ -755,7 +755,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
               İade tutarı (₺)
               <input name="amount" type="number" min="0" step="0.01" max={(refundable/100).toFixed(2)} placeholder={`${refundedSoFar>0?"Kalanın tamamı":"Tamamı"}: ${(refundable/100).toFixed(2)}`} className="ac-input"/>
             </label>
-            <p className="order-hint">
+            <p className="list-hint">
               Boş bırakırsanız {refundedSoFar>0?"kalan tutarın":"siparişin"} tamamı iade edilir ve sipariş kapanır. Bu işlem geri
               alınamaz.
               {/* Kısmi iadede sipariş kapanmaz: kalan ürünler gönderilebilir. */}

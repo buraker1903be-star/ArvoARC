@@ -62,7 +62,7 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
         (siparişler, ürünler, stok, müşteriler — 27.09.2026).
       */}
 
-      <section className="ac ac-pad-sm module-toolbar">
+      <section className="ac ac-pad-sm list-toolbar">
         <form className="ac-filter module-search" role="search">
           {filter!=="all"?<input type="hidden" name="filter" value={filter}/>:null}
           <input name="q" defaultValue={search} placeholder="Koleksiyon adı veya bağlantı" aria-label="Koleksiyonlarda ara"/>

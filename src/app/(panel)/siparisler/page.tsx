@@ -301,7 +301,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
       </section>
       ) : null}
 
-      <section className="ac ac-pad-sm order-toolbar">
+      <section className="ac ac-pad-sm list-toolbar">
         <form className="ac-filter order-search" role="search">
           {statusFilter !== "all" ? <input type="hidden" name="filter" value={statusFilter} /> : null}
           {period !== "all" ? <input type="hidden" name="period" value={period} /> : null}
