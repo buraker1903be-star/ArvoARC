@@ -54,5 +54,11 @@ test("durum rozeti", () => {
   assert.deepEqual(orderBadge("pending", "failed"), { label: "Ödeme başarısız", tone: "bad" });
   assert.equal(orderBadge("pending", "pending").tone, "warn");
   assert.equal(orderBadge("fulfilled", "paid").tone, "muted");
-  assert.deepEqual(orderBadge("confirmed", "paid"), { label: "Onaylandı · Ödendi", tone: undefined });
+  /*
+    Süregelen iş "info". Eskiden ton verilmiyordu ve rozetin varsayılanı
+    YEŞİL olduğu için hazırlanan sipariş, tamamlanmış siparişten daha
+    "iyi" görünüyordu (o gri, bu yeşil — 28.09.2026'da canlıda ölçüldü).
+  */
+  assert.deepEqual(orderBadge("confirmed", "paid"), { label: "Onaylandı · Ödendi", tone: "info" });
+  assert.equal(orderBadge("processing", "paid").tone, "info");
 });

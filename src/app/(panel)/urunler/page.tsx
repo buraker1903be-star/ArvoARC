@@ -216,7 +216,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
       */
       statusLabel: productStatusLabel(product.status),
       statusHint: yayinOzeti(product.publish_at, product.unpublish_at) || undefined,
-      statusTone: product.status === "active" ? undefined : product.status === "draft" ? "warn" : "muted",
+      statusTone: product.status === "active" ? "good" : product.status === "draft" ? "warn" : "muted",
       bestSeller: bestSellerIds.has(product.id),
     };
   });

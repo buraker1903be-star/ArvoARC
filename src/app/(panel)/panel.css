@@ -228,13 +228,17 @@ html[data-theme="dark"] .panel-user>span{background:color-mix(in srgb,var(--acce
 html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{background:var(--surface-raised)}
 
 /* Rozet: yumuşak zemin + renkli yazı; tablo satırında durum noktası. */
+/* Varsayılan NÖTR; yeşil açıkça isteniyor (gerekçesi design.css'te). */
 .panel-root :is(.ac-tag,.row em){
   display:inline-flex;align-items:center;gap:6px;width:max-content;padding:4px 10px;border:0;border-radius:999px;
-  background:var(--success-soft);color:var(--success);font-size:11.5px;font-style:normal;font-weight:700;letter-spacing:.01em;text-transform:none;white-space:nowrap;
+  background:var(--surface-2);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line);
+  font-size:11.5px;font-style:normal;font-weight:700;letter-spacing:.01em;text-transform:none;white-space:nowrap;
 }
+.panel-root :is(.ac-tag,.row em)[data-tone="good"]{background:var(--success-soft);color:var(--success);box-shadow:none}
+.panel-root :is(.ac-tag,.row em)[data-tone="info"]{background:var(--info-soft);color:var(--info);box-shadow:none}
 .panel-root .row :is(.ac-tag,em)::before{content:"";width:6px;height:6px;flex:none;border-radius:50%;background:currentColor;opacity:.85}
-.panel-root :is(.ac-tag,.row em)[data-tone="warn"]{background:var(--warning-soft);color:var(--warning)}
-.panel-root :is(.ac-tag,.row em):is([data-tone="bad"],[data-tone="danger"]){background:var(--danger-soft);color:var(--danger)}
+.panel-root :is(.ac-tag,.row em)[data-tone="warn"]{background:var(--warning-soft);color:var(--warning);box-shadow:none}
+.panel-root :is(.ac-tag,.row em):is([data-tone="bad"],[data-tone="danger"]){background:var(--danger-soft);color:var(--danger);box-shadow:none}
 .panel-root :is(.ac-tag,.row em)[data-tone="muted"]{background:var(--surface-2);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
 
 /* Form alanları */

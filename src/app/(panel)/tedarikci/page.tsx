@@ -59,7 +59,7 @@ export default async function SuppliersPage() {
                   <h3>{supplier.name}</h3>
                   <p>{supplier.code} · {supplier.publish_directly ? "Yeni ürünler doğrudan yayınlanır" : "Yeni ürünler taslak olarak gelir"}</p>
                 </div>
-                <em className="ac-tag" data-tone={total ? (percent >= 100 ? undefined : "warn") : "muted"}>{total ? `%${percent} aktarıldı` : "Aktarım başlamadı"}</em>
+                <em className="ac-tag" data-tone={total ? (percent >= 100 ? "good" : "warn") : "muted"}>{total ? `%${percent} aktarıldı` : "Aktarım başlamadı"}</em>
               </div>
 
               <div className="supplier-sync">

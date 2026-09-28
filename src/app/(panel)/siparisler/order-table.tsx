@@ -32,16 +32,31 @@ export type OrderRow = {
   kargo: { durum: "yok" | "kismi" | "tamam" | "teslim"; sorunlu: boolean };
 };
 
-/*
-  KARGO SÜTUNUNUN METNİ. "yok" ayrı bir renk almıyor: kargoya
-  verilmemiş olmak yeni siparişin olağan hâli, uyarı değil.
-*/
 const KARGO_ETIKETI: Record<OrderRow["kargo"]["durum"], string> = {
   yok: "Verilmedi",
   kismi: "Kısmen",
   tamam: "Kargoda",
   teslim: "Teslim edildi",
 };
+
+/*
+  KARGO SÜTUNUNUN RENGİ. Dört durumun üçü aynı yeşildi: rozetin
+  varsayılan tonu yeşil olduğu için "Verilmedi" ve "Kargoda",
+  "Teslim edildi" ile birebir aynı görünüyordu (28.09.2026'da canlıda
+  ölçüldü) — yani operasyoncu listeye bakıp hangi paketin yola bile
+  çıkmadığını ayırt edemiyordu.
+
+  "Verilmedi" nötr: yeni siparişin olağan hâli, uyarı değil — asıl
+  istenen buydu ama yeşil varsayılan yüzünden olmuyordu. Yolda olan
+  paket "info", teslim edilen yeşil; yeşil yalnızca işin bittiğini
+  söylüyor.
+*/
+const KARGO_TONU = (kargo: OrderRow["kargo"]): string | undefined =>
+  kargo.sorunlu ? "bad"
+  : kargo.durum === "teslim" ? "good"
+  : kargo.durum === "kismi" ? "warn"
+  : kargo.durum === "tamam" ? "info"
+  : "muted";
 
 const BULK_STEPS = [
   { key: "confirmed", label: "Onayla" },
@@ -295,7 +310,7 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
                   bitti demek. "Kargoda" sakin kalıyor — henüz
                   izlenmesi gereken bir şey.
                 */}
-                <em className="ac-tag" data-tone={row.kargo.sorunlu ? "bad" : row.kargo.durum === "teslim" ? "good" : row.kargo.durum === "kismi" ? "warn" : undefined}>
+                <em className="ac-tag" data-tone={KARGO_TONU(row.kargo)}>
                   {row.kargo.sorunlu ? "Sorunlu" : KARGO_ETIKETI[row.kargo.durum]}
                 </em>
               </span>

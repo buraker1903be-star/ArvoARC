@@ -244,19 +244,33 @@
    Rozet
    ========================================================== */
 
+/*
+  VARSAYILAN TON NÖTR. Önce yeşildi, yani tonu verilmeyen her rozet
+  "iyi" diyordu ve yeşil hiçbir şey ifade etmiyordu (28.09.2026'da
+  canlıda ölçüldü): kargoya hiç verilmemiş sipariş ("Verilmedi") ile
+  teslim edilmiş sipariş aynı yeşildi, "Hazırlanıyor" yeşilken
+  "Tamamlandı" griydi ve kodda `tone:"info"` yazan rozetler de yeşil
+  çıkıyordu — kural yalnızca müşteriler sayfasının CSS'inde vardı.
+
+  Artık yeşil AÇIKÇA isteniyor (data-tone="good"). Renk bir şey
+  söylüyorsa, söylediği şey kasıtlı olmalı.
+*/
 .ac-tag{
   display:inline-flex;
   align-items:center;
   padding:3px var(--s2);
   border-radius:var(--r3);
-  background:var(--c-good-bg);
-  color:var(--c-good);
+  background:var(--c-surface-2);
+  color:var(--c-ink-3);
   font-size:var(--t-micro);
   font-weight:700;
   font-style:normal;
   white-space:nowrap;
 }
 
+.ac-tag[data-tone="good"]{background:var(--c-good-bg);color:var(--c-good)}
+/* Süregelen iş: bitmiş değil, sorun da değil. */
+.ac-tag[data-tone="info"]{background:var(--c-info-bg);color:var(--c-info)}
 .ac-tag[data-tone="warn"]{background:var(--c-warn-bg);color:var(--c-warn)}
 .ac-tag[data-tone="bad"]{background:var(--c-bad-bg);color:var(--c-bad)}
 .ac-tag[data-tone="muted"]{background:var(--c-surface-2);color:var(--c-ink-3)}

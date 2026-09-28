@@ -130,7 +130,7 @@ export default async function DiscountsPage(){
               <span className="dl-old"><s>{money.format((item.compare_at_price??0)/100)}</s></span>
               <span className="dl-new"><b>{money.format(item.price/100)}</b><small>{money.format(item.discountAmount/100)} avantaj</small></span>
               <span className="dl-rate"><em>−%{item.discountRate}</em></span>
-              <span className="dl-badge"><em className="ac-tag" data-tone={meta.badge?undefined:"muted"}>{meta.badge||"Otomatik"}</em></span>
+              <span className="dl-badge"><em className="ac-tag" data-tone={meta.badge?"good":"muted"}>{meta.badge||"Otomatik"}</em></span>
               <span className="dl-edit"><Link prefetch={false} href={`/urunler/${item.product_id}`}>Düzenle →</Link></span>
             </div>;
           })}

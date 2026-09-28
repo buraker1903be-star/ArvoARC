@@ -161,16 +161,30 @@
 }
 @media(max-width:900px){
   /*
-    Telefonda satır ÜÇ SATIRA açılıyor: sipariş+tutar, müşteri+operasyon,
-    kargo. Kâr burada yok — ekranda sorulan soru "hangi sipariş, ne
-    durumda"; kâr masaüstünde incelenen bir sayı ve dar ekranda ya
-    kırpılır ya ötekileri kırpar.
+    Telefonda satır DÖRT SATIRA açılıyor: sipariş+tutar, müşteri,
+    operasyon, kargo. Kâr burada yok — ekranda sorulan soru "hangi
+    sipariş, ne durumda"; kâr masaüstünde incelenen bir sayı.
+
+    ÜÇ SATIRDAYKEN SİPARİŞ NUMARASI KIRPILIYORDU. Durum rozeti
+    ("Tamamlandı · Ödendi", 156px) sipariş numarasıyla AYNI SÜTUNDAYDI
+    ve sütun rozete göre boyutlanınca numaraya 71px kalıyordu:
+    "AC2609…" (375px'te ölçüldü, 28.09.2026). Satırın kimliği,
+    satırda okunamayan tek şeydi.
+
+    Rozetler kendi satırlarına alındı; dördüncü satırın bedeli satır
+    aralığından ve iç boşluktan geri alındı (145px → 147px, yani
+    yoğunluk aynı) ve on satırda hiçbir metin kırpılmıyor.
   */
-  .order-table[data-manage] .list-row{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"check main amount" "check customer status" "check shipping action";row-gap:6px;padding:12px 14px}
-  .order-table:not([data-manage]) .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amount" "customer status" "shipping shipping";row-gap:6px;padding:12px 14px}
+  .order-table[data-manage] .list-row{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"check main amount" "check customer customer" "check status status" "check shipping action";row-gap:4px;padding:10px 14px}
+  .order-table:not([data-manage]) .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amount" "customer customer" "status status" "shipping action";row-gap:4px;padding:10px 14px}
   .order-profit{display:none}
   .order-shipping{justify-self:start}
-  .order-amount,.order-status{justify-self:end;text-align:right}
+  /* Müşteri ve kaynağı tek satırda: satır genişliğini artık paylaşmıyorlar. */
+  .order-cell-customer{display:flex;align-items:baseline;gap:8px;min-width:0}
+  .order-cell-customer b{min-width:0}
+  .order-cell-customer small{flex:none}
+  .order-status{justify-self:start;text-align:left}
+  .order-amount{justify-self:end;text-align:right}
   /* Eylem düğmesi kargonun yanında: kendi satırında dördüncü bir sıra
      açıyordu ve telefonda satır 151px'e çıkıyordu. */
   .order-action{justify-content:flex-end;align-items:center}

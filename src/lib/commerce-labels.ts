@@ -109,5 +109,12 @@ export function orderBadge(status?: string | null, paymentStatus?: string | null
   if (status === "fulfilled") {
     return { label, tone: "muted" as const };
   }
-  return { label, tone: undefined };
+  /*
+    Süregelen iş (onaylandı, hazırlanıyor) "info": eskiden ton
+    verilmiyordu ve rozetin varsayılanı yeşil olduğu için hazırlanan
+    sipariş, TAMAMLANMIŞ siparişten daha "iyi" görünüyordu — o gri,
+    bu yeşildi. Tamamlanmış sipariş bilerek sessiz: listenin
+    tamamı odur, bağıran renk bilgi taşımaz.
+  */
+  return { label, tone: "info" as const };
 }

@@ -32,8 +32,16 @@
   --line:var(--n-200);--line-soft:#efeff3;--line-strong:var(--n-300);
   --accent:var(--accent-600);--accent-strong:var(--accent-800);--accent-soft:var(--accent-100);--accent-bright:var(--accent-400);
 
-  --success:#2f7d57;--success-soft:#e7f3ec;
-  --warning:#a8741c;--warning-soft:#faf0dc;
+  /*
+    AÇIK TEMADA KOYULAŞTIRILDI (28.09.2026'da canlıda ölçüldü).
+    Rozet yazısı 11,5px kalın, yani AA için 4,5 gerekiyor; yumuşak
+    zeminlerinde uyarı 3,58 ve başarı 4,40'taydı. Kargo sütununda
+    "Kısmen" tam da gözden kaçmaması gereken satır.
+    Yeni değerler: uyarı 4,68 · başarı 5,08. Koyu temada ölçüler
+    zaten 5,87–7,23 arasında, orası değişmedi.
+  */
+  --success:#2b7250;--success-soft:#e7f3ec;
+  --warning:#8f6316;--warning-soft:#faf0dc;
   --danger:#b83c3c;--danger-soft:#f9e9e7;
   --info:#2f5f9e;--info-soft:#e8eff8;
 
@@ -64,6 +72,7 @@
   --c-good:var(--success);--c-good-bg:var(--success-soft);
   --c-warn:var(--warning);--c-warn-bg:var(--warning-soft);
   --c-bad:var(--danger);--c-bad-bg:var(--danger-soft);
+  --c-info:var(--info);--c-info-bg:var(--info-soft);
   --e1:var(--shadow-sm);--e2:var(--shadow-md);--r1:var(--r-sm);--r2:var(--r-lg);
   /* Yazı ölçeği: en küçük 11px. Eski panelde 7–9px etiketler vardı. */
   --t-micro:11px;--t-sm:12.5px;--t-base:13.5px;--t-lg:16px;--t-xl:28px;--t-num:28px;

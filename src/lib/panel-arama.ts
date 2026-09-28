@@ -135,7 +135,7 @@ export async function panelAra(
       detay: [sku ? `SKU ${sku}` : null, meta.vendor].filter(Boolean).join(" · ") || "Ürün",
       rozet: {
         metin: productStatusLabel(urun.status),
-        ton: urun.status === "active" ? undefined : urun.status === "draft" ? "warn" : "muted",
+        ton: urun.status === "active" ? "good" : urun.status === "draft" ? "warn" : "muted",
       },
     };
   });
@@ -148,7 +148,7 @@ export async function panelAra(
     detay: `/${koleksiyon.slug}`,
     rozet: {
       metin: koleksiyon.status === "active" ? "Aktif" : koleksiyon.status === "draft" ? "Taslak" : "Arşiv",
-      ton: koleksiyon.status === "active" ? undefined : "muted",
+      ton: koleksiyon.status === "active" ? "good" : "muted",
     },
   }));
 

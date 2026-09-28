@@ -61,7 +61,7 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
         <h1>{collection.title}</h1>
         <p>/koleksiyon/{collection.slug} · {members.length.toLocaleString("tr-TR")} ürün · {collection.source==="shopify"?"Shopify eşlemesi":"ArvoARC"}</p>
       </div>
-      <div className="product-head-actions"><em className="ac-tag" data-tone={collection.status==="active"?undefined:collection.status==="draft"?"warn":"muted"}>{collection.status==="active"?"Aktif":collection.status==="draft"?"Taslak":"Arşivlenmiş"}</em></div>
+      <div className="product-head-actions"><em className="ac-tag" data-tone={collection.status==="active"?"good":collection.status==="draft"?"warn":"muted"}>{collection.status==="active"?"Aktif":collection.status==="draft"?"Taslak":"Arşivlenmiş"}</em></div>
     </section>
 
     <div className="ac-stack">

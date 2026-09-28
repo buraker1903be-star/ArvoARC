@@ -5,7 +5,6 @@
 
 .cust-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
 .cust-toolbar .cust-search{flex:1 1 360px}
-.panel-root .ac-tag[data-tone="info"]{background:var(--info-soft);color:var(--info)}
 
 /* Liste */
 .customer-list .list-row{
