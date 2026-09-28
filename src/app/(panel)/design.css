@@ -1,77 +1,22 @@
 /* ==========================================================
-   ArvoARC — Tasarım sistemi
+   ArvoARC — .ac-* bileşenleri
    ==========================================================
 
    Panelde üç ayrı kart dili, iki ayrı boşluk ölçeği ve anlam
-   taşımayan renkler vardı. Bu dosya tek bir dil kuruyor.
+   taşımayan renkler vardı. Bu dosya tek bir bileşen dili kuruyor.
 
-   Kural: bu dosyadaki değişkenler dışında sabit değer
-   kullanılmıyor. Yeni bir sayfa yazarken buradaki sınıflar
-   yeterli olmalı; olmuyorsa buraya eklenir.
+   JETONLAR BURADA DEĞİL: panel-tokens.css. Eskiden bu dosyanın
+   kendi :root bloğu vardı ve panelde .panel-root onu eziyordu —
+   yani dosyayı okuyan tek kaynağın burası olduğunu sanıyor ama
+   panelde geçerli olan değerler başka yerden geliyordu.
+
+   Dosya artık YALNIZCA panelden yükleniyor. Kök yerleşimden
+   yüklendiği sürece giriş ve şifre sayfaları da hiç kullanmadıkları
+   612 satırı indiriyordu; .ac-* sınıfları panel dışında geçmiyor.
+
+   Kural: sabit değer yazılmaz, jeton kullanılır. Yeni bir sayfa
+   yazarken buradaki sınıflar yeterli olmalı; olmuyorsa buraya eklenir.
    ========================================================== */
-
-:root{
-  /* --- Boşluk ölçeği ---------------------------------------
-     Dörtlü adımlar. Ara değer kullanılmıyor: tutarsız boşluk
-     panelin dağınık görünmesinin başlıca sebebiydi. */
-  --s1:4px;
-  --s2:8px;
-  --s3:12px;
-  --s4:16px;
-  --s5:24px;
-  --s6:32px;
-  --s7:48px;
-
-  /* --- Renk -----------------------------------------------
-     Renk anlam taşır: yeşil olumlu, sarı dikkat, kırmızı
-     sorun, gri nötr. Dekoratif renk yok. */
-  --c-ink:#14202b;
-  --c-ink-2:#3d4a56;
-  --c-ink-3:#77848f;
-
-  --c-bg:#f4f6f8;
-  --c-surface:#ffffff;
-  --c-surface-2:#fafbfc;
-
-  --c-line:#e4e9ee;
-  --c-line-2:#cfd7df;
-
-  --c-brand:#002045;
-  --c-accent:#6f9548;
-
-  --c-good:#2f7d4f;
-  --c-good-bg:#eef7f1;
-  --c-warn:#8a6a1f;
-  --c-warn-bg:#fbf5e8;
-  --c-bad:#a33b33;
-  --c-bad-bg:#fdf0ef;
-
-  /* --- Yükseklik -------------------------------------------
-     İki seviye yeterli: yüzey ve yüzen. Daha fazlası
-     hiyerarşiyi bulanıklaştırıyor. */
-  --e1:0 1px 2px rgba(20,32,43,.05);
-  --e2:0 4px 16px rgba(20,32,43,.08);
-
-  /* --- Yarıçap --------------------------------------------- */
-  --r1:8px;
-  --r2:12px;
-  --r3:999px;
-
-  /* --- Yazı ------------------------------------------------
-     Beş boy. Her boyun bir işi var. */
-  --t-micro:10px;   /* etiket, üst başlık */
-  --t-sm:12px;      /* tablo, yardımcı metin */
-  --t-base:13px;    /* gövde */
-  --t-lg:16px;      /* kart başlığı */
-  --t-xl:22px;      /* sayfa başlığı */
-  --t-num:26px;     /* ölçüm rakamı */
-
-  /* --- Geçiş ----------------------------------------------
-     Tek eğri, iki süre. Akıcılık tutarlılıktan gelir. */
-  --ease:cubic-bezier(.2,.8,.2,1);
-  --fast:140ms;
-  --slow:240ms;
-}
 
 /* ==========================================================
    Dikey ritim

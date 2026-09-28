@@ -5,7 +5,6 @@ import { InteractionFeedback } from "@/components/interaction-feedback";
 import "./globals.css";
 /* Tasarım sistemi globals'tan sonra yüklenir: tek dil kuran
    kurallar eski sayfa stillerini ezmelidir. */
-import "./design.css";
 
 /*
   Tek yazı tipi, ArvoOS ile aynı: Apple cihazlarında sistemin SF Pro'su,
