@@ -3,8 +3,7 @@ import { requireTenant } from "@/lib/tenant";
 import { orderStatusLabel, paymentStatusLabel } from "@/lib/commerce-labels";
 import { isBankTransfer, TRANSFER_STALE_HOURS } from "@/lib/payment-method";
 import { Icon, type IconName } from "@/components/panel/icons";
-import { ConfirmSubmit } from "@/components/panel/confirm-submit";
-import { cancelTransferOrder, confirmTransferPayment } from "../siparisler/actions";
+import { HavaleEylemleri } from "./havale-eylemleri";
 import { PanelBildirimi } from "@/components/panel/bildirim";
 
 /* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
@@ -145,18 +144,15 @@ export default async function Operations(){
             return transfer&&canManage&&order.payment_status!=="failed"?(
               <div className="ops-pay" key={order.id}>
                 {row}
-                <form action={confirmTransferPayment}>
-                  <input type="hidden" name="order_id" value={order.id}/>
-                  <input type="hidden" name="back" value="/operasyon"/>
-                  <ConfirmSubmit className="ac-btn ops-pay-btn" message={`${order.order_number} için ${money.format(order.total/100)} havale ödemesi alındı olarak işaretlensin mi? Müşteriye “Ödemeniz alındı” e-postası gönderilir.`}>Ödeme alındı</ConfirmSubmit>
-                </form>
-                {stale?(
-                  <form action={cancelTransferOrder}>
-                    <input type="hidden" name="order_id" value={order.id}/>
-                    <input type="hidden" name="back" value="/operasyon"/>
-                    <ConfirmSubmit className="ac-btn ac-btn-danger ops-pay-btn" message={`${order.order_number} ${waitingFor(order.created_at,now)} ödenmedi. Sipariş iptal edilsin mi? Müşteriye “Siparişiniz iptal edildi” e-postası gönderilir.`}>İptal et</ConfirmSubmit>
-                  </form>
-                ):null}
+                {/* Eylemler istemci bileşeninde: onay her seferinde sayfayı
+                    baştan çizdiriyordu ve bu ekranda genellikle birkaç
+                    havale birikiyor. Onay penceresi duruyor — e-posta
+                    geri alınamıyor. */}
+                <HavaleEylemleri
+                  siparisId={order.id}
+                  onayMesaji={`${order.order_number} için ${money.format(order.total/100)} havale ödemesi alındı olarak işaretlensin mi? Müşteriye “Ödemeniz alındı” e-postası gönderilir.`}
+                  iptalMesaji={stale?`${order.order_number} ${waitingFor(order.created_at,now)} ödenmedi. Sipariş iptal edilsin mi? Müşteriye “Siparişiniz iptal edildi” e-postası gönderilir.`:undefined}
+                />
               </div>
             ):<div key={order.id}>{row}</div>;
           })}</div>:<p className="dash-empty">Ödeme bekleyen sipariş bulunmuyor.</p>}

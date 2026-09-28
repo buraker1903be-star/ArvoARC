@@ -185,15 +185,27 @@ export async function durumIlerletSonuc(orderId: string, status: string): Promis
  * beklerken çalışır; sipariş "onaylandı + ödendi" olur ve müşteriye
  * "ödemeniz alındı" gider. Kart ödemesi PayTR bildirimiyle kapanır.
  */
-export async function confirmTransferPayment(formData: FormData) {
-  const { supabase, organization, membership } = await requireTenant();
-  /* Operasyon listesinden de sipariş detayından da çağrılır; kullanıcı geldiği yere döner. */
-  /* Sonuç çereze; backUrl yalnızca gidilecek yolu doğruluyor. */
-  const back = async (result: { hata?: string; basari?: string }): Promise<never> =>
-    bildirimliDonus(backUrl(formData.get("back"), fromDetail(formData) ? "/siparisler" : "/operasyon", {}), result);
-  if (!MANAGERS.includes(membership.role)) return await back({ hata: hataMetni("forbidden") });
+/*
+  HAVALE ÖDEMESİNİ ONAYLA — çekirdek. İki yolu var:
 
-  const orderId = String(formData.get("order_id") ?? "");
+    confirmTransferPayment  form gönderimi (JavaScript kapalıyken de
+                            çalışan yol), çereze yazıp yönlendiriyor.
+    havaleOnaySonuc         Operasyon Merkezi'nden, sonucu döndürüyor.
+
+  Operasyon Merkezi sabah açılan ekran ve genellikle birkaç havale
+  birikiyor; her onayda tam bir gezinme, üç ödemeyi onaylamak için üç
+  kez sayfayı baştan çizmek demekti. Yönlendirme kalkınca
+  revalidatePath satırı listeden düşürüyor — istenen geri bildirim
+  zaten bu.
+
+  KİLİT DURUYOR: çift tıklama ya da ikinci sekme siparişi kilitliyor,
+  müşteriye ikinci "Ödemeniz alındı" gitmiyor. Yerinde işlem bu korumayı
+  daha da gerekli kılıyor, çünkü düğme sayfa yenilenmediği için ekranda
+  kalıyor; düğme de işlenirken kilitleniyor.
+*/
+async function havaleOnayla(orderId: string): Promise<IslemSonucu> {
+  const { supabase, organization, membership } = await requireTenant();
+  if (!MANAGERS.includes(membership.role)) return { hata: hataMetni("forbidden") };
   const { data: order } = await supabase
     .from("arc_orders")
     .select("status,payment_status,metadata,order_number,customer_name,customer_email,total,updated_at")
@@ -201,14 +213,14 @@ export async function confirmTransferPayment(formData: FormData) {
     .eq("id", orderId)
     .maybeSingle();
 
-  if (!order) return await back({ hata: hataMetni("order-not-found") });
-  if (!isBankTransfer(order.metadata)) return await back({ hata: hataMetni("not-transfer") });
-  if (order.payment_status === "paid") return await back({ hata: hataMetni("already-paid") });
-  if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) return await back({ hata: hataMetni("order-closed") });
+  if (!order) return { hata: hataMetni("order-not-found") };
+  if (!isBankTransfer(order.metadata)) return { hata: hataMetni("not-transfer") };
+  if (order.payment_status === "paid") return { hata: hataMetni("already-paid") };
+  if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) return { hata: hataMetni("order-closed") };
 
   /* Çift tıklama ya da ikinci sekme: sipariş kilitlenir, müşteriye ikinci "Ödemeniz alındı" gitmez. */
   if (!(await claimOrderLock(supabase, organization.id, { id: orderId, updated_at: order.updated_at, metadata: order.metadata }, "transfer_lock"))) {
-    return await back({ hata: hataMetni("in-progress") });
+    return { hata: hataMetni("in-progress") };
   }
 
   const { error } = await supabase.rpc("arc_update_order_status", {
@@ -216,7 +228,7 @@ export async function confirmTransferPayment(formData: FormData) {
     p_status: order.status === "pending" ? "confirmed" : order.status,
     p_payment_status: "paid",
   });
-  if (error) return await back({ hata: hataMetni("save-failed") });
+  if (error) return { hata: hataMetni("save-failed") };
 
   await notifyTransferPaid(order, await getStoreBrand(supabase, membership.organization_id));
 
@@ -224,7 +236,21 @@ export async function confirmTransferPayment(formData: FormData) {
   revalidatePath("/operasyon");
   revalidatePath("/siparisler");
   revalidatePath(`/siparisler/${orderId}`);
-  return await back({ basari: `${order.order_number} · havale ödemesi onaylandı. Müşterinin e-posta adresi varsa bildirim gönderildi.` });
+  return { basari: `${order.order_number} · havale ödemesi onaylandı. Müşterinin e-posta adresi varsa bildirim gönderildi.` };
+}
+
+/** Form gönderimi: sonucu çereze yazıp geldiği yere döner. */
+export async function confirmTransferPayment(formData: FormData) {
+  const sonuc = await havaleOnayla(String(formData.get("order_id") ?? ""));
+  return await bildirimliDonus(
+    backUrl(formData.get("back"), fromDetail(formData) ? "/siparisler" : "/operasyon", {}),
+    sonuc,
+  );
+}
+
+/** Operasyon Merkezi: sonucu döndürür, yönlendirmez. */
+export async function havaleOnaySonuc(orderId: string): Promise<IslemSonucu> {
+  return await havaleOnayla(String(orderId ?? ""));
 }
 
 /**
@@ -235,15 +261,15 @@ export async function confirmTransferPayment(formData: FormData) {
  * kapanmamışken çalışır; müşteriye "Siparişiniz iptal edildi" gider.
  * Otomatik değil: kararı her seferinde bir yönetici verir.
  */
-export async function cancelTransferOrder(formData: FormData) {
+/*
+  ÖDENMEYEN HAVALE SİPARİŞİNİ İPTAL — çekirdek. Onaylamayla aynı iki yol
+  (form gönderimi ve Operasyon Merkezi'nden yerinde çağrı) ve aynı
+  gerekçe. Kilit de aynı sebeple duruyor: müşteriye ikinci "iptal
+  edildi" gitmesin.
+*/
+async function havaleIptal(orderId: string): Promise<IslemSonucu> {
   const { supabase, organization, membership } = await requireTenant();
-  /* Operasyon listesinden de sipariş detayından da çağrılır; kullanıcı geldiği yere döner. */
-  /* Sonuç çereze; backUrl yalnızca gidilecek yolu doğruluyor. */
-  const back = async (result: { hata?: string; basari?: string }): Promise<never> =>
-    bildirimliDonus(backUrl(formData.get("back"), fromDetail(formData) ? "/siparisler" : "/operasyon", {}), result);
-  if (!MANAGERS.includes(membership.role)) return await back({ hata: hataMetni("forbidden") });
-
-  const orderId = String(formData.get("order_id") ?? "");
+  if (!MANAGERS.includes(membership.role)) return { hata: hataMetni("forbidden") };
   const { data: order } = await supabase
     .from("arc_orders")
     .select("status,payment_status,metadata,order_number,customer_name,customer_email,updated_at")
@@ -251,14 +277,14 @@ export async function cancelTransferOrder(formData: FormData) {
     .eq("id", orderId)
     .maybeSingle();
 
-  if (!order) return await back({ hata: hataMetni("order-not-found") });
-  if (!isBankTransfer(order.metadata)) return await back({ hata: hataMetni("not-transfer") });
-  if (order.payment_status === "paid") return await back({ hata: hataMetni("already-paid") });
-  if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) return await back({ hata: hataMetni("order-closed") });
+  if (!order) return { hata: hataMetni("order-not-found") };
+  if (!isBankTransfer(order.metadata)) return { hata: hataMetni("not-transfer") };
+  if (order.payment_status === "paid") return { hata: hataMetni("already-paid") };
+  if (!["pending", "authorized"].includes(order.payment_status) || isOrderClosed(order.status, order.payment_status)) return { hata: hataMetni("order-closed") };
 
   /* Çift gönderim ya da aynı anda "Ödeme alındı": sipariş kilitlenir, ikinci istek durur. */
   if (!(await claimOrderLock(supabase, organization.id, { id: orderId, updated_at: order.updated_at, metadata: order.metadata }, "transfer_lock"))) {
-    return await back({ hata: hataMetni("in-progress") });
+    return { hata: hataMetni("in-progress") };
   }
 
   const { error } = await supabase.rpc("arc_update_order_status", {
@@ -266,7 +292,7 @@ export async function cancelTransferOrder(formData: FormData) {
     p_status: "cancelled",
     p_payment_status: order.payment_status,
   });
-  if (error) return await back({ hata: hataMetni("save-failed") });
+  if (error) return { hata: hataMetni("save-failed") };
 
   await notifyStatus(order, "cancelled", await getStoreBrand(supabase, membership.organization_id));
 
@@ -274,7 +300,21 @@ export async function cancelTransferOrder(formData: FormData) {
   revalidatePath("/operasyon");
   revalidatePath("/siparisler");
   revalidatePath(`/siparisler/${orderId}`);
-  return await back({ basari: `${order.order_number} · sipariş iptal edildi. Müşterinin e-posta adresi varsa bildirim gönderildi.` });
+  return { basari: `${order.order_number} · sipariş iptal edildi. Müşterinin e-posta adresi varsa bildirim gönderildi.` };
+}
+
+/** Form gönderimi: sonucu çereze yazıp geldiği yere döner. */
+export async function cancelTransferOrder(formData: FormData) {
+  const sonuc = await havaleIptal(String(formData.get("order_id") ?? ""));
+  return await bildirimliDonus(
+    backUrl(formData.get("back"), fromDetail(formData) ? "/siparisler" : "/operasyon", {}),
+    sonuc,
+  );
+}
+
+/** Operasyon Merkezi: sonucu döndürür, yönlendirmez. */
+export async function havaleIptalSonuc(orderId: string): Promise<IslemSonucu> {
+  return await havaleIptal(String(orderId ?? ""));
 }
 
 /**

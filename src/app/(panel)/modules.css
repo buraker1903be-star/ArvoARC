@@ -12,6 +12,19 @@
 */
 .list-toolbar .module-search{flex:1 1 360px}
 .list-hint{margin-top:8px}
+
+/*
+  Havale eyleminin yerinde sonucu. Operasyon Merkezi artık her onayda
+  sayfayı baştan çizmiyor, yani üstteki çerezli şerit okunmuyor; sonuç
+  satırın altında söyleniyor.
+
+  .ops-pay bir FLEX satırı (ızgara değil): tam satır kaplaması
+  flex-basis:100% ile oluyor ve kabın sarması gerekiyor — sarma
+  eskiden yalnızca 640px altında açıktı, mesaj o yüzden geniş ekranda
+  düğmelerin yanına sıkışırdı.
+*/
+.ops-pay{flex-wrap:wrap}
+.ops-pay-sonuc{flex:1 0 100%;margin-top:4px}
 .section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}
 .section-title small{display:block;color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.18em}
 .section-title h3{margin:4px 0 0;color:var(--ink);font-size:20px;font-weight:650;letter-spacing:-.015em}
