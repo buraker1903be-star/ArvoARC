@@ -29,7 +29,17 @@
 .order-cell-main{grid-area:main}
 .order-cell-customer{grid-area:customer}
 .order-amount{grid-area:amount;justify-self:end;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
-.order-profit{grid-area:profit;display:grid;justify-items:end;text-align:right}
+/*
+  SAĞA YASLI KÂR, SOLA YASLI DURUM'A YAPIŞIYORDU. Başlık şeridinde iki
+  metin arasında 12px kalıyordu; öteki sütun aralıkları 100–193px'ti
+  (28.09.2026'da ölçüldü). Göz "KÂR DURUM"u tek bir etiket olarak
+  okuyordu.
+
+  42px sağ boşluk aralıkları 58px / 54px'e getiriyor, yani TUTAR–KÂR
+  ile KÂR–DURUM artık eşit. Sütun genişliği değişmiyor, yalnızca
+  içerik komşusundan ayrılıyor.
+*/
+.order-profit{grid-area:profit;display:grid;justify-items:end;text-align:right;padding-right:42px}
 .order-status{grid-area:status}
 .order-shipping{grid-area:shipping}
 .order-action{grid-area:action;display:flex;justify-content:flex-end}
