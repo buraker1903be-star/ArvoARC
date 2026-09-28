@@ -7,7 +7,7 @@ import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { maliyetleriAyristir } from "@/lib/maliyet-aktarimi";
 import { fiyatKarari, skuAdaylari } from "@/lib/fiyat-aktarimi";
-import { gecerliFiyat, satirlariDogrula, kaynaklarIcin, KAYNAK_ADI, type FiyatKaynagi } from "@/lib/fiyat-toplayici";
+import { gecerliFiyat, saklananSatirlar, kaynaklarIcin, KAYNAK_ADI, type FiyatKaynagi } from "@/lib/fiyat-toplayici";
 import { jetonAnahtariVar, toplayiciJetonu } from "@/lib/fiyat-toplayici-jeton";
 import { lrTaramasiniKaydet } from "@/lib/lr/kaydet";
 import { createServiceClient } from "@/lib/paytr/service-client";
@@ -553,7 +553,13 @@ export async function sonToplananListe(
   */
   const birlesik = new Map<string, { sku: string; ad: string; fiyatlar: number[] }>();
   for (const kayit of [...kayitlar].reverse()) {
-    for (const satir of satirlariDogrula(kayit.satirlar).satirlar) birlesik.set(satir.sku, satir);
+    /*
+      saklananSatirlar, satirlariDogrula DEĞİL: doğrulama gelen gövdeye
+      uygulanıyor ve fiyatın metin olmasını şart koşuyor. Saklanan satırda
+      fiyat zaten kuruş sayısı; aynı kuralı burada ikinci kez uygulamak
+      yer imiyle toplanan bütün satırları sessizce düşürüyordu.
+    */
+    for (const satir of saklananSatirlar(kayit.satirlar)) birlesik.set(satir.sku, satir);
   }
   const satirlar = [...birlesik.values()];
   const kayit = kayitlar[0];

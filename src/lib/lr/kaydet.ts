@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { lrFiyatlariniTara, LR_BASLANGIC } from "./tarama";
+import { satirlariDogrula } from "../fiyat-toplayici";
 
 /*
   Taramanın sonucunu arc_price_collections'a bırakır.
@@ -25,7 +26,21 @@ export async function lrTaramasiniKaydet(
     return { yazilan: 0, satir: 0, gezilen: tarama.gezilen, hata: "LR sayfalarında ürün bulunamadı." };
   }
 
-  const satirlar = tarama.satirlar.map((satir) => ({ sku: satir.sku, ad: satir.ad, fiyatlar: [satir.fiyat] }));
+  /*
+    Fiyat KURUŞ SAYISI olarak saklanıyor, sayfadaki metin olarak değil.
+    Eskiden burası metni ("487,10") olduğu gibi yazıyordu; yer imi ucu ise
+    yazmadan önce çevirdiği için sayı ([48710]) yazıyordu. Aynı sütunda iki
+    tür, okuyan tarafın yalnızca birini tanımasına ve diğerini sessizce
+    düşürmesine yol açtı (bkz. lib/fiyat-toplayici.ts: saklananSatirlar).
+    Çevirme yine parseMoneyToCents'te; satirlariDogrula aralık ve uzunluk
+    sınırlarını da uyguluyor.
+  */
+  const { satirlar } = satirlariDogrula(
+    tarama.satirlar.map((satir) => ({ sku: satir.sku, ad: satir.ad, fiyatlar: [satir.fiyat] })),
+  );
+  if (!satirlar.length) {
+    return { yazilan: 0, satir: 0, gezilen: tarama.gezilen, hata: "LR sayfalarından okunabilir fiyat çıkmadı." };
+  }
   /*
     Kaynak 'lr-genel': girişsiz görünen MÜŞTERİ fiyatı. Yer imiyle
     toplanan liste 'lr' ve girişliyse alış fiyatı olabiliyor; ikisini

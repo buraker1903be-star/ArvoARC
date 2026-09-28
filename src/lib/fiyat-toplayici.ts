@@ -45,7 +45,30 @@ const EN_FAZLA_FIYAT = 6;
 const metin = (deger: unknown, uzunluk: number) =>
   typeof deger === "string" ? deger.trim().replace(/\s+/g, " ").slice(0, uzunluk) : "";
 
-export function satirlariDogrula(veri: unknown): { satirlar: ToplananSatir[]; atlanan: number } {
+/*
+  Bir fiyat alanını kuruşa çevirir.
+
+  `sayiKabul` iki farklı işi ayırıyor ve ayrım bilerek konuldu:
+
+    GELEN veri (yer imi ucu) yalnızca METİN kabul ediyor. Kuruşa çevirme
+    kuralı (iki ayırıcı, binlik grubu) parseMoneyToCents'te tek yerde
+    duruyor; tarayıcının kendi çevirdiği bir sayıya güvenmek o kuralın
+    ikinci bir kopyasını istemciye koymak demekti ve kopya sessizce eskir.
+
+    SAKLANAN veri ise zaten bu uçtan geçmiş kuruş SAYISI. Onu tekrar
+    "metin değil" diye elemek, kendi yazdığımız satırı okuyamamaktır.
+*/
+function kurusaCevir(deger: unknown, sayiKabul: boolean): number | null {
+  const kurus =
+    typeof deger === "string"
+      ? parseMoneyToCents(deger)
+      : sayiKabul && typeof deger === "number" && Number.isInteger(deger)
+        ? deger
+        : 0;
+  return kurus > 0 && kurus <= EN_YUKSEK_FIYAT ? kurus : null;
+}
+
+function satirlariAyikla(veri: unknown, sayiKabul: boolean): { satirlar: ToplananSatir[]; atlanan: number } {
   if (!Array.isArray(veri)) return { satirlar: [], atlanan: 0 };
 
   const satirlar: ToplananSatir[] = [];
@@ -56,9 +79,8 @@ export function satirlariDogrula(veri: unknown): { satirlar: ToplananSatir[]; at
     const kayit = ham as Record<string, unknown> | null;
     const sku = metin(kayit?.sku, 40);
     const fiyatlar = (Array.isArray(kayit?.fiyatlar) ? kayit.fiyatlar : [])
-      .filter((f): f is string => typeof f === "string")
-      .map((f) => parseMoneyToCents(f))
-      .filter((kurus) => kurus > 0 && kurus <= EN_YUKSEK_FIYAT)
+      .map((f) => kurusaCevir(f, sayiKabul))
+      .filter((kurus): kurus is number => kurus !== null)
       .slice(0, EN_FAZLA_FIYAT);
     if (!sku || !fiyatlar.length) { atlanan += 1; continue; }
 
@@ -78,6 +100,35 @@ export function satirlariDogrula(veri: unknown): { satirlar: ToplananSatir[]; at
   }
   if (Array.isArray(veri) && veri.length > EN_FAZLA_SATIR) atlanan += veri.length - EN_FAZLA_SATIR;
   return { satirlar, atlanan };
+}
+
+/** Yer imi ucuna GELEN ham gövde: fiyat yalnızca metin olarak kabul ediliyor. */
+export function satirlariDogrula(veri: unknown): { satirlar: ToplananSatir[]; atlanan: number } {
+  return satirlariAyikla(veri, false);
+}
+
+/*
+  arc_price_collections.satirlar'dan OKUMA.
+
+  Yazan iki yol aynı sütuna farklı TÜRDE fiyat bırakıyordu: yer imi ucu
+  gövdeyi yazmadan önce doğruladığı için kuruş SAYISI ([48710]), sunucu
+  taraması ise sayfadaki METNİ ("487,10") saklıyordu. Okuyan taraf
+  satirlariDogrula'yı ikinci kez çağırınca (yani gelen veriye uygulanan
+  "metin olmayanı at" kuralını saklanan veriye de uygulayınca) yer imiyle
+  toplanan HER satır sessizce düşüyordu.
+
+  Sonuç, kullanıcının şikâyet ettiği hasardı: partner hesabıyla girip
+  alış fiyatlarını toplamasına rağmen panel o listeyi boş görüyor,
+  geriye yalnızca cron'un müşteri fiyatları kalıyor ve alış alanına
+  onlar yazılıyordu. (26–28.09.2026'da 122 varyantın cost_price'ı
+  müşteri fiyatına eşitlendi.)
+
+  Bu yüzden okuma iki türü de kabul ediyor: yeni satırlar kuruş sayısı,
+  eski cron satırları metin. Aralık ve uzunluk sınırları yine
+  uygulanıyor — satır veritabanından geliyor diye sınırsız değil.
+*/
+export function saklananSatirlar(veri: unknown): ToplananSatir[] {
+  return satirlariAyikla(veri, true).satirlar;
 }
 
 /**
