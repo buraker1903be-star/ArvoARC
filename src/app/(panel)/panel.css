@@ -380,6 +380,19 @@ html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{b
 .panel-skeleton-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:6px}
 .skel-card{height:106px;border-radius:16px}
 .skel-block{height:220px;border-radius:18px}
+/*
+  Liste sayfalarının iskeleti: gösterge panelinin dört ölçüm kartı
+  yerine araç çubuğu, sekme şeridi ve satırlar. Şekil tutmayınca sayfa
+  yerleşmiş gibi görünüp içerik gelince sıçrıyordu.
+*/
+.skel-toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.skel-search{flex:1 1 380px;height:38px;border-radius:12px}
+.skel-pill{width:130px;height:38px;border-radius:12px}
+.skel-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.skel-tab{width:104px;height:32px;border-radius:999px}
+.skel-list{display:flex;flex-direction:column;gap:1px;overflow:hidden;border-radius:18px;background:var(--line-soft)}
+.skel-list-head{height:40px;border-radius:0}
+.skel-list-row{height:58px;border-radius:0}
 .panel-error-card{max-width:640px;margin:32px auto}
 .panel-error-card h1{margin:8px 0 10px;color:var(--ink);font-size:26px;letter-spacing:-.02em}
 .panel-error-card p{color:var(--muted);font-size:14px;line-height:1.6}
