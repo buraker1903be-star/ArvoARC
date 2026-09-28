@@ -62,32 +62,32 @@
 .dl-badge{grid-area:badge}
 .dl-edit{grid-area:edit;display:flex;justify-content:flex-end}
 .dl-edit a{color:var(--accent);font-size:13px;font-weight:650;text-decoration:none}
-.dl-rate em{display:inline-flex;padding:3px 9px;border-radius:999px;background:var(--danger-soft);color:var(--danger);font-size:12px;font-style:normal;font-weight:800}
+.dl-rate em{display:inline-flex;padding:3px 9px;border-radius:var(--r-pill);background:var(--danger-soft);color:var(--danger);font-size:12px;font-style:normal;font-weight:800}
 
 /* Silme onayı: tarayıcı confirm() yerine satır içi, JavaScript gerektirmez */
 .confirm-inline>summary{list-style:none;cursor:pointer}
 .confirm-inline>summary::-webkit-details-marker{display:none}
 .confirm-inline>summary::after{display:none!important;content:none!important}
 .confirm-inline[open]>summary{opacity:.6}
-.confirm-inline-body{display:grid;gap:8px;margin-top:8px;padding:10px;border:1px solid color-mix(in srgb,var(--danger) 30%,var(--line));border-radius:12px;background:var(--danger-soft)}
+.confirm-inline-body{display:grid;gap:8px;margin-top:8px;padding:10px;border:1px solid color-mix(in srgb,var(--danger) 30%,var(--line));border-radius:var(--r-md);background:var(--danger-soft)}
 .confirm-inline-body span{color:var(--danger);font-size:12.5px;font-weight:650;line-height:1.45}
 .panel-root .discount-package-actions{flex-wrap:wrap;align-items:flex-start}
 .panel-root .discount-package-actions>*{flex:1 1 0;min-width:0}
 .panel-root .discount-package-actions .ac-btn{width:100%;justify-content:center;padding:8px 10px;font-size:12.5px}
 
 /* ---------- Tedarikçiler ---------- */
-.supplier-sync{display:grid;gap:10px;margin-bottom:20px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+.supplier-sync{display:grid;gap:10px;margin-bottom:20px;padding:16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
 .supplier-sync-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;font-size:13.5px}
 .supplier-sync-top span{color:var(--muted)}
 .supplier-sync-top b{color:var(--ink);font-variant-numeric:tabular-nums}
-.supplier-track{height:8px;overflow:hidden;border-radius:999px;background:var(--line)}
+.supplier-track{height:8px;overflow:hidden;border-radius:var(--r-pill);background:var(--line)}
 .supplier-track i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent-500),var(--accent-300))}
 .supplier-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0}
 .supplier-facts dt{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
 .supplier-facts dd{margin:3px 0 0;color:var(--ink);font-size:13.5px;overflow-wrap:anywhere}
 .supplier-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:end}
 .supplier-form .is-wide{grid-column:1/-1}
-.supplier-preview{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:18px 0 0;padding:12px 14px;border:1px solid color-mix(in srgb,var(--accent-500) 30%,var(--line));border-radius:12px;background:var(--accent-soft);color:var(--ink-soft);font-size:13.5px}
+.supplier-preview{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:18px 0 0;padding:12px 14px;border:1px solid color-mix(in srgb,var(--accent-500) 30%,var(--line));border-radius:var(--r-md);background:var(--accent-soft);color:var(--ink-soft);font-size:13.5px}
 .supplier-preview strong{color:var(--accent-strong);font-size:15px}
 .supplier-reset{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
 .supplier-reset form{margin:0}
@@ -98,7 +98,7 @@
 .panel-root .import-card{display:flex;flex-direction:column;gap:12px}
 .import-card .ac-head{margin-bottom:0}
 .import-card p{margin:0;color:var(--ink-soft);font-size:13.5px;line-height:1.6}
-.import-form{display:grid;gap:10px;margin-top:auto;padding:12px;border:1px dashed var(--line-strong);border-radius:12px;background:var(--surface-2)}
+.import-form{display:grid;gap:10px;margin-top:auto;padding:12px;border:1px dashed var(--line-strong);border-radius:var(--r-md);background:var(--surface-2)}
 .panel-root .import-form input[type=file]{margin:0;padding:8px;background:var(--surface-raised);font-size:13px}
 .import-list .list-row{
   grid-template-columns:minmax(200px,2fr) 110px 120px 100px minmax(120px,.8fr) 130px;

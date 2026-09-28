@@ -48,7 +48,15 @@
   --shadow-sm:0 1px 2px rgba(11,27,46,.04),0 4px 14px rgba(11,27,46,.035);
   --shadow-md:0 2px 6px rgba(11,27,46,.04),0 16px 38px rgba(11,27,46,.08);
   --shadow-lg:0 28px 70px rgba(5,12,26,.18);
-  --r-sm:10px;--r-md:14px;--r-lg:18px;--r-xl:24px;--r-pill:999px;
+  /*
+    YARIÇAP ÖLÇEĞİ. 29.09.2026'da canlıda ölçüldüğünde tek ekranda
+    SEKİZ ayrı yarıçap vardı (6,8,9,10,11,12,13,14,15,16,18,20,22) ve
+    yalnızca ikisi jetondu: sistem dosyada duruyor, kod kullanmıyordu.
+    İç içe geçen kutuların köşeleri birbirini tutmuyordu.
+    xs küçük kareler içindir (24-32px ikon karoları, küçük rozetler);
+    onlara sm vermek köşeyi orantısız yuvarlatıyor.
+  */
+  --r-xs:8px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-xl:24px;--r-pill:999px;
 
   --font-body:var(--font-system);
   --ease-spring:cubic-bezier(.22,1,.36,1);

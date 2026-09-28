@@ -56,7 +56,7 @@
 .order-cell-customer small{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .order-transfer-tag{
   padding:1px 7px;border:1px solid color-mix(in srgb,var(--accent-500) 35%,var(--line));
-  border-radius:999px;color:var(--accent-strong);font-size:10.5px;font-style:normal;font-weight:700;
+  border-radius:var(--r-pill);color:var(--accent-strong);font-size:10.5px;font-style:normal;font-weight:700;
 }
 
 @media(max-width:1180px){
@@ -220,21 +220,21 @@
   firması, takip numarası ve durumuyla ayrı bir satır.
 */
 .shipment-list{display:grid;gap:10px;margin:0 0 18px;padding:0;list-style:none}
-.shipment-list li{padding:13px 15px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+.shipment-list li{padding:13px 15px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
 /* İptal edilen gönderi silinmiyor, soluklaşıyor: hangi firmaya ne
    verildiği geçmişte görünür kalmalı. */
 .shipment-list li[data-durum="cancelled"]{opacity:.55}
 .shipment-list li[data-durum="delivered"]{border-color:color-mix(in srgb,var(--success) 45%,var(--line))}
 .shipment-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .shipment-head b{font-size:13px}
-.shipment-head span{padding:2px 9px;border-radius:999px;background:var(--surface);color:var(--muted);font-size:11px;font-weight:700}
+.shipment-head span{padding:2px 9px;border-radius:var(--r-pill);background:var(--surface);color:var(--muted);font-size:11px;font-weight:700}
 .shipment-list p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.55}
 .shipment-items{color:var(--ink)!important;font-size:12px}
 .shipment-error{color:var(--danger)!important}
 .shipment-actions{display:flex;align-items:center;gap:12px;margin-top:10px}
 .shipment-actions a{color:var(--accent-500);font-size:12px;font-weight:700;text-decoration:none}
 .shipment-actions a:hover{text-decoration:underline}
-.shipment-actions button{padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer}
+.shipment-actions button{padding:4px 10px;border:1px solid var(--line);border-radius:var(--r-xs);background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer}
 .shipment-actions button:hover{border-color:var(--danger);color:var(--danger)}
 
 /* Yeni gönderi formu tedarikçi başına: aynı depodan çıkanlar bir pakette. */
@@ -249,18 +249,18 @@
 */
 .shipment-new > *{min-width:0}
 .shipment-item-picks label,.shipment-item-picks span{min-width:0}
-.shipment-form{padding:15px;border:1px dashed var(--line);border-radius:14px;background:var(--surface)}
+.shipment-form{padding:15px;border:1px dashed var(--line);border-radius:var(--r-md);background:var(--surface)}
 .shipment-form h4{display:flex;align-items:baseline;gap:10px;margin:0 0 12px;font-size:13px}
 .shipment-form h4 small{color:var(--muted);font-size:11px;font-weight:600}
 .shipment-item-picks{display:grid;gap:8px;margin-bottom:13px}
 .shipment-item-picks label{display:flex;align-items:center;gap:10px;font-size:12px}
 .shipment-item-picks span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.shipment-item-picks input{width:72px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);font:inherit;font-size:12px}
+.shipment-item-picks input{width:72px;padding:6px 8px;border:1px solid var(--line);border-radius:var(--r-xs);background:var(--surface-2);color:var(--ink);font:inherit;font-size:12px}
 .shipment-item-picks em{color:var(--muted);font-size:11px;font-style:normal}
 .shipment-form-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:13px}
 .shipment-form-fields .wide{grid-column:1/-1}
 .shipment-form-fields label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted)}
-.shipment-form-fields input,.shipment-form-fields select{min-height:36px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--ink);font:12px var(--font-body)}
+.shipment-form-fields input,.shipment-form-fields select{min-height:36px;padding:7px 10px;border:1px solid var(--line);border-radius:var(--r-xs);background:var(--surface-2);color:var(--ink);font:12px var(--font-body)}
 @media(max-width:700px){.shipment-form-fields{grid-template-columns:minmax(0,1fr)}}
 
 /* İki çalışma biçimi aynı formda: takip numarasıyla kayıt ve tryOTO ile
@@ -272,8 +272,8 @@
 /* Taslak gönderide kargo seçeneği ve ağırlık. */
 .shipment-oto{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;gap:10px;align-items:end;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
 .shipment-oto label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted)}
-.shipment-oto select,.shipment-oto input{min-height:36px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font:12px var(--font-body)}
-.shipment-oto button{min-height:36px;padding:8px 16px;border:0;border-radius:9px;background:var(--accent-500);color:#fff;font-size:12px;font-weight:700;cursor:pointer}
+.shipment-oto select,.shipment-oto input{min-height:36px;padding:7px 10px;border:1px solid var(--line);border-radius:var(--r-xs);background:var(--surface);color:var(--ink);font:12px var(--font-body)}
+.shipment-oto button{min-height:36px;padding:8px 16px;border:0;border-radius:var(--r-xs);background:var(--accent-500);color:#fff;font-size:12px;font-weight:700;cursor:pointer}
 .shipment-oto .shipment-error{grid-column:1/-1;margin:0}
 @media(max-width:760px){.shipment-oto{grid-template-columns:minmax(0,1fr)}}
 
@@ -283,8 +283,8 @@
    seçiliyor); sayıyı sebebini söylemeden göstermek farkı hata sandırıyordu. */
 .shipment-weight{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
 .shipment-weight label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted)}
-.shipment-weight input{width:110px;min-height:34px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font:12px var(--font-body)}
-.shipment-weight button{min-height:34px;padding:7px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer}
+.shipment-weight input{width:110px;min-height:34px;padding:6px 10px;border:1px solid var(--line);border-radius:var(--r-xs);background:var(--surface);color:var(--ink);font:12px var(--font-body)}
+.shipment-weight button{min-height:34px;padding:7px 14px;border:1px solid var(--line);border-radius:var(--r-xs);background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer}
 .shipment-weight button:hover{border-color:var(--accent-500);color:var(--accent-500)}
 .shipment-weight small{flex:1;min-width:160px;color:var(--muted);font-size:11px}
 .shipment-oto{border-top:0;margin-top:10px;padding-top:0}
@@ -296,7 +296,7 @@
 
 /* Durum çekme düğmesi kart başlığında, ikincil: her açılışta kendiliğinden
    sorgulamak gereksiz OTO çağrısı olurdu. */
-.shipment-refresh{margin-left:auto;padding:7px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.shipment-refresh{margin-left:auto;padding:7px 14px;border:1px solid var(--line);border-radius:var(--r-xs);background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 .shipment-refresh:hover{border-color:var(--accent-500);color:var(--accent-500)}
 
 
@@ -343,7 +343,7 @@
 
 .order-jump{display:flex;flex-wrap:wrap;gap:4px}
 .order-jump a{
-  padding:6px 11px;border:1px solid var(--line);border-radius:999px;
+  padding:6px 11px;border:1px solid var(--line);border-radius:var(--r-pill);
   color:var(--muted);font-size:12px;font-weight:700;text-decoration:none;
 }
 .order-jump a:hover{border-color:var(--accent-500);color:var(--accent-500)}
@@ -352,7 +352,7 @@
   İptal edilen gönderiler: kayıt duruyor ama tek satır. Tam kart
   çizildiğinde on iptal kaydı 1.218px yer kaplıyordu.
 */
-.shipment-cancelled{margin-top:12px;border:1px dashed var(--line);border-radius:12px}
+.shipment-cancelled{margin-top:12px;border:1px dashed var(--line);border-radius:var(--r-md)}
 .shipment-cancelled summary{
   padding:10px 14px;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;
 }
@@ -394,7 +394,7 @@
 .return-suppliers{
   margin:0 0 12px;padding:9px 12px;
   border:1px solid color-mix(in srgb,var(--accent-500) 30%,var(--line));
-  border-radius:10px;background:var(--accent-soft);
+  border-radius:var(--r-sm);background:var(--accent-soft);
   font-size:12.5px;line-height:1.5;
 }
 .return-suppliers em{color:var(--danger);font-style:normal;font-weight:700}
@@ -420,7 +420,7 @@
    yanında sakin duruyor. */
 .shipment-delivered{
   padding:4px 10px;border:1px solid color-mix(in srgb,var(--success) 45%,var(--line));
-  border-radius:8px;background:var(--surface);color:var(--success);
+  border-radius:var(--r-xs);background:var(--surface);color:var(--success);
   font-size:11px;font-weight:700;cursor:pointer;
 }
 .shipment-delivered:hover{background:color-mix(in srgb,var(--success) 12%,transparent)}

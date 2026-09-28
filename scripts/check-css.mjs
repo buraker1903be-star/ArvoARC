@@ -17,6 +17,13 @@
 //      (panel-tokens.css hariç; palet orada). Bu kural dosyaların
 //      yorumlarında zaten yazılıydı ama hiçbir şey uygulamıyordu; çok
 //      kiracılı temada sabit renk kurumun markasını yok sayar.
+//
+//   3. SABİT YARIÇAP — aynı gerekçe köşeler için. 29.09.2026'da canlıda
+//      tek ekranda SEKİZ ayrı yarıçap ölçüldü (6, 8, 9, 10, 11, 12, 13,
+//      14, 15, 16, 18, 20, 22) ve yalnızca ikisi jetondu: ölçek dosyada
+//      duruyor, kod kullanmıyordu. İç içe geçen kutuların köşeleri
+//      birbirini tutmuyor ve fark ekranda "özensiz" olarak okunuyor.
+//      %50 (daire) ve 0 muaf.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -99,6 +106,17 @@ for (const tam of cssDosyalari(KAYNAK)) {
       const ornek = [...new Set(hexler.map((m) => m[0]))].slice(0, 4).join(", ");
       sorunlar.push(`${göreli}: sabit renk var (${ornek}) — jeton kullanın, palet ${PALET}`);
     }
+
+    /* 3. Sabit yarıçap. */
+    const yaricaplar = [...gövde.matchAll(/border-radius:([^;}]+)/g)]
+      .flatMap((m) => m[1].trim().split(/\s+/))
+      .filter((deger) => /^[0-9.]+(px|rem|em)$/.test(deger) && Number.parseFloat(deger) !== 0);
+    if (yaricaplar.length) {
+      const ornek = [...new Set(yaricaplar)].slice(0, 5).join(", ");
+      sorunlar.push(
+        `${göreli}: sabit yarıçap var (${ornek}) — --r-xs/sm/md/lg/xl/pill kullanın, ölçek ${PALET}`,
+      );
+    }
   }
 }
 
@@ -109,4 +127,4 @@ if (sorunlar.length) {
 }
 
 const adet = cssDosyalari(KAYNAK).length;
-console.log(`✓ CSS denetimi: ${adet} dosya, parantezler dengeli, panelde sabit renk yok`);
+console.log(`✓ CSS denetimi: ${adet} dosya, parantezler dengeli, panelde sabit renk ve yarıçap yok`);

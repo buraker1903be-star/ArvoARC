@@ -1,6 +1,6 @@
 /* Genel arama sonuçları. Satır görünümü panel.css'te (Veri listeleri). */
 .search-list .list-row{grid-template-columns:34px minmax(0,1fr) auto;grid-template-areas:"icon main side";min-height:60px}
-.sr-icon{grid-area:icon;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--accent-soft);color:var(--accent-strong)}
+.sr-icon{grid-area:icon;display:grid;place-items:center;width:32px;height:32px;border-radius:var(--r-sm);background:var(--accent-soft);color:var(--accent-strong)}
 .sr-main{grid-area:main}
 .sr-side{grid-area:side;display:flex;align-items:center;justify-content:flex-end;gap:10px}
 .sr-amount{color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
