@@ -16,6 +16,8 @@ type Meta={
   images?:string[];image_paths?:string[];vendor?:string;type?:string;tags?:string;
   subtitle?:string;seo_title?:string;seo_description?:string;google_product_category?:string;
   gtin?:string;mpn?:string;condition?:string;material?:string;color?:string;gender?:string;age_group?:string;badge?:string;badge_tone?:string;
+  /* İşaretliyken Shopify içe aktarımı bu ürüne dokunmuyor. */
+  panelden_yonetiliyor?:boolean;
 };
 
 
@@ -127,6 +129,12 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
                 <label>Marka<input name="vendor" defaultValue={meta.vendor??""} maxLength={120} placeholder="Örn. ARVOCULTURE"/></label>
                 <label>Ürün türü<input name="type" defaultValue={meta.type??""} maxLength={120} placeholder="Örn. Kişisel bakım"/></label>
                 <label>Durum<select name="status" defaultValue={product.status}><option value="active">Aktif</option><option value="draft">Taslak</option><option value="archived">Arşivlenmiş</option></select></label>
+                {/*
+                  Shopify CSV'sinde SKU'su olmayan ürünlerde şart: içe
+                  aktarım kimliği yeniden üretip elle düzeltilmiş kaydın
+                  yanına ikinci bir varyant ekliyordu.
+                */}
+                <label className="check-inline"><input type="checkbox" name="panelden_yonetiliyor" defaultChecked={meta.panelden_yonetiliyor===true}/> Panelden yönetiliyor <small>Shopify içe aktarımı bu ürüne dokunmaz</small></label>
                 <label>Etiketler<input name="tags" defaultValue={meta.tags??""} maxLength={500} placeholder="bakım, premium, yeni"/></label>
                 <label>Ürün rozeti<input name="badge" defaultValue={meta.badge??""} maxLength={40} placeholder="Örn. Yeni, Çok Satan, Özel Seri"/></label>
                 <label>Rozet rengi<select name="badge_tone" defaultValue={meta.badge_tone??"green"}><option value="green">ARVO Yeşili</option><option value="navy">Lacivert</option><option value="gold">Altın</option><option value="red">Kırmızı</option></select></label>

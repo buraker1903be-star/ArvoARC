@@ -136,3 +136,27 @@ export function shopifyVaryantlari(
 
   return { satirlar: [...cikti.values()], hayalet };
 }
+
+/*
+  PANELDEN YÖNETİLEN ÜRÜN.
+
+  Bazı ürünler Shopify CSV'sinden geldi ama orada SKU'ları yoktu; SKU'yu
+  içe aktarım üretti (ArvoARC-<handle>-001) ve o kimlik LR'da karşılığı
+  olmadığı için fiyat akışına hiç girmedi. Doğru SKU'lar elle yazılınca
+  aynı CSV'nin tekrar aktarılması, üretilmiş kimliği YENİDEN üretip
+  düzeltilmiş kaydın yanına ikinci bir varyant ekler.
+
+  Bu yüzden ürün "panelden yönetiliyor" diye işaretlenebiliyor: içe
+  aktarım o handle'a hiç dokunmuyor. İşaret metadata'da, ayrı bir sütun
+  değil — ürün metadata'sı zaten içe aktarım ayarlarını taşıyor
+  (shopify_handle, images_migrated…) ve şema anlık görüntüsü el
+  değmeden kalıyor.
+*/
+export const PANEL_YONETIMI_ANAHTARI = "panelden_yonetiliyor";
+
+export function panelYonetiminde(metadata: unknown): boolean {
+  if (!metadata || typeof metadata !== "object") return false;
+  const deger = (metadata as Record<string, unknown>)[PANEL_YONETIMI_ANAHTARI];
+  /* Metin de kabul ediliyor: jsonb'den 'true' olarak okunabiliyor. */
+  return deger === true || deger === "true";
+}
