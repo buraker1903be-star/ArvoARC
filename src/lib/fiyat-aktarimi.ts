@@ -58,6 +58,24 @@ export function fiyatKarari(
   };
 }
 
+/**
+ * Alış geçişinde yazılacak maliyet ŞÜPHELİ Mİ?
+ *
+ * Alış geçişinin hiçbir denetimi yoktu: gelen sayı ne olursa olsun
+ * cost_price'a yazılıyordu. 26-28.09.2026'da tam bu yüzden 122 varyantın
+ * maliyeti satış fiyatına EŞİTLENDİ (yer imiyle toplanan liste okuma
+ * kusuru yüzünden düşüyor, geriye cron'un müşteri fiyatları kalıyordu)
+ * ve marj sıfırlandığı halde ekranda hiçbir işaret çıkmadı.
+ *
+ * ENGELLEMİYOR, uyarıyor: LR kendi kampanyasında müşteri fiyatını alışın
+ * altına indirebiliyor ve o satırı yazmamak maliyeti eski (yanlış)
+ * değerinde bırakmak olurdu. Kararı kullanıcı veriyor.
+ */
+export function maliyetUyarisi(maliyetKurus: number, satisKurus: number): string | undefined {
+  if (!Number.isFinite(satisKurus) || satisKurus <= 0) return undefined;
+  return maliyetKurus >= satisKurus ? "maliyet satış fiyatına eşit ya da üstünde" : undefined;
+}
+
 /*
   SKU EŞLEŞTİRME. LR'ın ürün kimliği "20604-201" biçiminde: taban
   numara + varyant eki. ArvoARC'taki SKU'lar taban numara ("20604").

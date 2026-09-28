@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fiyatKarari, skuAdaylari } from "@/lib/fiyat-aktarimi";
+import { fiyatKarari, maliyetUyarisi, skuAdaylari } from "@/lib/fiyat-aktarimi";
 
 /*
   LR fiyat kuralı. Yanlış olursa CANLI MAĞAZADA yanlış fiyat oluşur:
@@ -69,4 +69,29 @@ test("SKU: KESME İŞARETLİ kayıtlar da aday", () => {
     bu yüzden eşleşmedi (27.09.2026).
   */
   assert.ok(skuAdaylari("20604-201").includes("'20604"), "taban numara kesme işaretiyle de aranıyor");
+});
+
+/*
+  ALIŞ GEÇİŞİNİN DENETİMİ. Bu geçişte hiçbir denetim yoktu: gelen sayı ne
+  olursa olsun cost_price'a yazılıyordu. 26-28.09.2026'da 122 varyantın
+  maliyeti satış fiyatına eşitlendi ve marj sıfırlandığı halde ekranda
+  hiçbir işaret çıkmadı. Uyarı ENGELLEMİYOR, işaretliyor.
+*/
+test("maliyet satış fiyatına EŞİTSE uyarılıyor", () => {
+  // Hasarın tam biçimi buydu: cost_price = price, marj %0.
+  assert.ok(maliyetUyarisi(56690, 56690));
+});
+
+test("maliyet satış fiyatının ÜSTÜNDEYSE uyarılıyor", () => {
+  assert.ok(maliyetUyarisi(60000, 56690));
+});
+
+test("maliyet satış fiyatının ALTINDAYSA uyarı yok", () => {
+  // Beklenen hal: LR partner indirimiyle alış, müşteri fiyatının 1/1,4'ü.
+  assert.equal(maliyetUyarisi(40493, 56690), undefined);
+});
+
+test("satış fiyatı YOKSA uyarı üretilmiyor", () => {
+  /* Fiyatı olmayan varyantta "maliyet satışı aşıyor" demek yanıltıcı olurdu. */
+  assert.equal(maliyetUyarisi(40493, 0), undefined);
 });

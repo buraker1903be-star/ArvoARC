@@ -329,6 +329,16 @@ export function MaliyetAktarimi() {
           {onizleme.eslesen.length ? (
             <>
               <h4>{onizleme.eslesen.length} ürün eşleşti</h4>
+              {/*
+                Uyarı SAYISI başta: yüzlerce satırlık bir listede tek tek
+                aramak, uyarıyı hiç görmemekle aynı şey.
+              */}
+              {onizleme.eslesen.some((x) => x.uyari) ? (
+                <p className="maliyet-sonuc" data-tone="hata">
+                  {onizleme.eslesen.filter((x) => x.uyari).length} üründe maliyet satış fiyatına eşit
+                  ya da üstünde. Yanlış sütun toplandıysa belirtisi budur — uygulamadan önce bakın.
+                </p>
+              ) : null}
               <ul>
                 {onizleme.eslesen.map((satir) => (
                   <li key={satir.sku}>
@@ -351,6 +361,8 @@ export function MaliyetAktarimi() {
                       ) : (
                         <>
                           {satir.eski ? para.format(satir.eski / 100) : "—"} → <b>{para.format(satir.yeni / 100)}</b>
+                          {/* Uyarı "atlanacak" demiyor: satır yazılıyor, yalnızca şüpheli. */}
+                          {satir.uyari ? <span className="fiyat-sorun">{satir.uyari}</span> : null}
                         </>
                       )}
                     </em>
