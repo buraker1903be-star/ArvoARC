@@ -281,6 +281,12 @@ export function MaliyetAktarimi() {
           <div className="toplayici-liste">
             <b>{zaman.format(new Date(toplama.toplandi))}</b> tarihli liste getirildi · {toplama.okunan} satır okundu
             {toplama.toplamaSayisi > 1 ? <> · {toplama.toplamaSayisi} ayrı gönderim birleştirildi</> : null}
+            {/*
+              KAYNAK YAZIYOR. "Yer imi" ile "günlük tarama" farklı şeyler —
+              biri girişli oturumdan alış, öteki girişsiz müşteri fiyatı.
+              Görünmediği sürece hangisinin uygulandığı ekrandan okunamıyordu.
+            */}
+            {toplama.kaynaklar.length ? <> · kaynak: <b>{toplama.kaynaklar.join(" + ")}</b></> : null}
             {toplama.uygulandi ? <> · <b>bu liste {zaman.format(new Date(toplama.uygulandi))} tarihinde uygulanmış</b></> : null}
             {toplama.sayfa ? <><br /><small>{toplama.sayfa.slice(0, 120)}</small></> : null}
           </div>

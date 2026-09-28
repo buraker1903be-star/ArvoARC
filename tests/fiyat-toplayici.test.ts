@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EN_FAZLA_SATIR, gecerliFiyat, satirlariDogrula } from "@/lib/fiyat-toplayici";
+import { EN_FAZLA_SATIR, gecerliFiyat, satirlariDogrula, kaynaklarIcin, KAYNAK_ADI } from "@/lib/fiyat-toplayici";
 
 /*
   Toplayıcıdan gelen veri TAMAMEN İSTEMCİ TARAFINDAN üretiliyor: LR'ın
@@ -79,4 +79,26 @@ test("KARTTA İKİ FİYAT VARSA geçerli olan (düşük) alınıyor", () => {
   assert.equal(gecerliFiyat([49900, 34990]), 34990);
   assert.equal(gecerliFiyat([34990]), 34990);
   assert.equal(gecerliFiyat([]), null);
+});
+
+/*
+  'lr-genel' sunucunun günlük taraması ve GİRİŞSİZ okunuyor: tanım
+  gereği müşteri fiyatı, hiçbir koşulda alış olamaz. Süzgeç yokken her
+  gece 06:00'daki tarama uygulanmamış olarak duruyor ve "son toplanan
+  liste" birleştirmesine karışıyordu; kullanıcı girişli oturumda alış
+  toplasa bile müşteri fiyatları cost_price'a yazılıyordu.
+*/
+test("alış YALNIZCA yer imiyle toplanandan gelir", () => {
+  assert.deepEqual(kaynaklarIcin("alis"), ["lr"]);
+  assert.ok(!kaynaklarIcin("alis").includes("lr-genel"));
+});
+
+test("müşteri geçişinde iki kaynak da geçerli", () => {
+  // Kullanıcı çıkışlı sayfada yer imiyle de müşteri fiyatı toplayabilir.
+  assert.deepEqual([...kaynaklarIcin("musteri")].sort(), ["lr", "lr-genel"]);
+});
+
+test("kaynak adları ekranda okunabilir", () => {
+  assert.equal(KAYNAK_ADI.lr, "yer imi");
+  assert.equal(KAYNAK_ADI["lr-genel"], "günlük tarama");
 });
