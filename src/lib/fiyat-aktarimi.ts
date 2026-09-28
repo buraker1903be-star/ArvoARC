@@ -77,6 +77,37 @@ export function maliyetUyarisi(maliyetKurus: number, satisKurus: number): string
 }
 
 /*
+  AYNI SKU BİRDEN ÇOK KAYITTA.
+
+  arc_product_variants'ta (organization_id, sku) üzerinde benzersizlik
+  kısıtı YOK — yalnızca external_id ve supplier_sku benzersiz. Canlıda
+  altı varyantın aynı SKU'yu taşıdığı ürünler var (28.09.2026'da ölçüldü).
+
+  Bu fiyat aktarımını doğrudan ilgilendiriyor: önizleme SKU'yu TEK satır
+  gösteriyor (eşleştirme haritası sonuncuyu tutuyor) ama yazma
+  `eq("sku", …)` ile yapılıyor, yani fiyat BÜTÜN kopyalara gidiyor.
+  Kullanıcı bir kayda yazdığını sanıp altısına yazıyor.
+
+  İki hal ayrılıyor:
+
+    AYNI ürünün kopyaları — hepsine yazmak zaten istenen şey, yalnızca
+    kaç kayda gittiği söyleniyor.
+
+    FARKLI ürünler aynı SKU'yu taşıyor — satır ATLANIYOR. Bir ürünün
+    fiyatını başkasına yazmak canlı mağazada geri alınamaz bir hatadır
+    ve önizlemede görünmediği için fark edilmezdi. Hangisinin doğru
+    olduğuna kod karar veremez.
+*/
+export function skuYinelemesi(
+  kayitSayisi: number,
+  urunSayisi: number,
+): { sorun: "sku-farkli-urunlerde" } | { uyari?: string } {
+  if (urunSayisi > 1) return { sorun: "sku-farkli-urunlerde" };
+  if (kayitSayisi > 1) return { uyari: `aynı SKU ${kayitSayisi} kayıtta; hepsine yazılacak` };
+  return {};
+}
+
+/*
   SKU EŞLEŞTİRME. LR'ın ürün kimliği "20604-201" biçiminde: taban
   numara + varyant eki. ArvoARC'taki SKU'lar taban numara ("20604").
   Önce birebir, sonra tabandan eşleştiriliyor — birebir olanı

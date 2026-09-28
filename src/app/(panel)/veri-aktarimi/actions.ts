@@ -6,7 +6,7 @@ import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { maliyetleriAyristir } from "@/lib/maliyet-aktarimi";
-import { fiyatKarari, maliyetUyarisi, skuAdaylari } from "@/lib/fiyat-aktarimi";
+import { fiyatKarari, maliyetUyarisi, skuAdaylari, skuYinelemesi } from "@/lib/fiyat-aktarimi";
 import { gecerliFiyat, saklananSatirlar, kaynaklarIcin, KAYNAK_ADI, type FiyatKaynagi } from "@/lib/fiyat-toplayici";
 import { jetonAnahtariVar, toplayiciJetonu } from "@/lib/fiyat-toplayici-jeton";
 import { lrTaramasiniKaydet } from "@/lib/lr/kaydet";
@@ -288,7 +288,7 @@ export type MaliyetOnizleme = {
       gerçekten zararına kampanya yapabiliyor ve o satırı yazmamak
       vitrini LR'ın fiyatının gerisinde bırakırdı.
     */
-    uyari?: string;
+    uyarilar?: string[];
   }[];
   eslesmeyen: string[];
   atlanan: string[];
@@ -300,6 +300,7 @@ const SORUN_METNI: Record<string, string> = {
   "tavan-yok": "LR fiyatı okunamadı",
   "indirim-fiyati-asiyor": "indirim fiyatı sıfıra indiriyor",
   "maliyetin-altinda": "satış fiyatı maliyetin altına düşüyor",
+  "sku-farkli-urunlerde": "aynı SKU farklı ürünlerde; hangisi olduğu belirsiz",
 };
 
 /*
@@ -321,8 +322,14 @@ async function eslestir(
   */
   const adaylar = [...new Set(satirlar.flatMap((s) => skuAdaylari(s.sku)))];
 
-  type Varyant = { sku: string; cost_price: number | null; price: number; compare_at_price: number | null; title: string | null; arc_products: { name: string } | { name: string }[] | null };
+  type Varyant = { sku: string; product_id: string; cost_price: number | null; price: number; compare_at_price: number | null; title: string | null; arc_products: { name: string } | { name: string }[] | null };
   const bySku = new Map<string, Varyant>();
+  /*
+    SKU benzersiz DEĞİL (bkz. lib/fiyat-aktarimi.ts: skuYinelemesi).
+    Harita sonuncuyu tutuyor ama yazma eq("sku", …) ile bütün kopyalara
+    gidiyor; kaç kayıt ve kaç AYRI ÜRÜN olduğu bu yüzden sayılıyor.
+  */
+  const yineleme = new Map<string, { kayit: number; urunler: Set<string> }>();
 
   /*
     SKU'lar ÖBEK ÖBEK soruluyor. Adaylar adres satırına yazılıyor
@@ -337,11 +344,17 @@ async function eslestir(
   for (let i = 0; i < adaylar.length; i += OBEK) {
     const { data, error } = await supabase
       .from("arc_product_variants")
-      .select("sku,cost_price,price,compare_at_price,title,arc_products(name)")
+      .select("sku,product_id,cost_price,price,compare_at_price,title,arc_products(name)")
       .eq("organization_id", organizationId)
       .in("sku", adaylar.slice(i, i + OBEK));
     if (error) return { eslesen: [], eslesmeyen: [], hata: `Ürünler okunamadı: ${error.message}` };
-    for (const varyant of (data ?? []) as unknown as Varyant[]) bySku.set(varyant.sku, varyant);
+    for (const varyant of (data ?? []) as unknown as Varyant[]) {
+      bySku.set(varyant.sku, varyant);
+      const sayac = yineleme.get(varyant.sku) ?? { kayit: 0, urunler: new Set<string>() };
+      sayac.kayit += 1;
+      sayac.urunler.add(varyant.product_id);
+      yineleme.set(varyant.sku, sayac);
+    }
   }
 
   const eslesen: MaliyetOnizleme["eslesen"] = [];
@@ -352,10 +365,32 @@ async function eslestir(
     const urun = Array.isArray(varyant.arc_products) ? varyant.arc_products[0] : varyant.arc_products;
     const ad = [urun?.name, varyant.title].filter(Boolean).join(" · ") || varyant.sku;
 
+    /*
+      Yinelemeye İKİ GEÇİŞTE de bakılıyor: müşteri geçişi price yazıyor,
+      alış geçişi cost_price — ikisi de eq("sku", …) ile bütün kopyalara
+      gidiyor.
+    */
+    const sayac = yineleme.get(varyant.sku) ?? { kayit: 1, urunler: new Set([varyant.product_id]) };
+    const yinelemeDurumu = skuYinelemesi(sayac.kayit, sayac.urunler.size);
+    if ("sorun" in yinelemeDurumu) {
+      eslesen.push({
+        sku: varyant.sku, ad,
+        eski: gecis === "alis" ? varyant.cost_price : varyant.price,
+        yeni: satir.kurus,
+        sorun: SORUN_METNI[yinelemeDurumu.sorun] ?? yinelemeDurumu.sorun,
+      });
+      continue;
+    }
+
     if (gecis === "alis") {
-      /* Kural lib/fiyat-aktarimi.ts'te: engellemiyor, işaretliyor. */
-      const uyari = maliyetUyarisi(satir.kurus, varyant.price);
-      eslesen.push({ sku: varyant.sku, ad, eski: varyant.cost_price, yeni: satir.kurus, uyari });
+      /* Kurallar lib/fiyat-aktarimi.ts'te: engellemiyor, işaretliyor. */
+      const uyarilar = [maliyetUyarisi(satir.kurus, varyant.price), yinelemeDurumu.uyari].filter(
+        (u): u is string => Boolean(u),
+      );
+      eslesen.push({
+        sku: varyant.sku, ad, eski: varyant.cost_price, yeni: satir.kurus,
+        uyarilar: uyarilar.length ? uyarilar : undefined,
+      });
       continue;
     }
 
@@ -367,6 +402,7 @@ async function eslestir(
     eslesen.push({
       sku: varyant.sku, ad, eski: varyant.price, yeni: satir.kurus,
       satis: sonuc.karar.satis, ustuCizili: sonuc.karar.ustuCizili,
+      uyarilar: yinelemeDurumu.uyari ? [yinelemeDurumu.uyari] : undefined,
     });
   }
   return { eslesen, eslesmeyen, hata: null };
@@ -392,20 +428,51 @@ export async function maliyetUygula(
   satirlar: { sku: string; kurus: number; satis?: number; ustuCizili?: number | null }[],
   gecis: FiyatGecisi = "alis",
   toplamaIdleri: string[] = [],
-): Promise<{ yazilan: number; hata: string | null }> {
+): Promise<{ yazilan: number; hata: string | null; atlanan?: number }> {
   const { supabase, organization, membership } = await requireTenant();
   if (!["owner", "admin", "manager"].includes(membership.role)) {
     return { yazilan: 0, hata: "Bu işlem için yetkiniz yok." };
   }
   if (!satirlar.length) return { yazilan: 0, hata: "Uygulanacak satır yok." };
 
+  /*
+    BELİRSİZ SKU'LAR SUNUCUDA DA ELENİYOR. Önizleme bunları "atlanacak"
+    diye işaretliyor ama istemciden gelen listeye güvenilmiyor: alış
+    geçişinde yazma yalnızca kurus'a bakıyordu, yani işaretli satır da
+    yazılırdı.
+
+    Aynı SKU birden çok ÜRÜNDE varsa yazma eq("sku", …) ile hepsine
+    gider ve bir ürünün fiyatı başkasına yazılır — canlı mağazada geri
+    alınamaz. Aynı ürünün kopyaları sorun değil, hepsine yazmak istenen
+    şey (bkz. lib/fiyat-aktarimi.ts: skuYinelemesi).
+  */
+  const belirsiz = new Set<string>();
+  const urunler = new Map<string, Set<string>>();
+  const skular = [...new Set(satirlar.map((s) => s.sku))];
+  for (let i = 0; i < skular.length; i += 150) {
+    const { data, error } = await supabase
+      .from("arc_product_variants")
+      .select("sku,product_id")
+      .eq("organization_id", organization.id)
+      .in("sku", skular.slice(i, i + 150));
+    if (error) return { yazilan: 0, hata: `Ürünler okunamadı: ${error.message}` };
+    for (const satir of (data ?? []) as { sku: string; product_id: string }[]) {
+      const kume = urunler.get(satir.sku) ?? new Set<string>();
+      kume.add(satir.product_id);
+      urunler.set(satir.sku, kume);
+    }
+  }
+  for (const [sku, kume] of urunler) if (kume.size > 1) belirsiz.add(sku);
+
   let yazilan = 0;
+  let atlanan = 0;
   for (const satir of satirlar) {
     /*
       İstemciden gelen listeye güvenilmiyor: önizlemeden sonra
       değiştirilmiş olabilir. Sıfır ve eksi değer yazılmıyor.
     */
     if (!Number.isInteger(satir.kurus) || satir.kurus <= 0) continue;
+    if (belirsiz.has(satir.sku)) { atlanan += 1; continue; }
     const yazilacak =
       gecis === "alis"
         ? { cost_price: satir.kurus }
@@ -439,7 +506,16 @@ export async function maliyetUygula(
 
   revalidatePath("/urunler");
   revalidatePath("/siparisler");
-  return { yazilan, hata: null };
+  /*
+    Atlananlar SÖYLENİYOR: "12 ürüne yazıldı" deyip 3 satırı sessizce
+    düşürmek, kullanıcının yazıldığını sandığı fiyatın yazılmaması
+    demekti.
+  */
+  return {
+    yazilan,
+    hata: null,
+    atlanan: atlanan || undefined,
+  };
 }
 
 /*
