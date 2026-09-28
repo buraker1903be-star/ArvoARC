@@ -146,7 +146,7 @@ export function MaliyetAktarimi() {
       const gonderilecek = onizleme.eslesen.filter((s) => !s.sorun);
       if (!gonderilecek.length) return;
       const cevap = await maliyetUygula(
-        gonderilecek.map((s) => ({ sku: s.sku, kurus: s.yeni, satis: s.satis, ustuCizili: s.ustuCizili })),
+        gonderilecek.map((s) => ({ varyantId: s.varyantId, kurus: s.yeni, satis: s.satis, ustuCizili: s.ustuCizili })),
         gecis,
         toplama?.toplamaIdleri ?? [],
       );
@@ -154,10 +154,8 @@ export function MaliyetAktarimi() {
         cevap.hata
           ? { metin: cevap.hata, hata: true }
           : {
-              /* Sunucu da belirsiz SKU eleyebiliyor; kaç satır düştüğü söyleniyor. */
-              metin:
-                `${cevap.yazilan} üründe ${gecis === "alis" ? "alış fiyatı" : "satış fiyatı"} güncellendi.` +
-                (cevap.atlanan ? ` ${cevap.atlanan} satır atlandı: aynı SKU farklı ürünlerde.` : ""),
+              /* "Varyant", "ürün" değil: bir ürünün birkaç varyantına yazılmış olabilir. */
+              metin: `${cevap.yazilan} varyantta ${gecis === "alis" ? "alış fiyatı" : "satış fiyatı"} güncellendi.`,
             },
       );
       setOnizleme(null);
@@ -340,7 +338,7 @@ export function MaliyetAktarimi() {
         </button>
         {onizleme?.eslesen.length ? (
           <button className="ac-btn" type="button" onClick={uygula} disabled={calisiyor}>
-            {onizleme.eslesen.filter((x) => !x.sorun).length} ürüne uygula
+            {onizleme.eslesen.filter((x) => !x.sorun).length} varyanta uygula
           </button>
         ) : null}
       </div>
@@ -353,7 +351,8 @@ export function MaliyetAktarimi() {
           {onizleme.hata ? <p className="maliyet-sonuc" data-tone="hata">{onizleme.hata}</p> : null}
           {onizleme.eslesen.length ? (
             <>
-              <h4>{onizleme.eslesen.length} ürün eşleşti</h4>
+              {/* "Varyant": aynı SKU birden çok varyanta dağılmış olabilir. */}
+              <h4>{onizleme.eslesen.length} varyant eşleşti</h4>
               {/*
                 Uyarılar TÜRÜNE GÖRE sayılıp başta toplanıyor: yüzlerce
                 satırlık bir listede tek tek aramak, uyarıyı hiç
@@ -361,12 +360,12 @@ export function MaliyetAktarimi() {
               */}
               {uyariOzeti.length ? (
                 <p className="maliyet-sonuc" data-tone="hata">
-                  Uygulamadan önce bakın — {uyariOzeti.map(([metin, adet]) => `${adet} üründe ${metin}`).join("; ")}.
+                  Uygulamadan önce bakın — {uyariOzeti.map(([metin, adet]) => `${adet} varyantta ${metin}`).join("; ")}.
                 </p>
               ) : null}
               <ul>
                 {onizleme.eslesen.map((satir) => (
-                  <li key={satir.sku}>
+                  <li key={satir.varyantId}>
                     <span><b>{satir.ad}</b><small>{satir.sku}</small></span>
                     {/* Eski ve yeni yan yana: yanlış sütun kopyalandıysa
                         fark burada göze çarpar. */}
