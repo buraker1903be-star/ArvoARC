@@ -270,7 +270,8 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     <section className="ac-bar">
       <div>
         <h1>Siparişler</h1>
-        <p>{counts.all.toLocaleString("tr-TR")} sipariş · {periodLabel}{search ? ` · “${search}”` : ""}</p>
+        {/* İpucu buraya taşındı: liste üstünde ayrı bir bant olarak 56px tutuyordu. */}
+        <p>{counts.all.toLocaleString("tr-TR")} sipariş · {periodLabel}{search ? ` · “${search}”` : ""} · satıra tıklayarak detayı açın{canManage ? ", kutucuklarla toplu işlem yapın" : ""}</p>
       </div>
       <OrdersTabs active="orders" pendingReturns={pendingReturns} canExport={canManage} />
     </section>

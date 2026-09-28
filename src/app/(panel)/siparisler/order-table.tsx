@@ -85,16 +85,15 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
   return (
     <section className="ac table list-table order-table" data-manage={canManage ? "" : undefined}>
       {/*
-        Başlık kaldırıldı: sayfanın kendi başlığı zaten "Siparişler" ve
-        "Sipariş akışı" onun altında ikinci kez aynı şeyi söylüyordu.
-        Blok 82px yer kaplıyordu; 900px'lik ekranda ilk sipariş satırı
-        595. pikselde başlıyor ve 40 kayıttan 4'ü görünüyordu (canlıda
-        ölçüldü, 27.09.2026). İpucu duruyor — yeni kullanıcı için tek
-        cümlelik değeri var — ama tek satıra indi.
+        Liste üstünde ne başlık ne ipucu bandı var.
+
+        Başlık 27.09.2026'da kaldırılmıştı (sayfa başlığı zaten
+        "Siparişler" diyordu; blok 82px yiyordu). İpucu bandı tek
+        satıra inip kalmıştı ve scripts/olc-yogunluk.mjs onun da 56px
+        tuttuğunu ölçtü — bir kez okunan bir cümle için her listede,
+        her açılışta. Cümle sayfa alt başlığına taşındı: bilgi duruyor,
+        yer açıldı.
       */}
-      <div className="ac-head list-table-head">
-        <p>Satıra tıklayarak detayı açın{canManage ? "; toplu işlem için kutucukları işaretleyin." : "."}</p>
-      </div>
 
       {canManage && chosen.length > 0 ? (
         <form action={bulkStatus} className="list-bulk-bar">

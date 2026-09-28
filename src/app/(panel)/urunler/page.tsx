@@ -214,7 +214,8 @@ export default async function Products({ searchParams }: { searchParams: Promise
     <section className="ac-bar">
       <div>
         <h1>Ürünler</h1>
-        <p>{counts.all.toLocaleString("tr-TR")} ürün · {(variantCountResult.count ?? 0).toLocaleString("tr-TR")} varyant{search ? ` · “${search}”` : ""}</p>
+        {/* İpucu buraya taşındı: liste üstünde ayrı bir bant olarak 56px tutuyordu. */}
+        <p>{counts.all.toLocaleString("tr-TR")} ürün · {(variantCountResult.count ?? 0).toLocaleString("tr-TR")} varyant{search ? ` · “${search}”` : ""} · satıra tıklayarak düzenleyin{canManage ? ", kutucuklarla toplu işlem yapın" : ""}</p>
       </div>
       {canManage ? <div className="ac-bar-actions"><Link prefetch={false} className="ac-btn ac-btn-primary" href="/urunler?yeni=1#yeni-urun">+ Yeni ürün</Link></div> : null}
     </section>
@@ -260,7 +261,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
         ))}
       </nav>
 
-      <ProductTable key={JSON.stringify(params)} rows={rows} canManage={canManage} back={listHref(state, {})} total={total} katalogBos={(katalogSayimi.count ?? 0) === 0}>
+      <ProductTable key={JSON.stringify(params)} rows={rows} canManage={canManage} back={listHref(state, {})} katalogBos={(katalogSayimi.count ?? 0) === 0}>
         <div className="list-pagination">
           <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + rows.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} ürün` : "Kayıt yok"}</span>
           {pageCount > 1 ? (

@@ -37,7 +37,9 @@ const BULK = [
   yayınlamak yerine seçip topluca yayınlanabilir / arşivlenebilir.
   Satırın tamamı ürün düzenleyicisine gider.
 */
-export function ProductTable({ rows, canManage, back, total, katalogBos, children }: { rows: ProductRow[]; canManage: boolean; back: string; total: number; katalogBos: boolean; children?: React.ReactNode }) {
+/* total kaldırıldı: yalnızca liste üstündeki ipucu bandında kullanılıyordu,
+   o bant sayfa alt başlığına taşındı ve sayı zaten orada yazıyor. */
+export function ProductTable({ rows, canManage, back, katalogBos, children }: { rows: ProductRow[]; canManage: boolean; back: string; katalogBos: boolean; children?: React.ReactNode }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const chosen = rows.filter((row) => selected.has(row.id));
   const allChecked = rows.length > 0 && chosen.length === rows.length;
@@ -51,10 +53,12 @@ export function ProductTable({ rows, canManage, back, total, katalogBos, childre
 
   return (
     <section className="ac table list-table product-list" data-manage={canManage ? "" : undefined}>
-      {/* Başlık kaldırıldı: sayfanın kendi başlığı zaten "Ürünler". */}
-      <div className="ac-head list-table-head">
-        <p>{total.toLocaleString("tr-TR")} ürün · satıra tıklayarak düzenleyin{canManage ? "; toplu işlem için kutucukları işaretleyin." : "."}</p>
-      </div>
+      {/*
+        Liste üstünde ne başlık ne ipucu bandı var. Başlık zaten
+        kaldırılmıştı; ipucu bandının da 56px tuttuğunu
+        scripts/olc-yogunluk.mjs ölçtü — bir kez okunan bir cümle
+        için, her açılışta. Cümle sayfa alt başlığına taşındı.
+      */}
 
       {canManage && chosen.length > 0 ? (
         <form action={bulkSetStatus} className="list-bulk-bar">
