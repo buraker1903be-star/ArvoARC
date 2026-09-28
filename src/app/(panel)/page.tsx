@@ -7,6 +7,8 @@ import { TRANSFER_STALE_HOURS } from "@/lib/payment-method";
 import { orderBadge, productStatusLabel } from "@/lib/commerce-labels";
 import { Icon, type IconName } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
+import { KurulumRehberi } from "@/components/panel/kurulum-rehberi";
+import { ayarlardanOlgular, kurulumDurumu } from "@/lib/kurulum-adimlari";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });
@@ -27,7 +29,7 @@ type Tone = "gold" | "info" | "brand" | "success" | "warning" | "danger" | "mute
 type OrderRow = { id: string; order_number: string; customer_name: string | null; status: string; payment_status: string; total: number; currency: string; refunded_amount: unknown; created_at: string };
 
 export default async function Dashboard() {
-  const { supabase, organization } = await requireTenant();
+  const { supabase, organization, membership } = await requireTenant();
   const now = currentTime();
   /* Bugün dahil son 30 gün, Türkiye saatine göre. */
   const since = trDayStart(now) - 29 * DAY;
@@ -47,7 +49,7 @@ export default async function Dashboard() {
       .range(from, to) as unknown as PromiseLike<{ data: OrderRow[] | null; error: { message: string } | null }>,
   );
 
-  const [{ rows: orders, truncated }, openOrderCountResult, productsResult, productCountResult, activeProductCountResult, variantCountResult, stockSumResult, negativeStockResult, lowStockResult, staleTransferResult] = await Promise.all([
+  const [{ rows: orders, truncated }, openOrderCountResult, productsResult, productCountResult, activeProductCountResult, variantCountResult, stockSumResult, negativeStockResult, lowStockResult, ayarSonucu, staleTransferResult] = await Promise.all([
     ordersPromise,
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).in("status", ["pending", "confirmed", "processing"]),
     supabase.from("arc_products").select("id,name,slug,status,created_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(5),
@@ -62,11 +64,22 @@ export default async function Dashboard() {
     supabase.rpc("arc_total_stock_units"),
     supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).lt("stock", 0),
     supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).gte("stock", 0).lte("stock", 5),
+    /*
+      KURULUM REHBERİ için ayar satırı. Yeni mağazada Genel Bakış
+      sıfırlarla doluydu ve sıradaki işi söylemiyordu; rehber tam
+      olarak o boşluğu dolduruyor ve kurulum bitince kayboluyor.
+    */
+    supabase.from("arc_store_settings").select("logo_path,bank_transfer_enabled,bank_iban,paytr_enabled,paytr_merchant_id,paytr_merchant_key_enc,shipping_fee,storefront_url,custom_domain,domain_verified_at").eq("organization_id", organization.id).maybeSingle(),
     /* Süresi geçen havale: ödenmemiş, kapanmamış ve 72 saatten eski havale siparişleri. */
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).in("payment_status", ["pending", "authorized"]).not("status", "in", "(cancelled,refunded)").ilike("metadata->>payment_method", "%havale%").lt("created_at", new Date(now - TRANSFER_STALE_HOURS * 3_600_000).toISOString()),
   ]);
 
   if (openOrderCountResult.error) throw new Error(openOrderCountResult.error.message);
+  /*
+    Ayar okunamazsa rehber SESSİZCE gizlenmiyor: hata yutulsa yeni
+    mağaza "kurulum tamam" sanır ve eksik ayarla satışa çıkardı.
+  */
+  if (ayarSonucu.error) throw new Error(ayarSonucu.error.message);
   if (productsResult.error) throw new Error(productsResult.error.message);
   if (productCountResult.error) throw new Error(productCountResult.error.message);
   if (activeProductCountResult.error) throw new Error(activeProductCountResult.error.message);
@@ -156,6 +169,15 @@ export default async function Dashboard() {
     Hızlı işlem düğmeleri bilerek yok: hepsi sol menüde. Aynı
     işlevi iki yerde göstermek başlık hizasında yer kaplıyordu.
   */
+  /* Rehber yalnızca ayarları değiştirebilenlere: depocu adımların
+     hiçbirini yapamaz, onun için yalnızca gürültü olurdu. */
+  const kurulum = ["owner", "admin", "manager"].includes(membership.role)
+    ? kurulumDurumu(ayarlardanOlgular(ayarSonucu.data, {
+        urunSayisi: productCountResult.count ?? 0,
+        yayindaUrunSayisi: activeProductCountResult.count ?? 0,
+      }))
+    : null;
+
   return (
     <div className="dash">
       <section className="dash-hero">
@@ -165,6 +187,8 @@ export default async function Dashboard() {
           <p>{organization.name} mağazasının satış, sipariş ve stok durumu.</p>
         </div>
       </section>
+
+      {kurulum ? <KurulumRehberi durum={kurulum} /> : null}
 
       {truncated ? (
         <Notice tone="warn" title="Özet kısmi">Son 30 günde 20.000’den fazla sipariş var; rakamlar en yeni 20.000 siparişten hesaplandı.</Notice>

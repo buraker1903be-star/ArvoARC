@@ -112,3 +112,51 @@ a.dash-activity-row:hover{background:color-mix(in srgb,var(--ink) 4%,transparent
   .dash-hero-actions>*{flex:1;justify-content:center}
 }
 @media(prefers-reduced-motion:reduce){.dash-bar-fill{animation:none}}
+
+/*
+  KURULUM REHBERİ.
+
+  Kurulum bitince bileşen hiç çizilmiyor (kurulumDurumu.gorunsun), o
+  yüzden burada "boşken küçülsün" gibi bir kural yok: kart ya tam
+  hâliyle var ya hiç yok.
+
+  Tamamlanan adım tek satıra iniyor, açıklama yalnızca SIRADAKİ
+  adımda duruyor; altı paragraf yan yana konsa liste okunmazdı.
+*/
+.panel-root .kurulum{
+  display:grid;gap:16px;padding:20px 22px;border:1px solid var(--line);border-radius:18px;
+  background:linear-gradient(140deg,color-mix(in srgb,var(--accent-500) 8%,var(--surface)),var(--surface) 62%);
+  box-shadow:0 1px 2px rgba(11,27,46,.06),0 12px 30px rgba(11,27,46,.07);
+}
+.panel-root .kurulum-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:16px}
+.panel-root .kurulum-head h2{margin:6px 0 4px;font-size:19px}
+.panel-root .kurulum-head p{margin:0;max-width:62ch;color:var(--muted);font-size:13px;line-height:1.6}
+.panel-root .kurulum-ilerleme{display:grid;justify-items:end;gap:6px;min-width:160px}
+.panel-root .kurulum-ilerleme strong{font-size:20px;font-variant-numeric:tabular-nums}
+.panel-root .kurulum-ilerleme small{color:var(--muted);font-size:11.5px}
+.panel-root .kurulum-bar{display:block;width:160px;height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.panel-root .kurulum-bar>span{display:block;height:100%;border-radius:999px;background:var(--accent-500)}
+
+.panel-root .kurulum-liste{display:grid;gap:4px;margin:0;padding:0;list-style:none;counter-reset:adim}
+.panel-root .kurulum-liste>li{
+  display:flex;align-items:center;gap:12px;min-height:46px;padding:8px 12px;border-radius:12px;
+}
+.panel-root .kurulum-liste>li[data-sirada]{background:var(--surface);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent-500) 26%,var(--line))}
+.panel-root .kurulum-isaret{
+  display:grid;place-items:center;width:22px;height:22px;flex:none;border-radius:50%;
+  border:1.5px solid var(--line-strong);color:var(--surface);
+}
+.panel-root .kurulum-liste>li[data-tamam] .kurulum-isaret{border-color:transparent;background:var(--success);color:#fff}
+.panel-root .kurulum-metin{display:grid;gap:3px;min-width:0;flex:1}
+.panel-root .kurulum-metin>b{font-size:13.5px}
+.panel-root .kurulum-liste>li[data-tamam] .kurulum-metin>b{color:var(--muted);font-weight:600}
+.panel-root .kurulum-metin>small{color:var(--muted);font-size:12.5px;line-height:1.55}
+.panel-root .kurulum-durum{flex:none;color:var(--success);font-size:12px;font-weight:700}
+.panel-root .kurulum-liste .ac-btn{flex:none;min-height:34px;padding:7px 14px;font-size:12.5px}
+
+@media (max-width:760px){
+  .panel-root .kurulum{padding:16px}
+  .panel-root .kurulum-ilerleme{justify-items:start}
+  .panel-root .kurulum-liste>li{flex-wrap:wrap}
+  .panel-root .kurulum-liste .ac-btn{margin-left:34px}
+}

@@ -42,7 +42,7 @@ export default async function Settings(){
     <PanelBildirimi basarililBaslik="Mağaza ayarları kaydedildi" />
 
     <div className="settings-layout">
-      <section className="card settings-section">
+      <section className="card settings-section" id="marka-kimligi">
         <div className="head"><div><small>MARKA KİMLİĞİ</small><h3>Logo ve görünüm</h3></div><span>{organization.plan_code}</span></div>
         <div className="brand-assets-grid">
           <article className="brand-asset">
@@ -71,7 +71,7 @@ export default async function Settings(){
 
       {/* Satış ayarları: sütunlar vardı ama hiçbir form onları yazmıyordu,
           yani her mağaza ArvoCulture tarifesiyle satıyordu. */}
-      <section className="card settings-section">
+      <section className="card settings-section" id="satis-ayarlari">
         <header><h2>Satış ayarları</h2><p>Kargo, ücretsiz kargo eşiği, havale indirimi ve sipariş numarası öneki.</p></header>
         {canManage?<form action={updateSalesSettings} className="settings-form">
           <label>Kargo ücreti (₺)<input name="shipping_fee" type="number" min="0" max="100000" step="0.01" defaultValue={((settings?.shipping_fee??12000)/100).toFixed(2)} required/></label>
@@ -101,7 +101,7 @@ export default async function Settings(){
           </div>}
         </section>
 
-        <section className="card settings-section domain-section">
+        <section className="card settings-section domain-section" id="magaza-alan-adi">
           <div className="head"><div><small>E-TİCARET MAĞAZASI</small><h3>Mağaza alan adı</h3></div><em className={domainStatus}>{statusLabel[domainStatus]??domainStatus}</em></div>
           <p className="domain-explainer"><b>Herkese açık mağaza</b> · Ürünlerin, koleksiyonların ve ödeme akışının yayınlandığı müşteri adresidir.</p>
           <div className="domain-current storefront"><small>MAĞAZA ADRESİ</small><strong>{settings?.custom_domain??(settings?.platform_subdomain?`${settings.platform_subdomain}.shop.arvo-os.com`:"Henüz tanımlanmadı")}</strong><span>{settings?.domain_verified_at?"SSL ve alan adı doğrulandı":"DNS bağlantısı bekleniyor"}</span></div>
@@ -213,7 +213,7 @@ export default async function Settings(){
       </>:<p className="list-hint">Kargo entegrasyonunu yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
     </section>
 
-    <section className="card settings-section payment-section">
+    <section className="card settings-section payment-section" id="odeme-yontemleri">
       <div className="head"><div><small>ÖDEME ALTYAPISI</small><h3>Ödeme yöntemleri</h3><p>Her mağaza kendi havale hesabını ve PayTR mağaza numarasını yönetir.</p></div><span>GÜVENLİ YAPILANDIRMA</span></div>
       {canManagePayments?<form action={updatePaymentSettings} className="payment-form">
         <article className="payment-method">
