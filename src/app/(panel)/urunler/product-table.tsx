@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
-import { bulkSetStatus } from "./actions";
+import { Notice } from "@/components/panel/notice";
+import { bulkSetStatus, topluDurumSonuc } from "./actions";
 
 export type ProductRow = {
   id: string;
@@ -51,6 +52,28 @@ export function ProductTable({ rows, canManage, back, katalogBos, children }: { 
       return next;
     });
 
+  const [sonuc, setSonuc] = useState<{ tur: "hata" | "basari"; metin: string } | null>(null);
+  const [calisiyor, basla] = useTransition();
+
+  const uygula = (idler: string[], durum: string) => {
+    setSonuc(null);
+    basla(async () => {
+      const cevap = await topluDurumSonuc(idler, durum);
+      /* Hata da başarı da SÖYLENİYOR: yönlendirme kalktığı için çerezli
+         şerit okunmuyor, sessiz kalmak "işlem oldu mu" sorusu bırakırdı. */
+      if (cevap.hata) setSonuc({ tur: "hata", metin: cevap.hata });
+      else if (cevap.basari) setSonuc({ tur: "basari", metin: cevap.basari });
+      /*
+        SEÇİM TEMİZLENİYOR — ama yalnızca işlem başarılıysa. Durumu
+        değişen ürünler mevcut filtreden çıkabiliyor, yani seçimi
+        tutmak var olmayan satırlara işaret etmek olurdu. Hata
+        durumunda seçim korunuyor: kullanıcı yeniden denemek isterse
+        kırk kayıttan seçtiklerini tekrar bulmak zorunda kalmasın.
+      */
+      if (!cevap.hata) setSelected(new Set());
+    });
+  };
+
   return (
     <section className="ac table list-table product-list" data-manage={canManage ? "" : undefined}>
       {/*
@@ -60,8 +83,39 @@ export function ProductTable({ rows, canManage, back, katalogBos, children }: { 
         için, her açılışta. Cümle sayfa alt başlığına taşındı.
       */}
 
+      {/* Yerinde işlem sonucu: liste yönlendirmediği için çerezli şerit okunmuyor. */}
+      {sonuc ? (
+        <div className="list-sonuc">
+          <Notice tone={sonuc.tur === "hata" ? "error" : "success"} title={sonuc.tur === "hata" ? "İşlem tamamlanamadı" : "İşlem tamamlandı"}>
+            {sonuc.metin}
+          </Notice>
+        </div>
+      ) : null}
+
       {canManage && chosen.length > 0 ? (
-        <form action={bulkSetStatus} className="list-bulk-bar">
+        /*
+          FORM DURUYOR, yalnızca gönderimi kesiliyor.
+
+          Eskiden toplu işlem tam bir gezinme başlatıyordu: kaydırma
+          yeri ve seçim gidiyor, liste baştan çiziliyordu. Artık eylem
+          sonucu döndürüyor (topluDurumSonuc) ve içindeki
+          revalidatePath veriyi yeniliyor; kullanıcı yerinde kalıyor.
+
+          Hangi düğmeye basıldığını submitter söylüyor: durum
+          düğmelerin value'sunda ve type="button" yapmak JavaScript
+          kapalıyken toplu işlemi tamamen bozardı.
+        */
+        <form
+          action={bulkSetStatus}
+          className="list-bulk-bar"
+          onSubmit={(olay) => {
+            const basilan = (olay.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+            const durum = basilan?.value;
+            if (!durum) return; /* durum okunamadıysa forma dokunma: normal gönderim çalışsın */
+            olay.preventDefault();
+            uygula(chosen.map((row) => row.id), durum);
+          }}
+        >
           <input type="hidden" name="back" value={back} />
           {chosen.map((row) => <input key={row.id} type="hidden" name="product_id" value={row.id} />)}
           <b>{chosen.length} ürün seçildi</b>
@@ -69,7 +123,7 @@ export function ProductTable({ rows, canManage, back, katalogBos, children }: { 
             {BULK.map((step) => {
               const eligible = chosen.filter((row) => row.status !== step.key).length;
               return (
-                <button key={step.key} className="ac-btn" type="submit" name="status" value={step.key} disabled={!eligible}>
+                <button key={step.key} className="ac-btn" type="submit" name="status" value={step.key} disabled={!eligible || calisiyor}>
                   {step.label}
                   <span className="ac-count">{eligible}</span>
                 </button>

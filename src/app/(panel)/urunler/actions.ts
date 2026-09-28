@@ -53,27 +53,29 @@ export async function createProduct(formData: FormData) {
  * Yalnızca durumu farklı olanlar güncellenir; aynı durumdakiler
  * atlanır ve sayısı bildirilir.
  */
-export async function bulkSetStatus(formData: FormData) {
+export type IslemSonucu = { hata?: string; basari?: string };
+
+/*
+  SEÇİLENLERİN DURUMU — çekirdek. İki yerden çağrılıyor:
+
+    bulkSetStatus     form gönderimi (JavaScript kapalıyken de çalışan
+                      yol). Sonucu çereze yazıp geri yönlendiriyor.
+    topluDurumSonuc   listeden, istemciden. Sonucu DÖNDÜRÜYOR.
+
+  Ayrım neden: toplu işlem tam bir gezinme başlatıyordu, yani kaydırma
+  yeri ve seçim gidiyor, liste baştan çiziliyordu. Yönlendirme kalkınca
+  revalidatePath veriyi yine yeniliyor ama kullanıcı yerinde kalıyor.
+
+  Yetki, durum listesi ve kurum kısıtı çekirdekte; istemciye
+  güvenilmiyor, yalnızca sonucun nereye gideceği değişiyor.
+*/
+async function topluDurum(rawIds: string[], status: string): Promise<IslemSonucu> {
   const { supabase, organization, membership } = await requireTenant();
-  /*
-    SONUÇ ÇEREZE, adres satırına değil.
+  if (!MANAGERS.includes(membership.role)) return { hata: hataMetni("forbidden") };
 
-    Bu eylem redirect(backUrl(..., {error})) kullanıyordu; sayfa ise
-    çerezi okuyan PanelBildirimi'ni çiziyor. Yani "seçilenleri yayınla"
-    hiçbir mesaj göstermiyordu — başarısızlıkta bile. Karşıtlığı aynı
-    dosyada duruyordu: hemen aşağıdaki bulkUpdateStatus (filtreye
-    uyanlar) bildirimliDonus kullanıyor ve mesajı görünüyor.
-
-    backUrl duruyor ama yalnızca GİDİLECEK YOLU doğrulamak için.
-  */
-  const back = (sonuc: { hata?: string; basari?: string }) =>
-    bildirimliDonus(backUrl(formData.get("back"), "/urunler", {}), sonuc);
-  if (!MANAGERS.includes(membership.role)) return await back({ hata: hataMetni("forbidden") });
-
-  const status = String(formData.get("status") ?? "");
-  const ids = [...new Set(formData.getAll("product_id").map(String).filter(Boolean))].slice(0, 100);
-  if (!STATUSES.includes(status)) return await back({ hata: hataMetni("invalid-status") });
-  if (!ids.length) return await back({ hata: hataMetni("bulk-empty") });
+  const ids = [...new Set(rawIds.map(String).filter(Boolean))].slice(0, 100);
+  if (!STATUSES.includes(status)) return { hata: hataMetni("invalid-status") };
+  if (!ids.length) return { hata: hataMetni("bulk-empty") };
 
   const { data, error } = await supabase
     .from("arc_products")
@@ -82,7 +84,7 @@ export async function bulkSetStatus(formData: FormData) {
     .in("id", ids)
     .neq("status", status)
     .select("id");
-  if (error) return await back({ hata: hataMetni("bulk-failed") });
+  if (error) return { hata: hataMetni("bulk-failed") };
 
   const updated = data?.length ?? 0;
   const skipped = ids.length - updated;
@@ -90,11 +92,37 @@ export async function bulkSetStatus(formData: FormData) {
   revalidatePath("/urunler");
   /* Atlananlar SÖYLENİYOR: aynı durumdaki ürünler güncellenmiyor ve
      "5 seçtim, 2 değişti" farkı açıklanmazsa eksik işlem sanılıyor. */
-  return await back({
+  return {
     basari:
       `${updated.toLocaleString("tr-TR")} ürünün durumu güncellendi.` +
       (skipped > 0 ? ` ${skipped.toLocaleString("tr-TR")} ürün zaten bu durumdaydı, atlandı.` : ""),
-  });
+  };
+}
+
+/** Liste: sonucu döndürür, yönlendirmez. */
+export async function topluDurumSonuc(ids: string[], status: string): Promise<IslemSonucu> {
+  return await topluDurum(Array.isArray(ids) ? ids : [], String(status ?? ""));
+}
+
+export async function bulkSetStatus(formData: FormData) {
+  /*
+    JavaScript KAPALIYKEN çalışan yol. Mantık çekirdekte; burada
+    yalnızca sonucun nereye gideceği belirleniyor.
+
+    Sonuç ÇEREZE yazılıyor, adres satırına değil: bu eylem
+    redirect(backUrl(…,{error})) kullanıyordu ve sayfa çerezi okuyan
+    PanelBildirimi'ni çiziyor, yani hiçbir mesaj görünmüyordu —
+    başarısızlıkta bile. Karşıtlığı aynı dosyada duruyordu
+    (bulkUpdateStatus konuşuyor, bu susuyordu).
+
+    backUrl duruyor ama yalnızca GİDİLECEK YOLU doğrulamak için;
+    "back" dışarıdan geliyor.
+  */
+  const sonuc = await topluDurum(
+    formData.getAll("product_id").map(String),
+    String(formData.get("status") ?? ""),
+  );
+  return await bildirimliDonus(backUrl(formData.get("back"), "/urunler", {}), sonuc);
 }
 
 /**
