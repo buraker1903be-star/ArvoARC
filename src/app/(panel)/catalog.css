@@ -144,9 +144,35 @@
   .product-list:not([data-manage]) .list-row{grid-template-columns:44px minmax(0,1fr) auto;grid-template-areas:"thumb name name" "thumb price status";row-gap:4px;padding:12px 14px}
   .pl-margin,.pl-stock{display:none}
   .pl-status{align-items:flex-end}
-  .stock-list[data-manage] .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name qty" "sku policy" "adjust adjust";row-gap:6px;padding:12px 14px}
-  .stock-list:not([data-manage]) .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name qty" "sku policy";row-gap:6px;padding:12px 14px}
-  .sl-qty,.sl-policy{justify-self:end;text-align:right}
+  /*
+    ÜRÜN ADI İKİ SATIRA SARIYOR (375px'te ölçüldü, 28.09.2026).
+    Tek satırda ada 183px kalıyor, adların kendisi 444–549px istiyor:
+    ekrandaki 24 üründen 12'si ÜÇ GRUBA düşüp birbirinin AYNISI
+    görünüyordu ("Erkek Gümüş Renk Metal Ko…" altı kez). İki satırda
+    çarpışma kalmıyor; bedeli satır başına 21px (96px → 117px).
+  */
+  .product-list .pl-name b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow:hidden}
+  /*
+    TELEFONDA ÜRÜN ADI OKUNAMIYORDU (375px'te ölçüldü, 28.09.2026).
+    "Stoksuz satış açık" adla AYNI SÜTUNDAYDI (name|qty üstünde
+    sku|policy) ve sütun o metne göre boyutlanınca ada 153px
+    kalıyordu. LR adları uzun ortak önekle başlıyor —
+    "LR ALOE VIA Baby Hassas Yıkama Losyonu & Şampuan" ile
+    "LR ALOE VIA Baby Hassas Yüz & Vücut Losyonu" o genişlikte
+    HARFİ HARFİNE aynı görünüyordu, yani hangi varyantın stoğunu
+    değiştirdiğin ekrandan okunamıyordu.
+
+    Politika kendi satırına indi, ad tam genişliği alıyor (235px) ve
+    İKİ SATIRA sarıyor: adların en uzunu 476px istiyor, tek satır
+    telefonda hiçbir düzenle yetmiyordu. Bedeli satır başına ~22px
+    (146px → 168px ortalama) ve on beş satırda kırpılan ad 11'den
+    1'e indi — kalan, üç satır isteyen tek bir tekstil adı.
+  */
+  .stock-list[data-manage] .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name qty" "sku sku" "policy policy" "adjust adjust";row-gap:4px;padding:10px 14px}
+  .stock-list:not([data-manage]) .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name qty" "sku sku" "policy policy";row-gap:4px;padding:10px 14px}
+  .sl-qty{justify-self:end;text-align:right}
+  .sl-policy{justify-self:start;text-align:left}
+  .stock-list .sl-name b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow:hidden}
   .sl-adjust{justify-content:flex-start}
   .variant-list[data-manage] .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title title" "sku stock" "price compare" "gorsel gorsel" "backorder save";row-gap:8px;padding:14px}
   .variant-list:not([data-manage]) .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title stock" "sku price" ". compare";row-gap:6px;padding:14px}
