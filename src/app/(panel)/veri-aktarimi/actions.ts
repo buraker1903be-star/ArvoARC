@@ -7,7 +7,7 @@ import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { maliyetleriAyristir } from "@/lib/maliyet-aktarimi";
 import { fiyatKarari, skuAdaylari } from "@/lib/fiyat-aktarimi";
-import { gecerliFiyat, satirlariDogrula } from "@/lib/fiyat-toplayici";
+import { gecerliFiyat, satirlariDogrula, kaynaklarIcin, KAYNAK_ADI, type FiyatKaynagi } from "@/lib/fiyat-toplayici";
 import { jetonAnahtariVar, toplayiciJetonu } from "@/lib/fiyat-toplayici-jeton";
 import { lrTaramasiniKaydet } from "@/lib/lr/kaydet";
 import { createServiceClient } from "@/lib/paytr/service-client";
@@ -485,6 +485,8 @@ export type ToplananListe = {
   okunan: number;
   /** Kaç ayrı toplamadan geldi (LR'da kategori kategori gezilince artıyor). */
   toplamaSayisi: number;
+  /** Listenin hangi kaynaklardan geldiği ("yer imi", "günlük tarama"). */
+  kaynaklar: string[];
   onizleme: MaliyetOnizleme;
 };
 
@@ -504,25 +506,46 @@ export async function sonToplananListe(
     Hepsi uygulanmışsa sonuncusu yine gösteriliyor: "getir" düğmesinin
     sessizce hiçbir şey yapmaması, bir şeyin bozulduğu izlenimi verirdi.
   */
+  /*
+    KAYNAK SÜZÜLÜYOR. Süzülmediğinde her gece 06:00'da çalışan tarama
+    (kaynak 'lr-genel', GİRİŞSİZ okunan MÜŞTERİ fiyatı) uygulanmamış
+    olarak duruyor ve bu birleştirmeye karışıyordu: kullanıcı girişli
+    oturumda yer imiyle alış fiyatı toplasa bile, cron'un müşteri
+    fiyatları alış alanına yazılıyordu. Üstelik uygulama sırasında
+    cron'un listeleri de "uygulandı" işaretlenip sessizce tükeniyordu.
+
+    Ayrım kaydeden tarafta zaten kurulmuştu (lib/lr/kaydet.ts); eksik
+    olan okuyan tarafın sütuna bakmasıydı.
+  */
+  const kaynaklar = kaynaklarIcin(gecis);
   const sorgu = () =>
     supabase
       .from("arc_price_collections")
-      .select("id,satirlar,sayfa,created_at,uygulandi_at")
+      .select("id,satirlar,sayfa,created_at,uygulandi_at,kaynak")
       .eq("organization_id", organization.id)
+      .in("kaynak", kaynaklar)
       .order("created_at", { ascending: false })
       .limit(20);
 
   const { data: bekleyen, error } = await sorgu().is("uygulandi_at", null);
   if (error) return { hata: error.message };
 
-  type Kayit = { id: string; satirlar: unknown; sayfa: string | null; created_at: string; uygulandi_at: string | null };
+  type Kayit = { id: string; satirlar: unknown; sayfa: string | null; created_at: string; uygulandi_at: string | null; kaynak: string };
   let kayitlar = (bekleyen ?? []) as Kayit[];
   if (!kayitlar.length) {
     const { data: sonuncu, error: sonHata } = await sorgu().limit(1);
     if (sonHata) return { hata: sonHata.message };
     kayitlar = (sonuncu ?? []) as Kayit[];
   }
-  if (!kayitlar.length) return { hata: "Henüz toplanmış liste yok. LR sayfasında yer imine basın." };
+  if (!kayitlar.length) {
+    // Hangi kaynağın arandığı söyleniyor: "liste yok" demek, kullanıcı
+    // az önce toplama yaptıysa bir şeyin bozulduğu izlenimi verirdi.
+    return {
+      hata: gecis === "alis"
+        ? "Girişli oturumda yer imiyle toplanmış bir liste yok. LR'a giriş yapıp ürün sayfasında yer imine basın. (Günlük tarama müşteri fiyatı topluyor; alış geçişine karışmıyor.)"
+        : "Henüz toplanmış liste yok. LR sayfasında yer imine basın ya da “LR'dan fiyatları çek” deyin.",
+    };
+  }
 
   /*
     Eskiden yeniye: aynı ürün iki sayfada görünürse EN YENİ okuma
@@ -554,6 +577,7 @@ export async function sonToplananListe(
     sayfa: kayit.sayfa,
     okunan: satirlar.length,
     toplamaSayisi: kayitlar.length,
+    kaynaklar: [...new Set(kayitlar.map((k) => KAYNAK_ADI[k.kaynak as FiyatKaynagi] ?? k.kaynak))],
     onizleme,
   };
 }

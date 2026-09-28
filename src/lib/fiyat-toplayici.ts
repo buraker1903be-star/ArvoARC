@@ -93,3 +93,35 @@ export function gecerliFiyat(fiyatlar: number[]): number | null {
   const gecerli = fiyatlar.filter((f) => Number.isInteger(f) && f > 0);
   return gecerli.length ? Math.min(...gecerli) : null;
 }
+
+/*
+  HANGİ TOPLAMA HANGİ GEÇİŞE YARAR.
+
+  arc_price_collections.kaynak iki değer taşıyor ve ikisi farklı şey:
+
+    'lr'        yer imiyle, KULLANICININ tarayıcısında toplandı. Girişliyse
+                alış, çıkışsa müşteri fiyatı — hangisi olduğunu kullanıcı
+                panelde söylüyor (toplayıcı tahmin etmiyor).
+    'lr-genel'  sunucunun günlük taraması (api/cron/lr-fiyatlari, her gün
+                06:00). GİRİŞSİZ okunuyor, yani TANIM GEREĞİ müşteri fiyatı.
+                Hiçbir koşulda alış fiyatı olamaz.
+
+  Ayrım kaydeden tarafta bilerek kuruldu (lib/lr/kaydet.ts: "ikisini tek
+  etikette toplamak, hangisinin ne olduğunu kaybetmek demekti") ama OKUYAN
+  taraf sütuna hiç bakmıyordu: "son toplanan liste" uygulanmamış bütün
+  toplamaları birleştiriyor ve her gece cron yeni bir 'lr-genel' bırakıyor.
+  Sonuç, kullanıcı girişli toplama yapsa bile müşteri fiyatlarının alış
+  alanına yazılmasıydı — üstelik uygulama sırasında cron'un listeleri de
+  "uygulandı" işaretlenip sessizce tükeniyordu.
+*/
+export type FiyatKaynagi = "lr" | "lr-genel";
+
+export function kaynaklarIcin(gecis: "alis" | "musteri"): FiyatKaynagi[] {
+  // Alış yalnızca girişli oturumdan gelebilir; cron'un listesi asla alış değil.
+  return gecis === "alis" ? ["lr"] : ["lr", "lr-genel"];
+}
+
+export const KAYNAK_ADI: Record<FiyatKaynagi, string> = {
+  lr: "yer imi",
+  "lr-genel": "günlük tarama",
+};
