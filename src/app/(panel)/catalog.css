@@ -154,3 +154,29 @@
   .catalog-form,.stock-detailed-form,.variant-create-grid,.variant-matrix-grid,.variant-matrix-option{grid-template-columns:1fr}
   .product-gallery{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+
+/*
+  KİTAPLIKTAN GÖRSEL SEÇİCİSİ.
+
+  Yükleme formunun altında, kapalı duruyor: her ürün açılışında 24
+  küçük resim indirmek, seçiciyi hiç açmayan kullanıcıya bedel
+  yüklerdi. Sunucu da yalnızca açıkken sorguluyor.
+*/
+.kitaplik{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.kitaplik>summary{list-style:none;cursor:pointer;width:max-content}
+.kitaplik>summary::-webkit-details-marker{display:none}
+.kitaplik-ara{display:flex;gap:8px;margin:12px 0}
+.kitaplik-ara input{flex:1;min-width:0}
+.kitaplik-form{display:grid;gap:10px}
+.kitaplik-izgara{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px;max-height:320px;overflow-y:auto}
+/* Seçim radyo düğmesiyle: klavyeyle gezilebiliyor ve JavaScript
+   olmadan da çalışıyor. Düğmenin kendisi gizli, çerçeve işaret. */
+.kitaplik-secim{display:grid;gap:4px;cursor:pointer;margin:0}
+.kitaplik-secim>input{position:absolute;opacity:0;width:0;height:0}
+.kitaplik-secim>img{
+  width:100%;aspect-ratio:1;object-fit:cover;display:block;
+  border:2px solid var(--line);border-radius:10px;background:var(--surface-2);
+}
+.kitaplik-secim>input:checked+img{border-color:var(--accent-500);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent-500) 22%,transparent)}
+.kitaplik-secim>input:focus-visible+img{outline:2px solid var(--accent-500);outline-offset:2px}
+.kitaplik-secim>small{color:var(--muted);font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

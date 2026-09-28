@@ -18,6 +18,7 @@ export const ERRORS:Record<string,string>={
   "invalid-image-file":"Yalnızca JPG, PNG, WEBP, GIF veya AVIF; dosya başına en fazla 4 MB.",
   "invalid-image-path":"Geçersiz görsel.",
   "image-not-found":"Görsel bulunamadı.",
+  "image-already-here":"Bu görsel üründe zaten var.",
   /* Kopyalama: iki sınır da "aynı üründen çok fazla kopya" demek. */
   "invalid-date":"Tarih geçersiz. Gün, ay ve saati kontrol edin.",
   "copy-slug-full":"Bu üründen çok fazla kopya var; eski kopyaları arşivleyin.",
@@ -30,6 +31,7 @@ export const BASARILAR: Record<string, string> = {
   "variant-created": "Varyant eklendi.",
   images: "Görseller yüklendi.",
   "image-removed": "Görsel kaldırıldı.",
+  "image-reused": "Görsel kitaplıktan eklendi.",
 };
 
 export const hataMetni = (kod: string): string =>

@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
-import { createVariant, removeProductImage, updateProduct, updateVariant, uploadProductImages, urunuKopyala, varyantMatrisi } from "./actions";
+import { createVariant, kitapliktanGorselEkle, removeProductImage, updateProduct, updateVariant, uploadProductImages, urunuKopyala, varyantMatrisi } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel, sourceLabel } from "@/lib/commerce-labels";
 import { Icon } from "@/components/panel/icons";
@@ -10,6 +10,7 @@ import { PanelBildirimi } from "@/components/panel/bildirim";
 import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 import { trIsoToLocal } from "@/lib/tr-time";
 import { yayinOzeti } from "@/lib/yayin-plani";
+import { terimiTemizle } from "@/lib/panel-arama";
 import { SeoFields } from "./seo-fields";
 import "../../catalog.css";
 
@@ -24,8 +25,8 @@ type Meta={
 };
 
 
-export default async function ProductDetail({params}:{params:Promise<{id:string}>}){
-  const {id}=await params; const {supabase,organization,membership}=await requireTenant();
+export default async function ProductDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{medya?:string}>}){
+  const {id}=await params; const {medya}=await searchParams; const {supabase,organization,membership}=await requireTenant();
   const [{data:product,error},{data:variants,error:variantError},{data:settings}]=await Promise.all([
     supabase.from("arc_products").select("id,name,slug,description,status,source,metadata,created_at,publish_at,unpublish_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
     supabase.from("arc_product_variants").select("id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price,image_path").eq("organization_id",organization.id).eq("product_id",id).order("title"),
@@ -51,6 +52,30 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
     ?imagePaths.map(path=>({url:isRemote(path)?path:signedByPath.get(path),path:isRemote(path)?"":path}))
     :(meta.images??[]).map(url=>({url,path:""}))
   ).filter((image):image is {url:string;path:string}=>Boolean(image.url));
+
+  /*
+    KİTAPLIK SEÇİCİSİ. Arama adres satırından geliyor (?medya=…), yani
+    JavaScript yüklenmeden de çalışıyor ve bağlantısı paylaşılabiliyor.
+    Yalnızca terim VARKEN sorgulanıyor: her ürün açılışında 24 imzalı
+    adres üretmek, seçiciyi açmayan kullanıcıya bedel yüklerdi.
+  */
+  const kitaplikTerimi=terimiTemizle(medya);
+  const kitaplikAcik=typeof medya==="string";
+  type MedyaSatiri={yol:string;urun_id:string;urun_adi:string};
+  let kitaplik:{yol:string;adres:string;urun:string}[]=[];
+  if(kitaplikAcik){
+    const {data,error}=await supabase.rpc("arc_medya_listesi",{
+      p_organization_id:organization.id,p_arama:kitaplikTerimi||null,p_limit:24,p_offset:0,
+    });
+    if(error)throw new Error("Medya kitaplığı okunamadı: "+error.message);
+    /* Bu üründe zaten olanlar ve tedarikçi CDN adresleri elenir:
+       ikincisi bizim depomuzda değil, kopyalanamaz. */
+    const adaylar=((data??[]) as MedyaSatiri[])
+      .filter(satir=>!satir.yol.startsWith("http")&&!imagePaths.includes(satir.yol));
+    const adresler=await createProductImageUrls(supabase,adaylar.map(satir=>satir.yol));
+    kitaplik=adaylar.map((satir,sira)=>({yol:satir.yol,adres:adresler[sira],urun:satir.urun_adi}))
+      .filter((satir):satir is {yol:string;adres:string;urun:string}=>Boolean(satir.adres));
+  }
 
   /*
     Varyantın görseli galeride imzalanmış olanlardan biri. Ayrıca
@@ -147,6 +172,35 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
               <small>Tek seferde en fazla 5 dosya ve toplam 4 MB; ürün başına 8 görsel.</small>
               <button className="ac-btn" type="submit">Görselleri yükle</button>
             </form>
+          ):null}
+          {canManage?(
+            <details className="kitaplik" open={kitaplikAcik}>
+              <summary className="ac-btn">Kitaplıktan görsel ekle</summary>
+              {/* Arama adres satırına yazıyor: form GET, sayfa seçici
+                  açık olarak yeniden geliyor. JavaScript gerekmiyor. */}
+              <form className="kitaplik-ara" role="search">
+                <input name="medya" defaultValue={kitaplikTerimi} placeholder="Ürün adına göre ara" aria-label="Kitaplıkta ara"/>
+                <button className="ac-btn" type="submit">Ara</button>
+              </form>
+              {kitaplikAcik?(kitaplik.length?(
+                <form action={kitapliktanGorselEkle} className="kitaplik-form">
+                  <input type="hidden" name="product_id" value={product.id}/>
+                  <div className="kitaplik-izgara">
+                    {kitaplik.map((secenek,sira)=>(
+                      <label className="kitaplik-secim" key={secenek.yol}>
+                        <input type="radio" name="yol" value={secenek.yol} required defaultChecked={sira===0}/>
+                        <Image src={secenek.adres} alt="" width={200} height={200}/>
+                        <small>{secenek.urun}</small>
+                      </label>
+                    ))}
+                  </div>
+                  {/* Görsel KOPYALANIYOR, paylaşılmıyor: aynı nesneyi iki
+                      ürün gösterseydi birinden silmek ötekini boşaltırdı. */}
+                  <p className="list-hint">Seçilen görsel bu ürüne kopyalanır; kaynağı silinse de burada kalır.</p>
+                  <button className="ac-btn ac-btn-primary" type="submit">Ürüne ekle</button>
+                </form>
+              ):<p className="list-hint">{kitaplikTerimi?"Bu aramayla eşleşen, bu üründe olmayan görsel yok.":"Kitaplıkta eklenebilecek başka görsel yok."}</p>):null}
+            </details>
           ):null}
         </section>
 

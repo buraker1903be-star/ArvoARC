@@ -501,3 +501,63 @@ export async function urunuKopyala(formData: FormData) {
      iş her zaman onu düzenlemek. */
   return await bildirimliDonus(`/urunler/${yeniUrun.id}`, gorselUyarisi ? { uyari: `${sonuc} ${gorselUyarisi}` } : { basari: sonuc });
 }
+
+/*
+  KİTAPLIKTAN GÖRSEL EKLEME.
+
+  Aynı fotoğraf birkaç üründe kullanılıyor (beden tablosu, marka
+  görseli, aynı modelin renk varyantları) ve her seferinde yeniden
+  yükleniyordu: kullanıcı dosyayı bilgisayarında aramak zorundaydı.
+
+  NESNE PAYLAŞILMIYOR, KOPYALANIYOR. Aynı depo nesnesini iki ürün
+  gösterseydi birinden görseli silmek ötekinin galerisini de
+  boşaltırdı (removeProductImage nesneyi depodan siliyor). Ürün
+  kopyalamada da aynı karar verildi.
+
+  SAHİPLİK YOLDAN DOĞRULANIYOR: yollar "<kurum>/<ürün>/..." biçiminde,
+  yani önek kurumun kimliği. Başka salonun yolunu elle gönderen istek
+  buradan geçemiyor — seçici RLS ile zaten dar ama tek kat yetmez.
+*/
+export async function kitapliktanGorselEkle(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  const productId = String(formData.get("product_id") ?? "");
+  const donus = `/urunler/${productId}`;
+  if (!allowedRoles.has(membership.role)) return await bildirimliDonus(donus, { hata: hataMetni("forbidden") });
+
+  const kaynak = String(formData.get("yol") ?? "").trim();
+  const onek = `${organization.id}/`;
+  /* Uzak adresler (tedarikçi CDN'i) kitaplıktan eklenmiyor: sahipliği
+     doğrulanamıyor ve zaten bizim depomuzda değiller. */
+  if (!productId || !kaynak.startsWith(onek) || kaynak.includes("..")) {
+    return await bildirimliDonus(donus, { hata: hataMetni("invalid-image-path") });
+  }
+
+  const { data: urun, error: urunHatasi } = await supabase
+    .from("arc_products").select("metadata").eq("organization_id", organization.id).eq("id", productId).maybeSingle();
+  if (urunHatasi || !urun) return await bildirimliDonus(donus, { hata: hataMetni("product-not-found") });
+  const meta = (urun.metadata ?? {}) as ProductMetadata;
+  const yollar = meta.image_paths ?? [];
+  if (yollar.length >= 8) return await bildirimliDonus(donus, { hata: hataMetni("max-8-images") });
+  /* Aynı görseli iki kez eklemek galeriyi tekrarla doldururdu. */
+  if (yollar.includes(kaynak)) return await bildirimliDonus(donus, { hata: hataMetni("image-already-here") });
+
+  const uzanti = kaynak.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  const hedef = `${organization.id}/${productId}/kitaplik-${Date.now()}.${uzanti}`;
+  const { error: kopyaHatasi } = await supabase.storage.from("arc-product-images").copy(kaynak, hedef);
+  if (kopyaHatasi) return await bildirimliDonus(donus, { hata: hataMetni(kopyaHatasi.message) });
+
+  const { error } = await supabase.from("arc_products")
+    .update({ metadata: { ...meta, image_paths: [...yollar, hedef], images: [] } })
+    .eq("organization_id", organization.id).eq("id", productId);
+  /* Yazma düşerse kopya depodan siliniyor: kimsenin göremediği bir
+     dosya bırakmak, depoyu sessizce şişiren tek şey. */
+  if (error) {
+    await supabase.storage.from("arc-product-images").remove([hedef]);
+    return await bildirimliDonus(donus, { hata: hataMetni(error.message) });
+  }
+
+  revalidatePath("/urunler");
+  revalidatePath(donus);
+  revalidatePath("/medya");
+  return await bildirimliDonus(donus, { basari: basariMetni("image-reused") });
+}
