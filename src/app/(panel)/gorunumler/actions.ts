@@ -10,6 +10,7 @@ import {
   gorunumSorgusu,
   gorunumYolu,
 } from "@/lib/kayitli-gorunum";
+import { yetkiYok } from "@/lib/yetki-metni";
 
 /*
   KAYDEDİLMİŞ GÖRÜNÜM EYLEMLERİ.
@@ -29,7 +30,7 @@ async function yetkiliKurum(liste: unknown) {
   const { supabase, organization, membership, user } = await requireTenant();
   if (!gorunumListesiMi(liste)) return { hata: "Görünüm listesi tanınmadı." } as const;
   if (!["owner", "admin", "manager"].includes(membership.role)) {
-    return { hata: "Görünüm kaydetmek için yetkiniz yok." } as const;
+    return { hata: yetkiYok("görünüm kaydetme") } as const;
   }
   return { supabase, organizationId: organization.id, userId: user.id, liste } as const;
 }

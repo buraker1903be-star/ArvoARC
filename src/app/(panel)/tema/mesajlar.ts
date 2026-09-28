@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   Tema ekranının işlem sonucu metinleri. Metinler eskiden sayfada
   duruyordu ve işlem yalnızca bir kod gönderiyordu; kod adres satırında
@@ -5,7 +7,7 @@
 */
 
 export const ERRORS: Record<string, string> = {
-  forbidden: "Temayı değiştirmek için yönetici yetkisi gerekir.",
+  forbidden: yetkiYok("tema düzenleme"),
   "required-fields": "Hero ana başlığı ve açıklaması boş bırakılamaz.",
   "invalid-theme-image": "Bir görsel seçin. PNG, JPG, WebP veya AVIF olmalı ve 4 MB’ı geçmemeli.",
   "draft-not-found": "Kayıtlı taslak bulunamadı. Önce taslağı kaydedin.",

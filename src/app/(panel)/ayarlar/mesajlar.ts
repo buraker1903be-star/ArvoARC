@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   Ayarlar ekranının işlem sonucu metinleri.
 
@@ -22,7 +24,7 @@ export const SAVED:Record<string,string>={
   "storefront-domain-verified":"Mağaza alan adı doğrulandı; güvenli bağlantı etkin.",
 };
 export const ERRORS:Record<string,string>={
-  forbidden:"Bu ayarları değiştirmek için yönetici yetkisi gerekir.",
+  forbidden: yetkiYok("mağaza ayarları"),
   "invalid-bank-transfer":"Havale için banka adı, hesap sahibi ve TR ile başlayan 26 haneli IBAN gerekli.",
   "paytr-merchant-required":"PayTR’ı açmak için mağaza numarası gerekli.",
   "invalid-installment":"Taksit sayısı 0 ile 12 arasında olmalı.",

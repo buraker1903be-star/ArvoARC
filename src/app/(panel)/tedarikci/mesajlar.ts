@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   Tedarikçi ekranının işlem sonucu metinleri. Metinler eskiden sayfada duruyordu
   ve işlem yalnızca bir kod gönderiyordu; kod adres satırında taşındığı
@@ -13,7 +15,7 @@ export const ERRORS: Record<string, string> = {
   "invalid-buffer": "Stok tamponu 0 ile 100 arasında olmalı.",
   "missing-code": "Tedarikçi kodu eksik.",
   "save-failed": "Ayarlar kaydedilemedi, tekrar deneyin.",
-  forbidden: "Bu işlem için yetkiniz yok.",
+  forbidden: yetkiYok("tedarikçi ayarları", "sahiplik"),
 };
 
 export const BASARILAR: Record<string, string> = {

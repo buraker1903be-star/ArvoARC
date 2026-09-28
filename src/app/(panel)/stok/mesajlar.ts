@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   Stok ekranının işlem sonucu metinleri.
 
@@ -13,7 +15,7 @@
 */
 
 export const ERRORS: Record<string, string> = {
-  forbidden: "Bu hesap stok işlemi yetkisine sahip değil.",
+  forbidden: yetkiYok("stok hareketi"),
   "invalid-movement": "Hareket bilgilerini kontrol edin: varyant ve sıfırdan büyük bir adet gerekli.",
   "variant-not-found": "Varyant bulunamadı. SKU'yu kontrol edin.",
   "save-failed": "Stok hareketi kaydedilemedi. Lütfen tekrar deneyin.",

@@ -3,6 +3,7 @@ import { PanelBildirimi } from "@/components/panel/bildirim";
 import { updateSupplier, resetCursor } from "./actions";
 import "../catalog.css";
 import "../modules.css";
+import { yetkiYok } from "@/lib/yetki-metni";
 
 export const dynamic = "force-dynamic";
 
@@ -100,7 +101,7 @@ export default async function SuppliersPage() {
                   </div>
                 </>
               ) : (
-                <p className="list-hint">Ayarları değiştirmek için yönetici yetkisi gerekiyor.</p>
+                <p className="list-hint">{yetkiYok("tedarikçi ayarları", "sahiplik")}</p>
               )}
             </section>
           );

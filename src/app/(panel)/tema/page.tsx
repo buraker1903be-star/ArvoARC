@@ -5,6 +5,7 @@ import { PanelBildirimi } from "@/components/panel/bildirim";
 import { requireTenant } from "@/lib/tenant";
 import { ThemeEditor, type Theme } from "./theme-editor";
 import "./theme.css";
+import { yetkiYok } from "@/lib/yetki-metni";
 
 export const metadata: Metadata = { title: "Mağaza Tasarımı" };
 
@@ -73,7 +74,7 @@ export default async function Page() {
       {canEdit ? (
         <ThemeEditor key={draft?.updated_at ?? "yeni"} initial={config} store={previewUrl(settings?.storefront_url)} />
       ) : (
-        <Notice tone="info" title="Yalnızca görüntüleme">Temayı değiştirmek için yönetici yetkisi gerekir.</Notice>
+        <Notice tone="info" title="Yalnızca görüntüleme">{yetkiYok("tema düzenleme")}</Notice>
       )}
     </>
   );

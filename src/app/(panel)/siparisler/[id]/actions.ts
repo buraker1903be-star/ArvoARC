@@ -48,7 +48,7 @@ export async function updateOrderStatus(formData:FormData){
     gerçek iadeye kapanıyordu.
   */
   const marksRefund=(paymentStatus!==ownedOrder.payment_status&&["refunded","partially_refunded"].includes(paymentStatus))||(status==="refunded"&&ownedOrder.status!=="refunded");
-  if(marksRefund&&!["owner","admin"].includes(membership.role))return await siparise(orderId,{hata:"forbidden"});
+  if(marksRefund&&!["owner","admin"].includes(membership.role))return await siparise(orderId,{hata:"forbidden-para"});
   const {error}=await supabase.rpc("arc_update_order_status",{p_order_id:orderId,p_status:status,p_payment_status:paymentStatus});
 
   /*
@@ -177,7 +177,7 @@ export async function refundOrder(formData: FormData) {
 
   /* İade yalnızca sahip ve yöneticide: parasal işlem. */
   if (!["owner", "admin"].includes(membership.role)) {
-    return await bildirimliDonus("/siparisler",{hata:hataMetni("forbidden")});
+    return await bildirimliDonus("/siparisler",{hata:hataMetni("forbidden-para")});
   }
 
   const orderId = String(formData.get("order_id") ?? "");

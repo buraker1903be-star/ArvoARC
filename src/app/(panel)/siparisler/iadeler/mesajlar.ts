@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   İade talepleri ekranının işlem sonucu metinleri. Metinler eskiden sayfada duruyordu
   ve işlem yalnızca bir kod gönderiyordu; kod adres satırında taşındığı
@@ -8,7 +10,7 @@
 export const ERRORS: Record<string, string> = {
   "refund-failed": "PayTR iadeyi reddetti. Sipariş numarası ve tutarı kontrol edin.",
   "already-resolved": "Bu talep zaten sonuçlandırılmış.",
-  forbidden: "İade işlemi için yönetici yetkisi gerekiyor.",
+  forbidden: yetkiYok("iade işlemi", "sahiplik"),
   "invalid-amount": "Geçerli bir iade tutarı girin: sıfırdan büyük olmalı ve iade edilen kalemlerin (kargo çıkmadıysa kargo bedeli dahil) toplamını aşmamalı. Hesaplanan tutar için alanı boş bırakın.",
   "not-approved": "Para iadesi yalnızca onaylanmış talepte yapılabilir.",
   "already-refunded": "Bu sipariş zaten tamamen iade edilmiş.",

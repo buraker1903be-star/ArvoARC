@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   Siparişler ekranının işlem sonucu metinleri. Metinler eskiden sayfada duruyordu
   ve işlem yalnızca bir kod gönderiyordu; kod adres satırında taşındığı
@@ -8,7 +10,7 @@
 export const ERRORS: Record<string, string> = {
   "order-closed": "Bu sipariş kapandığı (iptal ya da iade) için akışta ilerletilemez.",
   "order-not-found": "Sipariş bulunamadı.",
-  forbidden: "Bu işlem için yetkiniz yok.",
+  forbidden: yetkiYok("sipariş işlemleri"),
   "invalid-status": "Geçersiz sipariş durumu.",
   "invalid-order": "Sipariş bilgileri eksik.",
   "save-failed": "Durum kaydedilemedi, tekrar deneyin.",

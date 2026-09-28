@@ -15,6 +15,7 @@ import { copyShopifyImages } from "@/lib/product-images";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { parseMoneyToCents } from "@/lib/money";
 import { panelYonetiminde, shopifyVaryantlari } from "@/lib/shopify-varyant";
+import { yetkiYok } from "@/lib/yetki-metni";
 
 type Row = Record<string,string>;
 
@@ -490,7 +491,7 @@ export async function maliyetOnizle(
 ): Promise<MaliyetOnizleme> {
   const { supabase, organization, membership } = await requireTenant();
   if (!["owner", "admin", "manager"].includes(membership.role)) {
-    return { eslesen: [], eslesmeyen: [], atlanan: ["Bu işlem için yetkiniz yok."] };
+    return { eslesen: [], eslesmeyen: [], atlanan: [yetkiYok("fiyat aktarımı")] };
   }
 
   const { satirlar, atlanan } = maliyetleriAyristir(metin);
@@ -515,7 +516,7 @@ export async function maliyetUygula(
 ): Promise<{ yazilan: number; hata: string | null }> {
   const { supabase, organization, membership } = await requireTenant();
   if (!["owner", "admin", "manager"].includes(membership.role)) {
-    return { yazilan: 0, hata: "Bu işlem için yetkiniz yok." };
+    return { yazilan: 0, hata: yetkiYok("fiyat aktarımı") };
   }
   if (!satirlar.length) return { yazilan: 0, hata: "Uygulanacak satır yok." };
 
@@ -577,7 +578,7 @@ export async function maliyetUygula(
 */
 export async function toplayiciKodu(): Promise<{ kod: string; bitis: string } | { hata: string }> {
   const { organization, membership } = await requireTenant();
-  if (!["owner", "admin", "manager"].includes(membership.role)) return { hata: "Bu işlem için yetkiniz yok." };
+  if (!["owner", "admin", "manager"].includes(membership.role)) return { hata: yetkiYok("veri aktarımı") };
   if (!jetonAnahtariVar()) {
     return { hata: "PAYMENT_CREDENTIALS_KEY tanımlı değil; toplayıcı jetonu imzalanamıyor." };
   }
@@ -632,7 +633,7 @@ export async function sonToplananListe(
   indirimKurus = 0,
 ): Promise<ToplananListe | { hata: string }> {
   const { supabase, organization, membership } = await requireTenant();
-  if (!["owner", "admin", "manager"].includes(membership.role)) return { hata: "Bu işlem için yetkiniz yok." };
+  if (!["owner", "admin", "manager"].includes(membership.role)) return { hata: yetkiYok("veri aktarımı") };
 
   /*
     UYGULANMAMIŞ TOPLAMALAR BİRLEŞTİRİLİYOR. LR'ın tek sayfasında bütün
@@ -753,7 +754,7 @@ export async function sonToplananListe(
 */
 export async function lrdanTara(indirimKurus = 0): Promise<ToplananListe | { hata: string }> {
   const { organization, membership } = await requireTenant();
-  if (!["owner", "admin", "manager"].includes(membership.role)) return { hata: "Bu işlem için yetkiniz yok." };
+  if (!["owner", "admin", "manager"].includes(membership.role)) return { hata: yetkiYok("veri aktarımı") };
 
   /*
     Bütün katalog tek turda: 27.09.2026'da 82 sayfa 23,7 saniye sürdü,

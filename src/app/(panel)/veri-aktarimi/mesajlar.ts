@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   Veri aktarımı ekranının işlem sonucu metinleri.
 
@@ -9,7 +11,7 @@
 */
 
 export const ERRORS: Record<string, string> = {
-  forbidden: "Aktarım için yetkiniz yok.",
+  forbidden: yetkiYok("veri aktarımı"),
   "csv-required": "Shopify Products dışa aktarımından bir .csv dosyası seçin.",
   "orders-csv-required": "Shopify Orders dışa aktarımından bir .csv dosyası seçin.",
 };

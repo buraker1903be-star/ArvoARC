@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   Ürünler ekranının işlem sonucu metinleri. Metinler eskiden sayfada duruyordu
   ve işlem yalnızca bir kod gönderiyordu; kod adres satırında taşındığı
@@ -6,7 +8,7 @@
 */
 
 export const ERRORS: Record<string, string> = {
-  forbidden: "Bu hesap ürün işlemi yetkisine sahip değil.",
+  forbidden: yetkiYok("ürün işlemleri"),
   "invalid-product": "Ürün bilgilerini kontrol edin: ad, SKU ve geçerli bir fiyat gerekli.",
   "23505": "Bu SKU zaten kullanılıyor.",
   "invalid-status": "Geçersiz ürün durumu.",

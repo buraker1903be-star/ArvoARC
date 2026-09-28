@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   İndirimler ekranının işlem sonucu metinleri.
 
@@ -8,7 +10,7 @@
 */
 
 export const ERRORS:Record<string,string>={
-  forbidden:"Bu işlem için yetkiniz yok.",
+  forbidden: yetkiYok("indirim yönetimi"),
   "invalid-discount":"Kampanya adı, türü ve geçerli bir indirim değeri gerekli.",
   "23505":"Bu kupon kodu başka bir kampanyada kullanılıyor.",
   "invalid-date":"Başlangıç veya bitiş tarihi geçersiz.",

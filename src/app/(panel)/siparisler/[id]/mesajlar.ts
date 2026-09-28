@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   Sipariş ekranının işlem sonucu metinleri.
 
@@ -20,7 +22,13 @@ export const HATALAR: Record<string, string> = {
   "order-closed": "Bu sipariş kapandığı (iptal ya da iade) için akışta ilerletilemez.",
   "order-not-found": "Sipariş bulunamadı.",
   "invalid-order": "Sipariş bulunamadı.",
-  forbidden: "Bu işlem için yetkiniz yok.",
+  forbidden: yetkiYok("sipariş işlemleri"),
+  /*
+    PARASAL İŞLEMİN KAPISI AYRI: iade ve "iade edildi" işaretlemesi
+    owner/admin. Tek metin kullanılsaydı müdüre "müdür de yapabilir"
+    denirdi — bu dosyada düzelttiğimiz kusurun aynısı.
+  */
+  "forbidden-para": yetkiYok("iade işlemi", "sahiplik"),
   "invalid-status": "Geçersiz sipariş durumu.",
   "invalid-fulfillment": "Kargo bilgileri çok uzun.",
   "invalid-tracking-url": "Takip bağlantısı https:// ile başlayan geçerli bir adres olmalı.",

@@ -3,6 +3,7 @@ import { PanelBildirimi } from "@/components/panel/bildirim";
 import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
 import { baglantiyiSina } from "@/lib/tryoto/ayar";
 import "../catalog.css";
+import { yetkiYok } from "@/lib/yetki-metni";
 
 const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending_dns:"DNS bekleniyor",verifying:"Doğrulanıyor",active:"Aktif",failed:"Bağlantı hatası"};
 
@@ -66,7 +67,7 @@ export default async function Settings(){
           <label>Dil / bölge<select name="locale" defaultValue={settings?.locale??"tr-TR"}><option value="tr-TR">Türkçe · Türkiye</option><option value="en-US">English · United States</option></select></label>
           <label>Düşük stok eşiği<input name="low_stock_threshold" type="number" min="0" max="10000" step="1" defaultValue={settings?.low_stock_threshold??5} required/></label>
           <button type="submit">Marka ayarlarını kaydet</button>
-        </form>:<p className="list-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
+        </form>:<p className="list-hint">{yetkiYok("mağaza ayarları")}</p>}
       </section>
 
       {/* Satış ayarları: sütunlar vardı ama hiçbir form onları yazmıyordu,
@@ -80,7 +81,7 @@ export default async function Settings(){
           <label>Sipariş numarası öneki<input name="order_prefix" maxLength={6} pattern="[A-Za-z]{1,6}" defaultValue={settings?.order_prefix??"AC"} required/></label>
           <p className="list-hint">Sepet tutarı eşiği geçerse kargo alınmaz. Eşik, indirim uygulanmadan önceki ara toplamla karşılaştırılır. Önek her mağazada farklı olmalı: sipariş numaraları çakışırsa ödeme bildirimleri yanlış siparişe düşebilir.</p>
           <button type="submit">Satış ayarlarını kaydet</button>
-        </form>:<p className="list-hint">Bu ayarları değiştirmek için yönetici yetkisi gerekir.</p>}
+        </form>:<p className="list-hint">{yetkiYok("mağaza ayarları")}</p>}
       </section>
 
       <section className="domain-stack">
@@ -210,7 +211,7 @@ export default async function Settings(){
                   :"Gönderici konumu bulunamadı. OTO panelinde Ayarlar → Gönderici Konumları bölümünden tanımlayın."}</p>}
           </>}
         </article>
-      </>:<p className="list-hint">Kargo entegrasyonunu yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
+      </>:<p className="list-hint">{yetkiYok("kargo entegrasyonu", "sahiplik")}</p>}
     </section>
 
     <section className="card settings-section payment-section" id="odeme-yontemleri">
@@ -248,7 +249,7 @@ export default async function Settings(){
           <div className="security-note"><b>Önce alan adınızı doğrulatın.</b><p>E-posta sağlayıcısı, sahipliğini kanıtlamadığınız bir alan adından gönderim yapmaz. Doğrulama tamamlanmadan bu alanı doldurursanız e-postalar gönderilemez ve müşterileriniz sipariş onayı alamaz. Alan adı doğrulaması için bizimle iletişime geçin.</p></div>
         </article>
         <button className="payment-save" type="submit">Ödeme ayarlarını kaydet</button>
-      </form>:<p className="list-hint">Ödeme hesaplarını (IBAN, PayTR) yalnızca mağaza sahibi ve yöneticisi (admin) değiştirebilir.</p>}
+      </form>:<p className="list-hint">{yetkiYok("ödeme hesapları (IBAN, PayTR)", "sahiplik")}</p>}
     </section>
     </div>
   </>;

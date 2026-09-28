@@ -1,3 +1,5 @@
+import { yetkiYok } from "@/lib/yetki-metni";
+
 /*
   Koleksiyonlar ekranının işlem sonucu metinleri. Metinler eskiden sayfada duruyordu
   ve işlem yalnızca bir kod gönderiyordu; kod adres satırında taşındığı
@@ -6,7 +8,7 @@
 */
 
 export const ERRORS:Record<string,string>={
-  forbidden:"Bu işlem için yetkiniz yok.",
+  forbidden: yetkiYok("koleksiyon yönetimi"),
   "invalid-collection":"Koleksiyon adı ve bağlantısı zorunlu.",
   "23505":"Bu bağlantı başka bir koleksiyonda kullanılıyor.",
   "not-found":"Koleksiyon bulunamadı.",

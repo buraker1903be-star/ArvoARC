@@ -13,6 +13,7 @@ import { backUrl } from "@/lib/back-url";
 import { isBankTransfer } from "@/lib/payment-method";
 import { notifyTransferPaid } from "@/lib/email/transfer-paid";
 import { claimOrderLock } from "@/lib/order-lock";
+import { yetkiYok } from "@/lib/yetki-metni";
 
 const MANAGERS = ["owner", "admin", "manager"];
 
@@ -415,7 +416,7 @@ export async function topluDurumSonuc(ids: string[], status: string): Promise<Is
 export async function siparisleriSil(formData: FormData) {
   const { supabase, membership } = await requireTenant();
   if (!["owner", "admin"].includes(membership.role)) {
-    return await backTo(formData, { hata: "Sipariş silmek için mağaza sahibi ya da yönetici olmalısınız." });
+    return await backTo(formData, { hata: yetkiYok("sipariş silme", "sahiplik") });
   }
 
   /*
