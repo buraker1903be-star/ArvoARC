@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 import { bulkSetStatus } from "./actions";
 
 export type ProductRow = {
@@ -36,7 +37,7 @@ const BULK = [
   yayınlamak yerine seçip topluca yayınlanabilir / arşivlenebilir.
   Satırın tamamı ürün düzenleyicisine gider.
 */
-export function ProductTable({ rows, canManage, back, total, children }: { rows: ProductRow[]; canManage: boolean; back: string; total: number; children?: React.ReactNode }) {
+export function ProductTable({ rows, canManage, back, total, katalogBos, children }: { rows: ProductRow[]; canManage: boolean; back: string; total: number; katalogBos: boolean; children?: React.ReactNode }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const chosen = rows.filter((row) => selected.has(row.id));
   const allChecked = rows.length > 0 && chosen.length === rows.length;
@@ -120,10 +121,31 @@ export function ProductTable({ rows, canManage, back, total, children }: { rows:
           ))}
         </>
       ) : (
-        <div className="list-empty">
-          <b>Bu ölçütlere uygun ürün yok.</b>
-          <p>Aramayı veya filtreleri değiştirin. Ürün adı, SKU, marka, tür ve etiketlerde arama yapılır.</p>
-        </div>
+        /*
+          İKİ DURUM AYRI. Katalog gerçekten boşken "filtreleri
+          değiştirin" demek, ortada olmayan bir filtreyi aratmaktı —
+          yeni mağazanın gördüğü ilk ekran buydu.
+        */
+        katalogBos ? (
+          <ListeBos
+            baslik="Kataloğunuz henüz boş."
+            aciklama="Ürünleri Shopify CSV'sinden toplu aktarabilir, tedarikçi kataloğundan çekebilir ya da tek tek ekleyebilirsiniz."
+          >
+            {canManage ? (
+              <>
+                <ListeBosEylem href="/veri-aktarimi" birincil>Ürün aktar</ListeBosEylem>
+                <ListeBosEylem href="/tedarikci">Tedarikçiden çek</ListeBosEylem>
+              </>
+            ) : null}
+          </ListeBos>
+        ) : (
+          <ListeBos
+            baslik="Bu ölçütlere uygun ürün yok."
+            aciklama="Ürün adı, SKU, marka, tür ve etiketlerde arama yapılır. Aramayı veya filtreleri değiştirin."
+          >
+            <ListeBosEylem href={back}>Filtreleri temizle</ListeBosEylem>
+          </ListeBos>
+        )
       )}
       {children}
     </section>

@@ -95,15 +95,28 @@ export default async function Products({ searchParams }: { searchParams: Promise
   if (statusFilter !== "all") listQuery = listQuery.eq("status", statusFilter);
   const from = (page - 1) * PAGE_SIZE;
 
-  const [listResult, variantCountResult, bestSellerResult, ...countResults] = await Promise.all([
+  /*
+    Katalogda HİÇ ürün var mı? counts.all arama ve kaynak süzgecinden
+    geçiyor, yani sıfır olması hem boş kataloğu hem sonuçsuz aramayı
+    anlatabiliyor. Boş ekran ikisine farklı şey söylediği için
+    süzgeçsiz bir sayım gerekiyor — head:true, satır taşımıyor.
+  */
+  const [listResult, variantCountResult, bestSellerResult, katalogSayimi, ...countResults] = await Promise.all([
     listQuery.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
     supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
     supabase.from("arc_collections").select("id").eq("organization_id", organization.id).eq("title", "Çok Satanlar").eq("status", "active").maybeSingle(),
+    supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
     ...STATUS_TABS.map(([key]) => countQuery(key)),
   ]);
 
   if (listResult.error && listResult.error.code !== "PGRST103") throw new Error(listResult.error.message);
   if (variantCountResult.error || bestSellerResult.error) throw new Error((variantCountResult.error ?? bestSellerResult.error)?.message ?? "Katalog sayıları okunamadı.");
+  /*
+    Sayım düşerse boş katalog VARSAYILMIYOR: hata yutulup "kataloğunuz
+    boş" demek, dolu bir kataloğa sahip kullanıcıya ürünlerinin
+    silindiğini düşündürürdü.
+  */
+  if (katalogSayimi.error) throw new Error(katalogSayimi.error.message);
 
   const counts = Object.fromEntries(STATUS_TABS.map(([key], index) => [key, countResults[index]?.count ?? 0])) as Record<StatusKey, number>;
   const total = listResult.count ?? counts[statusFilter];
@@ -247,7 +260,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
         ))}
       </nav>
 
-      <ProductTable key={JSON.stringify(params)} rows={rows} canManage={canManage} back={listHref(state, {})} total={total}>
+      <ProductTable key={JSON.stringify(params)} rows={rows} canManage={canManage} back={listHref(state, {})} total={total} katalogBos={(katalogSayimi.count ?? 0) === 0}>
         <div className="list-pagination">
           <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + rows.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} ürün` : "Kayıt yok"}</span>
           {pageCount > 1 ? (

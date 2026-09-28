@@ -133,19 +133,29 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     çekilir. Tüm katalog değil, kendi ürünlerimiz: manuel sipariş
     telefonla gelen siparişler için, tedarikçi kataloğu için değil.
   */
-  const [listResult, variantsResult, returnsResult, sorunluResult, ...countResults] = await Promise.all([
+  const [listResult, variantsResult, returnsResult, sorunluResult, siparisSayimi, ...countResults] = await Promise.all([
     listQuery.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
     canManage
       ? supabase.from("arc_product_variants").select("id,product_id,sku,price,stock,allow_backorder").eq("organization_id", organization.id).is("supplier", null).order("sku").limit(500)
       : Promise.resolve({ data: [], error: null }),
     supabase.from("arc_return_requests").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).eq("status", "beklemede"),
     supabase.from("arc_shipments").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).eq("status", "failed"),
+    /*
+      Mağaza HİÇ sipariş almış mı? counts.all arama ve dönem
+      süzgecinden geçtiği için sıfır olması hem boş mağazayı hem
+      sonuçsuz aramayı anlatabiliyor; boş ekran ikisine farklı şey
+      söylüyor. head:true, satır taşımıyor.
+    */
+    supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
     ...STATUS_TABS.map(([key]) => countQuery(key)),
   ]);
 
   /* Son sayfanın ötesine gidilirse PostgREST PGRST103 döner: boş liste say. */
   if (listResult.error && listResult.error.code !== "PGRST103") throw new Error(listResult.error.message);
   if (variantsResult.error) throw new Error(variantsResult.error.message);
+  /* Sayım düşerse "hiç sipariş yok" VARSAYILMIYOR; hatayı yutmak dolu
+     mağazaya siparişlerinin kaybolduğunu düşündürürdü. */
+  if (siparisSayimi.error) throw new Error(siparisSayimi.error.message);
 
   const counts = Object.fromEntries(STATUS_TABS.map(([key], index) => [key, countResults[index]?.count ?? 0])) as Record<StatusKey, number>;
   const total = listResult.count ?? counts[statusFilter];
@@ -346,7 +356,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
         ) : null}
       </nav>
 
-      <OrderTable key={JSON.stringify(params)} rows={rows} canManage={canManage} canDelete={["owner","admin"].includes(membership.role)} back={listHref(state, {})}>
+      <OrderTable key={JSON.stringify(params)} rows={rows} canManage={canManage} canDelete={["owner","admin"].includes(membership.role)} back={listHref(state, {})} siparisYok={(siparisSayimi.count ?? 0) === 0}>
         <div className="list-pagination">
           <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + rows.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} sipariş` : "Kayıt yok"}</span>
           {pageCount > 1 ? (

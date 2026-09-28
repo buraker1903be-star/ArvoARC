@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { bulkStatus, quickStatus, siparisleriSil } from "./actions";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
+import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 
 export type OrderRow = {
   id: string;
@@ -59,7 +60,7 @@ const BULK_STEPS = [
   Satırın tamamı detay bağlantısı (ilk hücredeki <a> kaplamayla):
   orta tık ve "yeni sekmede aç" çalışır.
 */
-export function OrderTable({ rows, canManage, canDelete, back, children }: { rows: OrderRow[]; canManage: boolean; canDelete: boolean; back: string; children?: React.ReactNode }) {
+export function OrderTable({ rows, canManage, canDelete, back, siparisYok, children }: { rows: OrderRow[]; canManage: boolean; canDelete: boolean; back: string; siparisYok: boolean; children?: React.ReactNode }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const chosen = rows.filter((row) => selected.has(row.id));
   const allChecked = rows.length > 0 && chosen.length === rows.length;
@@ -215,10 +216,25 @@ export function OrderTable({ rows, canManage, canDelete, back, children }: { row
           ))}
         </>
       ) : (
-        <div className="list-empty">
-          <b>Bu ölçütlere uygun sipariş yok.</b>
-          <p>Filtreyi veya dönemi değiştirin. Eski Shopify siparişlerini Veri Aktarımı ekranından yükleyebilirsiniz.</p>
-        </div>
+        /*
+          Hiç sipariş almamış mağazaya "filtreyi değiştirin" demek,
+          ortada olmayan bir filtreyi aratmaktı.
+        */
+        siparisYok ? (
+          <ListeBos
+            baslik="Henüz sipariş yok."
+            aciklama="Vitrinden ilk sipariş geldiğinde burada görünür. Shopify'daki eski siparişlerinizi şimdi aktarabilirsiniz."
+          >
+            <ListeBosEylem href="/veri-aktarimi" birincil>Eski siparişleri aktar</ListeBosEylem>
+          </ListeBos>
+        ) : (
+          <ListeBos
+            baslik="Bu ölçütlere uygun sipariş yok."
+            aciklama="Filtreyi veya dönemi değiştirin. Sipariş numarası, müşteri adı ve e-postada arama yapılır."
+          >
+            <ListeBosEylem href={back}>Filtreleri temizle</ListeBosEylem>
+          </ListeBos>
+        )
       )}
       {children}
     </section>

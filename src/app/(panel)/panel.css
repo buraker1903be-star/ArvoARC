@@ -348,6 +348,8 @@ html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{b
 .list-empty{padding:40px 20px;text-align:center}
 .list-empty b{display:block;color:var(--ink);font-size:15px}
 .list-empty p{max-width:520px;margin:6px auto 0;color:var(--muted);font-size:13.5px;line-height:1.55}
+/* Boş ekranın eylemi: kullanıcı ne yapacağını okuyor, nereye gideceğini de görsün. */
+.list-empty-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px}
 /*
   Liste üstü araç çubuğu ve ipucu satırı.
 
