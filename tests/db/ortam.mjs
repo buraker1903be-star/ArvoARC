@@ -27,14 +27,14 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   uygulamaya gerek kalmadı.
 */
 /*
-  27.09.2026 akşam dökümü o günün BÜTÜN migration'larını içeriyor:
-  kargo bildirimi sütunu, vitrinde kargo takibi (get_arvoculture_my_orders
-  yeniden kuruldu), sipariş silme, iade kalemlerinin doğrulanması, sipariş
-  kalemi maliyeti ve fiyat toplama tablosu (20260927170056). İmleç
-  sonuncunun ardında; dökümde zaten olan bir migration'ı yeniden uygulamak
-  "already exists" ile düşerdi.
+  28.09.2026 akşam dökümü o güne kadarki BÜTÜN migration'ları içeriyor:
+  fiyat toplama tablosu, pasif üyelik kapanışı, hayalet varyant onarımı,
+  LR/Serox kimlikleri, kaydedilmiş görünümler, varyant görseli, vitrin
+  varyant nitelikleri, medya listesi ve zamanlanmış yayın (sonuncusu
+  20260928180805). İmleç sonuncunun ardında; dökümde zaten olan bir
+  migration'ı yeniden uygulamak "already exists" ile düşerdi.
 */
-const ILK_UYGULANAN = "20260927170057";
+const ILK_UYGULANAN = "20260928180806";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;
