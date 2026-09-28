@@ -1,15 +1,14 @@
 /*
   SİPARİŞ KÂRI. Saf modül; testi tests/siparis-kari.test.ts.
 
-  Kâr = kalem geliri − kalem maliyeti. Maliyet varyantın cost_price
-  alanından geliyor (tedarikçi aktarımı yazıyor, ürün ekranında "Alış"
-  diye görünüyor).
+  Kâr = kalem geliri − kalem maliyeti.
 
-  ÖNEMLİ SINIR: maliyet SİPARİŞ ANINDA saklanmıyor, varyantın BUGÜNKÜ
-  değeri okunuyor. Tedarikçi fiyatı değişirse geçmiş siparişlerin kârı
-  da değişmiş görünür. Bunu düzeltmek arc_order_items'a maliyet sütunu
-  eklemeyi gerektirir; o güne kadar ekrandaki kâr "bugünkü maliyetle
-  hesaplanmış" demektir.
+  MALİYET SATIŞ ANINDA DONUYOR: arc_order_items.cost_price, kalem
+  eklenirken tetikleyiciyle varyanttan kopyalanıyor
+  (private.arc_order_item_cost, 20260927162152). Önce varyantın BUGÜNKÜ
+  cost_price'ı okunuyordu ve tedarikçi fiyatı değişince geçmiş
+  siparişlerin kârı da değişmiş görünüyordu; bu modül o değeri değil,
+  çağıranın verdiği donmuş maliyeti kullanıyor.
 
   EKSİK MALİYETTE SAYI GÖSTERİLMİYOR. Bir kalemin maliyeti yoksa kâr
   olduğundan yüksek çıkar; yarım bir sayı, sayı olmamasından daha
@@ -20,7 +19,7 @@ export interface KarKalemi {
   /** Kalemin satış geliri (kuruş). */
   toplamKurus: number;
   adet: number;
-  /** Varyantın alış fiyatı (kuruş); bilinmiyorsa null. */
+  /** Satış anında donmuş birim alış fiyatı (kuruş); bilinmiyorsa null. */
   maliyetKurus: number | null;
 }
 
