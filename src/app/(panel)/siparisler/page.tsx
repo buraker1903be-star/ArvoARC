@@ -6,6 +6,9 @@ import { gonderiSorunlu, kargoGorunumu } from "@/lib/kargo-bolme";
 import { siparisKari } from "@/lib/siparis-kari";
 import { isBankTransfer } from "@/lib/payment-method";
 import { PanelBildirimi } from "@/components/panel/bildirim";
+import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
+import { gorunumleriOku } from "../gorunumler/oku";
+import { gorunumSorgusu, SIPARIS_DONEMLERI, SIPARIS_DURUMLARI } from "@/lib/kayitli-gorunum";
 import { OrderForm } from "./order-form";
 import { OrderTable, type OrderRow } from "./order-table";
 import { OrdersTabs } from "./orders-tabs";
@@ -15,22 +18,14 @@ const PAGE_SIZE = 50;
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 const dateFormat = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
 
-const STATUS_TABS = [
-  ["all", "Tümü"],
-  ["pending", "Bekliyor"],
-  ["confirmed", "Onaylandı"],
-  ["processing", "Hazırlanıyor"],
-  ["fulfilled", "Tamamlandı"],
-  ["cancelled", "İptal"],
-  ["refunded", "İade"],
-] as const;
-
-const PERIODS = [
-  ["all", "Tümü", "Tüm zamanlar"],
-  ["today", "Bugün", "Bugün"],
-  ["7", "7 gün", "Son 7 gün"],
-  ["30", "30 gün", "Son 30 gün"],
-] as const;
+/*
+  Durum ve dönem listeleri lib/kayitli-gorunum.ts'de. Kaydedilmiş
+  görünüm, sakladığı sorgunun geçerli olduğunu doğrulamak zorunda;
+  ikinci bir kopya olsaydı buraya eklenen yeni bir durumu görünüm
+  tanımaz ve sessizce düşürürdü.
+*/
+const STATUS_TABS = SIPARIS_DURUMLARI;
+const PERIODS = SIPARIS_DONEMLERI;
 
 type StatusKey = (typeof STATUS_TABS)[number][0];
 type PeriodKey = (typeof PERIODS)[number][0];
@@ -84,6 +79,13 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   */
   const kargo: ListState["kargo"] = params.kargo === "sorunlu" ? "sorunlu" : "";
   const state: ListState = { q: search, filter: statusFilter, period, page, kargo };
+  /*
+    Görünüm karşılaştırması için süzgecin KANONİK hâli: sayfa numarası
+    düşer, varsayılanlar yazılmaz, anahtarlar hep aynı sırada. Adres
+    satırındaki metni doğrudan karşılaştırmak, "?period=7&filter=pending"
+    ile "?filter=pending&period=7" için iki farklı sonuç verirdi.
+  */
+  const aktifSorgu = gorunumSorgusu("siparisler", params as Record<string, string | undefined>);
   const since = periodStart(period);
   const periodLabel = PERIODS.find(([key]) => key === period)?.[2] ?? "Tüm zamanlar";
 
@@ -133,7 +135,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     çekilir. Tüm katalog değil, kendi ürünlerimiz: manuel sipariş
     telefonla gelen siparişler için, tedarikçi kataloğu için değil.
   */
-  const [listResult, variantsResult, returnsResult, sorunluResult, siparisSayimi, ...countResults] = await Promise.all([
+  const [listResult, variantsResult, returnsResult, sorunluResult, siparisSayimi, gorunumler, ...countResults] = await Promise.all([
     listQuery.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
     canManage
       ? supabase.from("arc_product_variants").select("id,product_id,sku,price,stock,allow_backorder").eq("organization_id", organization.id).is("supplier", null).order("sku").limit(500)
@@ -147,6 +149,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
       söylüyor. head:true, satır taşımıyor.
     */
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
+    gorunumleriOku(supabase, organization.id, "siparisler"),
     ...STATUS_TABS.map(([key]) => countQuery(key)),
   ]);
 
@@ -325,7 +328,11 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
             <Link prefetch={false} key={key} className="ac-btn" href={listHref(state, { period: key, page: 1 })} aria-current={period === key ? "page" : undefined}>{label}</Link>
           ))}
         </nav>
+        <GorunumKaydet liste="siparisler" aktifSorgu={aktifSorgu} gorunumler={gorunumler} canManage={canManage} />
       </section>
+
+      {/* Şerit yalnızca kayıtlı görünüm varken çiziliyor; boşken hiç yer kaplamıyor. */}
+      <KayitliGorunumler liste="siparisler" gorunumler={gorunumler} aktifSorgu={aktifSorgu} canManage={canManage} />
 
       {/*
         Durum filtreleri tek tıkla çalışır; her sekmede o durumdaki

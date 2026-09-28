@@ -228,6 +228,16 @@
       "updated_at",
       "user_id"
     ],
+    "arc_saved_views": [
+      "ad",
+      "created_at",
+      "created_by",
+      "id",
+      "liste",
+      "organization_id",
+      "sira",
+      "sorgu"
+    ],
     "arc_shipment_items": [
       "created_at",
       "id",

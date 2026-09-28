@@ -5,23 +5,22 @@ import { createProduct, bulkUpdateStatus } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel } from "@/lib/commerce-labels";
 import { PanelBildirimi } from "@/components/panel/bildirim";
+import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
+import { gorunumleriOku } from "../gorunumler/oku";
+import { gorunumSorgusu, URUN_DURUMLARI, URUN_KAYNAKLARI } from "@/lib/kayitli-gorunum";
 import { ProductTable, type ProductRow } from "./product-table";
 import "../catalog.css";
 
 const PAGE_SIZE = 24;
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 
-const STATUS_TABS = [
-  ["all", "Tümü"],
-  ["active", "Aktif"],
-  ["draft", "Taslak"],
-  ["archived", "Arşiv"],
-] as const;
-const SOURCES = [
-  ["all", "Tüm kaynaklar"],
-  ["own", "Kendi ürünlerimiz"],
-  ["tarzyeri", "Tarzyeri"],
-] as const;
+/*
+  Durum ve kaynak listeleri lib/kayitli-gorunum.ts'de: kaydedilmiş
+  görünüm sakladığı sorgunun geçerli olduğunu doğrulamak zorunda ve
+  ikinci bir kopya, buraya eklenen yeni bir kaynağı görünmez kılardı.
+*/
+const STATUS_TABS = URUN_DURUMLARI;
+const SOURCES = URUN_KAYNAKLARI;
 
 type StatusKey = (typeof STATUS_TABS)[number][0];
 type SourceKey = (typeof SOURCES)[number][0];
@@ -62,6 +61,8 @@ export default async function Products({ searchParams }: { searchParams: Promise
   const source: SourceKey = SOURCES.some(([key]) => key === params.source) ? (params.source as SourceKey) : "all";
   const page = Math.min(10_000, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));
   const state: ListState = { q: search, filter: statusFilter, source, page };
+  /* Görünüm karşılaştırması için süzgecin kanonik hâli; sayfa numarası düşer. */
+  const aktifSorgu = gorunumSorgusu("urunler", params as Record<string, string | undefined>);
 
   /* SKU varyantta duruyor: eşleşen varyantların ürünleri aramaya eklenir. */
   let skuProductIds: string[] = [];
@@ -101,11 +102,12 @@ export default async function Products({ searchParams }: { searchParams: Promise
     anlatabiliyor. Boş ekran ikisine farklı şey söylediği için
     süzgeçsiz bir sayım gerekiyor — head:true, satır taşımıyor.
   */
-  const [listResult, variantCountResult, bestSellerResult, katalogSayimi, ...countResults] = await Promise.all([
+  const [listResult, variantCountResult, bestSellerResult, katalogSayimi, gorunumler, ...countResults] = await Promise.all([
     listQuery.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
     supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
     supabase.from("arc_collections").select("id").eq("organization_id", organization.id).eq("title", "Çok Satanlar").eq("status", "active").maybeSingle(),
     supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
+    gorunumleriOku(supabase, organization.id, "urunler"),
     ...STATUS_TABS.map(([key]) => countQuery(key)),
   ]);
 
@@ -250,7 +252,11 @@ export default async function Products({ searchParams }: { searchParams: Promise
             <Link prefetch={false} key={key} className="ac-btn" href={listHref(state, { source: key, page: 1 })} aria-current={source === key ? "page" : undefined}>{label}</Link>
           ))}
         </nav>
+        <GorunumKaydet liste="urunler" aktifSorgu={aktifSorgu} gorunumler={gorunumler} canManage={canManage} />
       </section>
+
+      {/* Şerit yalnızca kayıtlı görünüm varken çiziliyor; boşken hiç yer kaplamıyor. */}
+      <KayitliGorunumler liste="urunler" gorunumler={gorunumler} aktifSorgu={aktifSorgu} canManage={canManage} />
 
       <nav className="ac-filter" aria-label="Ürün durumu">
         {STATUS_TABS.map(([key, label]) => (
