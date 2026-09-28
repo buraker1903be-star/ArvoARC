@@ -300,13 +300,22 @@ export async function resolveReturn(formData: FormData) {
       kalemleri müşterinin tarayıcısından geliyor ve RPC onları
       doğrulamadan saklıyor.
     */
-    const { data: siparisKalemleri } = await supabase.from("arc_order_items")
+    const { data: siparisKalemleri, error: kalemHatasi } = await supabase.from("arc_order_items")
       .select("sku,quantity").eq("organization_id", organization.id).eq("order_id", request.order_id);
+    /*
+      Hata akışı KESMİYOR (para çoktan gitti, yukarıdaki gerekçe) ama
+      artık iz bırakıyor. Yutulduğunda sınır listesi boş kalıyor,
+      stogaDonecekler hiçbir şey döndürmüyor ve stok sessizce eksik
+      kalıyordu: "neden eklenmedi" sorusunun hiçbir cevabı yoktu.
+    */
+    if (kalemHatasi) console.error("İade stoğu için sipariş kalemleri okunamadı:", request.order_id, kalemHatasi.message);
     const donecekler = stogaDonecekler(request.items, (siparisKalemleri ?? []) as Array<{ sku: string | null; quantity: number }>);
     if (donecekler.length) {
-      const { data: varyantlar } = await supabase.from("arc_product_variants")
+      const { data: varyantlar, error: varyantHatasi } = await supabase.from("arc_product_variants")
         .select("id,sku").eq("organization_id", organization.id)
         .in("sku", donecekler.map((k) => k.sku));
+      // Aynı gerekçe: okunamadıysa hiçbir SKU eşleşmez ve stok sessizce eksik kalır.
+      if (varyantHatasi) console.error("İade stoğu için varyantlar okunamadı:", request.order_id, varyantHatasi.message);
       const varyantBySku = new Map(((varyantlar ?? []) as Array<{ id: string; sku: string }>).map((v) => [v.sku, v.id]));
       for (const kalem of donecekler) {
         const varyantId = varyantBySku.get(kalem.sku);

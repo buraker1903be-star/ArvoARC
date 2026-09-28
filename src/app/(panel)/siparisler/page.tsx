@@ -113,8 +113,15 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     Sorunlu gönderi az sayıda olur; sınır 500'de.
   */
   if (kargo === "sorunlu") {
-    const { data: sorunlular } = await supabase.from("arc_shipments")
+    const { data: sorunlular, error: sorunluHatasi } = await supabase.from("arc_shipments")
       .select("order_id").eq("organization_id", organization.id).eq("status", "failed").limit(500);
+    /*
+      Hata YUTULMUYOR. Yutulsaydı liste boş kalır ve süzgeç "sorunlu
+      gönderi yok" derdi: amacı sorun göstermek olan bir ekranın
+      sessizce temiz görünmesi, hata sayfasından çok daha kötü.
+      Sayfanın geri kalanı da hatada düşüyor (productsError).
+    */
+    if (sorunluHatasi) throw new Error("Sorunlu gönderiler okunamadı: " + sorunluHatasi.message);
     const idler = [...new Set(((sorunlular ?? []) as { order_id: string }[]).map((s) => s.order_id))];
     /* Hiç yoksa boş liste: .in("id", []) PostgREST'te hata veriyor. */
     listQuery = idler.length ? listQuery.in("id", idler) : listQuery.eq("id", "00000000-0000-0000-0000-000000000000");
@@ -161,9 +168,6 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   /*
     KÂR ve KARGO DURUMU listedeki siparişler için tek turda çekiliyor.
     Sipariş başına sorgu, elli satırda elli tur demekti.
-
-    Kâr varyantın BUGÜNKÜ maliyetinden hesaplanıyor: sipariş anındaki
-    maliyet saklanmıyor (lib/siparis-kari.ts).
   */
   const listeIdleri = (listResult.data ?? []).map((order) => order.id);
   const [{ data: listeKalemleri }, { data: listeGonderileri }] = listeIdleri.length
