@@ -36,6 +36,8 @@ const paths = {
   printer: <><path d="M7 9V3h10v6" /><rect x="3" y="9" width="18" height="8" rx="2" /><path d="M7 14h10v7H7z" /></>,
   download: <><path d="M12 4v11M7 10l5 5 5-5" /><path d="M4 20h16" /></>,
   search: <><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></>,
+  /* Medya: çerçeve + tepe + güneş; fotoğraf için yerleşik işaret. */
+  image: <><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="8.5" cy="9.5" r="1.6" /><path d="m4 17 5-5 4.5 4.5L16 14l4 4" /></>,
   mail: <><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7 8 6 8-6" /></>,
   bell: <><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></>,
 } satisfies Record<string, React.ReactNode>;

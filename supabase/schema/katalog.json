@@ -459,6 +459,7 @@
     "arc_find_address",
     "arc_first_text",
     "arc_log_order_event",
+    "arc_medya_listesi",
     "arc_normalize_address",
     "arc_reprice_supplier",
     "arc_resolve_commerce_tenant",

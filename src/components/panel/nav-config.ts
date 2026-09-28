@@ -26,6 +26,7 @@ export const navSections: NavSection[] = [
       { label: "Ürünler", href: "/urunler", icon: "tag" },
       { label: "Koleksiyonlar", href: "/koleksiyonlar", icon: "layers" },
       { label: "Stok Yönetimi", href: "/stok", icon: "archive" },
+      { label: "Medya", href: "/medya", icon: "image" },
       { label: "İndirimler", href: "/indirimler", icon: "percent" },
     ],
   },

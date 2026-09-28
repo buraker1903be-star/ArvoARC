@@ -42,6 +42,8 @@ const PANEL = [
   "private.can_manage_organization_assets",
   "public.arc_address_line",
   "public.arc_adjust_inventory",
+  /* Medya kitaplığı: panel okuması, anon'a kapalı. */
+  "public.arc_medya_listesi",
   /*
     Sipariş silme: yalnızca oturumlu kullanıcıya açık, yetkiyi
     fonksiyonun kendisi daraltıyor (private.arvo_is_org_admin ile
