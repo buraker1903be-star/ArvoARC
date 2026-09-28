@@ -6,7 +6,7 @@ import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { maliyetleriAyristir } from "@/lib/maliyet-aktarimi";
-import { fiyatKarari, skuAdaylari } from "@/lib/fiyat-aktarimi";
+import { fiyatKarari, maliyetUyarisi, skuAdaylari } from "@/lib/fiyat-aktarimi";
 import { gecerliFiyat, saklananSatirlar, kaynaklarIcin, KAYNAK_ADI, type FiyatKaynagi } from "@/lib/fiyat-toplayici";
 import { jetonAnahtariVar, toplayiciJetonu } from "@/lib/fiyat-toplayici-jeton";
 import { lrTaramasiniKaydet } from "@/lib/lr/kaydet";
@@ -280,7 +280,15 @@ export type MaliyetOnizleme = {
     /** Müşteri geçişinde hesaplanan satış fiyatı ve üstü çizili değer. */
     satis?: number;
     ustuCizili?: number | null;
+    /** Satır UYGULANMIYOR; sebebi burada. */
     sorun?: string;
+    /*
+      Satır uygulanıyor ama şüpheli. "sorun" ile aynı şey değil: sorunlu
+      satır atlanıyor, uyarılı satır yazılıyor. Ayrım şart, çünkü LR
+      gerçekten zararına kampanya yapabiliyor ve o satırı yazmamak
+      vitrini LR'ın fiyatının gerisinde bırakırdı.
+    */
+    uyari?: string;
   }[];
   eslesmeyen: string[];
   atlanan: string[];
@@ -345,7 +353,9 @@ async function eslestir(
     const ad = [urun?.name, varyant.title].filter(Boolean).join(" · ") || varyant.sku;
 
     if (gecis === "alis") {
-      eslesen.push({ sku: varyant.sku, ad, eski: varyant.cost_price, yeni: satir.kurus });
+      /* Kural lib/fiyat-aktarimi.ts'te: engellemiyor, işaretliyor. */
+      const uyari = maliyetUyarisi(satir.kurus, varyant.price);
+      eslesen.push({ sku: varyant.sku, ad, eski: varyant.cost_price, yeni: satir.kurus, uyari });
       continue;
     }
 
