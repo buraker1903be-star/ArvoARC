@@ -311,6 +311,15 @@ export function MaliyetAktarimi() {
             */}
             {toplama.kaynaklar.length ? <> · kaynak: <b>{toplama.kaynaklar.join(" + ")}</b></> : null}
             {toplama.uygulandi ? <> · <b>bu liste {zaman.format(new Date(toplama.uygulandi))} tarihinde uygulanmış</b></> : null}
+            {/*
+              Sınıra takılıp dışarıda kalan toplamalar SÖYLENİYOR.
+              Sessiz kalması, kullanıcının "hepsini uyguladım" sanıp bir
+              kısmını uygulamaması demekti; kalanlar en eskiler olduğu
+              için gözden de düşerlerdi.
+            */}
+            {toplama.disaridaKalan ? (
+              <><br /><b>{toplama.disaridaKalan} toplama bu listeye girmedi</b> — en yenileri alındı. Bunu uygulayın, sonra tekrar getirin.</>
+            ) : null}
             {toplama.sayfa ? <><br /><small>{toplama.sayfa.slice(0, 120)}</small></> : null}
           </div>
         ) : null}

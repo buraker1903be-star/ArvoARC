@@ -618,6 +618,12 @@ export type ToplananListe = {
   toplamaSayisi: number;
   /** Listenin hangi kaynaklardan geldiği ("yer imi", "günlük tarama"). */
   kaynaklar: string[];
+  /*
+    Sınır yüzünden bu listeye GİRMEYEN toplama sayısı. Sessiz kalması,
+    kullanıcının "hepsini uyguladım" sanıp bir kısmını uygulamaması
+    demekti — üstelik kalanlar en eskiler olduğu için gözden de düşerdi.
+  */
+  disaridaKalan?: number;
   onizleme: MaliyetOnizleme;
 };
 
@@ -648,23 +654,37 @@ export async function sonToplananListe(
     Ayrım kaydeden tarafta zaten kurulmuştu (lib/lr/kaydet.ts); eksik
     olan okuyan tarafın sütuna bakmasıydı.
   */
+  /*
+    TEK TURDA BİRLEŞTİRİLEN TOPLAMA SAYISI. Sınır bellek ve yanıt boyutu
+    için: her toplama 2.000 satıra kadar taşıyabiliyor. Eskiden 20'ydi ve
+    28.09.2026'da kullanıcının elinde 19 bekleyen toplama vardı — bir
+    sayfa daha gönderse en eskiler SESSİZCE dışarıda kalacaktı. Sınır
+    yükseltildi ve dışarıda kalan sayısı artık söyleniyor.
+  */
+  const EN_FAZLA_TOPLAMA = 100;
   const kaynaklar = kaynaklarIcin(gecis);
-  const sorgu = () =>
-    supabase
+  const { data: bekleyen, error, count: bekleyenSayisi } = await supabase
+    .from("arc_price_collections")
+    .select("id,satirlar,sayfa,created_at,uygulandi_at,kaynak", { count: "exact" })
+    .eq("organization_id", organization.id)
+    .in("kaynak", kaynaklar)
+    .order("created_at", { ascending: false })
+    .limit(EN_FAZLA_TOPLAMA)
+    .is("uygulandi_at", null);
+  if (error) return { hata: error.message };
+
+  type Kayit = { id: string; satirlar: unknown; sayfa: string | null; created_at: string; uygulandi_at: string | null; kaynak: string };
+  let kayitlar = (bekleyen ?? []) as Kayit[];
+  /* Sınırdan dolayı dışarıda kalanlar (en eskiler); 0 ise alan hiç gönderilmiyor. */
+  const disaridaKalan = Math.max(0, (bekleyenSayisi ?? kayitlar.length) - kayitlar.length);
+  if (!kayitlar.length) {
+    const { data: sonuncu, error: sonHata } = await supabase
       .from("arc_price_collections")
       .select("id,satirlar,sayfa,created_at,uygulandi_at,kaynak")
       .eq("organization_id", organization.id)
       .in("kaynak", kaynaklar)
       .order("created_at", { ascending: false })
-      .limit(20);
-
-  const { data: bekleyen, error } = await sorgu().is("uygulandi_at", null);
-  if (error) return { hata: error.message };
-
-  type Kayit = { id: string; satirlar: unknown; sayfa: string | null; created_at: string; uygulandi_at: string | null; kaynak: string };
-  let kayitlar = (bekleyen ?? []) as Kayit[];
-  if (!kayitlar.length) {
-    const { data: sonuncu, error: sonHata } = await sorgu().limit(1);
+      .limit(1);
     if (sonHata) return { hata: sonHata.message };
     kayitlar = (sonuncu ?? []) as Kayit[];
   }
@@ -715,6 +735,7 @@ export async function sonToplananListe(
     okunan: satirlar.length,
     toplamaSayisi: kayitlar.length,
     kaynaklar: [...new Set(kayitlar.map((k) => KAYNAK_ADI[k.kaynak as FiyatKaynagi] ?? k.kaynak))],
+    disaridaKalan: disaridaKalan || undefined,
     onizleme,
   };
 }
