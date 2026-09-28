@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EN_FAZLA_SATIR, gecerliFiyat, satirlariDogrula, kaynaklarIcin, KAYNAK_ADI } from "@/lib/fiyat-toplayici";
+import {
+  EN_FAZLA_SATIR,
+  gecerliFiyat,
+  satirlariDogrula,
+  saklananSatirlar,
+  kaynaklarIcin,
+  KAYNAK_ADI,
+} from "@/lib/fiyat-toplayici";
 
 /*
   Toplayıcıdan gelen veri TAMAMEN İSTEMCİ TARAFINDAN üretiliyor: LR'ın
@@ -101,4 +108,47 @@ test("müşteri geçişinde iki kaynak da geçerli", () => {
 test("kaynak adları ekranda okunabilir", () => {
   assert.equal(KAYNAK_ADI.lr, "yer imi");
   assert.equal(KAYNAK_ADI["lr-genel"], "günlük tarama");
+});
+
+/*
+  YAZ-OKU GİDİŞ DÖNÜŞÜ. Buradaki asıl kusur, aynı kuralın iki farklı işte
+  kullanılmasıydı: gelen gövdeyi doğrulayan "fiyat metin olmalı" kuralı
+  saklanan satıra da uygulanınca, yer imiyle toplanmış bütün satırlar
+  okunurken sessizce düştü. Panelde geriye yalnızca cron'un metin
+  saklayan müşteri fiyatları kaldı ve alış alanına onlar yazıldı.
+
+  Bu yüzden yazma ve okuma bir arada sabitleniyor: her iki yolun yazdığı
+  satır, okuyan tarafta aynen geri gelmeli.
+*/
+test("YER İMİ yolu: yazılan satır okunurken geri geliyor", () => {
+  const gelen = [{ sku: "20328", ad: "Aloe Vera Jel", fiyatlar: ["487,10"] }];
+  /* Uç, yazmadan önce doğruluyor ve KURUŞ SAYISI saklıyor. */
+  const saklanan = satirlariDogrula(gelen).satirlar;
+  assert.deepEqual(saklanan, [{ sku: "20328", ad: "Aloe Vera Jel", fiyatlar: [48710] }]);
+  assert.deepEqual(saklananSatirlar(saklanan), saklanan);
+});
+
+test("SUNUCU TARAMASI yolu: metin saklayan ESKİ satırlar da okunuyor", () => {
+  /*
+    Cron eskiden sayfadaki metni olduğu gibi yazıyordu. Yeni kod kuruş
+    yazıyor ama tablodaki eski satırlar duruyor; okuma ikisini de tanımalı.
+  */
+  assert.deepEqual(saklananSatirlar([{ sku: "20328", ad: "X", fiyatlar: ["487,10"] }]), [
+    { sku: "20328", ad: "X", fiyatlar: [48710] },
+  ]);
+});
+
+test("okuma da SINIRLARI uyguluyor: satır veritabanından geldi diye sınırsız değil", () => {
+  assert.deepEqual(saklananSatirlar([{ sku: "20328", ad: "X", fiyatlar: [10_000_001, 48710] }]), [
+    { sku: "20328", ad: "X", fiyatlar: [48710] },
+  ]);
+  assert.deepEqual(saklananSatirlar([{ sku: "20328", ad: "X", fiyatlar: [0, -5, 12.5] }]), []);
+});
+
+test("GELEN gövde hâlâ sayı kabul etmiyor; kural yalnızca okumada gevşedi", () => {
+  /*
+    İstemcinin kendi çevirdiği sayıya güvenmek, kuruşa çevirme kuralının
+    ikinci bir kopyasını tarayıcıya koymak demekti ve kopya sessizce eskir.
+  */
+  assert.deepEqual(satirlariDogrula([{ sku: "20328", fiyatlar: [48710] }]).satirlar, []);
 });
