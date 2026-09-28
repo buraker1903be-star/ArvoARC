@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { Icon } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
+import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 import { customerTags, currentTime, DAY, daysAgo, loadCustomers, NEW_DAYS, RISK_DAYS, type Customer } from "./customer-data";
 import "./customers.css";
 
@@ -154,10 +155,26 @@ export default async function Customers({ searchParams }: { searchParams: Promis
             ))}
           </>
         ) : (
-          <div className="list-empty">
-            <b>Bu ölçütlere uygun müşteri yok.</b>
-            <p>Aramayı veya segmenti değiştirin.</p>
-          </div>
+          /*
+            Müşteri listesi siparişlerden türüyor; hiç müşteri yoksa
+            değiştirilecek bir segment de yok. Yeni mağazaya "segmenti
+            değiştirin" demek, olmayan bir düğmeyi aratmaktı.
+          */
+          customers.length === 0 ? (
+            <ListeBos
+              baslik="Henüz müşteri yok."
+              aciklama="Müşteri kaydı siparişlerden oluşuyor: vitrinden ilk sipariş geldiğinde alıcı burada görünür."
+            >
+              <ListeBosEylem href="/siparisler" birincil>Siparişlere git</ListeBosEylem>
+            </ListeBos>
+          ) : (
+            <ListeBos
+              baslik="Bu ölçütlere uygun müşteri yok."
+              aciklama="Ad ve e-postada arama yapılır. Aramayı veya segmenti değiştirin."
+            >
+              <ListeBosEylem href={listHref(state, { q: "", segment: "all", page: 1 })}>Filtreleri temizle</ListeBosEylem>
+            </ListeBos>
+          )
         )}
         <div className="list-pagination">
           <span>{sorted.length ? `${(from + 1).toLocaleString("tr-TR")}–${(from + visible.length).toLocaleString("tr-TR")} / ${sorted.length.toLocaleString("tr-TR")} müşteri` : "Kayıt yok"}</span>

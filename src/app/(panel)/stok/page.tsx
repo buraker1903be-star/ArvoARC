@@ -4,6 +4,7 @@ import { adjustInventory } from "./actions";
 import { inventoryKindLabel } from "@/lib/commerce-labels";
 import { Icon } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
+import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 import "../catalog.css";
 import { PanelBildirimi } from "@/components/panel/bildirim";
 
@@ -79,7 +80,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
     narrowed(supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id), filter);
   const from = (page - 1) * PAGE_SIZE;
 
-  const [listResult, movementsResult, unavailableResult, stockSumResult, ...countResults] = await Promise.all([
+  const [listResult, movementsResult, unavailableResult, stockSumResult, varyantSayimi, ...countResults] = await Promise.all([
     narrowed(supabase.from("arc_product_variants").select("id,product_id,sku,title,stock,allow_backorder", { count: "exact" }).eq("organization_id", organization.id), stockFilter)
       .order("stock", { ascending: true })
       .order("sku", { ascending: true })
@@ -88,11 +89,20 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
     supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).lte("stock", 0).eq("allow_backorder", false),
     /* Toplam adet veritabanında toplanıyor; tüm varyantlar belleğe alınamaz. */
     supabase.rpc("arc_total_stock_units"),
+    /*
+      Katalogda HİÇ varyant var mı? counts.all aramadan geçtiği için
+      sıfır olması hem boş kataloğu hem sonuçsuz aramayı anlatıyor;
+      boş ekran ikisine farklı şey söylüyor.
+    */
+    supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
     ...FILTERS.map(([key]) => countQuery(key)),
   ]);
 
   if (listResult.error && listResult.error.code !== "PGRST103") throw new Error(listResult.error.message);
   if (movementsResult.error) throw new Error(movementsResult.error.message);
+  /* Sayım düşerse "katalog boş" varsayılmıyor; hata yutmak dolu
+     katalogda varyantların silindiği izlenimi verirdi. */
+  if (varyantSayimi.error) throw new Error(varyantSayimi.error.message);
 
   const counts = Object.fromEntries(FILTERS.map(([key], index) => [key, countResults[index]?.count ?? 0])) as Record<FilterKey, number>;
   const variants = listResult.data ?? [];
@@ -217,10 +227,21 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
             ))}
           </>
         ) : (
-          <div className="list-empty">
-            <b>Bu ölçütlere uygun varyant yok.</b>
-            <p>Aramayı veya filtreyi değiştirin.</p>
-          </div>
+          (varyantSayimi.count ?? 0) === 0 ? (
+            <ListeBos
+              baslik="Stok takip edilecek varyant yok."
+              aciklama="Stok, ürün varyantlarında tutuluyor. Önce kataloğa ürün ekleyin; her varyant burada kendi adediyle görünür."
+            >
+              <ListeBosEylem href="/urunler" birincil>Ürünlere git</ListeBosEylem>
+            </ListeBos>
+          ) : (
+            <ListeBos
+              baslik="Bu ölçütlere uygun varyant yok."
+              aciklama="SKU ve varyant adında arama yapılır. Aramayı veya filtreyi değiştirin."
+            >
+              <ListeBosEylem href={back}>Filtreleri temizle</ListeBosEylem>
+            </ListeBos>
+          )
         )}
         <div className="list-pagination">
           <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + variants.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} varyant` : "Kayıt yok"}</span>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { PanelBildirimi } from "@/components/panel/bildirim";
+import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 import { createCollection } from "./actions";
 import "../catalog.css";
 import "../modules.css";
@@ -91,7 +92,15 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
               <span className="col-status"><em className="ac-tag" data-tone={collection.status==="active"?undefined:collection.status==="draft"?"warn":"muted"}>{statusLabels[collection.status]??collection.status}</em></span>
             </div>
           ))}
-        </>:<div className="list-empty"><b>{all.length?"Bu ölçütlere uygun koleksiyon yok.":"Henüz koleksiyon bulunmuyor."}</b><p>{all.length?"Aramayı veya durumu değiştirin.":"İlk koleksiyonunuzu oluşturarak ürünleri gruplandırmaya başlayın."}</p></div>}
+        </>:all.length?(
+          <ListeBos baslik="Bu ölçütlere uygun koleksiyon yok." aciklama="Koleksiyon adında arama yapılır. Aramayı veya durumu değiştirin.">
+            <ListeBosEylem href="/koleksiyonlar">Filtreleri temizle</ListeBosEylem>
+          </ListeBos>
+        ):(
+          <ListeBos baslik="Henüz koleksiyon bulunmuyor." aciklama="Koleksiyon, vitrinde ürünleri gruplayan raftır — “Yeni Gelenler”, “Çok Satanlar” gibi.">
+            {canManage?<ListeBosEylem href="#yeni-koleksiyon" birincil>İlk koleksiyonu oluştur</ListeBosEylem>:null}
+          </ListeBos>
+        )}
       </section>
 
       {canManage?(

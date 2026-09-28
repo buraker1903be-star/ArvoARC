@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { PanelBildirimi } from "@/components/panel/bildirim";
+import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 import { createDiscount,deleteDiscount,toggleDiscount } from "./actions";
 import "../catalog.css";
 import "../modules.css";
@@ -110,7 +111,11 @@ export default async function DiscountsPage(){
               </form>
             </details>
           </div>:null}
-        </article>)}</div>:<section className="ac list-empty"><b>Henüz indirim paketi yok.</b><p>Kupon kodlu ya da sepette otomatik uygulanan bir kampanya oluşturun.</p></section>}
+        </article>)}</div>:<section className="ac">
+          <ListeBos baslik="Henüz indirim paketi yok." aciklama="Kupon kodlu ya da sepette kendiliğinden uygulanan bir kampanya oluşturabilirsiniz.">
+            {canManage?<ListeBosEylem href="#yeni-indirim" birincil>İlk indirimi oluştur</ListeBosEylem>:null}
+          </ListeBos>
+        </section>}
       </section>
 
       <section className="ac table list-table discount-product-list">
@@ -128,7 +133,9 @@ export default async function DiscountsPage(){
               <span className="dl-edit"><Link prefetch={false} href={`/urunler/${item.product_id}`}>Düzenle →</Link></span>
             </div>;
           })}
-        </>:<div className="list-empty"><b>Aktif ürün indirimi bulunmuyor.</b><p>Ürün varyantına satış fiyatından yüksek karşılaştırma fiyatı girerek ürün indirimi oluşturabilirsiniz.</p></div>}
+        </>:<ListeBos baslik="Aktif ürün indirimi bulunmuyor." aciklama="Bir varyanta satış fiyatından yüksek karşılaştırma fiyatı girdiğinizde vitrinde üstü çizili fiyat ve indirim rozeti görünür.">
+          <ListeBosEylem href="/urunler">Ürünlere git</ListeBosEylem>
+        </ListeBos>}
       </section>
     </div>
   </>;

@@ -7,6 +7,7 @@ import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel, sourceLabel } from "@/lib/commerce-labels";
 import { Icon } from "@/components/panel/icons";
 import { PanelBildirimi } from "@/components/panel/bildirim";
+import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 import { SeoFields } from "./seo-fields";
 import "../../catalog.css";
 
@@ -202,7 +203,9 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
               );
             })}
           </>
-        ):<div className="list-empty"><b>Bu ürünün varyantı yok.</b><p>Satışa açmak için en az bir varyant (SKU ve fiyat) ekleyin.</p></div>}
+        ):<ListeBos baslik="Bu ürünün varyantı yok." aciklama="Ürün varyantsız satılamaz: fiyat, stok ve SKU varyantta tutulur. Tek seçenekli üründe bile bir varyant gerekir.">
+          {canManage?<ListeBosEylem href="#yeni-varyant" birincil>Varyant ekle</ListeBosEylem>:null}
+        </ListeBos>}
         {canManage?(
           <details className="variant-create-wrap" id="yeni-varyant">
             <summary>+ Yeni varyant ekle</summary>
