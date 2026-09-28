@@ -256,7 +256,7 @@ export default async function ReturnsPage({
                 <span>Sipariş toplamı <b>{money.format((order?.total ?? 0) / 100)}</b></span>
               </p>
 
-              {refund.shippingRefund > 0 ? <p className="order-hint">Kargo çıkmadığı için kargo bedeli de iade tutarına eklendi.</p> : null}
+              {refund.shippingRefund > 0 ? <p className="list-hint">Kargo çıkmadığı için kargo bedeli de iade tutarına eklendi.</p> : null}
 
               {request.status === "tamamlandi" && request.refund_amount ? (
                 <p className="return-done">{money.format(request.refund_amount / 100)} iade edildi.</p>
@@ -265,7 +265,7 @@ export default async function ReturnsPage({
               {request.status === "onaylandi" && canResolve ? (
                 <>
                   <hr className="ac-divider" />
-                  <p className="order-hint">
+                  <p className="list-hint">
                     Talep onaylandı, müşteri ürünü gönderecek. Ürün elinize
                     ulaşıp kontrol ettikten sonra iadeyi tamamlayın.
                   </p>
@@ -313,7 +313,7 @@ export default async function ReturnsPage({
                       <span>Ürünler satılabilir durumda, stoğa geri ekle</span>
                     </label>
 
-                    <p className="order-hint is-danger">
+                    <p className="list-hint is-danger">
                       Bu adım PayTR üzerinden gerçek para iadesi başlatır ve
                       geri alınamaz. Ürünü teslim aldığınızdan emin olun.
                     </p>
@@ -334,7 +334,7 @@ export default async function ReturnsPage({
                       <textarea name="note" rows={2} maxLength={500} placeholder="Kargo talimatı, iade adresi gibi bilgiler. E-postada görünür." className="ac-input" />
                     </label>
 
-                    <p className="order-hint">
+                    <p className="list-hint">
                       Onay para iadesi yapmaz; müşteriye ürünü gönderebileceğini
                       bildirir. Para, ürün elinize ulaştıktan sonra iade edilir.
                     </p>

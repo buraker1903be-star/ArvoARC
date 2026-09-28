@@ -5,9 +5,13 @@
    panel.css paletinden.
    ============================================================ */
 
-.module-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
-.module-toolbar .module-search{flex:1 1 360px}
-.module-hint{margin:8px 0 0;color:var(--muted);font-size:12.5px;line-height:1.65}
+/*
+  Çubuğun ve ipucunun kendisi panel.css'te. Bu modüllerde ipucu
+  kendinden önceki bloktan sonra geliyor ve üstten boşluk istiyor;
+  sıfırlandığı tek yer .supplier-reset (aşağıda).
+*/
+.list-toolbar .module-search{flex:1 1 360px}
+.list-hint{margin-top:8px}
 .section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}
 .section-title small{display:block;color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.18em}
 .section-title h3{margin:4px 0 0;color:var(--ink);font-size:20px;font-weight:650;letter-spacing:-.015em}
@@ -74,7 +78,7 @@
 .supplier-preview strong{color:var(--accent-strong);font-size:15px}
 .supplier-reset{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
 .supplier-reset form{margin:0}
-.supplier-reset .module-hint{flex:1 1 280px;margin:0}
+.supplier-reset .list-hint{flex:1 1 280px;margin:0}
 
 /* ---------- Veri aktarımı ---------- */
 .import-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}

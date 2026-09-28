@@ -161,7 +161,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
         </Notice>
       ) : null}
 
-      <section className="ac ac-pad-sm catalog-toolbar">
+      <section className="ac ac-pad-sm list-toolbar">
         <form className="ac-filter catalog-search" role="search">
           {stockFilter !== "all" ? <input type="hidden" name="filter" value={stockFilter} /> : null}
           <input name="q" defaultValue={search} placeholder="SKU veya ürün adı" aria-label="Stokta ara" />
@@ -267,7 +267,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
               );
             })}
           </ul>
-        ) : <p className="catalog-hint">Henüz stok hareketi yok.</p>}
+        ) : <p className="list-hint">Henüz stok hareketi yok.</p>}
       </section>
     </div>
   </>;

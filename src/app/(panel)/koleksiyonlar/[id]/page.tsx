@@ -72,7 +72,7 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
 
       {canManage?<>
         {/* Ayrı form: kaydetme formunun içine yerleştirilemez (iç içe form). */}
-        <section className="ac ac-pad-sm module-toolbar">
+        <section className="ac ac-pad-sm list-toolbar">
           <form className="ac-filter module-search" role="search">
             <input name="q" defaultValue={search} placeholder="Koleksiyona eklenecek ürünü adıyla ara" aria-label="Eklenecek ürünü ara"/>
             <button className="ac-btn ac-btn-primary" type="submit">Ara</button>
@@ -98,14 +98,14 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
             <div className="ac-head"><div><h3>Ürünler</h3><p>İşareti kaldırılan ürün koleksiyondan çıkar; işaretlenen yeni ürün sona eklenir.</p></div></div>
             <div className="collection-product-picker">
               <p className="picker-group">KOLEKSİYONDAKİ ÜRÜNLER · {members.length.toLocaleString("tr-TR")}</p>
-              {members.length?members.map(product=><PickerRow key={product.id} product={product} checked/>):<p className="module-hint">Henüz ürün yok. Aşağıdan ekleyin.</p>}
+              {members.length?members.map(product=><PickerRow key={product.id} product={product} checked/>):<p className="list-hint">Henüz ürün yok. Aşağıdan ekleyin.</p>}
               <p className="picker-group">{search?`“${search}” İÇİN SONUÇLAR`:"SON GÜNCELLENEN ÜRÜNLER"} · {candidates.length}</p>
-              {candidates.length?candidates.map(product=><PickerRow key={product.id} product={product} checked={false}/>):<p className="module-hint">{search?"Eşleşen ve koleksiyonda olmayan ürün yok.":"Eklenebilecek ürün yok."}</p>}
+              {candidates.length?candidates.map(product=><PickerRow key={product.id} product={product} checked={false}/>):<p className="list-hint">{search?"Eşleşen ve koleksiyonda olmayan ürün yok.":"Eklenebilecek ürün yok."}</p>}
             </div>
           </section>
           <div className="product-editor-actions"><span>Koleksiyon ve ürün sıralaması mağaza kataloğuna yansır.</span><button className="ac-btn ac-btn-primary" type="submit">Koleksiyonu kaydet</button></div>
         </form>
-      </>:<p className="module-hint">Bu koleksiyonu düzenleme yetkiniz bulunmuyor.</p>}
+      </>:<p className="list-hint">Bu koleksiyonu düzenleme yetkiniz bulunmuyor.</p>}
     </div>
   </>;
 }

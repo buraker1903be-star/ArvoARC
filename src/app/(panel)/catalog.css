@@ -4,9 +4,8 @@
    (Veri listeleri); burada yalnızca katalog düzeni.
    ============================================================ */
 
-.catalog-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
-.catalog-toolbar .catalog-search{flex:1 1 380px}
-.catalog-hint{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
+/* Çubuğun ve ipucunun kendisi panel.css'te; burada yalnızca arama genişliği. */
+.list-toolbar .catalog-search{flex:1 1 380px}
 
 /* ---------- Ürün listesi ---------- */
 .product-list[data-manage] .list-row{
