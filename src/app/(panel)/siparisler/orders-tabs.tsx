@@ -15,7 +15,7 @@ export function OrdersTabs({ active, pendingReturns, canExport = false }: { acti
         {pendingReturns > 0 ? <span className="ac-count" data-tone="warn">{pendingReturns}</span> : null}
       </Link>
       {active === "orders" && canExport ? (
-        <a className="ac-btn" href="/api/disari-aktar/siparisler"><Icon name="download" size={15} />CSV indir</a>
+        <a className="ac-btn" href="/api/disari-aktar/siparisler"><Icon name="download" size={16} />CSV indir</a>
       ) : null}
     </nav>
   );

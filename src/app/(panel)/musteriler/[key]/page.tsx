@@ -100,7 +100,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
       </div>
       <div className="customer-head-actions">
         {customerTags(summary, now).map((tag) => <em className="ac-tag" data-tone={tag.tone} key={tag.label}>{tag.label}</em>)}
-        {customerEmail ? <a className="ac-btn" href={`mailto:${customerEmail}`}><Icon name="mail" size={15} />E-posta gönder</a> : null}
+        {customerEmail ? <a className="ac-btn" href={`mailto:${customerEmail}`}><Icon name="mail" size={16} />E-posta gönder</a> : null}
       </div>
     </section>
 

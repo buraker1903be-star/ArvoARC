@@ -10,7 +10,7 @@ export function Notice({ tone = "success", title, children }: { tone?: Tone; tit
   const icon = tone === "success" ? "check" : tone === "info" ? "info" : "alert";
   return (
     <div className="panel-notice" data-tone={tone} role={tone === "error" ? "alert" : "status"}>
-      <span className="panel-notice-icon"><Icon name={icon} size={15} /></span>
+      <span className="panel-notice-icon"><Icon name={icon} size={16} /></span>
       <div>
         <b>{title}</b>
         {children ? <p>{children}</p> : null}

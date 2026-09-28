@@ -141,7 +141,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
         <p>{stockSum.toLocaleString("tr-TR")} adet · {counts.all.toLocaleString("tr-TR")} varyant · en düşük stoktan başlar{canManage ? ", miktarı yazıp satırdan giriş veya çıkış yapın" : ""} · her değişiklik hareket olarak kaydedilir.</p>
       </div>
       <div className="ac-bar-actions">
-        {canManage ? <a className="ac-btn" href="/api/disari-aktar/stok"><Icon name="download" size={15} />CSV indir</a> : null}
+        {canManage ? <a className="ac-btn" href="/api/disari-aktar/stok"><Icon name="download" size={16} />CSV indir</a> : null}
       </div>
     </section>
 

@@ -254,7 +254,7 @@ export function KomutPaleti() {
                   onMouseEnter={() => setImlec(tumSatirlar.findIndex((satir) => satir.anahtar === komut.anahtar))}
                   onClick={() => git(komut.yol)}
                 >
-                  <span className="palet-ikon"><Icon name={komut.ikon} size={15} /></span>
+                  <span className="palet-ikon"><Icon name={komut.ikon} size={16} /></span>
                   <span className="palet-metin"><b>{komut.baslik}</b><small>{komut.detay}</small></span>
                 </button>
               ))}
@@ -275,7 +275,7 @@ export function KomutPaleti() {
                     onMouseEnter={() => setImlec(tumSatirlar.findIndex((satir) => satir.anahtar === anahtar))}
                     onClick={() => git(kayit.yol)}
                   >
-                    <span className="palet-ikon"><Icon name={TUR_IKON[kayit.tur]} size={15} /></span>
+                    <span className="palet-ikon"><Icon name={TUR_IKON[kayit.tur]} size={16} /></span>
                     <span className="palet-metin"><b title={kayit.baslik}>{kayit.baslik}</b><small title={kayit.detay}>{kayit.detay}</small></span>
                     {kayit.yan ? <span className="palet-yan">{kayit.yan}</span> : null}
                     {kayit.rozet ? <em className="ac-tag" data-tone={kayit.rozet.ton}>{kayit.rozet.metin}</em> : null}
@@ -303,7 +303,7 @@ export function KomutPaleti() {
               onMouseEnter={() => setImlec(tumSatirlar.findIndex((satir) => satir.anahtar === "tum-sonuclar"))}
               onClick={() => git(`/ara?q=${encodeURIComponent(terim.trim())}`)}
             >
-              <span className="palet-ikon"><Icon name="search" size={15} /></span>
+              <span className="palet-ikon"><Icon name="search" size={16} /></span>
               <span className="palet-metin"><b>“{terim.trim()}” için tüm sonuçlar</b><small>Arama sayfasında aç</small></span>
             </button>
           ) : null}

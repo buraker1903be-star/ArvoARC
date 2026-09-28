@@ -14,7 +14,7 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
   const active = isActive(pathname, item.href);
   return (
     <Link prefetch={false} href={item.href} className={active ? "active" : undefined} aria-current={active ? "page" : undefined} title={item.label}>
-      <i><Icon name={item.icon} size={17} /></i>
+      <i><Icon name={item.icon} size={16} /></i>
       <span>{item.label}</span>
     </Link>
   );

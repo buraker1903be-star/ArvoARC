@@ -134,7 +134,7 @@ export default async function Operations(){
         <article className="dash-card">
           <div className="dash-card-head">
             <div><h2>Açık siparişler</h2><p>Onay ve hazırlık bekleyenler, en yeniden.</p></div>
-            <Link prefetch={false} className="dash-card-link" href="/siparisler?filter=pending">Siparişler <Icon name="chevron" size={15}/></Link>
+            <Link prefetch={false} className="dash-card-link" href="/siparisler?filter=pending">Siparişler <Icon name="chevron" size={16}/></Link>
           </div>
           {(openOrders??[]).length?<div className="dash-list">{(openOrders??[]).map(order=>(
             <ActionRow key={order.id} href={`/siparisler/${order.id}`} icon="box" tone={order.status==="pending"?"warning":"info"} title={`${order.order_number} · ${order.customer_name||"Müşteri"}`} detail={`${orderStatusLabel(order.status)} · ${shortDate.format(new Date(order.created_at))}`} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>
@@ -173,7 +173,7 @@ export default async function Operations(){
         <article className="dash-card">
           <div className="dash-card-head">
             <div><h2>Kritik stoklar</h2><p>Satışa kapalı olanlar ve {threshold} adet altına düşenler.</p></div>
-            <Link prefetch={false} className="dash-card-link" href="/stok?filter=zero">Stok <Icon name="chevron" size={15}/></Link>
+            <Link prefetch={false} className="dash-card-link" href="/stok?filter=zero">Stok <Icon name="chevron" size={16}/></Link>
           </div>
           {stockVariants.length?<div className="dash-list">{stockVariants.map(variant=>(
             <ActionRow key={variant.id} href={`/stok?q=${encodeURIComponent(variant.sku)}`} icon="alert" tone={variant.stock<=0?"danger":"warning"} title={productName.get(variant.product_id)??"Ürün"} detail={`${variant.sku} · ${variant.stock<=0?"mağazada satın alınamıyor":"azalıyor"}`} side={<span className="dash-row-count">{variant.stock}</span>}/>
@@ -183,7 +183,7 @@ export default async function Operations(){
         <article className="dash-card">
           <div className="dash-card-head">
             <div><h2>Görseli eksik ürünler</h2><p>Yayında ama kapak görseli yok.</p></div>
-            <Link prefetch={false} className="dash-card-link" href="/urunler?filter=active">Ürünler <Icon name="chevron" size={15}/></Link>
+            <Link prefetch={false} className="dash-card-link" href="/urunler?filter=active">Ürünler <Icon name="chevron" size={16}/></Link>
           </div>
           {missingImages.length?<div className="dash-list">{missingImages.slice(0,8).map(product=>(
             <ActionRow key={product.id} href={`/urunler/${product.id}`} icon="tag" tone="gold" title={product.name} detail={product.source==="shopify"?"Shopify aktarımı":"ArvoARC"} side={<span className="ops-cta">Görsel ekle</span>}/>

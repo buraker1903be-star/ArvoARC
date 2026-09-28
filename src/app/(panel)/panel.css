@@ -206,7 +206,7 @@ html[data-theme="dark"] .panel-user>span{background:color-mix(in srgb,var(--acce
 
 /* Düğmeler: ikincil (kenarlıklı) ve birincil (gece mavisi + altın halka). */
 .panel-root .ac-btn{
-  min-height:38px;padding:8px 14px;border:1px solid var(--line);border-radius:var(--r-sm);
+  min-height:var(--control-h);padding:8px 14px;border:1px solid var(--line);border-radius:var(--r-sm);
   background:linear-gradient(180deg,var(--surface-raised),var(--surface));box-shadow:var(--shadow-sm);
   color:var(--ink);font-size:13px;font-weight:700;
   transition:transform .34s var(--ease-spring),border-color .2s ease,background-color .2s ease,color .2s ease,box-shadow .2s ease;
@@ -229,7 +229,7 @@ html[data-theme="dark"] .panel-user>span{background:color-mix(in srgb,var(--acce
   box-shadow:inset 0 1px 2px rgba(11,27,46,.06);overflow-x:auto;scrollbar-width:none;
 }
 .panel-root nav.ac-filter::-webkit-scrollbar{display:none}
-.panel-root nav.ac-filter>.ac-btn{height:auto;min-height:34px;padding:7px 14px;border:0;border-radius:var(--r-sm);background:transparent;box-shadow:none;color:var(--muted);font-weight:650}
+.panel-root nav.ac-filter>.ac-btn{height:auto;min-height:var(--control-h-sm);padding:7px 14px;border:0;border-radius:var(--r-sm);background:transparent;box-shadow:none;color:var(--muted);font-weight:650}
 .panel-root nav.ac-filter>.ac-btn:hover{background:color-mix(in srgb,var(--surface) 60%,transparent);color:var(--ink)}
 .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm),0 0 0 1px color-mix(in srgb,var(--accent-500) 24%,var(--line))}
 html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{background:var(--surface-raised)}
@@ -249,7 +249,7 @@ html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{b
 .panel-root :is(.ac-tag,.row em)[data-tone="muted"]{background:var(--surface-2);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
 
 /* Form alanları */
-.panel-root :is(.ac-input,.ac-filter input,.ac-filter select){min-height:40px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-raised);color:var(--ink);font-size:14px;box-shadow:inset 0 1px 1px rgba(15,35,60,.025)}
+.panel-root :is(.ac-input,.ac-filter input,.ac-filter select){min-height:var(--control-h);border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-raised);color:var(--ink);font-size:14px;box-shadow:inset 0 1px 1px rgba(15,35,60,.025)}
 .panel-root :is(input,select,textarea):focus,.panel-root .ac-input:focus{outline:none;border-color:var(--accent-500);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent-500) 15%,transparent)}
 .panel-root label{color:var(--ink-soft)}
 
@@ -774,3 +774,8 @@ html[data-theme="dark"] .panel-root .gorunum-cip[data-acik]{background:var(--sur
 .panel-root .gorunum-kaydet>summary::-webkit-details-marker{display:none}
 .panel-root .gorunum-kaydet-form{position:absolute;z-index:40;top:calc(100% + 6px);left:0;display:grid;gap:10px;width:min(300px,86vw);padding:14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-raised);box-shadow:var(--shadow-md)}
 .panel-root .gorunum-kaydet-form label{display:grid;gap:6px;color:var(--muted);font-size:12.5px;font-weight:650}
+
+/* Tek satırlık alanlar tam olarak kontrol yüksekliğinde: min-height ile
+   dolgu ve satır yüksekliği 41px ve 44px üretiyor, aynı satırdaki düğmeyle
+   hizalanmıyordu. textarea dışarıda: yüksekliğini satır sayısı belirler. */
+.panel-root :is(input.ac-input,select.ac-input,.ac-filter input,.ac-filter select){height:var(--control-h)}

@@ -350,7 +350,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             const current=index===reachedIndex&&!done;
             const at=reachedAt.get(step.key);
             return <li key={step.key} className={done?"is-done":current?"is-current":undefined} aria-current={current?"step":undefined}>
-              <span className="order-step-dot">{done?<Icon name="check" size={15}/>:index+1}</span>
+              <span className="order-step-dot">{done?<Icon name="check" size={16}/>:index+1}</span>
               <b>{step.label}</b>
               <small>{at&&index<=reachedIndex?shortDate.format(new Date(at)):current?"Şu an":"—"}</small>
             </li>;
@@ -729,7 +729,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
               <button className="ac-btn ac-btn-primary" type="submit">{gonderiler.length?"Notu kaydet":"Kargo bilgilerini kaydet"}</button>
             </form>
           ):<p className="list-hint">{meta.shipping_carrier||"Kargo firması yok"} · {meta.tracking_number||"Takip numarası yok"}</p>}
-          {meta.tracking_url&&!gonderiler.length?<p className="order-track"><a className="ac-btn" href={meta.tracking_url} target="_blank" rel="noreferrer"><Icon name="external" size={15}/>Kargo takibini aç</a></p>:null}
+          {meta.tracking_url&&!gonderiler.length?<p className="order-track"><a className="ac-btn" href={meta.tracking_url} target="_blank" rel="noreferrer"><Icon name="external" size={16}/>Kargo takibini aç</a></p>:null}
         </div>
       </section>
 

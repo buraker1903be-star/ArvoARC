@@ -81,7 +81,7 @@ export default async function Customers({ searchParams }: { searchParams: Promis
         <p>{customers.length.toLocaleString("tr-TR")} müşteri · müşteri başına {money.format(customers.length ? totalSpent / customers.length / 100 : 0)} · {orderCount.toLocaleString("tr-TR")} siparişten oluşturuldu</p>
       </div>
       <div className="ac-bar-actions">
-        {canManage ? <a className="ac-btn" href="/api/disari-aktar/musteriler"><Icon name="download" size={15} />CSV indir</a> : null}
+        {canManage ? <a className="ac-btn" href="/api/disari-aktar/musteriler"><Icon name="download" size={16} />CSV indir</a> : null}
       </div>
     </section>
 

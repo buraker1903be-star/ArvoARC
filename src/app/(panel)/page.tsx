@@ -245,7 +245,7 @@ export default async function Dashboard() {
               </Link>
             ))}
           </div>
-          <Link prefetch={false} className="dash-card-link" href="/operasyon">Operasyon merkezi <Icon name="chevron" size={15} /></Link>
+          <Link prefetch={false} className="dash-card-link" href="/operasyon">Operasyon merkezi <Icon name="chevron" size={16} /></Link>
         </article>
 
         <article className="dash-card dash-activity">
@@ -254,7 +254,7 @@ export default async function Dashboard() {
               <h2>Son siparişler</h2>
               <p>Son 30 günde gelen siparişler.</p>
             </div>
-            <Link prefetch={false} className="dash-card-link" href="/siparisler">Tümünü gör <Icon name="chevron" size={15} /></Link>
+            <Link prefetch={false} className="dash-card-link" href="/siparisler">Tümünü gör <Icon name="chevron" size={16} /></Link>
           </div>
           {recentOrders.length ? (
             <ul className="dash-activity-list">
@@ -287,7 +287,7 @@ export default async function Dashboard() {
               <h2>Son ürünler</h2>
               <p>Kataloğa en son eklenenler.</p>
             </div>
-            <Link prefetch={false} className="dash-card-link" href="/urunler">Ürünler <Icon name="chevron" size={15} /></Link>
+            <Link prefetch={false} className="dash-card-link" href="/urunler">Ürünler <Icon name="chevron" size={16} /></Link>
           </div>
           {products.length ? (
             <ul className="dash-activity-list">

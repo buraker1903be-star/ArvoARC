@@ -57,6 +57,14 @@
     onlara sm vermek köşeyi orantısız yuvarlatıyor.
   */
   --r-xs:8px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-xl:24px;--r-pill:999px;
+  /*
+    KONTROL YÜKSEKLİĞİ. 29.09.2026'da canlıda ölçüldü: arama kutusu
+    40px, yanındaki "Ara" düğmesi 38px, elle sipariş formunda metin
+    alanı 44px ve açılır liste 41px — yan yana duran şeyler birbirini
+    tutmuyordu. Yükseklik artık iki ölçü: sıradan kontrol ve segmentli
+    süzgeçteki küçük çip.
+  */
+  --control-h:40px;--control-h-sm:34px;
 
   --font-body:var(--font-system);
   --ease-spring:cubic-bezier(.22,1,.36,1);

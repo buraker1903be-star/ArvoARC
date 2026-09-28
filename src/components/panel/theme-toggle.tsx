@@ -26,8 +26,8 @@ export function ThemeToggle() {
 
   return (
     <button type="button" className="panel-icon-button panel-theme-toggle" onClick={toggle} aria-label="Aydınlık / karanlık mod" title="Aydınlık / karanlık mod">
-      <span className="theme-icon-moon"><Icon name="moon" size={17} /></span>
-      <span className="theme-icon-sun"><Icon name="sun" size={17} /></span>
+      <span className="theme-icon-moon"><Icon name="moon" size={16} /></span>
+      <span className="theme-icon-sun"><Icon name="sun" size={16} /></span>
     </button>
   );
 }

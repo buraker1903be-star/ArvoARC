@@ -173,7 +173,7 @@ export function ActivityDrawer({ initialUnread }: { initialUnread: number }) {
                 return (
                   <li key={item.id} className={isNew ? "act-item is-new" : "act-item"} data-tone={item.tone}>
                     <Link prefetch={false} className="act-main" href={item.href} onClick={close}>
-                      <span className="act-icon"><Icon name={icons[item.kind]} size={17} /></span>
+                      <span className="act-icon"><Icon name={icons[item.kind]} size={16} /></span>
                       <span className="act-body">
                         <span className="act-top">
                           <b>{item.title}</b>
@@ -212,7 +212,7 @@ export function ActivityDrawer({ initialUnread }: { initialUnread: number }) {
         aria-expanded={open}
         aria-controls="activity-drawer"
       >
-        <Icon name="bell" size={17} />
+        <Icon name="bell" size={16} />
         {unread ? <span className="act-badge" key={unread}>{badgeText(unread)}</span> : null}
       </button>
       {portalTarget
@@ -231,7 +231,7 @@ export function ActivityDrawer({ initialUnread }: { initialUnread: number }) {
                 </header>
                 <div className="act-scroll">{body}</div>
                 <footer className="act-foot">
-                  <Link prefetch={false} href="/operasyon" onClick={close}>Operasyon merkezi <Icon name="chevron" size={15} /></Link>
+                  <Link prefetch={false} href="/operasyon" onClick={close}>Operasyon merkezi <Icon name="chevron" size={16} /></Link>
                 </footer>
               </div>
             </div>,

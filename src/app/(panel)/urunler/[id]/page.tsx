@@ -113,7 +113,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
       </div>
       <div className="product-head-actions">
         <em className="ac-tag" data-tone={statusTone}>{productStatusLabel(product.status)}</em>
-        {storeHref?<a className="ac-btn" href={storeHref} target="_blank" rel="noreferrer"><Icon name="external" size={15}/>Mağazada gör</a>:null}
+        {storeHref?<a className="ac-btn" href={storeHref} target="_blank" rel="noreferrer"><Icon name="external" size={16}/>Mağazada gör</a>:null}
         {/*
           Kopyalama ONAY İSTEMİYOR: yeni bir taslak üretiyor, hiçbir
           şeyi bozmuyor ve yanlışlıkla basılırsa kopya arşivlenip
