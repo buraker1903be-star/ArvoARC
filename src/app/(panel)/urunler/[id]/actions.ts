@@ -305,7 +305,7 @@ export async function varyantMatrisi(formData: FormData) {
 
   /* Önek boşsa üründen türüyor: kullanıcı kod düşünmek zorunda kalmasın. */
   const onek = field(formData, "sku_oneki", 16) || product.slug || product.name;
-  const { satirlar, atlanan, hata } = matrisiKur(secenekler, {
+  const { satirlar, atlanan, hata, not } = matrisiKur(secenekler, {
     skuOneki: onek,
     mevcutSkular: mevcutVaryantlar.map((varyant) => String(varyant.sku ?? "")),
     mevcutBasliklar: mevcutVaryantlar.map((varyant) => String(varyant.title ?? "")),
@@ -335,10 +335,11 @@ export async function varyantMatrisi(formData: FormData) {
   revalidatePath(donus);
   revalidatePath("/stok");
   /* Atlananlar SAYILIYOR: "12 eklendi" deyip 3'ünü sessizce düşürmek,
-     kullanıcıya eksik bir kataloğu tam gibi gösterirdi. */
-  return await bildirimliDonus(donus, {
-    basari: `${satirlar.length} varyant eklendi${atlanan ? `; ${atlanan} birleşim üründe zaten vardı` : ""}.`,
-  });
+     kullanıcıya eksik bir kataloğu tam gibi gösterirdi. Seçenek sırası
+     değiştiyse o da söyleniyor (uyarı tonuyla): sessiz bir yeniden
+     sıralama, SKU'ların neden o biçimde çıktığını açıklamaz. */
+  const ozet = `${satirlar.length} varyant eklendi${atlanan ? `; ${atlanan} birleşim üründe zaten vardı` : ""}.`;
+  return await bildirimliDonus(donus, not ? { uyari: `${ozet} ${not}` } : { basari: ozet });
 }
 
 /*

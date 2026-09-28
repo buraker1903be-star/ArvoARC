@@ -139,3 +139,72 @@ test("üretilen kodlar kendi içinde de tekil", () => {
   assert.equal(satirlar.length, 4);
   assert.equal(new Set(satirlar.map((s) => s.sku)).size, 4);
 });
+
+/*
+  VİTRİN İLK PARÇAYI RENK OKUYOR (get_arvoculture_storefront_variants
+  başlığı "/" ile bölüp birinci parçayı renk sayıyor). Matrise
+  seçenekleri "Beden, Renk" sırasıyla yazmak, vitrine "renk: M"
+  yazdırırdı — panelde her şey doğru görünürken müşteri yanlış
+  etiketi görür. Aşağıdakiler o sırayı sabitliyor.
+*/
+
+test("renk seçeneği başta değilse öne alınıyor", () => {
+  const { satirlar, not } = matrisiKur(
+    [
+      { ad: "Beden", degerler: ["S", "M"] },
+      { ad: "Renk", degerler: ["Siyah", "Beyaz"] },
+    ],
+    BOS,
+  );
+  assert.deepEqual(satirlar.map((s) => s.baslik), ["Siyah / S", "Siyah / M", "Beyaz / S", "Beyaz / M"]);
+  assert.deepEqual(satirlar[0].nitelikler, { Renk: "Siyah", Beden: "S" });
+  /* Sessiz sıralama, SKU'ların neden böyle çıktığını açıklamazdı. */
+  assert.match(not ?? "", /başa alındı/);
+  assert.equal(satirlar[0].sku, "TSHIRT-SIYAH-S");
+});
+
+test("renk zaten baştaysa sıra değişmiyor ve not verilmiyor", () => {
+  const { satirlar, not } = matrisiKur(
+    [
+      { ad: "Renk", degerler: ["Siyah"] },
+      { ad: "Beden", degerler: ["S", "M"] },
+    ],
+    BOS,
+  );
+  assert.deepEqual(satirlar.map((s) => s.baslik), ["Siyah / S", "Siyah / M"]);
+  assert.equal(not, undefined);
+});
+
+test("renk adı büyük/küçük ve İngilizce yazımla da tanınıyor", () => {
+  /* Türkçe küçültme tuzağı: "RENK" → "renk", I/İ ayrımı bozmamalı. */
+  for (const ad of ["RENK", "Renk", "renk", "Color", "COLOUR", " Renkler "]) {
+    const { not } = matrisiKur([{ ad: "Beden", degerler: ["S"] }, { ad, degerler: ["Siyah"] }], BOS);
+    assert.match(not ?? "", /başa alındı/, ad);
+  }
+});
+
+test("renk seçeneği yoksa yazılan sıra korunuyor", () => {
+  /* Renk kavramı olmayan üründe (hacim, koku) kullanıcının sırası esas. */
+  const { satirlar, not } = matrisiKur(
+    [
+      { ad: "Hacim", degerler: ["50 ml", "100 ml"] },
+      { ad: "Koku", degerler: ["Lavanta"] },
+    ],
+    BOS,
+  );
+  assert.deepEqual(satirlar.map((s) => s.baslik), ["50 ml / Lavanta", "100 ml / Lavanta"]);
+  assert.equal(not, undefined);
+});
+
+test("üç seçenekte renk öne alınırken ötekiler sırasını koruyor", () => {
+  const { satirlar } = matrisiKur(
+    [
+      { ad: "Beden", degerler: ["S"] },
+      { ad: "Kalıp", degerler: ["Dar"] },
+      { ad: "Renk", degerler: ["Siyah"] },
+    ],
+    BOS,
+  );
+  assert.deepEqual(satirlar.map((s) => s.baslik), ["Siyah / S / Dar"]);
+  assert.deepEqual(satirlar[0].nitelikler, { Renk: "Siyah", Beden: "S", Kalıp: "Dar" });
+});

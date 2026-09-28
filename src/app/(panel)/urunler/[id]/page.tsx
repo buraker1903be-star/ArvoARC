@@ -272,7 +272,7 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
             <summary>Seçeneklerden toplu varyant üret</summary>
             <form action={varyantMatrisi} className="variant-matrix">
               <input type="hidden" name="product_id" value={product.id}/>
-              <p className="list-hint">Renk ve beden gibi seçenekleri yazın; her birleşim için bir varyant üretilir. Değerleri virgülle ayırın. Üründe zaten olan birleşimler atlanır.</p>
+              <p className="list-hint">Renk ve beden gibi seçenekleri yazın; her birleşim için bir varyant üretilir. Değerleri virgülle ayırın. Üründe zaten olan birleşimler atlanır. <b>Renk seçeneği başa alınır</b> — mağaza varyant başlığının ilk parçasını renk olarak okuyor.</p>
               <div className="variant-matrix-options">
                 {[1,2,3].map(sira=>(
                   <div className="variant-matrix-option" key={sira}>

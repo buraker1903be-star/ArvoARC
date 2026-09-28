@@ -37,6 +37,8 @@ export type MatrisSonucu = {
   atlanan: number;
   /** Doluysa hiçbir şey üretilmedi. */
   hata?: string;
+  /** Sessizce değişmeyen bir şey oldu; kullanıcıya söyleniyor. */
+  not?: string;
 };
 
 /** Tek seferde eklenebilecek varyant sayısı. */
@@ -90,6 +92,25 @@ export function seceneginDegerleri(ham: string): string[] {
   return cikti;
 }
 
+/*
+  VİTRİN İLK PARÇAYI RENK OKUYOR.
+
+  get_arvoculture_storefront_variants, varyant başlığını "/" ile bölüp
+  BİRİNCİ parçayı renk, ikinciyi beden sayıyor. Matriste seçenekleri
+  "Beden, Renk" sırasıyla yazan biri vitrine "renk: M" yazdırırdı —
+  panelde her şey doğru görünürken müşteri yanlış etiketi görür.
+
+  Bu yüzden renk gibi görünen seçenek BAŞA alınıyor ve bu kullanıcıya
+  SÖYLENİYOR: sessiz bir yeniden sıralama, SKU'ların neden
+  "TSHIRT-SIYAH-M" çıktığını açıklamaz.
+*/
+const RENK_ADLARI = ["renk", "color", "colour", "renkler"];
+
+const renkSecenegiMi = (ad: string) =>
+  RENK_ADLARI.includes(
+    ad.toLocaleLowerCase("tr-TR").replace(/[ıİ]/g, "i").replace(/[şŞ]/g, "s").trim(),
+  );
+
 type Girdi = {
   /** SKU'nun başına gelen kod; boşsa üründen türetilmiş bir kod verin. */
   skuOneki: string;
@@ -107,7 +128,18 @@ export function matrisiKur(secenekler: SecenekTanimi[], girdi: Girdi): MatrisSon
   if (!gecerli.length) return { satirlar: [], atlanan: 0, hata: "En az bir seçenek adı ve değeri girin." };
   if (gecerli.length > EN_FAZLA_SECENEK) return { satirlar: [], atlanan: 0, hata: `En fazla ${EN_FAZLA_SECENEK} seçenek kullanılabilir.` };
 
-  const toplam = gecerli.reduce((carpim, secenek) => carpim * secenek.degerler.length, 1);
+  /* Renk seçeneği başta değilse öne alınıyor; öteki seçenekler kendi
+     aralarındaki sırayı koruyor. */
+  const renkSirasi = gecerli.findIndex((secenek) => renkSecenegiMi(secenek.ad));
+  const siralandi = renkSirasi > 0;
+  const duzen = siralandi
+    ? [gecerli[renkSirasi], ...gecerli.filter((_, sira) => sira !== renkSirasi)]
+    : gecerli;
+  const siralamaNotu = siralandi
+    ? `“${gecerli[renkSirasi].ad}” seçeneği başa alındı: mağaza varyant başlığının ilk parçasını renk olarak okuyor.`
+    : undefined;
+
+  const toplam = duzen.reduce((carpim, secenek) => carpim * secenek.degerler.length, 1);
   /*
     Sınır aşıldığında HİÇBİR ŞEY üretilmiyor: ilk yüzü ekleyip
     gerisini sessizce atmak, kullanıcıya eksik bir katalog bırakır ve
@@ -126,7 +158,7 @@ export function matrisiKur(secenekler: SecenekTanimi[], girdi: Girdi): MatrisSon
   /* Birleşimler seçeneklerin YAZILDIĞI sırada: ilk seçenek en yavaş
      değişiyor, yani liste "Siyah / S, Siyah / M, Beyaz / S…" diye akıyor. */
   let birlesimler: string[][] = [[]];
-  for (const secenek of gecerli) {
+  for (const secenek of duzen) {
     birlesimler = birlesimler.flatMap((onceki) => secenek.degerler.map((deger) => [...onceki, deger]));
   }
 
@@ -150,10 +182,10 @@ export function matrisiKur(secenekler: SecenekTanimi[], girdi: Girdi): MatrisSon
     kullanilanSku.add(sku);
 
     const nitelikler: Record<string, string> = {};
-    gecerli.forEach((secenek, sira) => { nitelikler[secenek.ad] = birlesim[sira]; });
+    duzen.forEach((secenek, sira) => { nitelikler[secenek.ad] = birlesim[sira]; });
     satirlar.push({ baslik, sku, nitelikler });
   }
 
   if (!satirlar.length) return { satirlar: [], atlanan, hata: "Bu birleşimlerin hepsi üründe zaten var." };
-  return { satirlar, atlanan };
+  return { satirlar, atlanan, not: siralamaNotu };
 }
