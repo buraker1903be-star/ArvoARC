@@ -307,6 +307,7 @@ const SORUN_METNI: Record<string, string> = {
   "tavan-yok": "LR fiyatı okunamadı",
   "indirim-fiyati-asiyor": "indirim fiyatı sıfıra indiriyor",
   "maliyetin-altinda": "satış fiyatı maliyetin altına düşüyor",
+  "urun-arsivde": "ürün arşivde",
 };
 
 /*
@@ -328,7 +329,7 @@ async function eslestir(
   */
   const adaylar = [...new Set(satirlar.flatMap((s) => skuAdaylari(s.sku)))];
 
-  type Varyant = { id: string; sku: string; product_id: string; cost_price: number | null; price: number; compare_at_price: number | null; title: string | null; arc_products: { name: string } | { name: string }[] | null };
+  type Varyant = { id: string; sku: string; product_id: string; cost_price: number | null; price: number; compare_at_price: number | null; title: string | null; arc_products: { name: string; status: string } | { name: string; status: string }[] | null };
   /*
     SKU başına TEK varyant değil, LİSTE. Benzersizlik kısıtı yok ve
     sonuncuyu tutan bir harita, geri kalan varyantları önizlemeden
@@ -349,7 +350,7 @@ async function eslestir(
   for (let i = 0; i < adaylar.length; i += OBEK) {
     const { data, error } = await supabase
       .from("arc_product_variants")
-      .select("id,sku,product_id,cost_price,price,compare_at_price,title,arc_products(name)")
+      .select("id,sku,product_id,cost_price,price,compare_at_price,title,arc_products(name,status)")
       .eq("organization_id", organizationId)
       .in("sku", adaylar.slice(i, i + OBEK));
     if (error) return { eslesen: [], eslesmeyen: [], hata: `Ürünler okunamadı: ${error.message}` };
@@ -377,14 +378,44 @@ async function eslestir(
       tek satır görünüp hepsine yazılıyordu; artık kullanıcı ne
       yazılacağını olduğu gibi görüyor.
     */
+    /*
+      Yineleme sayımı ARŞİVDEKİLERİ SAYMIYOR: fiyat onlara zaten
+      yazılmayacak. Saysaydı, tek canlı varyantı olan bir SKU için
+      "4 ayrı üründe" denip kullanıcı olmayan bir riski araştırırdı.
+    */
+    const canli = liste.filter((v) => {
+      const u = Array.isArray(v.arc_products) ? v.arc_products[0] : v.arc_products;
+      return u?.status !== "archived";
+    });
     const yinelemeUyarisi = skuYinelemesi(
-      liste.length,
-      new Set(liste.map((v) => v.product_id)).size,
+      canli.length,
+      new Set(canli.map((v) => v.product_id)).size,
     );
 
     for (const varyant of liste) {
       const urun = Array.isArray(varyant.arc_products) ? varyant.arc_products[0] : varyant.arc_products;
       const ad = [urun?.name, varyant.title].filter(Boolean).join(" · ") || varyant.sku;
+
+      /*
+        ARŞİVDEKİ ÜRÜNE FİYAT YAZILMIYOR. Vitrin yalnızca status='active'
+        olanı basıyor, yani arşivdeki ürünün fiyatını güncellemenin bir
+        karşılığı yok; üstelik arşivlenen ürünler genellikle bir içe
+        aktarma hatasının kalıntısı ve SKU'ları yaşayan ürünlerinkiyle
+        çakışabiliyor (28.09.2026'da "The Society Collection" ürünleri
+        TR-8409-* SKU'larını dört ayrı ürüne dağıtmış halde arşivlendi).
+
+        Gizlenmiyor, İŞARETLENİYOR: listeden sessizce düşen bir satır,
+        kullanıcının yazıldığını sandığı fiyatın yazılmaması demekti.
+      */
+      if (urun?.status === "archived") {
+        eslesen.set(varyant.id, {
+          varyantId: varyant.id, sku: varyant.sku, ad,
+          eski: gecis === "alis" ? varyant.cost_price : varyant.price,
+          yeni: satir.kurus,
+          sorun: SORUN_METNI["urun-arsivde"],
+        });
+        continue;
+      }
 
       if (gecis === "alis") {
         /* Kurallar lib/fiyat-aktarimi.ts'te: engellemiyor, işaretliyor. */
