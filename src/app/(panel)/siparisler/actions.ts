@@ -287,22 +287,31 @@ export async function cancelTransferOrder(formData: FormData) {
  * uygunluk sunucuda yeniden hesaplanıyor, formdaki listeye
  * güvenilmiyor.
  */
-export async function bulkStatus(formData: FormData) {
+/*
+  TOPLU DURUM — çekirdek. İki yolu var, mantık burada:
+
+    bulkStatus        form gönderimi (JavaScript kapalıyken de çalışır),
+                      sonucu çereze yazıp yönlendiriyor.
+    topluDurumSonuc   listeden, sonucu DÖNDÜRÜYOR.
+
+  Toplu işlem de tam bir gezinme başlatıyordu: kaydırma yeri ve seçim
+  gidiyor, liste baştan çiziliyordu.
+*/
+async function topluDurumCekirdek(rawIds: string[], status: string): Promise<IslemSonucu> {
   const { supabase, organization, membership } = await requireTenant();
-  if (!MANAGERS.includes(membership.role)) return await backTo(formData, { hata: hataMetni("forbidden") });
+  if (!MANAGERS.includes(membership.role)) return { hata: hataMetni("forbidden") };
 
-  const status = String(formData.get("status") ?? "");
-  const ids = [...new Set(formData.getAll("order_id").map(String).filter(Boolean))].slice(0, 100);
+  const ids = [...new Set(rawIds.map(String).filter(Boolean))].slice(0, 100);
 
-  if (!["confirmed", "processing", "fulfilled"].includes(status)) return await backTo(formData, { hata: hataMetni("invalid-status") });
-  if (!ids.length) return await backTo(formData, { hata: hataMetni("bulk-empty") });
+  if (!["confirmed", "processing", "fulfilled"].includes(status)) return { hata: hataMetni("invalid-status") };
+  if (!ids.length) return { hata: hataMetni("bulk-empty") };
 
   const { data: orders, error } = await supabase
     .from("arc_orders")
     .select("id,status,payment_status,order_number,customer_name,customer_email,metadata")
     .eq("organization_id", organization.id)
     .in("id", ids);
-  if (error) return await backTo(formData, { hata: hataMetni("save-failed") });
+  if (error) return { hata: hataMetni("save-failed") };
 
   const eligible = (orders ?? []).filter((order) => nextOrderStep(order.status, order.payment_status)?.key === status);
   const updated: typeof eligible = [];
@@ -323,9 +332,23 @@ export async function bulkStatus(formData: FormData) {
   revalidatePath("/siparisler");
   /* Sayılar MESAJIN İÇİNDE: adres satırında taşınırken dışarıdan
      uydurulabiliyordu. */
-  return await backTo(formData, {
+  return {
     basari: `${updated.length} siparişin durumu güncellendi${ids.length - updated.length ? ` · ${ids.length - updated.length} sipariş atlandı` : ""}.`,
-  });
+  };
+}
+
+/** Form gönderimi: sonucu çereze yazıp geldiği yere döner. */
+export async function bulkStatus(formData: FormData) {
+  const sonuc = await topluDurumCekirdek(
+    formData.getAll("order_id").map(String),
+    String(formData.get("status") ?? ""),
+  );
+  return await backTo(formData, sonuc);
+}
+
+/** Liste: sonucu döndürür, yönlendirmez. */
+export async function topluDurumSonuc(ids: string[], status: string): Promise<IslemSonucu> {
+  return await topluDurumCekirdek(Array.isArray(ids) ? ids : [], String(status ?? ""));
 }
 
 

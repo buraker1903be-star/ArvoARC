@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { bulkStatus, durumIlerletSonuc, quickStatus, siparisleriSil } from "./actions";
+import { bulkStatus, durumIlerletSonuc, quickStatus, siparisleriSil, topluDurumSonuc } from "./actions";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
 import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 import { Notice } from "@/components/panel/notice";
@@ -97,6 +97,24 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
   const [sonuc, setSonuc] = useState<{ tur: "hata" | "basari"; metin: string } | null>(null);
   const [, basla] = useTransition();
 
+  const [topluCalisiyor, topluBasla] = useTransition();
+
+  /*
+    Toplu işlem de yerinde. Seçim YALNIZCA BAŞARIDA temizleniyor:
+    durumu değişen siparişler mevcut filtreden çıkabiliyor, yani seçimi
+    tutmak var olmayan satırlara işaret etmek olurdu. Hatada seçim
+    korunuyor ki kullanıcı kırk kayıttan seçtiklerini tekrar bulmasın.
+  */
+  const topluUygula = (idler: string[], durum: string) => {
+    setSonuc(null);
+    topluBasla(async () => {
+      const cevap = await topluDurumSonuc(idler, durum);
+      if (cevap.hata) setSonuc({ tur: "hata", metin: cevap.hata });
+      else if (cevap.basari) setSonuc({ tur: "basari", metin: cevap.basari });
+      if (!cevap.hata) setSelected(new Set());
+    });
+  };
+
   const ilerlet = (id: string, durum: string) => {
     setIslenen((önce) => new Set(önce).add(id));
     setSonuc(null);
@@ -151,7 +169,22 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
       ) : null}
 
       {canManage && chosen.length > 0 ? (
-        <form action={bulkStatus} className="list-bulk-bar">
+        /*
+          FORM DURUYOR, gönderimi kesiliyor: type="button" yapmak
+          JavaScript kapalıyken toplu işlemi tamamen bozardı. Hangi
+          düğmeye basıldığı submitter'dan okunuyor (durum value'da);
+          okunamazsa forma dokunulmuyor ve normal gönderim çalışıyor.
+        */
+        <form
+          action={bulkStatus}
+          className="list-bulk-bar"
+          onSubmit={(olay) => {
+            const durum = ((olay.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value;
+            if (!durum) return;
+            olay.preventDefault();
+            topluUygula(chosen.map((row) => row.id), durum);
+          }}
+        >
           <input type="hidden" name="back" value={back} />
           {chosen.map((row) => <input key={row.id} type="hidden" name="order_id" value={row.id} />)}
           <b>{chosen.length} sipariş seçildi</b>
@@ -159,7 +192,7 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
             {BULK_STEPS.map((step) => {
               const eligible = chosen.filter((row) => row.next?.key === step.key).length;
               return (
-                <button key={step.key} className="ac-btn" type="submit" name="status" value={step.key} disabled={!eligible} title={eligible ? `${eligible} siparişe uygulanır` : "Seçilenlerde bu adıma uygun sipariş yok"}>
+                <button key={step.key} className="ac-btn" type="submit" name="status" value={step.key} disabled={!eligible || topluCalisiyor} title={eligible ? `${eligible} siparişe uygulanır` : "Seçilenlerde bu adıma uygun sipariş yok"}>
                   {step.label}
                   <span className="ac-count">{eligible}</span>
                 </button>
