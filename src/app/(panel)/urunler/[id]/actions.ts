@@ -42,6 +42,7 @@ type EditableProductMetadata = {
   age_group?: string;
   badge?: string;
   badge_tone?: string;
+  panelden_yonetiliyor?: boolean;
   [key: string]: unknown;
 };
 
@@ -84,6 +85,13 @@ export async function updateProduct(formData: FormData) {
     age_group: field(formData, "age_group", 30),
     badge: field(formData, "badge", 40),
     badge_tone: ["green", "navy", "gold", "red"].includes(field(formData, "badge_tone", 20)) ? field(formData, "badge_tone", 20) : "green",
+    /*
+      İşaretliyken Shopify CSV içe aktarımı bu ürüne HİÇ dokunmuyor
+      (bkz. lib/shopify-varyant.ts: panelYonetiminde). SKU'su CSV'de
+      olmayan ürünlerde gerekli: içe aktarım kimliği yeniden üretip
+      elle düzeltilmiş kaydın yanına ikinci bir varyant eklerdi.
+    */
+    panelden_yonetiliyor: formData.get("panelden_yonetiliyor") === "on",
   };
 
   const { error } = await supabase

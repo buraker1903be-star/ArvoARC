@@ -14,7 +14,7 @@ import { createServiceClient } from "@/lib/paytr/service-client";
 import { copyShopifyImages } from "@/lib/product-images";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { parseMoneyToCents } from "@/lib/money";
-import { shopifyVaryantlari } from "@/lib/shopify-varyant";
+import { panelYonetiminde, shopifyVaryantlari } from "@/lib/shopify-varyant";
 
 type Row = Record<string,string>;
 
@@ -35,8 +35,27 @@ export async function importActiveProducts(formData:FormData){
   const active=[...groups.entries()].filter(([,g])=>g.find(r=>r.Status?.trim())?.Status.trim().toLowerCase()==="active");
   const {data:batch,error:batchError}=await supabase.from("arc_import_batches").insert({organization_id:organization.id,source:"shopify",kind:"products",file_name:file.name,status:"processing",total_rows:active.length,created_by:user.id}).select("id").single();
   if(batchError) return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni(batchError.message)});
-  let imported=0,errors=0,hayalet=0;
-  for(const [handle,g] of active){try{
+  /*
+    PANELDEN YÖNETİLEN ÜRÜNLERE DOKUNULMUYOR. Bu ürünlerin SKU'ları
+    CSV'de yoktu, içe aktarım üretmişti ve doğru SKU'lar elle yazıldı;
+    aynı dosyayı tekrar aktarmak üretilmiş kimliği yeniden üretip
+    düzeltilmiş kaydın yanına ikinci bir varyant eklerdi.
+  */
+  const panelde=new Set<string>();
+  {
+    const slugler=active.map(([handle])=>handle);
+    for(let i=0;i<slugler.length;i+=150){
+      const {data,error}=await supabase.from("arc_products").select("slug,metadata").eq("organization_id",organization.id).in("slug",slugler.slice(i,i+150));
+      /* Okuma düşerse içe aktarım DURUYOR: sessizce devam etmek, korunan ürünün üstüne yazmaktı. */
+      if(error) return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni(error.message)});
+      for(const satir of (data??[]) as {slug:string;metadata:unknown}[]) if(panelYonetiminde(satir.metadata)) panelde.add(satir.slug);
+    }
+  }
+
+  let imported=0,errors=0,hayalet=0,korunan=0;
+  for(const [handle,g] of active){
+    if(panelde.has(handle)){korunan+=1;continue;}
+    try{
     const first=g.find(r=>r.Title?.trim())??g[0]; const description=(first["Body (HTML)"]??"").replace(/<style[^>]*>[\s\S]*?<\/style>/gi,"").trim();
     const shopifyImageSources=[...new Set(g.map(r=>r["Image Src"]?.trim()).filter((value):value is string=>Boolean(value)))];
     const plainDescription=description.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
@@ -95,11 +114,15 @@ export async function importActiveProducts(formData:FormData){
       beklenenden farklı olduğunu gizlerdi — kusurun canlıda bir ay
       fark edilmeden durmasının sebebi tam olarak buydu.
     */
-    errors
-      ? {uyari:`${imported} aktif ürün aktarıldı. ${errors} satır hatalı olduğu için aktarılamadı.${hayalet?` ${hayalet} satır varyant sayılmadı (aynı SKU tekrar geldi).`:""}`}
-      : hayalet
-        ? {uyari:`${imported} aktif ürün aktarıldı. ${hayalet} satır varyant sayılmadı (aynı SKU tekrar geldi).`}
-        : {basari:`${imported} aktif ürün aktarıldı.`});
+    (()=>{
+      const ekler=[
+        hayalet?`${hayalet} satır varyant sayılmadı (aynı SKU tekrar geldi).`:"",
+        korunan?`${korunan} ürün panelden yönetildiği için atlandı.`:"",
+      ].filter(Boolean).join(" ");
+      const govde=`${imported} aktif ürün aktarıldı.${ekler?` ${ekler}`:""}`;
+      if(errors) return {uyari:`${govde} ${errors} satır hatalı olduğu için aktarılamadı.`};
+      return ekler?{uyari:govde}:{basari:govde};
+    })());
 }
 
 type ProductMetadata={

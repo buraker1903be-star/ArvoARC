@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { shopifyVaryantlari, uretilmisSku, varyantKimligi } from "@/lib/shopify-varyant";
+import { panelYonetiminde, shopifyVaryantlari, uretilmisSku, varyantKimligi } from "@/lib/shopify-varyant";
 
 /*
   CANLIDA OLAN ŞEY. 20.08.2026'daki tek bir içe aktarımda on beş ürünün
@@ -106,4 +106,21 @@ test("üstü çizili fiyat ancak satıştan YÜKSEKSE yazılıyor", () => {
   ], {});
   assert.equal(satirlar[0].compare_at_price, null);
   assert.equal(satirlar[1].compare_at_price, 1500);
+});
+
+/*
+  PANELDEN YÖNETİLEN ÜRÜN. SKU'su CSV'de olmayan ürünlerde içe aktarım
+  kimliği yeniden üretip elle düzeltilmiş kaydın yanına ikinci bir
+  varyant ekliyordu; işaretli ürüne hiç dokunulmuyor.
+*/
+test("işaret okunuyor; jsonb'den metin olarak gelse de", () => {
+  assert.equal(panelYonetiminde({ panelden_yonetiliyor: true }), true);
+  assert.equal(panelYonetiminde({ panelden_yonetiliyor: "true" }), true);
+});
+
+test("işaretsiz ürün korunmuyor", () => {
+  assert.equal(panelYonetiminde({}), false);
+  assert.equal(panelYonetiminde({ panelden_yonetiliyor: false }), false);
+  assert.equal(panelYonetiminde(null), false);
+  assert.equal(panelYonetiminde("true"), false);
 });
