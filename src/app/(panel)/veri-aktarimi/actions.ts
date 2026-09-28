@@ -7,7 +7,7 @@ import { hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { maliyetleriAyristir } from "@/lib/maliyet-aktarimi";
 import { fiyatKarari, maliyetUyarisi, skuAdaylari, skuYinelemesi } from "@/lib/fiyat-aktarimi";
-import { gecerliFiyat, saklananSatirlar, kaynaklarIcin, KAYNAK_ADI, type FiyatKaynagi } from "@/lib/fiyat-toplayici";
+import { gecerliFiyat, gorunmeyenler, saklananSatirlar, kaynaklarIcin, KAYNAK_ADI, type FiyatKaynagi } from "@/lib/fiyat-toplayici";
 import { jetonAnahtariVar, toplayiciJetonu } from "@/lib/fiyat-toplayici-jeton";
 import { lrTaramasiniKaydet } from "@/lib/lr/kaydet";
 import { createServiceClient } from "@/lib/paytr/service-client";
@@ -620,6 +620,14 @@ export type ToplananListe = {
   /** Listenin hangi kaynaklardan geldiği ("yer imi", "günlük tarama"). */
   kaynaklar: string[];
   /*
+    ÖNCEKİ TARAMADA GÖRÜLÜP BU TURDA GÖRÜNMEYEN ürünler. LR stoksuz
+    ürünleri herkese açık katalogdan düşürüyor; o ürün taramaya hiç
+    girmiyor ve fiyatı sessizce eskiyor. Yanlış bir şey yazılmıyor ama
+    kullanıcı bunu hiçbir yerden göremiyordu (29.09.2026'da beş LR
+    ürününde tam bu oldu).
+  */
+  gorunmeyen?: { sku: string; ad: string; sonGorulme: string }[];
+  /*
     Sınır yüzünden bu listeye GİRMEYEN toplama sayısı. Sessiz kalması,
     kullanıcının "hepsini uyguladım" sanıp bir kısmını uygulamaması
     demekti — üstelik kalanlar en eskiler olduğu için gözden de düşerdi.
@@ -627,6 +635,89 @@ export type ToplananListe = {
   disaridaKalan?: number;
   onizleme: MaliyetOnizleme;
 };
+
+/*
+  LR kimliklerinin KATALOGDAKİ karşılıkları (ad ve bizdeki SKU).
+  Yalnızca uyarı metni için; fiyat hesabı yok.
+
+  Katalogda olmayanlar eleniyor: LR bizde hiç satılmayan yüzlerce ürün
+  satıyor ve onları "görünmedi" diye listelemek uyarıyı gürültüye
+  çevirirdi.
+*/
+async function katalogdakiler(
+  supabase: Awaited<ReturnType<typeof requireTenant>>["supabase"],
+  organizationId: string,
+  lrIdleri: string[],
+): Promise<Map<string, string>> {
+  const bulunan = new Map<string, string>();
+  if (!lrIdleri.length) return bulunan;
+
+  const adaylar = [...new Set(lrIdleri.flatMap((id) => skuAdaylari(id)))];
+  const skuAdlari = new Map<string, string>();
+  const OBEK = 150;
+  for (let i = 0; i < adaylar.length; i += OBEK) {
+    const { data } = await supabase
+      .from("arc_product_variants")
+      .select("sku,title,arc_products(name)")
+      .eq("organization_id", organizationId)
+      .in("sku", adaylar.slice(i, i + OBEK));
+    type Satir = { sku: string; title: string | null; arc_products: { name: string } | { name: string }[] | null };
+    for (const varyant of (data ?? []) as unknown as Satir[]) {
+      const urun = Array.isArray(varyant.arc_products) ? varyant.arc_products[0] : varyant.arc_products;
+      skuAdlari.set(varyant.sku, [urun?.name, varyant.title].filter(Boolean).join(" · ") || varyant.sku);
+    }
+  }
+  for (const id of lrIdleri) {
+    const aday = skuAdaylari(id).find((x) => skuAdlari.has(x));
+    if (aday) bulunan.set(id, skuAdlari.get(aday)!);
+  }
+  return bulunan;
+}
+
+/*
+  BU TURDA GÖRÜNMEYENLER. Önceki taramalarda okunmuş ama bu turda hiç
+  çıkmayan LR ürünleri.
+
+  LR, stoksuz ürünü herkese açık katalogdan düşürüyor: ürün silinmiyor,
+  yalnızca listelerde görünmüyor. Tarama da onu göremediği için fiyatı
+  en son görüldüğü gündeki değerde kalıyor. Yanlış bir şey YAZILMIYOR —
+  tehlike sessizlikte: LR ürünü aylar sonra farklı bir fiyatla geri
+  getirirse vitrinde eski fiyat durmaya devam eder.
+
+  Karşılaştırma katalogla değil, ÖNCEKİ TARAMALARLA yapılıyor: "LR
+  ürünü" diye bir işaret yok ve SKU'nun biçiminden tahmin etmek
+  (kesme işaretiyle başlayanlar) veri temizlendiği gün sessizce
+  yanılırdı. Bir ürünü daha önce tarama gördüyse LR onu satıyor
+  demektir; bu, işaretten daha sağlam bir ölçüt.
+*/
+async function taramadaGorunmeyenler(
+  supabase: Awaited<ReturnType<typeof requireTenant>>["supabase"],
+  organizationId: string,
+  buTurdakiler: Set<string>,
+  buTurunTarihi: string,
+): Promise<{ sku: string; ad: string; sonGorulme: string }[]> {
+  /* Beş tur geriye bakılıyor: daha eskisi "LR artık satmıyor" demek. */
+  const { data } = await supabase
+    .from("arc_price_collections")
+    .select("satirlar,created_at")
+    .eq("organization_id", organizationId)
+    .eq("kaynak", "lr-genel")
+    .lt("created_at", buTurunTarihi)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const turlar = ((data ?? []) as { satirlar: unknown; created_at: string }[])
+    .map((kayit) => ({ satirlar: saklananSatirlar(kayit.satirlar), tarih: kayit.created_at }));
+  const eksikler = gorunmeyenler(turlar, buTurdakiler);
+  if (!eksikler.length) return [];
+
+  const adlar = await katalogdakiler(supabase, organizationId, eksikler.map((e) => e.sku));
+  return eksikler
+    .filter((e) => adlar.has(e.sku))
+    .map((e) => ({ ...e, ad: adlar.get(e.sku)! }))
+    .sort((a, b) => a.ad.localeCompare(b.ad, "tr"))
+    .slice(0, 50);
+}
 
 export async function sonToplananListe(
   gecis: FiyatGecisi = "alis",
@@ -728,6 +819,11 @@ export async function sonToplananListe(
   const eslestirme = await eslestir(supabase, organization.id, fiyatli, gecis, indirimKurus);
   if (eslestirme.hata) return { hata: eslestirme.hata };
   const onizleme: MaliyetOnizleme = { ...eslestirme, atlanan: [] };
+
+  const gorunmeyen = kayitlar.some((k) => k.kaynak === "lr-genel")
+    ? await taramadaGorunmeyenler(supabase, organization.id, new Set(birlesik.keys()), kayit.created_at)
+    : undefined;
+
   return {
     toplamaIdleri: kayitlar.map((k) => k.id),
     toplandi: kayit.created_at,
@@ -736,6 +832,7 @@ export async function sonToplananListe(
     okunan: satirlar.length,
     toplamaSayisi: kayitlar.length,
     kaynaklar: [...new Set(kayitlar.map((k) => KAYNAK_ADI[k.kaynak as FiyatKaynagi] ?? k.kaynak))],
+    gorunmeyen: gorunmeyen?.length ? gorunmeyen : undefined,
     disaridaKalan: disaridaKalan || undefined,
     onizleme,
   };

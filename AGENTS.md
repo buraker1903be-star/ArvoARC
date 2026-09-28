@@ -127,6 +127,14 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   PAYMENT_CREDENTIALS_KEY'den alan ayrımıyla türetilmiş anahtarla imzalı;
   anahtar yoksa 401). Tablonun INSERT politikası yok, yazma servis
   anahtarıyla. Kuruşa çevirme tarayıcıda DEĞİL `parseMoneyToCents`'te.
+  **LR stoksuz ürünü katalogdan düşürüyor**, yani tarama onu hiç
+  görmüyor ve fiyatı en son görüldüğü gündeki değerde donuyor. Yanlış
+  bir şey yazılmıyor ama sessiz: panel bu yüzden "bu turda görünmeyen
+  ürünler"i önceki taramalarla karşılaştırıp söylüyor
+  (`gorunmeyenler`). Ölçüt katalogdaki bir işaret değil, ÖNCEKİ
+  TARAMALAR: "LR ürünü" diye bir alan yok ve SKU biçiminden tahmin
+  etmek (kesme işaretiyle başlayanlar) veri temizlendiği gün sessizce
+  yanılırdı.
 - **Geri dönüş adresi doğrulanır**: başka bölüme ya da dış adrese
   yönlendirme engellenir, filtre ve sayfa korunur.
 

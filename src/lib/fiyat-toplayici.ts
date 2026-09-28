@@ -176,3 +176,29 @@ export const KAYNAK_ADI: Record<FiyatKaynagi, string> = {
   lr: "yer imi",
   "lr-genel": "günlük tarama",
 };
+
+/**
+ * Önceki turlarda okunmuş ama BU TURDA görünmeyen ürünler.
+ *
+ * LR stoksuz ürünü herkese açık katalogdan düşürüyor: ürün silinmiyor,
+ * yalnızca listelerde görünmüyor ve tarama onu göremiyor. Yanlış bir
+ * fiyat yazılmıyor — tehlike sessizlikte: ürünün fiyatı en son
+ * görüldüğü gündeki değerde donuyor ve LR onu farklı bir fiyatla geri
+ * getirirse vitrinde eski fiyat durmaya devam eder.
+ *
+ * Turlar YENİDEN ESKİYE geliyor; bir ürün için ilk görülen kayıt en son
+ * görüldüğü turdur.
+ */
+export function gorunmeyenler(
+  oncekiTurlar: { satirlar: ToplananSatir[]; tarih: string }[],
+  buTurdakiler: Set<string>,
+): { sku: string; sonGorulme: string }[] {
+  const bulunan = new Map<string, string>();
+  for (const tur of oncekiTurlar) {
+    for (const satir of tur.satirlar) {
+      if (buTurdakiler.has(satir.sku) || bulunan.has(satir.sku)) continue;
+      bulunan.set(satir.sku, tur.tarih);
+    }
+  }
+  return [...bulunan].map(([sku, sonGorulme]) => ({ sku, sonGorulme }));
+}

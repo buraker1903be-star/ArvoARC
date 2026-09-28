@@ -323,6 +323,30 @@ export function MaliyetAktarimi() {
             {toplama.sayfa ? <><br /><small>{toplama.sayfa.slice(0, 120)}</small></> : null}
           </div>
         ) : null}
+
+        {/*
+          LR STOKSUZ ÜRÜNÜ KATALOGDAN DÜŞÜRÜYOR: ürün silinmiyor, sadece
+          listelerde görünmüyor ve tarama onu göremiyor. Yanlış bir fiyat
+          yazılmıyor ama ürünün fiyatı en son görüldüğü gündeki değerde
+          donuyor; LR onu farklı bir fiyatla geri getirdiğinde vitrinde
+          eski fiyat durmaya devam ederdi. 29.09.2026'da beş LR ürününde
+          tam bu oldu ve hiçbir ekranda görünmüyordu.
+        */}
+        {toplama?.gorunmeyen?.length ? (
+          <div className="toplayici-liste" data-tone="uyari">
+            <b>{toplama.gorunmeyen.length} ürün bu taramada görünmedi.</b> LR stoksuz ürünleri katalogdan
+            düşürüyor; bu ürünlerin fiyatı en son görüldükleri gündeki değerde kalıyor. Satışa açıksalar,
+            stoksuz satışı kapatmayı da düşünün.
+            <ul>
+              {toplama.gorunmeyen.slice(0, 8).map((urun) => (
+                <li key={urun.sku}>
+                  {urun.ad} <small>· son görülme {gun.format(new Date(urun.sonGorulme))}</small>
+                </li>
+              ))}
+            </ul>
+            {toplama.gorunmeyen.length > 8 ? <small>… ve {toplama.gorunmeyen.length - 8} ürün daha</small> : null}
+          </div>
+        ) : null}
       </div>
 
       <label className="wide">

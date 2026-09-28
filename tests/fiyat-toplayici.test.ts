@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   EN_FAZLA_SATIR,
   gecerliFiyat,
+  gorunmeyenler,
   satirlariDogrula,
   saklananSatirlar,
   kaynaklarIcin,
@@ -151,4 +152,36 @@ test("GELEN gövde hâlâ sayı kabul etmiyor; kural yalnızca okumada gevşedi"
     ikinci bir kopyasını tarayıcıya koymak demekti ve kopya sessizce eskir.
   */
   assert.deepEqual(satirlariDogrula([{ sku: "20328", fiyatlar: [48710] }]).satirlar, []);
+});
+
+/*
+  LR STOKSUZ ÜRÜNÜ HERKESE AÇIK KATALOGDAN DÜŞÜRÜYOR: ürün silinmiyor,
+  yalnızca listelerde görünmüyor ve tarama onu göremiyor. Yanlış fiyat
+  yazılmıyor — tehlike sessizlikte: fiyat en son görüldüğü gündeki
+  değerde donuyor ve LR ürünü farklı bir fiyatla geri getirirse vitrinde
+  eski fiyat durmaya devam eder. 29.09.2026'da beş LR ürününde tam bu
+  oldu ve hiçbir ekranda görünmüyordu.
+*/
+const tur = (tarih: string, skular: string[]) => ({
+  tarih,
+  satirlar: skular.map((sku) => ({ sku, ad: `Ürün ${sku}`, fiyatlar: [1000] })),
+});
+
+test("önceki turda görülüp bu turda çıkmayan ürünler bildiriliyor", () => {
+  const sonuc = gorunmeyenler([tur("2026-09-28", ["A", "B", "C"])], new Set(["A", "C"]));
+  assert.deepEqual(sonuc, [{ sku: "B", sonGorulme: "2026-09-28" }]);
+});
+
+test("SON GÖRÜLME en yeni turdan alınıyor", () => {
+  /* Turlar yeniden eskiye geliyor; ilk görülen kayıt en sonuncusudur. */
+  const sonuc = gorunmeyenler(
+    [tur("2026-09-28", ["B"]), tur("2026-09-20", ["B"])],
+    new Set(["A"]),
+  );
+  assert.deepEqual(sonuc, [{ sku: "B", sonGorulme: "2026-09-28" }]);
+});
+
+test("bu turda görünen ürün uyarıya girmiyor", () => {
+  assert.deepEqual(gorunmeyenler([tur("2026-09-28", ["A", "B"])], new Set(["A", "B"])), []);
+  assert.deepEqual(gorunmeyenler([], new Set(["A"])), []);
 });
