@@ -14,6 +14,7 @@ import { createServiceClient } from "@/lib/paytr/service-client";
 import { copyShopifyImages } from "@/lib/product-images";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { parseMoneyToCents } from "@/lib/money";
+import { shopifyVaryantlari } from "@/lib/shopify-varyant";
 
 type Row = Record<string,string>;
 
@@ -34,7 +35,7 @@ export async function importActiveProducts(formData:FormData){
   const active=[...groups.entries()].filter(([,g])=>g.find(r=>r.Status?.trim())?.Status.trim().toLowerCase()==="active");
   const {data:batch,error:batchError}=await supabase.from("arc_import_batches").insert({organization_id:organization.id,source:"shopify",kind:"products",file_name:file.name,status:"processing",total_rows:active.length,created_by:user.id}).select("id").single();
   if(batchError) return await bildirimliDonus("/veri-aktarimi",{hata:hataMetni(batchError.message)});
-  let imported=0,errors=0;
+  let imported=0,errors=0,hayalet=0;
   for(const [handle,g] of active){try{
     const first=g.find(r=>r.Title?.trim())??g[0]; const description=(first["Body (HTML)"]??"").replace(/<style[^>]*>[\s\S]*?<\/style>/gi,"").trim();
     const shopifyImageSources=[...new Set(g.map(r=>r["Image Src"]?.trim()).filter((value):value is string=>Boolean(value)))];
@@ -69,13 +70,15 @@ export async function importActiveProducts(formData:FormData){
       büyük CSV'ler süre sınırına takılıp yarıda kesiliyordu. Mevcut
       stok tek sorguda okunup korunur, tüm satırlar tek upsert'le yazılır.
     */
-    const variants=g.filter(r=>r["Variant Price"]?.trim()||r["Variant SKU"]?.trim()||r["Option1 Value"]?.trim()); const seen=new Set<string>(); let n=0;
-    const variantRows:{organization_id:string;product_id:string;sku:string;title:string;price:number;compare_at_price:number|null;currency:string;stock:number;attributes:Record<string,string>;external_id:string;allow_backorder:boolean}[]=[];
-    for(const r of variants){const key=[r["Option1 Value"],r["Option2 Value"],r["Option3 Value"],r["Variant SKU"],r["Variant Price"]].join("|");if(seen.has(key))continue;seen.add(key);n++;
-      const attrs:Record<string,string>={};for(const i of [1,2,3]){const name=optionNames[i],value=r[`Option${i} Value`]?.trim();if(name&&value)attrs[name]=value;}
-      const sku=r["Variant SKU"]?.trim()||`ArvoARC-${handle.slice(0,35).toUpperCase()}-${String(n).padStart(3,"0")}`; const price=moneyToCents(r["Variant Price"]); const rawCompareAtPrice=moneyToCents(r["Variant Compare At Price"]); const compareAtPrice=rawCompareAtPrice>price?rawCompareAtPrice:null;
-      variantRows.push({organization_id:organization.id,product_id:product.id,sku,title:Object.values(attrs).join(" / ")||"Default",price,compare_at_price:compareAtPrice,currency:"TRY",stock:0,attributes:attrs,external_id:`${handle}:${n}`,allow_backorder:true});
-    }
+    /*
+      Varyant ayıklaması lib/shopify-varyant.ts'te ve testli. Kural
+      burada gömülüyken 20.08.2026'da on beş ürüne 4-5'er HAYALET
+      varyant yazdı (aynı SKU, boş nitelik, "Default" başlık) ve kusur
+      ancak 28.09.2026'da fiyat aktarımı yanlış kayda yazınca görüldü.
+    */
+    const {satirlar:cikan,hayalet:urunHayaleti}=shopifyVaryantlari(handle,g,optionNames);
+    hayalet+=urunHayaleti;
+    const variantRows=cikan.map(v=>({organization_id:organization.id,product_id:product.id,sku:v.sku,title:v.title,price:v.price,compare_at_price:v.compare_at_price,currency:"TRY",stock:0,attributes:v.attributes,external_id:v.external_id,allow_backorder:true}));
     if(variantRows.length){
       const {data:existing,error:existingError}=await supabase.from("arc_product_variants").select("external_id,stock").eq("organization_id",organization.id).in("external_id",variantRows.map(row=>row.external_id));
       if(existingError)throw existingError;
@@ -87,9 +90,16 @@ export async function importActiveProducts(formData:FormData){
   }catch(e){errors++;await supabase.from("arc_import_errors").insert({batch_id:batch.id,organization_id:organization.id,row_key:handle,message:e instanceof Error?e.message:"Import error"});}}
   await supabase.from("arc_import_batches").update({status:errors?"failed":"completed",imported_rows:imported,error_rows:errors,completed_at:new Date().toISOString()}).eq("id",batch.id);
   revalidatePath("/urunler");revalidatePath("/koleksiyonlar");revalidatePath("/veri-aktarimi");return await bildirimliDonus("/veri-aktarimi",
+    /*
+      Hayalet satır sayısı SÖYLENİYOR: sessizce atlamak, CSV'nin
+      beklenenden farklı olduğunu gizlerdi — kusurun canlıda bir ay
+      fark edilmeden durmasının sebebi tam olarak buydu.
+    */
     errors
-      ? {uyari:`${imported} aktif ürün aktarıldı. ${errors} satır hatalı olduğu için aktarılamadı.`}
-      : {basari:`${imported} aktif ürün aktarıldı.`});
+      ? {uyari:`${imported} aktif ürün aktarıldı. ${errors} satır hatalı olduğu için aktarılamadı.${hayalet?` ${hayalet} satır varyant sayılmadı (aynı SKU tekrar geldi).`:""}`}
+      : hayalet
+        ? {uyari:`${imported} aktif ürün aktarıldı. ${hayalet} satır varyant sayılmadı (aynı SKU tekrar geldi).`}
+        : {basari:`${imported} aktif ürün aktarıldı.`});
 }
 
 type ProductMetadata={
