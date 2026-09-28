@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
+import { matrisiKur, seceneginDegerleri } from "@/lib/varyant-matrisi";
 
 const allowedRoles = new Set(["owner", "admin", "manager"]);
 
@@ -221,4 +222,87 @@ export async function removeProductImage(formData:FormData){
   if(updateError)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(updateError.message)});
   revalidatePath("/urunler");revalidatePath(`/urunler/${productId}`);
   return await bildirimliDonus(`/urunler/${productId}`,{basari:basariMetni("image-removed")});
+}
+
+/*
+  VARYANT MATRİSİ — seçeneklerin çarpımından toplu ekleme.
+
+  Varyant tek tek ekleniyordu ve her biri tam bir gezinme: dört renk ×
+  beş bedenlik bir tişört yirmi gönderim demekti. Matris aynı işi tek
+  gönderimde yapıyor.
+
+  TEK INSERT. Satır satır yazmak, ortada düşen bir kayıttan sonra
+  ürünü yarım bırakırdı; tek çağrı ya hepsini yazıyor ya hiçbirini.
+  Çakışmalar zaten önceden çözülüyor (lib/varyant-matrisi.ts), yani
+  23505 buraya gelmiyor — gelirse gerçekten beklenmedik bir şey var.
+*/
+export async function varyantMatrisi(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  const productId = String(formData.get("product_id") ?? "");
+  const donus = `/urunler/${productId}`;
+  if (!allowedRoles.has(membership.role)) return await bildirimliDonus(donus, { hata: hataMetni("forbidden") });
+
+  const priceInput = Number(formData.get("price") ?? 0);
+  const compareInput = Number(formData.get("compare_at_price") ?? 0);
+  const stock = Number(formData.get("stock") ?? 0);
+  const allowBackorder = formData.get("allow_backorder") === "on";
+  if (!productId || !Number.isFinite(priceInput) || priceInput <= 0 || !Number.isFinite(compareInput) || compareInput < 0 || !Number.isInteger(stock) || stock < 0) {
+    return await bildirimliDonus(donus, { hata: hataMetni("invalid-variant") });
+  }
+
+  const { data: product, error: productError } = await supabase
+    .from("arc_products").select("id,name,slug").eq("organization_id", organization.id).eq("id", productId).maybeSingle();
+  if (productError || !product) return await bildirimliDonus(donus, { hata: hataMetni("product-not-found") });
+
+  /*
+    Var olan varyantlar çakışma denetimi için okunuyor. Hata
+    YUTULMUYOR: boş liste saymak, üründe zaten duran bir birleşimi
+    ikinci kez eklemeye çalışmak demekti.
+  */
+  const { data: mevcut, error: mevcutHatasi } = await supabase
+    .from("arc_product_variants").select("sku,title").eq("organization_id", organization.id).eq("product_id", productId);
+  if (mevcutHatasi) return await bildirimliDonus(donus, { hata: hataMetni(mevcutHatasi.message) });
+  const mevcutVaryantlar = mevcut ?? [];
+
+  const secenekler = [1, 2, 3].map((sira) => ({
+    ad: field(formData, `secenek_ad_${sira}`, 40),
+    degerler: seceneginDegerleri(field(formData, `secenek_deger_${sira}`, 600)),
+  }));
+
+  /* Önek boşsa üründen türüyor: kullanıcı kod düşünmek zorunda kalmasın. */
+  const onek = field(formData, "sku_oneki", 16) || product.slug || product.name;
+  const { satirlar, atlanan, hata } = matrisiKur(secenekler, {
+    skuOneki: onek,
+    mevcutSkular: mevcutVaryantlar.map((varyant) => String(varyant.sku ?? "")),
+    mevcutBasliklar: mevcutVaryantlar.map((varyant) => String(varyant.title ?? "")),
+  });
+  if (hata) return await bildirimliDonus(donus, { hata });
+
+  const compareAt = compareInput > priceInput ? Math.round(compareInput * 100) : null;
+  const { error } = await supabase.from("arc_product_variants").insert(
+    satirlar.map((satir) => ({
+      organization_id: organization.id,
+      product_id: productId,
+      title: satir.baslik,
+      sku: satir.sku,
+      price: Math.round(priceInput * 100),
+      compare_at_price: compareAt,
+      currency: "TRY",
+      stock,
+      allow_backorder: allowBackorder,
+      attributes: satir.nitelikler,
+      external_id: null,
+    })),
+  );
+  if (error) return await bildirimliDonus(donus, { hata: hataMetni(error.code ?? error.message) });
+
+  revalidatePath("/");
+  revalidatePath("/urunler");
+  revalidatePath(donus);
+  revalidatePath("/stok");
+  /* Atlananlar SAYILIYOR: "12 eklendi" deyip 3'ünü sessizce düşürmek,
+     kullanıcıya eksik bir kataloğu tam gibi gösterirdi. */
+  return await bildirimliDonus(donus, {
+    basari: `${satirlar.length} varyant eklendi${atlanan ? `; ${atlanan} birleşim üründe zaten vardı` : ""}.`,
+  });
 }

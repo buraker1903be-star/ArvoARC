@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
-import { createVariant, removeProductImage, updateProduct, updateVariant, uploadProductImages } from "./actions";
+import { createVariant, removeProductImage, updateProduct, updateVariant, uploadProductImages, varyantMatrisi } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel, sourceLabel } from "@/lib/commerce-labels";
 import { Icon } from "@/components/panel/icons";
@@ -207,8 +207,39 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
           {canManage?<ListeBosEylem href="#yeni-varyant" birincil>Varyant ekle</ListeBosEylem>:null}
         </ListeBos>}
         {canManage?(
+          <>
+          {/*
+            MATRİS ÖNCE: dört renk × beş bedenlik bir üründe tek tek
+            ekleme yirmi gönderim demekti. Tekil form altında duruyor,
+            çünkü artık istisna olan o.
+          */}
+          <details className="variant-create-wrap" id="varyant-matrisi">
+            <summary>Seçeneklerden toplu varyant üret</summary>
+            <form action={varyantMatrisi} className="variant-matrix">
+              <input type="hidden" name="product_id" value={product.id}/>
+              <p className="list-hint">Renk ve beden gibi seçenekleri yazın; her birleşim için bir varyant üretilir. Değerleri virgülle ayırın. Üründe zaten olan birleşimler atlanır.</p>
+              <div className="variant-matrix-options">
+                {[1,2,3].map(sira=>(
+                  <div className="variant-matrix-option" key={sira}>
+                    <label>{sira}. seçenek adı<input name={`secenek_ad_${sira}`} maxLength={40} placeholder={sira===1?"Renk":sira===2?"Beden":"İsteğe bağlı"} className="ac-input"/></label>
+                    <label>Değerler<input name={`secenek_deger_${sira}`} maxLength={600} placeholder={sira===1?"Siyah, Beyaz, Lacivert":sira===2?"S, M, L, XL":""} className="ac-input"/></label>
+                  </div>
+                ))}
+              </div>
+              <div className="variant-matrix-grid">
+                <label>SKU öneki<input name="sku_oneki" maxLength={16} defaultValue={variantList[0]?.sku?.split("-")[0]??""} placeholder={product.slug?.slice(0,16)??"Üründen türetilir"} className="ac-input"/></label>
+                <label>Satış fiyatı ₺<input name="price" type="number" min="0" step="0.01" required defaultValue={prices.length?(minPrice/100).toFixed(2):""} className="ac-input"/></label>
+                <label>Karşılaştırma fiyatı ₺<input name="compare_at_price" type="number" min="0" step="0.01" placeholder="İndirim yoksa boş" className="ac-input"/></label>
+                <label>Her varyantın başlangıç stoku<input name="stock" type="number" step="1" min="0" defaultValue="0" required className="ac-input"/></label>
+              </div>
+              <div className="catalog-form-actions">
+                <label className="check-inline"><input name="allow_backorder" type="checkbox" defaultChecked/> Stoksuz satış</label>
+                <button className="ac-btn ac-btn-primary" type="submit">Varyantları üret</button>
+              </div>
+            </form>
+          </details>
           <details className="variant-create-wrap" id="yeni-varyant">
-            <summary>+ Yeni varyant ekle</summary>
+            <summary>Tek varyant ekle</summary>
             <form action={createVariant} className="variant-create-grid">
               <input type="hidden" name="product_id" value={product.id}/>
               <label>Varyant adı<input name="title" placeholder="Örn. Siyah / M" required className="ac-input"/></label>
@@ -222,6 +253,7 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
               </div>
             </form>
           </details>
+          </>
         ):null}
       </section>
     </div>

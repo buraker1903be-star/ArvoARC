@@ -82,6 +82,16 @@
 .variant-create-wrap{padding:14px 18px;border-top:1px solid var(--line);background:var(--surface-2)}
 .variant-create-wrap>summary{color:var(--ink);font-size:14px;font-weight:700;cursor:pointer}
 
+/*
+  Varyant matrisi: seçenek satırları ad + değerler ikilisi hâlinde.
+  Tek sütunlu bir ızgara DEĞİL, çünkü değer alanı adın üç katı metin
+  alıyor ("Siyah, Beyaz, Lacivert, Gri" ile "Renk").
+*/
+.variant-matrix{display:grid;gap:12px;margin-top:12px}
+.variant-matrix-options{display:grid;gap:8px}
+.variant-matrix-option{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.4fr);gap:10px;align-items:end}
+.variant-matrix-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end}
+
 /* ---------- Stok ---------- */
 .stock-list[data-manage] .list-row{
   grid-template-columns:minmax(220px,2fr) minmax(120px,1fr) 90px minmax(130px,1fr) minmax(270px,auto);
@@ -117,7 +127,7 @@
   .product-layout{grid-template-columns:1fr}
   .panel-root .product-media{position:static}
   .product-gallery{grid-template-columns:repeat(4,minmax(0,1fr))}
-  .variant-create-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .variant-create-grid,.variant-matrix-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .stock-detailed-form{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:900px){
@@ -132,6 +142,6 @@
   .variant-list[data-manage] .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title title" "sku stock" "price compare" "backorder save";row-gap:8px;padding:14px}
   .variant-list:not([data-manage]) .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title stock" "sku price" ". compare";row-gap:6px;padding:14px}
   .vl-label{display:block;margin-bottom:4px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.1em}
-  .catalog-form,.stock-detailed-form,.variant-create-grid{grid-template-columns:1fr}
+  .catalog-form,.stock-detailed-form,.variant-create-grid,.variant-matrix-grid,.variant-matrix-option{grid-template-columns:1fr}
   .product-gallery{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
