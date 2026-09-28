@@ -398,13 +398,30 @@ html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{b
   yerleşmiş gibi görünüp içerik gelince sıçrıyordu.
 */
 .skel-toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
-.skel-search{flex:1 1 380px;height:38px;border-radius:12px}
-.skel-pill{width:130px;height:38px;border-radius:12px}
-.skel-tabs{display:flex;flex-wrap:wrap;gap:8px}
-.skel-tab{width:104px;height:32px;border-radius:999px}
-.skel-list{display:flex;flex-direction:column;gap:1px;overflow:hidden;border-radius:18px;background:var(--line-soft)}
-.skel-list-head{height:40px;border-radius:0}
-.skel-list-row{height:58px;border-radius:0}
+/* 47px: gerçek arama formunun yüksekliği (giriş kutusu + kenarlık).
+   38px iskeleti araç çubuğunu 9px kısa bırakıyordu. */
+.skel-search{flex:1 1 380px;height:47px;border-radius:12px}
+.skel-pill{width:130px;height:47px;border-radius:12px}
+/* Kap nav.ac-filter olduğu için boşluk ve kenarlık oradan; burada
+   yalnızca sahte sekmelerin ölçüsü var (gerçek düğme 34px). */
+.skel-tabs{gap:6px}
+.skel-tab{width:104px;height:34px;border-radius:10px;flex:none}
+/* .skel-list artık gerçek .ac.table kartının İÇİNDE: kart kendi
+   çerçevesini ve köşesini veriyor, iskelet yalnızca satır yüksekliğini
+   tutuyor. Ayrı bir kutu çizmek 65px'lik sapmanın kaynağıydı. */
+.skel-list{display:flex;flex-direction:column;gap:1px;background:var(--line-soft)}
+/* 39px: gerçek .list-row.th'nin ölçülen yüksekliği (28.09.2026).
+   Satır ızgarası ekrandan ekrana değiştiği için başlık burada tek bir
+   sayıyla tutuluyor; kalan her boşluk gerçek kaplardan geliyor. */
+.skel-list-head{height:39px;border-radius:0}
+.skel-list-row{height:60px;border-radius:0}
+/* Izgara iskeleti: medya sayfasının kare kutularıyla aynı ölçü. */
+.skel-izgara{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
+.skel-kare{aspect-ratio:1;border-radius:14px}
+/* Başlık iskeleti ac-bar içinde: gerçek h1 ve p ile aynı yüksekliği
+   tutuyor, yoksa başlık şeridi kısa kalıp her şeyi yukarı çekiyor. */
+.panel-root .ac-bar .skel-title{height:36px;margin:2px 0 9px}
+.panel-root .ac-bar .skel-sub{height:16px;margin:0}
 .panel-error-card{max-width:640px;margin:32px auto}
 .panel-error-card h1{margin:8px 0 10px;color:var(--ink);font-size:26px;letter-spacing:-.02em}
 .panel-error-card p{color:var(--muted);font-size:14px;line-height:1.6}

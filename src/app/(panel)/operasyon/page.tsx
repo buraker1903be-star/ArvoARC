@@ -43,7 +43,11 @@ export default async function Operations(){
     varyant belleğe alınıyor, Supabase 1000 satırda kestiği için
     sayılar sessizce yanlış çıkıyordu.
   */
-  const {data:settings}=await supabase.from("arc_store_settings").select("low_stock_threshold").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error:ayarHatasi}=await supabase.from("arc_store_settings").select("low_stock_threshold").eq("organization_id",organization.id).maybeSingle();
+  /* Hata YUTULMUYOR: varsayılan eşiğe (5) düşmek, mağazanın kendi
+     belirlediği eşiği sessizce değiştirmek ve yanlış sayıda uyarı
+     göstermek demekti. */
+  if(ayarHatasi)throw new Error("Mağaza ayarları okunamadı: "+ayarHatasi.message);
   const threshold=settings?.low_stock_threshold??5;
 
   const OPEN=["pending","confirmed","processing"];
@@ -82,7 +86,15 @@ export default async function Operations(){
     Görseli eksik ürünler. Metadata içinde arama yapılamadığı için
     son güncellenen 200 aktif ürüne bakılıyor.
   */
-  const {data:recentActive}=await supabase.from("arc_products").select("id,name,status,source,metadata").eq("organization_id",organization.id).eq("status","active").order("updated_at",{ascending:false}).limit(200);
+  const {data:recentActive,error:urunHatasi}=await supabase.from("arc_products").select("id,name,status,source,metadata").eq("organization_id",organization.id).eq("status","active").order("updated_at",{ascending:false}).limit(200);
+  /*
+    Hata YUTULMUYOR. Yutulsaydı liste boş kalır, ekran "Aktif
+    ürünlerde görsel eksiği bulunmuyor" der ve başlık "Her şey güncel"
+    yazardı: işi sorun göstermek olan bir merkezin sessizce temiz
+    görünmesi, hata sayfasından çok daha kötü. Siparişlerdeki sorunlu
+    kargo süzgecinde aynı karar verilmişti.
+  */
+  if(urunHatasi)throw new Error("Görseli eksik ürünler okunamadı: "+urunHatasi.message);
   const missingImages=(recentActive??[]).filter(product=>{const meta=(product.metadata??{}) as ProductMeta;return !(meta.image_paths?.length)&&!(meta.images?.length);});
 
   const stockAlerts=(criticalCount??0)+(lowCount??0);

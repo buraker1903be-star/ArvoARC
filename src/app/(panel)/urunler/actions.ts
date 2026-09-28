@@ -164,19 +164,27 @@ export async function bulkUpdateStatus(formData: FormData) {
   if (currentStatus) query = query.eq("status", currentStatus);
 
   if (collectionSlug) {
-    const { data: collection } = await supabase
+    const { data: collection, error: collectionError } = await supabase
       .from("arc_collections")
       .select("id")
       .eq("organization_id", organization.id)
       .eq("slug", collectionSlug)
       .maybeSingle();
 
+    /*
+      OKUMA HATASI "BULUNAMADI" DEĞİLDİR. Ayrılmadan önce her iki durum
+      da "koleksiyon bulunamadı" / "koleksiyonda ürün yok" diyordu:
+      kullanıcı yazdığı slug'ı kontrol etmeye gidiyor, oysa sorgu
+      düşmüştü ve tekrar denemesi gerekiyordu.
+    */
+    if (collectionError) return await bildirimliDonus("/urunler",{hata:hataMetni(collectionError.message)});
     if (!collection) return await bildirimliDonus("/urunler",{hata:hataMetni("collection-not-found")});
 
-    const { data: members } = await supabase
+    const { data: members, error: membersError } = await supabase
       .from("arc_collection_products")
       .select("product_id")
       .eq("collection_id", collection.id);
+    if (membersError) return await bildirimliDonus("/urunler",{hata:hataMetni(membersError.message)});
 
     const ids = (members ?? []).map((row) => row.product_id);
     if (ids.length === 0) return await bildirimliDonus("/urunler",{hata:hataMetni("empty-collection")});

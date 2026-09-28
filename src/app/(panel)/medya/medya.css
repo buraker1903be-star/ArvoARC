@@ -1,4 +1,12 @@
 /*
+  Arama formu ESNEMELİ. Sınıfsız bir form.ac-filter içeriğine göre
+  daralıyor (264px) ve giriş kutusuyla düğme iki satıra düşüyordu:
+  araç çubuğu 123px oluyordu, ötekilerde 77px. Siparişler ve Ürünler
+  ekranları da kendi arama formlarına aynı sebeple sınıf veriyor.
+*/
+.medya-ara{flex:1 1 320px}
+
+/*
   Medya ızgarası. Sabit 160px değil, auto-fill: dar ekranda iki, geniş
   ekranda altı-yedi görsel sığıyor ve tek bir kırılma noktası
   yazmadan ara genişlikler de dolu görünüyor.

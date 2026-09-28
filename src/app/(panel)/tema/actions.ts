@@ -35,7 +35,15 @@ function sectionLayout(fd:FormData):ThemeSection[]{
 async function writeDraft(formData:FormData){
   const {supabase,user,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))return await bildirimliDonus("/tema",{hata:hataMetni("forbidden")});
-  const {data:current}=await supabase.from("arc_store_themes").select("version,config").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();
+  const {data:current,error:taslakHatasi}=await supabase.from("arc_store_themes").select("version,config").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();
+  /*
+    OKUMA HATASI TASLAĞI SİLERDİ. Yeni config mevcut config'in üzerine
+    kuruluyor (...current?.config); okuma düşünce o boş nesne oluyor ve
+    formda alanı olmayan HER AYAR sessizce kayboluyordu. Formun
+    kaydedilmemiş değişiklikleri atması bu dosyada bir kez
+    düzeltilmişti; aynı kayıp buradan hâlâ mümkündü.
+  */
+  if(taslakHatasi)return await bildirimliDonus("/tema",{hata:hataMetni(taslakHatasi.message)});
   const layout=sectionLayout(formData);const section=(type:string)=>layout.find(item=>item.type===type);const config={
     ...((current?.config??{}) as Record<string,unknown>),
     announcement:text(formData,"announcement",180),

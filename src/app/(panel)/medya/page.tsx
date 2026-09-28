@@ -85,7 +85,7 @@ export default async function Medya({ searchParams }: { searchParams: Promise<Pa
 
     <div className="ac-stack">
       <section className="ac ac-pad-sm list-toolbar">
-        <form className="ac-filter" role="search">
+        <form className="ac-filter medya-ara" role="search">
           <input name="q" defaultValue={arama} placeholder="Ürün adına göre ara" aria-label="Görsellerde ara" />
           <button className="ac-btn ac-btn-primary" type="submit">Ara</button>
           {arama ? <Link prefetch={false} className="ac-btn" href={yol({ q: "", page: 1 })}>Temizle</Link> : null}
