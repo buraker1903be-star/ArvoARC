@@ -350,6 +350,18 @@ html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{b
 .list-empty p{max-width:520px;margin:6px auto 0;color:var(--muted);font-size:13.5px;line-height:1.55}
 /* Boş ekranın eylemi: kullanıcı ne yapacağını okuyor, nereye gideceğini de görsün. */
 .list-empty-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px}
+
+/*
+  Yerinde işlem geri bildirimi.
+
+  Liste eylemleri artık yönlendirmiyor (sayfa üstündeki çerezli şerit
+  okunmuyor), sonuç listenin başında söyleniyor. Bekleyen satır
+  soluklaşıyor: düğmedeki "Gönderiliyor…" tek başına satırın ucunda
+  kalıyor ve göz listenin ortasındayken fark edilmiyor.
+*/
+.list-sonuc{padding:12px 18px 0}
+.list-row[data-islenen]{opacity:.55}
+.list-row[data-islenen] .row-action{cursor:progress}
 /*
   Liste üstü araç çubuğu ve ipucu satırı.
 

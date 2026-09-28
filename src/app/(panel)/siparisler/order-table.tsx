@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { bulkStatus, quickStatus, siparisleriSil } from "./actions";
+import { useState, useTransition } from "react";
+import { bulkStatus, durumIlerletSonuc, quickStatus, siparisleriSil } from "./actions";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
 import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
+import { Notice } from "@/components/panel/notice";
 
 export type OrderRow = {
   id: string;
@@ -75,6 +76,45 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
   const toggleAll = () => setSelected(allChecked ? new Set() : new Set(rows.map((row) => row.id)));
 
   /*
+    DURUM İLERLETME YERİNDE OLUYOR.
+
+    Eskiden her satırda bir <form action={quickStatus}> vardı ve eylem
+    geri YÖNLENDİRİYORDU: kaydırma yeri gidiyor, seçim sıfırlanıyor,
+    liste baştan çiziliyordu. Kırk kayıtlı bir listede üç siparişi
+    ilerletmek üç kez başa dönmek demekti.
+
+    Artık eylem sonucu döndürüyor (durumIlerletSonuc) ve içindeki
+    revalidatePath veriyi yeniliyor; kullanıcı yerinde kalıyor.
+
+    İyimser durum olarak satırın YENİ ETİKETİ UYDURULMUYOR. Bir sonraki
+    adımın rozet metni ve tonu sunucu kuralından geliyor (nextOrderStep
+    + durum etiketleri); istemcide tahmin etmek o eşlemenin ikinci bir
+    kopyası olurdu ve yanlış etiket göstermek, geç güncellemekten kötü.
+    Onun yerine satır "işleniyor" hâline geçiyor: düğme kilitleniyor,
+    gerçek rozet veri gelince yerine oturuyor.
+  */
+  const [islenen, setIslenen] = useState<ReadonlySet<string>>(() => new Set());
+  const [sonuc, setSonuc] = useState<{ tur: "hata" | "basari"; metin: string } | null>(null);
+  const [, basla] = useTransition();
+
+  const ilerlet = (id: string, durum: string) => {
+    setIslenen((önce) => new Set(önce).add(id));
+    setSonuc(null);
+    basla(async () => {
+      const cevap = await durumIlerletSonuc(id, durum);
+      setIslenen((önce) => {
+        const sonra = new Set(önce);
+        sonra.delete(id);
+        return sonra;
+      });
+      /* Hata da başarı da SÖYLENİYOR: yönlendirme kalktığı için çerezli
+         şerit okunmuyor, sessiz kalmak "bir şey oldu mu" sorusu bırakırdı. */
+      if (cevap.hata) setSonuc({ tur: "hata", metin: cevap.hata });
+      else if (cevap.basari) setSonuc({ tur: "basari", metin: cevap.basari });
+    });
+  };
+
+  /*
     list-table  paylaşılan liste davranışı (yapışkan başlık, satır
                 kaplaması, toplu işlem çubuğu, sayfalama)
     order-table bu modülün ızgarası (orders.css)
@@ -94,6 +134,21 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
         her açılışta. Cümle sayfa alt başlığına taşındı: bilgi duruyor,
         yer açıldı.
       */}
+
+      {/*
+        Yerinde işlem sonucu. Sayfa üstündeki çerezli şerit yalnızca
+        yönlendirmeli eylemlerde okunuyor; liste artık yönlendirmediği
+        için sonucu burada söylüyor. Listenin BAŞINDA, çünkü kullanıcı
+        düğmeye bastıktan sonra gözü satırda kalıyor ve sayfanın en
+        üstüne çıkmış bir mesajı görmüyor.
+      */}
+      {sonuc ? (
+        <div className="list-sonuc">
+          <Notice tone={sonuc.tur === "hata" ? "error" : "success"} title={sonuc.tur === "hata" ? "İşlem tamamlanamadı" : "İşlem tamamlandı"}>
+            {sonuc.metin}
+          </Notice>
+        </div>
+      ) : null}
 
       {canManage && chosen.length > 0 ? (
         <form action={bulkStatus} className="list-bulk-bar">
@@ -155,7 +210,14 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
             {canManage ? <span className="order-action" /> : null}
           </div>
           {rows.map((row) => (
-            <div className={selected.has(row.id) ? "list-row is-selected" : "list-row"} key={row.id}>
+            /* data-islenen: satır beklerken soluklaşıyor — düğmedeki
+               "Gönderiliyor…" tek başına satırın ucunda kalıyor ve göz
+               listenin ortasındayken fark edilmiyor. */
+            <div
+              className={selected.has(row.id) ? "list-row is-selected" : "list-row"}
+              data-islenen={islenen.has(row.id) ? "" : undefined}
+              key={row.id}
+            >
               {canManage ? (
                 <label className="list-check"><input type="checkbox" checked={selected.has(row.id)} onChange={() => toggle(row.id)} aria-label={`${row.number} siparişini seç`} /></label>
               ) : null}
@@ -207,11 +269,28 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
               {canManage ? (
                 <span className="order-action">
                   {row.next ? (
-                    <form action={quickStatus}>
+                    /*
+                      FORM DURUYOR, yalnızca gönderimi kesiliyor.
+
+                      Düğmeyi type="button" yapmak JavaScript kapalıyken
+                      onu işlevsiz bırakırdı; önceden form POST'uydu ve
+                      çalışıyordu. Şimdi JS varsa preventDefault ile
+                      yerinde işleniyor, yoksa form normal gönderilip
+                      quickStatus'un yönlendirmeli yolundan geçiyor.
+                    */
+                    <form
+                      action={quickStatus}
+                      onSubmit={(olay) => {
+                        olay.preventDefault();
+                        ilerlet(row.id, row.next!.key);
+                      }}
+                    >
                       <input type="hidden" name="order_id" value={row.id} />
                       <input type="hidden" name="status" value={row.next.key} />
                       <input type="hidden" name="back" value={back} />
-                      <button type="submit" className="row-action">{row.next.label} →</button>
+                      <button type="submit" className="row-action" disabled={islenen.has(row.id)}>
+                        {islenen.has(row.id) ? "Gönderiliyor…" : `${row.next.label} →`}
+                      </button>
                     </form>
                   ) : null}
                 </span>

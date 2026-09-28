@@ -90,16 +90,34 @@ async function notifyStatus(order: { order_number: string; customer_name: string
  * Ödeme durumuna dokunulmuyor: o PayTR bildirimiyle geliyor ve
  * elle değiştirmek muhasebeyle uyumsuzluk yaratır.
  */
-export async function quickStatus(formData: FormData) {
+export type IslemSonucu = { hata?: string; basari?: string };
+
+/*
+  DURUM İLERLETMENİN ÇEKİRDEĞİ — iki yerden çağrılıyor ve ikisi sonucu
+  farklı taşıyor:
+
+    quickStatus            sipariş DETAYINDA, sunucu formu. Sonucu
+                           çereze yazıp geri yönlendiriyor.
+    durumIlerletSonuc      LİSTEDE, istemciden. Sonucu DÖNDÜRÜYOR,
+                           yönlendirmiyor.
+
+  Ayrım neden gerekli: listede her durum değişikliği tam bir gezinme
+  başlatıyordu. Kaydırma yeri gidiyor, seçim sıfırlanıyor, liste baştan
+  çiziliyordu — kırk kayıtlık bir listede üç siparişi ilerletmek üç kez
+  başa dönmek demekti. Yönlendirme kalkınca revalidatePath yine veriyi
+  yeniliyor ama kullanıcı yerinde kalıyor.
+
+  Mantık TEK YERDE: yetki, adım atlama kontrolü ve bildirim iki yolda
+  da aynı çalışmalı; kopyalamak birinde düzeltilen bir kuralın ötekinde
+  kalması demekti.
+*/
+async function durumIlerlet(orderId: string, status: string): Promise<IslemSonucu> {
   const { supabase, organization, membership } = await requireTenant();
 
-  if (!MANAGERS.includes(membership.role)) return await backTo(formData, { hata: hataMetni("forbidden") });
+  if (!MANAGERS.includes(membership.role)) return { hata: hataMetni("forbidden") };
 
-  const orderId = String(formData.get("order_id") ?? "");
-  const status = String(formData.get("status") ?? "");
   const allowed = new Set(["confirmed", "processing", "fulfilled", "cancelled"]);
-
-  if (!orderId || !allowed.has(status)) return await backTo(formData, { hata: hataMetni("invalid-status") });
+  if (!orderId || !allowed.has(status)) return { hata: hataMetni("invalid-status") };
 
   const { data: order } = await supabase
     .from("arc_orders")
@@ -114,15 +132,15 @@ export async function quickStatus(formData: FormData) {
     geçiliyordu: ödenmiş siparişin ödeme durumu sessizce
     "Ödeme bekliyor"a düşebiliyordu.
   */
-  if (!order) return await backTo(formData, { hata: hataMetni("order-not-found") });
+  if (!order) return { hata: hataMetni("order-not-found") };
 
   /* Kapanmış sipariş akışta ilerletilemez. Düğme zaten gizli;
      bu kontrol elle gönderilen isteğe karşı. */
-  if (isOrderClosed(order.status, order.payment_status)) return await backTo(formData, { hata: hataMetni("order-closed") });
+  if (isOrderClosed(order.status, order.payment_status)) return { hata: hataMetni("order-closed") };
 
   /* Yalnızca akıştaki bir sonraki adım ya da iptal (toplu işlemle aynı kural): elle gönderilen istek adım atlatamaz. */
   if (status !== "cancelled" && nextOrderStep(order.status, order.payment_status)?.key !== status) {
-    return await backTo(formData, { hata: hataMetni("invalid-status") });
+    return { hata: hataMetni("invalid-status") };
   }
 
   const { error } = await supabase.rpc("arc_update_order_status", {
@@ -132,14 +150,31 @@ export async function quickStatus(formData: FormData) {
     p_payment_status: order.payment_status,
   });
 
-  if (error) return await backTo(formData, { hata: hataMetni("save-failed") });
+  if (error) return { hata: hataMetni("save-failed") };
 
   await notifyStatus(order, status, await getStoreBrand(supabase, membership.organization_id));
 
   revalidatePath("/");
   revalidatePath("/siparisler");
   revalidatePath(`/siparisler/${orderId}`);
-  return await backTo(formData, { basari: "Sipariş durumu güncellendi." });
+  return { basari: "Sipariş durumu güncellendi." };
+}
+
+/** Sipariş detayı: sonucu çereze yazıp geldiği yere döner. */
+export async function quickStatus(formData: FormData) {
+  const sonuc = await durumIlerlet(String(formData.get("order_id") ?? ""), String(formData.get("status") ?? ""));
+  return await backTo(formData, sonuc);
+}
+
+/**
+ * Liste: sonucu DÖNDÜRÜR, yönlendirmez.
+ *
+ * Kimlik ve durum istemciden geliyor ama yetki, sipariş sahipliği ve
+ * adım kuralı çekirdekte doğrulanıyor — istemciye güvenilmiyor,
+ * yalnızca sonucun nereye gideceği değişiyor.
+ */
+export async function durumIlerletSonuc(orderId: string, status: string): Promise<IslemSonucu> {
+  return await durumIlerlet(String(orderId ?? ""), String(status ?? ""));
 }
 
 /**
