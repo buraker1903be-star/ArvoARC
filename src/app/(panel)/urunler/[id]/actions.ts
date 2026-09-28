@@ -103,8 +103,13 @@ export async function createVariant(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   const productId=String(formData.get("product_id")??"");
   if(!allowedRoles.has(membership.role))return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("forbidden")});
-  const title=String(formData.get("title")??"").trim()||"Default";
   const sku=String(formData.get("sku")??"").trim().toUpperCase();
+  /*
+    Başlık boşsa SKU yazılıyor, "Default" değil. Aynı üründe birkaç
+    "Default" görününce hangi varyantın hangisi olduğu ne ekranda ne
+    veride okunabiliyordu (28.09.2026'da canlıda tam bu oldu).
+  */
+  const title=String(formData.get("title")??"").trim()||sku;
   const priceInput=Number(formData.get("price")??0);
   const compareAtPriceInput=Number(formData.get("compare_at_price")??0);
   const stock=Number(formData.get("stock")??0);
