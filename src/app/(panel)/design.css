@@ -231,7 +231,12 @@
 
 .ac-btn-primary:hover{
   border-color:var(--c-brand);
-  background:#00305f;
+  /*
+    Marka renginin koyusu; sabit lacivert DEĞİL. Eskiden #00305f
+    yazıyordu: kurum kendi rengini seçse bile üzerine gelince düğme
+    eski markaya atlıyordu.
+  */
+  background:color-mix(in srgb,var(--c-brand) 85%,black);
   color:#fff;
 }
 

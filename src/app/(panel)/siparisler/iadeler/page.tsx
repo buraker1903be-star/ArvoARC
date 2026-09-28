@@ -141,7 +141,7 @@ export default async function ReturnsPage({
         <PanelBildirimi />
 
         {(requests ?? []).length === 0 ? (
-          <section className="ac order-empty">
+          <section className="ac list-empty">
             <b>Bu durumda talep bulunmuyor.</b>
             <p>Müşteriler iade talebini mağazadaki sipariş sayfasından oluşturur; yeni talepler “Bekleyenler” sekmesine düşer.</p>
           </section>

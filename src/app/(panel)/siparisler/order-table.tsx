@@ -73,8 +73,16 @@ export function OrderTable({ rows, canManage, canDelete, back, children }: { row
     });
   const toggleAll = () => setSelected(allChecked ? new Set() : new Set(rows.map((row) => row.id)));
 
+  /*
+    list-table  paylaşılan liste davranışı (yapışkan başlık, satır
+                kaplaması, toplu işlem çubuğu, sayfalama)
+    order-table bu modülün ızgarası (orders.css)
+
+    Ayrım bilerek: ızgarayı paylaşılan sınıfa bağlamak, .list-table'ı
+    kullanan bir sonraki modüle sipariş sütunlarını sızdırırdı.
+  */
   return (
-    <section className="ac table order-table" data-manage={canManage ? "" : undefined}>
+    <section className="ac table list-table order-table" data-manage={canManage ? "" : undefined}>
       {/*
         Başlık kaldırıldı: sayfanın kendi başlığı zaten "Siparişler" ve
         "Sipariş akışı" onun altında ikinci kez aynı şeyi söylüyordu.
@@ -83,16 +91,16 @@ export function OrderTable({ rows, canManage, canDelete, back, children }: { row
         ölçüldü, 27.09.2026). İpucu duruyor — yeni kullanıcı için tek
         cümlelik değeri var — ama tek satıra indi.
       */}
-      <div className="ac-head order-table-head">
+      <div className="ac-head list-table-head">
         <p>Satıra tıklayarak detayı açın{canManage ? "; toplu işlem için kutucukları işaretleyin." : "."}</p>
       </div>
 
       {canManage && chosen.length > 0 ? (
-        <form action={bulkStatus} className="order-bulk-bar">
+        <form action={bulkStatus} className="list-bulk-bar">
           <input type="hidden" name="back" value={back} />
           {chosen.map((row) => <input key={row.id} type="hidden" name="order_id" value={row.id} />)}
           <b>{chosen.length} sipariş seçildi</b>
-          <span className="order-bulk-actions">
+          <span className="list-bulk-actions">
             {BULK_STEPS.map((step) => {
               const eligible = chosen.filter((row) => row.next?.key === step.key).length;
               return (
@@ -117,11 +125,11 @@ export function OrderTable({ rows, canManage, canDelete, back, children }: { row
         uyarı hangi üçü olduğunu söylemiyor.
       */}
       {canDelete && chosen.length > 0 ? (
-        <form action={siparisleriSil} className="order-bulk-bar order-bulk-danger">
+        <form action={siparisleriSil} className="list-bulk-bar order-bulk-danger">
           <input type="hidden" name="back" value={back} />
           {chosen.map((row) => <input key={row.id} type="hidden" name="order_id" value={row.id} />)}
           <b>Seçilenleri kalıcı olarak sil</b>
-          <span className="order-bulk-actions">
+          <span className="list-bulk-actions">
             <ConfirmSubmit
               className="ac-btn ac-btn-danger"
               message={`${chosen.length} sipariş KALICI olarak silinecek:\n\n${chosen.slice(0, 10).map((row) => row.number).join("\n")}${chosen.length > 10 ? `\n… ve ${chosen.length - 10} sipariş daha` : ""}\n\nKalemleri, gönderileri ve işlem geçmişi de silinir. Açık siparişlerin stoğu iade edilir. Bu işlem geri alınamaz.`}
@@ -134,9 +142,9 @@ export function OrderTable({ rows, canManage, canDelete, back, children }: { row
 
       {rows.length ? (
         <>
-          <div className="order-row th">
+          <div className="list-row th">
             {canManage ? (
-              <label className="order-check"><input type="checkbox" checked={allChecked} onChange={toggleAll} aria-label="Bu sayfadaki tüm siparişleri seç" /></label>
+              <label className="list-check"><input type="checkbox" checked={allChecked} onChange={toggleAll} aria-label="Bu sayfadaki tüm siparişleri seç" /></label>
             ) : null}
             <span className="order-cell-main">SİPARİŞ</span>
             <span className="order-cell-customer">MÜŞTERİ</span>
@@ -147,12 +155,12 @@ export function OrderTable({ rows, canManage, canDelete, back, children }: { row
             {canManage ? <span className="order-action" /> : null}
           </div>
           {rows.map((row) => (
-            <div className={selected.has(row.id) ? "order-row is-selected" : "order-row"} key={row.id}>
+            <div className={selected.has(row.id) ? "list-row is-selected" : "list-row"} key={row.id}>
               {canManage ? (
-                <label className="order-check"><input type="checkbox" checked={selected.has(row.id)} onChange={() => toggle(row.id)} aria-label={`${row.number} siparişini seç`} /></label>
+                <label className="list-check"><input type="checkbox" checked={selected.has(row.id)} onChange={() => toggle(row.id)} aria-label={`${row.number} siparişini seç`} /></label>
               ) : null}
               <span className="order-cell-main">
-                <Link prefetch={false} className="order-row-link" href={`/siparisler/${row.id}`}><b>{row.number}</b></Link>
+                <Link prefetch={false} className="list-row-link" href={`/siparisler/${row.id}`}><b>{row.number}</b></Link>
                 <small>{row.date}</small>
               </span>
               <span className="order-cell-customer">
@@ -207,7 +215,7 @@ export function OrderTable({ rows, canManage, canDelete, back, children }: { row
           ))}
         </>
       ) : (
-        <div className="order-empty">
+        <div className="list-empty">
           <b>Bu ölçütlere uygun sipariş yok.</b>
           <p>Filtreyi veya dönemi değiştirin. Eski Shopify siparişlerini Veri Aktarımı ekranından yükleyebilirsiniz.</p>
         </div>

@@ -347,7 +347,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
       </nav>
 
       <OrderTable key={JSON.stringify(params)} rows={rows} canManage={canManage} canDelete={["owner","admin"].includes(membership.role)} back={listHref(state, {})}>
-        <div className="order-pagination">
+        <div className="list-pagination">
           <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + rows.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} sipariş` : "Kayıt yok"}</span>
           {pageCount > 1 ? (
             <div>

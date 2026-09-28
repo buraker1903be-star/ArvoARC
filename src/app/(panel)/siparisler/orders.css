@@ -17,15 +17,15 @@
    Tutar ve kâr SABİT genişlikte ve sağa yaslı: rakamlar alt alta
    hizalanmazsa göz onları karşılaştıramıyor.
 */
-.order-table[data-manage] .order-row{
+.order-table[data-manage] .list-row{
   grid-template-columns:24px minmax(150px,1.1fr) minmax(170px,1.4fr) 116px 116px 150px 112px 128px;
   grid-template-areas:"check main customer amount profit status shipping action";
 }
-.order-table:not([data-manage]) .order-row{
+.order-table:not([data-manage]) .list-row{
   grid-template-columns:minmax(150px,1.1fr) minmax(170px,1.4fr) 116px 116px 150px 112px;
   grid-template-areas:"main customer amount profit status shipping";
 }
-.order-check{grid-area:check}
+.list-check{grid-area:check}
 .order-cell-main{grid-area:main}
 .order-cell-customer{grid-area:customer}
 .order-amount{grid-area:amount;justify-self:end;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
@@ -51,11 +51,11 @@
 
 @media(max-width:1180px){
   /* Dar masaüstünde kâr sütunu düşüyor: tutar ve durum önce gelir. */
-  .order-table[data-manage] .order-row{
+  .order-table[data-manage] .list-row{
     grid-template-columns:24px minmax(140px,1.1fr) minmax(150px,1.3fr) 110px 140px 104px 120px;
     grid-template-areas:"check main customer amount status shipping action";
   }
-  .order-table:not([data-manage]) .order-row{
+  .order-table:not([data-manage]) .list-row{
     grid-template-columns:minmax(140px,1.1fr) minmax(150px,1.3fr) 110px 140px 104px;
     grid-template-areas:"main customer amount status shipping";
   }
@@ -156,8 +156,8 @@
     durumda"; kâr masaüstünde incelenen bir sayı ve dar ekranda ya
     kırpılır ya ötekileri kırpar.
   */
-  .order-table[data-manage] .order-row{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"check main amount" "check customer status" "check shipping action";row-gap:6px;padding:12px 14px}
-  .order-table:not([data-manage]) .order-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amount" "customer status" "shipping shipping";row-gap:6px;padding:12px 14px}
+  .order-table[data-manage] .list-row{grid-template-columns:22px minmax(0,1fr) auto;grid-template-areas:"check main amount" "check customer status" "check shipping action";row-gap:6px;padding:12px 14px}
+  .order-table:not([data-manage]) .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amount" "customer status" "shipping shipping";row-gap:6px;padding:12px 14px}
   .order-profit{display:none}
   .order-shipping{justify-self:start}
   .order-amount,.order-status{justify-self:end;text-align:right}
