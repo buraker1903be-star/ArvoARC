@@ -97,31 +97,33 @@ test("satış fiyatı YOKSA uyarı üretilmiyor", () => {
 });
 
 /*
-  AYNI SKU BİRDEN ÇOK KAYITTA. arc_product_variants'ta (organization_id,
-  sku) benzersiz değil ve canlıda altı varyantın aynı SKU'yu taşıdığı
-  ürünler var (28.09.2026). Yazma eq("sku", …) ile bütün kopyalara
-  gidiyor, önizleme ise SKU'yu tek satır gösteriyordu.
+  AYNI SKU BİRDEN ÇOK VARYANTTA. arc_product_variants'ta (organization_id,
+  sku) benzersiz değil: canlıda aynı SKU'yu altı varyantın taşıdığı
+  ürünler ve dört AYRI ÜRÜNE dağılmış SKU'lar var (28.09.2026).
+
+  Önizleme artık varyant başına satır veriyor ve yazma varyant
+  kimliğiyle yapılıyor, yani görünen ile yazılan aynı şey. Geriye kalan
+  iş kullanıcıyı uyarmak.
 */
-test("SKU tekse ne uyarı ne sorun var", () => {
-  assert.deepEqual(skuYinelemesi(1, 1), {});
+test("SKU tek varyanttaysa uyarı yok", () => {
+  assert.equal(skuYinelemesi(1, 1), undefined);
 });
 
-test("AYNI ürünün kopyalarında uyarı var, satır yazılıyor", () => {
-  // Hepsine yazmak istenen şey; yalnızca kaç kayda gittiği söyleniyor.
-  const sonuc = skuYinelemesi(6, 1);
-  assert.ok("uyari" in sonuc && sonuc.uyari?.includes("6"));
-  assert.ok(!("sorun" in sonuc));
+test("aynı ürünün birkaç VARYANTI aynı SKU'yu taşıyorsa uyarılıyor", () => {
+  // Beden/renk varyantları: hepsine yazmak istenen şey, yalnızca söyleniyor.
+  assert.match(String(skuYinelemesi(6, 1)), /6 varyantta/);
 });
 
-test("FARKLI ürünler aynı SKU'yu taşıyorsa satır ATLANIYOR", () => {
+test("SKU birkaç AYRI ÜRÜNE dağılmışsa ürün sayısı söyleniyor", () => {
   /*
-    Bir ürünün fiyatını başkasına yazmak canlı mağazada geri alınamaz ve
-    önizlemede görünmezdi (harita sonuncuyu tutuyor). Hangisinin doğru
-    olduğuna kod karar veremez.
+    Genellikle bir içe aktarma hatasının belirtisi ("The Society
+    Collection" ürünleri aynı SKU'yu dört ürüne dağıtmış). Engellenmiyor:
+    engellemek, meşru toplu güncellemeyi de durdururdu; kararı kullanıcı
+    veriyor ve artık hangi varyantlara yazılacağını satır satır görüyor.
   */
-  assert.deepEqual(skuYinelemesi(2, 2), { sorun: "sku-farkli-urunlerde" });
+  assert.match(String(skuYinelemesi(4, 4)), /4 ayrı üründe/);
 });
 
-test("çok kayıt VE çok ürün varsa sorun kazanıyor, uyarıya düşmüyor", () => {
-  assert.deepEqual(skuYinelemesi(6, 3), { sorun: "sku-farkli-urunlerde" });
+test("hem çok varyant hem çok ÜRÜN varsa ürün uyarısı kazanıyor", () => {
+  assert.match(String(skuYinelemesi(6, 3)), /3 ayrı üründe/);
 });

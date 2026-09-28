@@ -77,34 +77,28 @@ export function maliyetUyarisi(maliyetKurus: number, satisKurus: number): string
 }
 
 /*
-  AYNI SKU BİRDEN ÇOK KAYITTA.
+  AYNI SKU BİRDEN ÇOK VARYANTTA.
 
   arc_product_variants'ta (organization_id, sku) üzerinde benzersizlik
   kısıtı YOK — yalnızca external_id ve supplier_sku benzersiz. Canlıda
-  altı varyantın aynı SKU'yu taşıdığı ürünler var (28.09.2026'da ölçüldü).
+  aynı SKU'yu altı varyantın taşıdığı ürünler var, bazı SKU'lar da dört
+  AYRI ÜRÜNE dağılmış (28.09.2026'da ölçüldü).
 
-  Bu fiyat aktarımını doğrudan ilgilendiriyor: önizleme SKU'yu TEK satır
-  gösteriyor (eşleştirme haritası sonuncuyu tutuyor) ama yazma
-  `eq("sku", …)` ile yapılıyor, yani fiyat BÜTÜN kopyalara gidiyor.
-  Kullanıcı bir kayda yazdığını sanıp altısına yazıyor.
+  Eskiden önizleme SKU'yu TEK satır gösteriyordu (eşleştirme haritası
+  sonuncuyu tutuyordu) ama yazma `eq("sku", …)` ile bütün kopyalara
+  gidiyordu: kullanıcı bir kayda yazdığını sanıp altısına yazıyordu.
+  Artık önizleme VARYANT BAŞINA satır veriyor ve yazma varyant
+  kimliğiyle yapılıyor, yani görünen ile yazılan aynı şey.
 
-  İki hal ayrılıyor:
-
-    AYNI ürünün kopyaları — hepsine yazmak zaten istenen şey, yalnızca
-    kaç kayda gittiği söyleniyor.
-
-    FARKLI ürünler aynı SKU'yu taşıyor — satır ATLANIYOR. Bir ürünün
-    fiyatını başkasına yazmak canlı mağazada geri alınamaz bir hatadır
-    ve önizlemede görünmediği için fark edilmezdi. Hangisinin doğru
-    olduğuna kod karar veremez.
+  Geriye kalan tek şey kullanıcıyı uyarmak: bir SKU birden çok varyanta
+  ya da birden çok ÜRÜNE dağılmışsa aynı fiyat hepsine yazılacak ve bu,
+  beden/renk varyantlarında istenen şey ama ayrı ürünlerde genellikle
+  bir içe aktarma hatasının belirtisi.
 */
-export function skuYinelemesi(
-  kayitSayisi: number,
-  urunSayisi: number,
-): { sorun: "sku-farkli-urunlerde" } | { uyari?: string } {
-  if (urunSayisi > 1) return { sorun: "sku-farkli-urunlerde" };
-  if (kayitSayisi > 1) return { uyari: `aynı SKU ${kayitSayisi} kayıtta; hepsine yazılacak` };
-  return {};
+export function skuYinelemesi(varyantSayisi: number, urunSayisi: number): string | undefined {
+  if (urunSayisi > 1) return `aynı SKU ${urunSayisi} ayrı üründe; hepsine yazılacak`;
+  if (varyantSayisi > 1) return `aynı SKU ${varyantSayisi} varyantta; hepsine yazılacak`;
+  return undefined;
 }
 
 /*
