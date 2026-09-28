@@ -365,7 +365,9 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
       </nav>
 
       <OrderTable key={JSON.stringify(params)} rows={rows} canManage={canManage} canDelete={["owner","admin"].includes(membership.role)} back={listHref(state, {})} siparisYok={(siparisSayimi.count ?? 0) === 0}>
-        <div className="list-pagination">
+        {/* Kayıt yokken şerit gizli: boş ekran zaten "kayıt yok" diyor ve
+              altındaki ikinci "Kayıt yok" 45px yeri tekrara harcıyordu. */}
+        <div className="list-pagination" data-bos={total ? undefined : ""}>
           <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + rows.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} sipariş` : "Kayıt yok"}</span>
           {pageCount > 1 ? (
             <div>

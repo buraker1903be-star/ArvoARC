@@ -31,7 +31,14 @@ html[data-theme="dark"] .dash [data-tone="brand"]{--tone-fg:var(--brand-200)}
 }
 .dash-widget::after{content:"";position:absolute;inset:auto -30% -60% auto;width:140px;height:140px;border-radius:50%;background:var(--tone-bg);opacity:.55;pointer-events:none}
 .dash-widget-icon{display:grid;place-items:center;width:34px;height:34px;margin-bottom:12px;border-radius:var(--r-sm);background:var(--tone-bg);color:var(--tone-fg)}
-.dash-widget small{position:relative;z-index:1;color:var(--muted);font-size:13px;font-weight:600}
+/*
+  ETİKET PANELİN MİKRO ETİKETİYLE AYNI. Gösterge panosu kendi ölçüsünü
+  kullanıyordu (13px, cümle düzeni) ama aynı işi yapan .ac-metric ve
+  tablo başlıkları 11px/700/BÜYÜK HARF/.12em yazıyor: aynı ekranda iki
+  ayrı etiket dili vardı. Sayı 28px kalıyor — burada kart daha büyük ve
+  bu bilerek bir boyut değişkesi, ayrı bir bileşen değil.
+*/
+.dash-widget small{position:relative;z-index:1;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
 .dash-widget strong{position:relative;z-index:1;font-size:28px;font-weight:700;line-height:1.1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
 .dash-widget-note{position:relative;z-index:1;margin-top:2px;color:var(--muted);font-size:12.5px}
 @media(hover:hover) and (pointer:fine){

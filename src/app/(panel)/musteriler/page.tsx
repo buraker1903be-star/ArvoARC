@@ -178,7 +178,9 @@ export default async function Customers({ searchParams }: { searchParams: Promis
             </ListeBos>
           )
         )}
-        <div className="list-pagination">
+        {/* Kayıt yokken şerit gizli: boş ekran zaten "kayıt yok" diyor ve
+              altındaki ikinci "Kayıt yok" 45px yeri tekrara harcıyordu. */}
+        <div className="list-pagination" data-bos={sorted.length ? undefined : ""}>
           <span>{sorted.length ? `${(from + 1).toLocaleString("tr-TR")}–${(from + visible.length).toLocaleString("tr-TR")} / ${sorted.length.toLocaleString("tr-TR")} müşteri` : "Kayıt yok"}</span>
           {pageCount > 1 ? (
             <div>

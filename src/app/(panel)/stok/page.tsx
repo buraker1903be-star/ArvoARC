@@ -239,7 +239,9 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
       </StokTablosu>
 
       <div className="ac table list-table">
-        <div className="list-pagination">
+        {/* Kayıt yokken şerit gizli: boş ekran zaten "kayıt yok" diyor ve
+              altındaki ikinci "Kayıt yok" 45px yeri tekrara harcıyordu. */}
+        <div className="list-pagination" data-bos={total ? undefined : ""}>
           <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + variants.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} varyant` : "Kayıt yok"}</span>
           {pageCount > 1 ? (
             <div>

@@ -277,7 +277,9 @@ export default async function Products({ searchParams }: { searchParams: Promise
       </nav>
 
       <ProductTable key={JSON.stringify(params)} rows={rows} canManage={canManage} back={listHref(state, {})} katalogBos={(katalogSayimi.count ?? 0) === 0}>
-        <div className="list-pagination">
+        {/* Kayıt yokken şerit gizli: boş ekran zaten "kayıt yok" diyor ve
+              altındaki ikinci "Kayıt yok" 45px yeri tekrara harcıyordu. */}
+        <div className="list-pagination" data-bos={total ? undefined : ""}>
           <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + rows.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} ürün` : "Kayıt yok"}</span>
           {pageCount > 1 ? (
             <div>

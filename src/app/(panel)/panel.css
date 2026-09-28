@@ -165,7 +165,14 @@ html[data-theme="dark"] .panel-user>span{background:color-mix(in srgb,var(--acce
 .panel-root .card:hover{border-color:var(--line)}
 .panel-root .ac-pad{padding:22px}
 .panel-root .ac-pad-sm{padding:14px 16px}
-.panel-root .ac-head{margin-bottom:14px}
+/*
+  KART BAŞLIĞI İLE İÇERİK ARASI TEK ÖLÇÜ. 29.09.2026'da canlıda
+  ölçüldüğünde aynı bileşen üç ayrı boşluk veriyordu: 12px (aktarım
+  kartı, flex gap'ten), 14px (buradan) ve 16px (sonraki öğenin kendi
+  üst boşluğundan). Üçü de ölçekte olmayan ya da ölçekten kaçan
+  değerlerdi; boşluk ölçeği (--s1…--s7) tam da bunun için var.
+*/
+.panel-root .ac-head{margin-bottom:var(--s4)}
 .panel-root .ac-head h3{color:var(--ink);font-size:17px;font-weight:700;letter-spacing:-.015em}
 .panel-root .ac-head p{margin-top:3px;color:var(--muted);font-size:13px}
 .panel-root .ac-head a{color:var(--accent);font-size:13.5px;font-weight:650}
@@ -346,6 +353,7 @@ html[data-theme="dark"] .panel-root nav.ac-filter>.ac-btn[aria-current="page"]{b
 }
 .list-bulk-bar>b{color:var(--accent-strong);font-size:13.5px}
 .list-bulk-actions{display:flex;flex-wrap:wrap;gap:8px}
+.list-pagination[data-bos]{display:none}
 .list-pagination{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface-2);color:var(--muted);font-size:13px}
 .list-pagination>div{display:flex;align-items:center;gap:8px}
 .order-page-number{min-width:56px;text-align:center;font-variant-numeric:tabular-nums}
