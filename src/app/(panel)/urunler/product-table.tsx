@@ -102,9 +102,15 @@ export function ProductTable({ rows, canManage, back, katalogBos, children }: { 
               <span className="pl-thumb">
                 {row.image ? <Image src={row.image} alt="" width={88} height={88} sizes="44px" /> : <b>{row.initials}</b>}
               </span>
+              {/*
+                title ŞART: satır metinleri üç nokta ile kırpılıyor
+                (panel.css, .list-row b/small) ve uzun ürün adı kaydı
+                açmadan okunamıyordu. Kırpılan her metnin tam hâli
+                imlecin altında duruyor.
+              */}
               <span className="pl-name">
-                <Link prefetch={false} className="list-row-link" href={`/urunler/${row.id}`}><b>{row.name}</b></Link>
-                <small>{row.meta}</small>
+                <Link prefetch={false} className="list-row-link" href={`/urunler/${row.id}`}><b title={row.name}>{row.name}</b></Link>
+                <small title={row.meta}>{row.meta}</small>
               </span>
               <span className="pl-price">
                 <b>{row.price}</b>

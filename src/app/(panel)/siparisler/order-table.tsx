@@ -159,12 +159,17 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
               {canManage ? (
                 <label className="list-check"><input type="checkbox" checked={selected.has(row.id)} onChange={() => toggle(row.id)} aria-label={`${row.number} siparişini seç`} /></label>
               ) : null}
+              {/*
+                title ŞART: satır metinleri üç nokta ile kırpılıyor
+                (panel.css, .list-row b/small) ve uzun müşteri adı
+                kaydı açmadan okunamıyordu.
+              */}
               <span className="order-cell-main">
-                <Link prefetch={false} className="list-row-link" href={`/siparisler/${row.id}`}><b>{row.number}</b></Link>
+                <Link prefetch={false} className="list-row-link" href={`/siparisler/${row.id}`}><b title={row.number}>{row.number}</b></Link>
                 <small>{row.date}</small>
               </span>
               <span className="order-cell-customer">
-                <b>{row.customer}</b>
+                <b title={row.customer}>{row.customer}</b>
                 {/*
                   Kaynak ve havale etiketi müşterinin altına indi:
                   kendi sütununda 110px yer kaplıyordu ve satırda

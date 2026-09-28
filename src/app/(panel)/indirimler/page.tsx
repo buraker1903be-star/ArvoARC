@@ -125,7 +125,8 @@ export default async function DiscountsPage(){
           {productDiscounts.map(item=>{
             const meta=(item.product?.metadata??{}) as Meta;
             return <div className="list-row" key={item.id}>
-              <span className="dl-name"><b>{item.product?.name}</b><small>{item.title||"Default"} · {item.sku}</small></span>
+              {/* title: satır metni üç nokta ile kırpılıyor. */}
+              <span className="dl-name"><b title={item.product?.name}>{item.product?.name}</b><small title={`${item.title||"Default"} · ${item.sku}`}>{item.title||"Default"} · {item.sku}</small></span>
               <span className="dl-old"><s>{money.format((item.compare_at_price??0)/100)}</s></span>
               <span className="dl-new"><b>{money.format(item.price/100)}</b><small>{money.format(item.discountAmount/100)} avantaj</small></span>
               <span className="dl-rate"><em>−%{item.discountRate}</em></span>

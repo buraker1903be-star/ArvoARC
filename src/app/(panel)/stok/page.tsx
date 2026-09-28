@@ -205,8 +205,10 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
             </div>
             {variants.map((variant) => (
               <div className="list-row" key={variant.id}>
+                {/* title: satır metni üç nokta ile kırpılıyor, uzun ürün adı
+                    kaydı açmadan okunamıyordu. */}
                 <span className="sl-name">
-                  <Link prefetch={false} className="list-row-link" href={`/urunler/${variant.product_id}`}><b>{productName.get(variant.product_id) ?? "Ürün"}</b></Link>
+                  <Link prefetch={false} className="list-row-link" href={`/urunler/${variant.product_id}`}><b title={productName.get(variant.product_id) ?? "Ürün"}>{productName.get(variant.product_id) ?? "Ürün"}</b></Link>
                   <small>{variant.title && variant.title !== "Default" ? variant.title : "Tek varyant"}</small>
                 </span>
                 <span className="sl-sku">{variant.sku}</span>

@@ -143,9 +143,11 @@ export default async function Customers({ searchParams }: { searchParams: Promis
             {visible.map((customer) => (
               <div className="list-row" key={customer.key}>
                 <span className="cl-avatar">{initials(customer.name)}</span>
+                {/* title: satır metni üç nokta ile kırpılıyor, uzun ad ve
+                    e-posta kaydı açmadan okunamıyordu. */}
                 <span className="cl-name">
-                  <Link prefetch={false} className="list-row-link" href={`/musteriler/${encodeURIComponent(customer.key)}`}><b>{customer.name}</b></Link>
-                  <small>{customer.email || "E-posta yok"}</small>
+                  <Link prefetch={false} className="list-row-link" href={`/musteriler/${encodeURIComponent(customer.key)}`}><b title={customer.name}>{customer.name}</b></Link>
+                  <small title={customer.email || undefined}>{customer.email || "E-posta yok"}</small>
                 </span>
                 <span className="cl-orders"><b>{customer.orders}</b><small>{customer.orders === customer.paidOrders ? "sipariş" : `${customer.orders - customer.paidOrders} iptal/iade`}</small></span>
                 <span className="cl-spent"><b>{money.format(customer.spent / 100)}</b><small>ort. {money.format(customer.paidOrders ? customer.spent / customer.paidOrders / 100 : 0)}</small></span>

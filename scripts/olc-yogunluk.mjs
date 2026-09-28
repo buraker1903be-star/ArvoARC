@@ -62,6 +62,38 @@ const LISTELER = [
     basliklar: ["", "", "ÜRÜN", "FİYAT", "MARJ", "STOK", "DURUM"],
     hucreler: ["list-check", "pl-thumb", "pl-name", "pl-price", "pl-margin", "pl-stock", "pl-status"],
   },
+  {
+    ad: "Müşteriler",
+    css: "src/app/(panel)/musteriler/customers.css",
+    kap: "ac table list-table customer-list",
+    basliklar: ["", "MÜŞTERİ", "SİPARİŞ", "HARCAMA", "SON ALIŞVERİŞ", "ETİKET"],
+    hucreler: ["cl-avatar", "cl-name", "cl-orders", "cl-spent", "cl-last", "cl-tags"],
+    sekme: true,
+  },
+  {
+    ad: "Stok",
+    css: "src/app/(panel)/catalog.css",
+    kap: "ac table list-table stock-list",
+    basliklar: ["VARYANT", "SKU", "ADET", "POLİTİKA", ""],
+    hucreler: ["sl-name", "sl-sku", "sl-qty", "sl-policy", "sl-adjust"],
+    sekme: true,
+  },
+  {
+    ad: "Koleksiyonlar",
+    css: "src/app/(panel)/modules.css",
+    kap: "ac table list-table collection-list",
+    basliklar: ["KOLEKSİYON", "KAYNAK", "ÜRÜN", "DURUM"],
+    hucreler: ["col-name", "col-source", "col-count", "col-status"],
+    sekme: true,
+  },
+  {
+    ad: "İndirimler",
+    css: "src/app/(panel)/modules.css",
+    kap: "ac table list-table discount-product-list",
+    basliklar: ["ÜRÜN / VARYANT", "ESKİ FİYAT", "YENİ FİYAT", "İNDİRİM", "ROZET", ""],
+    hucreler: ["dl-name", "dl-old", "dl-new", "dl-rate", "dl-badge", "dl-edit"],
+    sekme: false,
+  },
 ];
 
 /*
@@ -76,8 +108,14 @@ const LISTELER = [
 */
 const satirIcerigi = (sinif) => {
   if (sinif === "list-check") return '<input type="checkbox">';
-  if (sinif === "pl-thumb") return "<b>—</b>";
+  if (sinif === "pl-thumb" || sinif === "cl-avatar") return "<b>AB</b>";
   if (sinif === "order-action") return '<button class="row-action">Hazırla →</button>';
+  if (sinif === "sl-adjust") return '<button class="ac-btn">+ Giriş</button><button class="ac-btn">− Çıkış</button>';
+  if (sinif === "dl-edit") return '<a>Düzenle →</a>';
+  /* Rozet taşıyan hücreler tek satırlık: ikinci satır uydurmak boyu şişirirdi. */
+  if (["pl-stock", "cl-tags", "col-count", "col-status", "dl-rate", "dl-badge", "sl-qty", "sl-policy"].includes(sinif)) {
+    return '<em class="ac-tag">Örnek</em>';
+  }
   return "<b>Örnek değer</b><small>ikincil satır</small>";
 };
 
@@ -98,7 +136,7 @@ function belge(liste, modulCss) {
       <form class="ac-filter" style="flex:1 1 380px"><input placeholder="Ara"><button class="ac-btn ac-btn-primary">Ara</button></form>
       <nav class="ac-filter"><a class="ac-btn">Bugün</a><a class="ac-btn">7 gün</a><a class="ac-btn">30 gün</a><a class="ac-btn">Tümü</a></nav>
     </section>
-    <nav class="ac-filter"><a class="ac-btn">Tümü<span class="ac-count">128</span></a><a class="ac-btn">Bekleyen<span class="ac-count">12</span></a><a class="ac-btn">Hazırlanan<span class="ac-count">7</span></a><a class="ac-btn">Tamamlanan<span class="ac-count">109</span></a></nav>
+    ${liste.sekme === false ? "" : `<nav class="ac-filter"><a class="ac-btn">Tümü<span class="ac-count">128</span></a><a class="ac-btn">Bekleyen<span class="ac-count">12</span></a><a class="ac-btn">Hazırlanan<span class="ac-count">7</span></a><a class="ac-btn">Tamamlanan<span class="ac-count">109</span></a></nav>`}
     <section class="${liste.kap}" data-manage>
       <div class="list-row th" id="ilk-baslik">${th}</div>
       ${Array.from({ length: 40 }, () => `<div class="list-row">${satir}</div>`).join("")}
