@@ -28,7 +28,7 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
   const {id}=await params; const {supabase,organization,membership}=await requireTenant();
   const [{data:product,error},{data:variants,error:variantError},{data:settings}]=await Promise.all([
     supabase.from("arc_products").select("id,name,slug,description,status,source,metadata,created_at,publish_at,unpublish_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
-    supabase.from("arc_product_variants").select("id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price").eq("organization_id",organization.id).eq("product_id",id).order("title"),
+    supabase.from("arc_product_variants").select("id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price,image_path").eq("organization_id",organization.id).eq("product_id",id).order("title"),
     supabase.from("arc_store_settings").select("storefront_url").eq("organization_id",organization.id).maybeSingle(),
   ]);
   if(error)throw new Error(error.message);if(variantError)throw new Error(variantError.message);if(!product)notFound();
@@ -51,6 +51,17 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
     ?imagePaths.map(path=>({url:isRemote(path)?path:signedByPath.get(path),path:isRemote(path)?"":path}))
     :(meta.images??[]).map(url=>({url,path:""}))
   ).filter((image):image is {url:string;path:string}=>Boolean(image.url));
+
+  /*
+    Varyantın görseli galeride imzalanmış olanlardan biri. Ayrıca
+    imzalanmıyor: aynı nesne için ikinci bir imza turu, sayfayı
+    varyant sayısı kadar yavaşlatırdı.
+  */
+  const gorselAdresi=new Map(imageEntries.map(image=>[image.path,image.url]));
+  const varyantGorseli=(yol:string|null)=>{
+    const adres=yol?gorselAdresi.get(yol):undefined;
+    return adres?<Image className="vl-thumb" src={adres} alt="" width={64} height={64}/>:null;
+  };
 
   const prices=variantList.map(variant=>variant.price);
   const minPrice=prices.length?Math.min(...prices):0;
@@ -200,6 +211,7 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
           <>
             <div className="list-row th">
               <span className="vl-title">VARYANT</span>
+              {canManage?<span className="vl-gorsel">GÖRSEL</span>:null}
               <span className="vl-sku">SKU</span>
               <span className="vl-price">FİYAT ₺</span>
               <span className="vl-compare">KARŞILAŞTIRMA ₺</span>
@@ -213,7 +225,21 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
                 <form action={updateVariant} className="list-row" key={variant.id}>
                   <input type="hidden" name="product_id" value={product.id}/>
                   <input type="hidden" name="variant_id" value={variant.id}/>
-                  <span className="vl-title"><b>{variant.title||"Default"}</b>{variant.cost_price?<small>Alış {money.format(variant.cost_price/100)}</small>:null}</span>
+                  <span className="vl-title">{varyantGorseli(variant.image_path)}<span><b>{variant.title||"Default"}</b>{variant.cost_price?<small>Alış {money.format(variant.cost_price/100)}</small>:null}</span></span>
+                  {/*
+                    GÖRSEL ÜRÜNÜN GALERİSİNDEN SEÇİLİYOR, yüklenmiyor:
+                    varyantın kendi deposu olsaydı aynı fotoğraf iki kez
+                    durur, biri silinince öteki kalırdı. Galeri boşken
+                    seçici de anlamsız, o yüzden ipucu gösteriliyor.
+                  */}
+                  <label className="vl-gorsel"><span className="vl-label">Görsel</span>
+                    {imageEntries.length?(
+                      <select name="image_path" defaultValue={variant.image_path??""} aria-label="Varyant görseli">
+                        <option value="">Kapak</option>
+                        {imageEntries.map((image,index)=>image.path?<option key={image.path} value={image.path}>Görsel {index+1}</option>:null)}
+                      </select>
+                    ):<small className="vl-gorsel-bos">Galeri boş</small>}
+                  </label>
                   <label className="vl-sku"><span className="vl-label">SKU</span><input name="sku" defaultValue={variant.sku??""} required aria-label="SKU"/></label>
                   <label className="vl-price"><span className="vl-label">Fiyat ₺</span><input name="price" type="number" min="0" step="0.01" defaultValue={(variant.price/100).toFixed(2)} required aria-label="Satış fiyatı"/></label>
                   <label className="vl-compare"><span className="vl-label">Karşılaştırma ₺</span><input name="compare_at_price" type="number" min="0" step="0.01" defaultValue={variant.compare_at_price?(variant.compare_at_price/100).toFixed(2):""} placeholder="İndirim yok" aria-label="Karşılaştırma fiyatı"/></label>
@@ -223,7 +249,7 @@ export default async function ProductDetail({params}:{params:Promise<{id:string}
                 </form>
               ):(
                 <div className="list-row" key={variant.id}>
-                  <span className="vl-title"><b>{variant.title||"Default"}</b></span>
+                  <span className="vl-title">{varyantGorseli(variant.image_path)}<span><b>{variant.title||"Default"}</b></span></span>
                   <span className="vl-sku">{variant.sku}</span>
                   <span className="vl-price"><b>{money.format(variant.price/100)}</b></span>
                   <span className="vl-compare">{variant.compare_at_price&&variant.compare_at_price>variant.price?<s>{money.format(variant.compare_at_price/100)}</s>:"—"}</span>

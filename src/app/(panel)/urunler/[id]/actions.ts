@@ -151,9 +151,26 @@ export async function updateVariant(formData: FormData) {
   const allowBackorder = formData.get("allow_backorder") === "on";
   if (!productId || !variantId || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isFinite(compareAtPriceInput) || compareAtPriceInput < 0) return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("invalid-variant")});
 
+  /*
+    VARYANT GÖRSELİ ÜRÜNÜN GALERİSİNDEN SEÇİLİYOR. Serbest metin kabul
+    edilseydi galeride olmayan bir yol yazılabilir ve vitrin kırık
+    resim gösterirdi; veritabanı kısıtı bunu yakalayamıyor (CHECK alt
+    sorgu içeremez), denetim burada.
+  */
+  const istenenGorsel = String(formData.get("image_path") ?? "").trim();
+  let imagePath: string | null = null;
+  if (istenenGorsel) {
+    const { data: urun, error: urunHatasi } = await supabase
+      .from("arc_products").select("metadata").eq("organization_id", organization.id).eq("id", productId).maybeSingle();
+    if (urunHatasi || !urun) return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("product-not-found")});
+    const yollar = ((urun.metadata ?? {}) as ProductMetadata).image_paths ?? [];
+    if (!yollar.includes(istenenGorsel)) return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("image-not-found")});
+    imagePath = istenenGorsel;
+  }
+
   const { error } = await supabase
     .from("arc_product_variants")
-    .update({ sku, price: Math.round(priceInput * 100), compare_at_price: compareAtPriceInput > priceInput ? Math.round(compareAtPriceInput * 100) : null, allow_backorder: allowBackorder, updated_at: new Date().toISOString() })
+    .update({ sku, price: Math.round(priceInput * 100), compare_at_price: compareAtPriceInput > priceInput ? Math.round(compareAtPriceInput * 100) : null, allow_backorder: allowBackorder, image_path: imagePath, updated_at: new Date().toISOString() })
     .eq("id", variantId)
     .eq("product_id", productId)
     .eq("organization_id", organization.id);
@@ -226,6 +243,17 @@ export async function removeProductImage(formData:FormData){
   if(storageError)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(storageError.message)});
   const {error:updateError}=await supabase.from("arc_products").update({metadata:{...metadata,image_paths:paths.filter(item=>item!==path)}}).eq("organization_id",organization.id).eq("id",productId);
   if(updateError)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(updateError.message)});
+
+  /*
+    BU GÖRSELE BAĞLI VARYANTLAR ÇÖZÜLÜYOR. Bırakılsaydı varyant artık
+    var olmayan bir nesneyi gösterirdi; vitrin fonksiyonu galeride
+    olmayan yolu zaten eliyor ama kayıt ekranda "görseli var" gibi
+    durur ve kimse neden çalışmadığını anlamazdı.
+  */
+  const {error:varyantHatasi}=await supabase.from("arc_product_variants")
+    .update({image_path:null}).eq("organization_id",organization.id).eq("product_id",productId).eq("image_path",path);
+  if(varyantHatasi)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(varyantHatasi.message)});
+
   revalidatePath("/urunler");revalidatePath(`/urunler/${productId}`);
   return await bildirimliDonus(`/urunler/${productId}`,{basari:basariMetni("image-removed")});
 }
@@ -341,7 +369,7 @@ export async function urunuKopyala(formData: FormData) {
 
   const [{ data: kaynak, error: kaynakHatasi }, { data: kaynakVaryantlar, error: varyantHatasi }] = await Promise.all([
     supabase.from("arc_products").select("id,name,slug,description,metadata,source,supplier,supplier_product_code,tax_rate").eq("organization_id", organization.id).eq("id", kaynakId).maybeSingle(),
-    supabase.from("arc_product_variants").select("sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price,supplier,supplier_sku").eq("organization_id", organization.id).eq("product_id", kaynakId),
+    supabase.from("arc_product_variants").select("sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price,supplier,supplier_sku,image_path").eq("organization_id", organization.id).eq("product_id", kaynakId),
   ]);
   if (kaynakHatasi || !kaynak) return await bildirimliDonus(donus, { hata: hataMetni("product-not-found") });
   if (varyantHatasi) return await bildirimliDonus(donus, { hata: hataMetni(varyantHatasi.message) });
@@ -395,6 +423,36 @@ export async function urunuKopyala(formData: FormData) {
   }).select("id").single();
   if (urunHatasi || !yeniUrun) return await bildirimliDonus(donus, { hata: hataMetni(urunHatasi?.code ?? urunHatasi?.message ?? "product-create") });
 
+  /*
+    GÖRSELLER VARYANTLARDAN ÖNCE. Varyantın image_path'i kopyanın
+    yeni yoluna çevrilmek zorunda; sıra ters olsaydı çeviri için
+    ikinci bir güncelleme turu gerekirdi.
+
+    Depodaki nesneler kopyanın klasörüne çoğaltılıyor.
+    Tedarikçi CDN adresleri (http…) olduğu gibi taşınıyor, onlar bizim
+    deponuzda değil. Çoğaltma düşerse ürün KALIYOR ve uyarı veriliyor:
+    on beş alanı doldurulmuş bir kopyayı görsel yüzünden silmek,
+    kullanıcıyı işin başına döndürürdü.
+  */
+  const kaynakYollari = (meta.image_paths ?? []).slice(0, 8);
+  const yeniYollar: string[] = [];
+  /* Eski yol → yeni yol: varyant görselleri aşağıda bununla çevriliyor. */
+  const gorselEslemesi = new Map<string, string>();
+  let gorselUyarisi = "";
+  for (const [sira, yol] of kaynakYollari.entries()) {
+    if (yol.startsWith("http")) { yeniYollar.push(yol); gorselEslemesi.set(yol, yol); continue; }
+    const uzanti = yol.split(".").pop() ?? "jpg";
+    const hedef = `${organization.id}/${yeniUrun.id}/kopya-${Date.now()}-${sira + 1}.${uzanti}`;
+    const { error } = await supabase.storage.from("arc-product-images").copy(yol, hedef);
+    if (error) { gorselUyarisi = "Görseller kopyalanamadı; ürüne elle yükleyin."; break; }
+    yeniYollar.push(hedef);
+    gorselEslemesi.set(yol, hedef);
+  }
+  if (yeniYollar.length) {
+    const { error } = await supabase.from("arc_products").update({ metadata: { ...meta, image_paths: yeniYollar, images: [] } }).eq("organization_id", organization.id).eq("id", yeniUrun.id);
+    if (error) gorselUyarisi = "Görseller kopyalandı ama ürüne bağlanamadı; elle yükleyin.";
+  }
+
   if (varyantlar.length) {
     const { error } = await supabase.from("arc_product_variants").insert(
       varyantlar.map((varyant) => ({
@@ -402,6 +460,10 @@ export async function urunuKopyala(formData: FormData) {
         product_id: yeniUrun.id,
         title: varyant.title,
         sku: esleme.get(String(varyant.sku ?? "").trim().toUpperCase()) ?? String(varyant.sku ?? ""),
+        /* Görsel yolu KOPYANINKİNE çevriliyor: kaynağın yolunu
+           taşımak, kaynaktan o görsel silindiğinde kopyayı da
+           kırardı ve iki ürün aynı nesneyi gösterirdi. */
+        image_path: varyant.image_path ? (gorselEslemesi.get(varyant.image_path) ?? null) : null,
         price: varyant.price,
         compare_at_price: varyant.compare_at_price,
         currency: varyant.currency ?? "TRY",
@@ -418,35 +480,16 @@ export async function urunuKopyala(formData: FormData) {
     );
     /*
       Varyantsız bir ürün satılamaz (fiyat ve stok varyantta). Yarım
-      kopya bırakmaktansa ürün satırı geri alınıyor.
+      kopya bırakmaktansa ürün satırı geri alınıyor — çoğaltılmış
+      görsel nesneleri de, yoksa depoda kimsenin göremediği dosyalar
+      birikirdi.
     */
     if (error) {
+      const cop = yeniYollar.filter((yol) => !yol.startsWith("http"));
+      if (cop.length) await supabase.storage.from("arc-product-images").remove(cop);
       await supabase.from("arc_products").delete().eq("organization_id", organization.id).eq("id", yeniUrun.id);
       return await bildirimliDonus(donus, { hata: hataMetni(error.code ?? error.message) });
     }
-  }
-
-  /*
-    Görseller: depodaki nesneler kopyanın klasörüne çoğaltılıyor.
-    Tedarikçi CDN adresleri (http…) olduğu gibi taşınıyor, onlar bizim
-    deponuzda değil. Çoğaltma düşerse ürün KALIYOR ve uyarı veriliyor:
-    on beş alanı doldurulmuş bir kopyayı görsel yüzünden silmek,
-    kullanıcıyı işin başına döndürürdü.
-  */
-  const kaynakYollari = (meta.image_paths ?? []).slice(0, 8);
-  const yeniYollar: string[] = [];
-  let gorselUyarisi = "";
-  for (const [sira, yol] of kaynakYollari.entries()) {
-    if (yol.startsWith("http")) { yeniYollar.push(yol); continue; }
-    const uzanti = yol.split(".").pop() ?? "jpg";
-    const hedef = `${organization.id}/${yeniUrun.id}/kopya-${Date.now()}-${sira + 1}.${uzanti}`;
-    const { error } = await supabase.storage.from("arc-product-images").copy(yol, hedef);
-    if (error) { gorselUyarisi = "Görseller kopyalanamadı; ürüne elle yükleyin."; break; }
-    yeniYollar.push(hedef);
-  }
-  if (yeniYollar.length) {
-    const { error } = await supabase.from("arc_products").update({ metadata: { ...meta, image_paths: yeniYollar, images: [] } }).eq("organization_id", organization.id).eq("id", yeniUrun.id);
-    if (error) gorselUyarisi = "Görseller kopyalandı ama ürüne bağlanamadı; elle yükleyin.";
   }
 
   revalidatePath("/");

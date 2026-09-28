@@ -64,15 +64,24 @@
 
 /* Varyantlar: her satır kendi kaydet düğmesiyle bir form */
 .variant-list[data-manage] .list-row{
-  grid-template-columns:minmax(130px,1fr) minmax(130px,1fr) 120px 130px 90px minmax(130px,auto) auto;
-  grid-template-areas:"title sku price compare stock backorder save";
+  /* KARŞILAŞTIRMA ₺ başlığı 130px'in altında iki satıra düşüyor ve
+     başlık şeridini büyütüyor; ölçülerek bulundu. */
+  grid-template-columns:minmax(120px,1fr) 100px minmax(120px,1fr) 108px 130px 84px minmax(118px,auto) auto;
+  grid-template-areas:"title gorsel sku price compare stock backorder save";
 }
 .variant-list:not([data-manage]) .list-row{
   grid-template-columns:minmax(130px,1fr) minmax(130px,1fr) 120px 130px 90px;
   grid-template-areas:"title sku price compare stock";
 }
 .variant-list .list-row:not(.th){min-height:62px}
-.vl-title{grid-area:title}.vl-sku{grid-area:sku}.vl-price{grid-area:price}.vl-compare{grid-area:compare}.vl-stock{grid-area:stock}.vl-backorder{grid-area:backorder}
+/* Küçük görsel başlığın yanında: hangi varyantın hangi fotoğrafa
+   bağlandığı seçiciye bakmadan görünsün. */
+.vl-title{grid-area:title;display:flex;align-items:center;gap:10px}
+.vl-title>span{display:grid;min-width:0}
+.vl-thumb{width:32px;height:32px;flex:none;border-radius:8px;border:1px solid var(--line);object-fit:cover}
+.vl-gorsel{grid-area:gorsel}
+.vl-gorsel-bos{color:var(--muted);font-size:12px}
+.panel-root .variant-list select{min-height:36px;margin:0;padding:6px 8px;font-size:13px}.vl-sku{grid-area:sku}.vl-price{grid-area:price}.vl-compare{grid-area:compare}.vl-stock{grid-area:stock}.vl-backorder{grid-area:backorder}
 .vl-save{grid-area:save;display:flex;justify-content:flex-end}
 .variant-list label{display:grid;margin:0}
 .vl-label{display:none}
@@ -139,7 +148,7 @@
   .stock-list:not([data-manage]) .list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name qty" "sku policy";row-gap:6px;padding:12px 14px}
   .sl-qty,.sl-policy{justify-self:end;text-align:right}
   .sl-adjust{justify-content:flex-start}
-  .variant-list[data-manage] .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title title" "sku stock" "price compare" "backorder save";row-gap:8px;padding:14px}
+  .variant-list[data-manage] .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title title" "sku stock" "price compare" "gorsel gorsel" "backorder save";row-gap:8px;padding:14px}
   .variant-list:not([data-manage]) .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title stock" "sku price" ". compare";row-gap:6px;padding:14px}
   .vl-label{display:block;margin-bottom:4px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.1em}
   .catalog-form,.stock-detailed-form,.variant-create-grid,.variant-matrix-grid,.variant-matrix-option{grid-template-columns:1fr}
