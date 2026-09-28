@@ -122,18 +122,43 @@ export function MaliyetAktarimi() {
       setYerImi(cevap);
     }));
 
+  /*
+    Uyarılar TÜRÜNE GÖRE sayılıyor. Satır başına birden çok uyarı
+    olabiliyor (maliyet + yinelenen SKU), bu yüzden düzleştiriliyor.
+  */
+  const uyariOzeti: [string, number][] = onizleme
+    ? [
+        ...onizleme.eslesen
+          .filter((x) => !x.sorun)
+          .flatMap((x) => x.uyarilar ?? [])
+          .reduce((sayac, metin) => sayac.set(metin, (sayac.get(metin) ?? 0) + 1), new Map<string, number>()),
+      ]
+    : [];
+
   const uygula = () =>
     basla(() => koru(async () => {
       if (!onizleme?.eslesen.length) return;
+      /*
+        Sorunlu satır GÖNDERİLMİYOR. Düğmenin sayısı zaten onları
+        saymıyordu; listenin tamamını yollamak, alış geçişinde
+        "atlanacak" yazan satırın yine de yazılması demekti.
+      */
+      const gonderilecek = onizleme.eslesen.filter((s) => !s.sorun);
+      if (!gonderilecek.length) return;
       const cevap = await maliyetUygula(
-        onizleme.eslesen.map((s) => ({ sku: s.sku, kurus: s.yeni, satis: s.satis, ustuCizili: s.ustuCizili })),
+        gonderilecek.map((s) => ({ sku: s.sku, kurus: s.yeni, satis: s.satis, ustuCizili: s.ustuCizili })),
         gecis,
         toplama?.toplamaIdleri ?? [],
       );
       setSonuc(
         cevap.hata
           ? { metin: cevap.hata, hata: true }
-          : { metin: `${cevap.yazilan} üründe ${gecis === "alis" ? "alış fiyatı" : "satış fiyatı"} güncellendi.` },
+          : {
+              /* Sunucu da belirsiz SKU eleyebiliyor; kaç satır düştüğü söyleniyor. */
+              metin:
+                `${cevap.yazilan} üründe ${gecis === "alis" ? "alış fiyatı" : "satış fiyatı"} güncellendi.` +
+                (cevap.atlanan ? ` ${cevap.atlanan} satır atlandı: aynı SKU farklı ürünlerde.` : ""),
+            },
       );
       setOnizleme(null);
       setToplama(null);
@@ -330,13 +355,13 @@ export function MaliyetAktarimi() {
             <>
               <h4>{onizleme.eslesen.length} ürün eşleşti</h4>
               {/*
-                Uyarı SAYISI başta: yüzlerce satırlık bir listede tek tek
-                aramak, uyarıyı hiç görmemekle aynı şey.
+                Uyarılar TÜRÜNE GÖRE sayılıp başta toplanıyor: yüzlerce
+                satırlık bir listede tek tek aramak, uyarıyı hiç
+                görmemekle aynı şey.
               */}
-              {onizleme.eslesen.some((x) => x.uyari) ? (
+              {uyariOzeti.length ? (
                 <p className="maliyet-sonuc" data-tone="hata">
-                  {onizleme.eslesen.filter((x) => x.uyari).length} üründe maliyet satış fiyatına eşit
-                  ya da üstünde. Yanlış sütun toplandıysa belirtisi budur — uygulamadan önce bakın.
+                  Uygulamadan önce bakın — {uyariOzeti.map(([metin, adet]) => `${adet} üründe ${metin}`).join("; ")}.
                 </p>
               ) : null}
               <ul>
@@ -361,10 +386,17 @@ export function MaliyetAktarimi() {
                       ) : (
                         <>
                           {satir.eski ? para.format(satir.eski / 100) : "—"} → <b>{para.format(satir.yeni / 100)}</b>
-                          {/* Uyarı "atlanacak" demiyor: satır yazılıyor, yalnızca şüpheli. */}
-                          {satir.uyari ? <span className="fiyat-sorun">{satir.uyari}</span> : null}
                         </>
                       )}
+                      {/*
+                        Uyarı rozeti iki geçişte de görünüyor ve
+                        "atlanacak" DEMİYOR: satır yazılıyor, yalnızca
+                        şüpheli. Sorunlu satırda uyarı gösterilmiyor —
+                        o satır zaten yazılmayacak.
+                      */}
+                      {!satir.sorun && satir.uyarilar?.length ? (
+                        <span className="fiyat-sorun">{satir.uyarilar.join(" · ")}</span>
+                      ) : null}
                     </em>
                   </li>
                 ))}

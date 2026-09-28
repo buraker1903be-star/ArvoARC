@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fiyatKarari, maliyetUyarisi, skuAdaylari } from "@/lib/fiyat-aktarimi";
+import { fiyatKarari, maliyetUyarisi, skuAdaylari, skuYinelemesi } from "@/lib/fiyat-aktarimi";
 
 /*
   LR fiyat kuralı. Yanlış olursa CANLI MAĞAZADA yanlış fiyat oluşur:
@@ -94,4 +94,34 @@ test("maliyet satış fiyatının ALTINDAYSA uyarı yok", () => {
 test("satış fiyatı YOKSA uyarı üretilmiyor", () => {
   /* Fiyatı olmayan varyantta "maliyet satışı aşıyor" demek yanıltıcı olurdu. */
   assert.equal(maliyetUyarisi(40493, 0), undefined);
+});
+
+/*
+  AYNI SKU BİRDEN ÇOK KAYITTA. arc_product_variants'ta (organization_id,
+  sku) benzersiz değil ve canlıda altı varyantın aynı SKU'yu taşıdığı
+  ürünler var (28.09.2026). Yazma eq("sku", …) ile bütün kopyalara
+  gidiyor, önizleme ise SKU'yu tek satır gösteriyordu.
+*/
+test("SKU tekse ne uyarı ne sorun var", () => {
+  assert.deepEqual(skuYinelemesi(1, 1), {});
+});
+
+test("AYNI ürünün kopyalarında uyarı var, satır yazılıyor", () => {
+  // Hepsine yazmak istenen şey; yalnızca kaç kayda gittiği söyleniyor.
+  const sonuc = skuYinelemesi(6, 1);
+  assert.ok("uyari" in sonuc && sonuc.uyari?.includes("6"));
+  assert.ok(!("sorun" in sonuc));
+});
+
+test("FARKLI ürünler aynı SKU'yu taşıyorsa satır ATLANIYOR", () => {
+  /*
+    Bir ürünün fiyatını başkasına yazmak canlı mağazada geri alınamaz ve
+    önizlemede görünmezdi (harita sonuncuyu tutuyor). Hangisinin doğru
+    olduğuna kod karar veremez.
+  */
+  assert.deepEqual(skuYinelemesi(2, 2), { sorun: "sku-farkli-urunlerde" });
+});
+
+test("çok kayıt VE çok ürün varsa sorun kazanıyor, uyarıya düşmüyor", () => {
+  assert.deepEqual(skuYinelemesi(6, 3), { sorun: "sku-farkli-urunlerde" });
 });
