@@ -5,6 +5,7 @@ import { inventoryKindLabel } from "@/lib/commerce-labels";
 import { Icon } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
 import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
+import { StokTablosu } from "./stok-tablosu";
 import "../catalog.css";
 import { PanelBildirimi } from "@/components/panel/bildirim";
 
@@ -136,7 +137,8 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
     <section className="ac-bar">
       <div>
         <h1>Stok Yönetimi</h1>
-        <p>{stockSum.toLocaleString("tr-TR")} adet · {counts.all.toLocaleString("tr-TR")} varyant · tüm değişiklikler hareket olarak kaydedilir.</p>
+        {/* İpucu buraya taşındı: liste üstünde ayrı bir bant olarak 56px tutuyordu. */}
+        <p>{stockSum.toLocaleString("tr-TR")} adet · {counts.all.toLocaleString("tr-TR")} varyant · en düşük stoktan başlar{canManage ? ", miktarı yazıp satırdan giriş veya çıkış yapın" : ""} · her değişiklik hareket olarak kaydedilir.</p>
       </div>
       <div className="ac-bar-actions">
         {canManage ? <a className="ac-btn" href="/api/disari-aktar/stok"><Icon name="download" size={15} />CSV indir</a> : null}
@@ -196,62 +198,47 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
         ))}
       </nav>
 
-      <section className="ac table list-table stock-list" data-manage={canManage ? "" : undefined}>
-        {/* Başlık kaldırıldı: sayfanın kendi başlığı zaten "Stok Yönetimi". */}
-        <div className="ac-head list-table-head">
-          <p>En düşük stoktan başlayarak{canManage ? "; miktarı yazıp satırdan giriş veya çıkış yapın." : "."}</p>
-        </div>
-        {variants.length ? (
-          <>
-            <div className="list-row th">
-              <span className="sl-name">ÜRÜN</span>
-              <span className="sl-sku">SKU</span>
-              <span className="sl-qty">STOK</span>
-              <span className="sl-policy">POLİTİKA</span>
-              {canManage ? <span className="sl-adjust">HAREKET</span> : null}
-            </div>
-            {variants.map((variant) => (
-              <div className="list-row" key={variant.id}>
-                {/* title: satır metni üç nokta ile kırpılıyor, uzun ürün adı
-                    kaydı açmadan okunamıyordu. */}
-                <span className="sl-name">
-                  <Link prefetch={false} className="list-row-link" href={`/urunler/${variant.product_id}`}><b title={productName.get(variant.product_id) ?? "Ürün"}>{productName.get(variant.product_id) ?? "Ürün"}</b></Link>
-                  <small>{variant.title && variant.title !== "Default" ? variant.title : "Tek varyant"}</small>
-                </span>
-                <span className="sl-sku">{variant.sku}</span>
-                <span className="sl-qty">
-                  <em className="stock-pill" data-tone={variant.stock < 0 ? "bad" : variant.stock === 0 ? "warn" : variant.stock <= lowStockThreshold ? "warn" : undefined}>{variant.stock.toLocaleString("tr-TR")}</em>
-                </span>
-                <span className="sl-policy">{variant.allow_backorder ? "Stoksuz satış açık" : "Stok zorunlu"}</span>
-                {canManage ? (
-                  <form action={adjustInventory} className="sl-adjust">
-                    <input type="hidden" name="variant_id" value={variant.id} />
-                    <input type="hidden" name="back" value={back} />
-                    <input name="quantity" type="number" min="1" step="1" defaultValue="1" required className="ac-input" aria-label={`${variant.sku} hareket miktarı`} />
-                    <button className="ac-btn" type="submit" name="direction" value="in" title="Stok girişi">+ Giriş</button>
-                    <button className="ac-btn" type="submit" name="direction" value="out" title="Stok çıkışı">− Çıkış</button>
-                  </form>
-                ) : null}
-              </div>
-            ))}
-          </>
+      {/*
+        Liste İSTEMCİ BİLEŞENİNDE: satır içi giriş/çıkış her tıklamada
+        tam bir gezinme başlatıyordu ve stok düzeltmesi seri yapılan bir
+        iş — sayımdan sonra on varyantı girmek on kez başa dönmek
+        demekti. Veri ve yetki kararı burada, çizim ve etkileşim orada.
+
+        İpucu bandı da kalktı (56px, ölçüldü); cümlesi sayfa alt
+        başlığına taşındı.
+      */}
+      <StokTablosu
+        satirlar={variants.map((variant) => ({
+          id: variant.id,
+          urunId: variant.product_id,
+          urunAdi: productName.get(variant.product_id) ?? "Ürün",
+          varyantAdi: variant.title && variant.title !== "Default" ? variant.title : "Tek varyant",
+          sku: variant.sku,
+          stok: variant.stock,
+          stoksuzSatis: variant.allow_backorder,
+        }))}
+        canManage={canManage}
+        back={back}
+        dusukStokEsigi={lowStockThreshold}
+      >
+        {(varyantSayimi.count ?? 0) === 0 ? (
+          <ListeBos
+            baslik="Stok takip edilecek varyant yok."
+            aciklama="Stok, ürün varyantlarında tutuluyor. Önce kataloğa ürün ekleyin; her varyant burada kendi adediyle görünür."
+          >
+            <ListeBosEylem href="/urunler" birincil>Ürünlere git</ListeBosEylem>
+          </ListeBos>
         ) : (
-          (varyantSayimi.count ?? 0) === 0 ? (
-            <ListeBos
-              baslik="Stok takip edilecek varyant yok."
-              aciklama="Stok, ürün varyantlarında tutuluyor. Önce kataloğa ürün ekleyin; her varyant burada kendi adediyle görünür."
-            >
-              <ListeBosEylem href="/urunler" birincil>Ürünlere git</ListeBosEylem>
-            </ListeBos>
-          ) : (
-            <ListeBos
-              baslik="Bu ölçütlere uygun varyant yok."
-              aciklama="SKU ve varyant adında arama yapılır. Aramayı veya filtreyi değiştirin."
-            >
-              <ListeBosEylem href={back}>Filtreleri temizle</ListeBosEylem>
-            </ListeBos>
-          )
+          <ListeBos
+            baslik="Bu ölçütlere uygun varyant yok."
+            aciklama="SKU ve varyant adında arama yapılır. Aramayı veya filtreyi değiştirin."
+          >
+            <ListeBosEylem href={back}>Filtreleri temizle</ListeBosEylem>
+          </ListeBos>
         )}
+      </StokTablosu>
+
+      <div className="ac table list-table">
         <div className="list-pagination">
           <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + variants.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} varyant` : "Kayıt yok"}</span>
           {pageCount > 1 ? (
@@ -262,7 +249,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
             </div>
           ) : null}
         </div>
-      </section>
+      </div>
 
       {canManage ? (
         <details className="ac ac-pad catalog-details">
