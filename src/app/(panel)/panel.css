@@ -775,7 +775,28 @@ html[data-theme="dark"] .panel-root .gorunum-cip[data-acik]{background:var(--sur
 .panel-root .gorunum-kaydet-form{position:absolute;z-index:40;top:calc(100% + 6px);left:0;display:grid;gap:10px;width:min(300px,86vw);padding:14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-raised);box-shadow:var(--shadow-md)}
 .panel-root .gorunum-kaydet-form label{display:grid;gap:6px;color:var(--muted);font-size:12.5px;font-weight:650}
 
-/* Tek satırlık alanlar tam olarak kontrol yüksekliğinde: min-height ile
-   dolgu ve satır yüksekliği 41px ve 44px üretiyor, aynı satırdaki düğmeyle
-   hizalanmıyordu. textarea dışarıda: yüksekliğini satır sayısı belirler. */
-.panel-root :is(input.ac-input,select.ac-input,.ac-filter input,.ac-filter select){height:var(--control-h)}
+/*
+  TEK SATIRLIK ALANLAR TAM OLARAK KONTROL YÜKSEKLİĞİNDE.
+
+  Kural SINIFA DEĞİL, ELEMANA bağlı. Önce yalnızca .ac-input'a bakıyordu;
+  indirim formundaki alanların hiç sınıfı yok (globals.css'teki genel
+  input kuralıyla çiziliyorlar) ve tek formda ÜÇ ayrı yükseklik
+  çıkıyordu: metin 47px, açılır liste 44px, tarih 49px (29.09.2026'da
+  ölçüldü). Sınıf eklemeyi unutmak mümkün, eleman seçicisi ise yeni
+  sayfada da kendiliğinden geçerli.
+
+  Dışarıda kalanlar: textarea (yüksekliğini satır sayısı belirler),
+  kutucuk/radyo (kendi boyutu var), dosya ve kaydırıcı (tarayıcı
+  denetimleri). Renk seçici İÇERİDE: yanındaki metin alanı 40px iken o
+  43px duruyordu ve ayarlar formunda yan yanalar.
+
+  Düğmeler min-height alıyor, height değil: yerel kuralı olan küçük
+  düğmeler (ör. stok satırındaki +Giriş/−Çıkış, 34px) kendi ölçüsünde
+  kalsın. Dolgu sıfırlanıyor çünkü 11px+11px dolgu + satır yüksekliği
+  42px üretiyordu; düğme içeriği zaten dikeyde ortalanıyor.
+*/
+.panel-root :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+  select
+){height:var(--control-h)}
+.panel-root form button{min-height:var(--control-h);padding-block:0}
