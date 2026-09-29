@@ -27,14 +27,22 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   uygulamaya gerek kalmadı.
 */
 /*
-  28.09.2026 akşam dökümü o güne kadarki BÜTÜN migration'ları içeriyor:
-  fiyat toplama tablosu, pasif üyelik kapanışı, hayalet varyant onarımı,
-  LR/Serox kimlikleri, kaydedilmiş görünümler, varyant görseli, vitrin
-  varyant nitelikleri, medya listesi ve zamanlanmış yayın (sonuncusu
-  20260928180805). İmleç sonuncunun ardında; dökümde zaten olan bir
-  migration'ı yeniden uygulamak "already exists" ile düşerdi.
+  29.09.2026 akşam dökümü o güne kadarki bütün migration'ları içeriyor
+  (sonuncusu 20260929182709: Tami anahtarları).
+
+  AMA İMLEÇ SONUNCUNUN ARDINDA DEĞİL, 20260929090233'ÜN ÜSTÜNDE.
+  Sebebi dökümün kendisi: dışa aktarma betiği, yalnızca sahibinde yetki
+  kalmış bir fonksiyonu yetki bölümünden tamamen düşürüyordu, yani
+  tetikleyici fonksiyonlarının "revoke all … from public" satırları
+  dökümde yok. Dökümden kurulan veritabanı canlıdan DAHA AÇIK kalıyor
+  ve yetki testi bunu yakalıyor. Betik düzeltildi
+  (scripts/sema-disa-aktar.sql); döküm yeniden üretildiğinde imleç
+  20260929182710'a alınabilir.
+
+  O zamana kadar yetkileri kapatan migration testlerde yeniden
+  uygulanıyor — zararsız, çünkü revoke/grant tekrar edilebilir.
 */
-const ILK_UYGULANAN = "20260928180806";
+const ILK_UYGULANAN = "20260929090233";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;

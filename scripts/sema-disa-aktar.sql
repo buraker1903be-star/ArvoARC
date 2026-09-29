@@ -117,6 +117,20 @@ fonksiyon_ddl as (
   where n.nspname in ('public', 'private') and p.prokind in ('f', 'p')
     and not exists (select 1 from pg_depend dep where dep.objid = p.oid and dep.deptype = 'e')
 ),
+-- YETKİLER. Her fonksiyon için ÖNCE revoke satırı yazılır, sonra
+-- sahibi dışındaki yetkiler.
+--
+-- Sahip satırını WHERE ile elemek, yalnızca sahibinde yetki kalmış bir
+-- fonksiyonu dökümden TAMAMEN düşürüyordu: aclexplode tek satır
+-- üretiyor, o da eleniyor ve fonksiyon yetki bölümünde hiç görünmüyordu.
+-- Sonuç, dökümden kurulan veritabanının CANLIDAN DAHA AÇIK olması —
+-- Postgres yeni fonksiyonu PUBLIC'e açık oluşturuyor ve revoke satırı
+-- gelmediği için öyle kalıyor. 29.09.2026'da tetikleyici fonksiyonları
+-- anon'a kapatılınca yedi fonksiyon dökümden bu şekilde düştü ve
+-- tests/db/yetki.test.mjs yakaladı.
+--
+-- Eleme artık satır düzeyinde değil, TOPLAMA İÇİNDE (filter): revoke
+-- satırı her hâlükârda yazılıyor.
 yetki_ddl as (
   select n.nspname || '.' || p.proname as ad, 85 as sira,
          format('revoke all on function %I.%I(%s) from public;', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid))
@@ -124,14 +138,13 @@ yetki_ddl as (
               format('grant execute on function %I.%I(%s) to %s;',
                 n.nspname, p.proname, pg_get_function_identity_arguments(p.oid),
                 case when acl.grantee = 0 then 'public' else quote_ident(r.rolname) end),
-              E'\n'), '') as ddl
+              E'\n') filter (where acl.grantee is not null and acl.grantee <> p.proowner), '') as ddl
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   left join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl on acl.privilege_type = 'EXECUTE'
   left join pg_roles r on r.oid = acl.grantee
   where n.nspname in ('public', 'private') and p.prokind in ('f', 'p')
     and not exists (select 1 from pg_depend dep where dep.objid = p.oid and dep.deptype = 'e')
-    and (acl.grantee is null or acl.grantee <> p.proowner)
   group by p.oid, n.nspname, p.proname
 ),
 tetikleyici_ddl as (
