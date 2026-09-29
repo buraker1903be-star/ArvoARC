@@ -195,13 +195,27 @@ export function ProductTable({ rows, canManage, back, katalogBos, children }: { 
           yeni mağazanın gördüğü ilk ekran buydu.
         */
         katalogBos ? (
+          /*
+            BİRİNCİL EYLEM "TEK ÜRÜN EKLE". Eskiden birincil düğme
+            Shopify CSV aktarımıydı ve "tek tek ekleyebilirsiniz"
+            metinde geçtiği hâlde düğmesi YOKTU. İkisi de ArvoCulture'ın
+            durumunu varsayıyordu: başka bir platformdan taşınan,
+            tedarikçi akışı olan bir mağaza. Yeni bir kuaför ya da
+            güzellik salonunun ne Shopify geçmişi ne tedarikçi akışı
+            var; ilk işi tek bir ürün girmek.
+
+            Kurulum rehberinin 1. adımı da tam buraya gidiyordu
+            (/urunler?yeni=1#yeni-urun); iki ekran ilk adım konusunda
+            birbiriyle çelişiyordu.
+          */
           <ListeBos
             baslik="Kataloğunuz henüz boş."
-            aciklama="Ürünleri Shopify CSV'sinden toplu aktarabilir, tedarikçi kataloğundan çekebilir ya da tek tek ekleyebilirsiniz."
+            aciklama="Tek bir ürünle başlayabilirsiniz. Başka bir platformdan taşınıyorsanız Shopify CSV'sini toplu aktarabilir ya da tedarikçi kataloğundan çekebilirsiniz."
           >
             {canManage ? (
               <>
-                <ListeBosEylem href="/veri-aktarimi" birincil>Ürün aktar</ListeBosEylem>
+                <ListeBosEylem href="/urunler?yeni=1#yeni-urun" birincil>Ürün ekle</ListeBosEylem>
+                <ListeBosEylem href="/veri-aktarimi">Toplu aktar</ListeBosEylem>
                 <ListeBosEylem href="/tedarikci">Tedarikçiden çek</ListeBosEylem>
               </>
             ) : null}

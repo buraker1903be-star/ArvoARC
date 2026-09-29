@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ayarlardanOlgular, kurulumDurumu, type KurulumOlgulari } from "@/lib/kurulum-adimlari";
+import { ayarlardanOlgular, kurulumAdimlari, kurulumDurumu, type KurulumOlgulari } from "@/lib/kurulum-adimlari";
 
 /*
   Rehber yanlış "tamam" derse kullanıcı satışa hazır olduğunu sanır ve
@@ -124,4 +124,34 @@ test("platform alt alan adı da vitrin adresi sayılıyor", () => {
   */
   assert.equal(ayarlardanOlgular({ platform_subdomain: "salon-beta" }, SAYILAR).vitrinAdresiVar, true);
   assert.equal(ayarlardanOlgular({ platform_subdomain: "  " }, SAYILAR).vitrinAdresiVar, false);
+});
+
+/*
+  REHBER İLE BOŞ KATALOG AYNI İLK ADIMI GÖSTERMELİ.
+
+  Rehberin 1. adımı "Ürün ekle" deyip /urunler?yeni=1#yeni-urun'e
+  gidiyordu; aynı sayfanın boş katalog ekranının birincil düğmesi ise
+  Shopify CSV aktarımıydı ve "tek tek ekleyebilirsiniz" metinde geçtiği
+  hâlde düğmesi yoktu. İki ekran, kullanıcının ilk işi konusunda
+  birbiriyle çelişiyordu.
+
+  Bağ tiplerle kurulamıyor; kaynak üzerinden sabitleniyor.
+*/
+test("boş katalogun birincil eylemi, rehberin ürün adımıyla aynı yere gidiyor", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { resolve } = await import("node:path");
+  const tablo = readFileSync(
+    resolve(import.meta.dirname, "../src/app/(panel)/urunler/product-table.tsx"),
+    "utf8",
+  );
+  const urunAdimi = kurulumAdimlari({
+    urunSayisi: 0, yayindaUrunSayisi: 0, logoVar: false,
+    odemeAcik: false, kargoUcretiVar: false, vitrinAdresiVar: false,
+  }).find((adim) => adim.anahtar === "urun");
+
+  assert.ok(urunAdimi, "ürün adımı kayboldu");
+  assert.ok(
+    tablo.includes(`href="${urunAdimi.yol}" birincil`),
+    `boş katalogun birincil düğmesi ${urunAdimi.yol} adresine gitmeli`,
+  );
 });

@@ -352,11 +352,20 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
           ortada olmayan bir filtreyi aratmaktı.
         */
         siparisYok ? (
+          /*
+            BİRİNCİL EYLEM ARTIK "MAĞAZANI GÖR". Tek düğme "Eski
+            siparişleri aktar" idi ve birincildi: hiç Shopify geçmişi
+            olmayan yeni bir salona, yapması gereken ilk şeymiş gibi
+            duruyordu — ArvoCulture'ın (taşınan mağaza) durumu herkesin
+            varsayılanıydı. Sipariş üretmek kiracının elinde değil;
+            elindeki tek anlamlı iş vitrinin çalıştığını görmek.
+          */
           <ListeBos
             baslik="Henüz sipariş yok."
-            aciklama="Vitrinden ilk sipariş geldiğinde burada görünür. Shopify'daki eski siparişlerinizi şimdi aktarabilirsiniz."
+            aciklama="Vitrinden ilk sipariş geldiğinde burada görünür. Mağazanızı açıp alışveriş akışını kendiniz deneyebilirsiniz."
           >
-            <ListeBosEylem href="/veri-aktarimi" birincil>Eski siparişleri aktar</ListeBosEylem>
+            <ListeBosEylem href="/magaza" birincil>Mağazanı gör</ListeBosEylem>
+            <ListeBosEylem href="/veri-aktarimi">Eski siparişleri aktar</ListeBosEylem>
           </ListeBos>
         ) : (
           <ListeBos
