@@ -790,13 +790,17 @@ html[data-theme="dark"] .panel-root .gorunum-cip[data-acik]{background:var(--sur
   denetimleri). Renk seçici İÇERİDE: yanındaki metin alanı 40px iken o
   43px duruyordu ve ayarlar formunda yan yanalar.
 
-  Düğmeler min-height alıyor, height değil: yerel kuralı olan küçük
-  düğmeler (ör. stok satırındaki +Giriş/−Çıkış, 34px) kendi ölçüsünde
-  kalsın. Dolgu sıfırlanıyor çünkü 11px+11px dolgu + satır yüksekliği
-  42px üretiyordu; düğme içeriği zaten dikeyde ortalanıyor.
+  Düğme kuralı YALNIZCA type="submit" için ve min-height veriyor
+  (height değil). İkisi de bilerek: mağaza tasarımı düzenleyicisinin
+  araç düğmeleri (geri al/yinele 33px, cihaz seçici 32px) sınıfsız ama
+  type="button"; genel bir kural o yoğun şeridi 40px'e şişirirdi. Kendi
+  ölçüsü olan gönderim düğmeleri de (stok satırındaki +Giriş/−Çıkış,
+  34px) daha yüksek özgüllükte kaldıkları için etkilenmiyor. Dolgu
+  sıfırlanıyor: 11px+11px dolgu + satır yüksekliği 42px üretiyordu ve
+  düğme içeriği zaten dikeyde ortalanıyor.
 */
 .panel-root :is(
   input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
   select
 ){height:var(--control-h)}
-.panel-root form button{min-height:var(--control-h);padding-block:0}
+.panel-root form button[type="submit"]{min-height:var(--control-h);padding-block:0}
