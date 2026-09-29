@@ -450,12 +450,24 @@ export async function tamiBaglantisiniDene(): Promise<{ ok: boolean; mesaj: stri
 
   /* Var olmayan ama biçime uyan bir kimlik (Tami: 2-36, harf/rakam, - ve _). */
   const sonuc = await sorgula(ayar, crypto.randomUUID());
-  if (sonuc.ok) {
-    return { ok: true, mesaj: "Bağlantı çalışıyor: Tami isteği kabul etti." };
-  }
+  /*
+    Sayısal olmayan numara ayrıca söyleniyor: portalde
+    "Terminal-84032909" görünen değer olduğu gibi yazılırsa özet tutmuyor
+    ve Tami 4003 dönüyor; mesajdan bu anlaşılmıyordu.
+  */
+  const rakamDisi = [
+    /^\d+$/.test(ayar.kimlik.merchantNumber.trim()) ? null : "işyeri numarası",
+    /^\d+$/.test(ayar.kimlik.terminalNumber.trim()) ? null : "terminal numarası",
+  ].filter(Boolean);
+  const uyari = rakamDisi.length
+    ? ` · ${rakamDisi.join(" ve ")} rakam dışı karakter içeriyor; Tami bunları sayı olarak bekliyor.`
+    : "";
+  const kimlikNotu = `İstek ${ortam} ortamına, ${jetonOnEki} kimliğiyle gitti.${uyari}`;
+
+  if (sonuc.ok) return { ok: true, mesaj: `Bağlantı çalışıyor: Tami isteği kabul etti. ${kimlikNotu}` };
   if (/bulunamad|not found|4009|4010/i.test(sonuc.hata)) {
     /* İşlem yok ama kimlik kabul edildi: aradığımız cevap bu. */
-    return { ok: true, mesaj: `Kimlik doğrulandı. Tami’nin cevabı: ${sonuc.hata}` };
+    return { ok: true, mesaj: `Kimlik doğrulandı. Tami: ${sonuc.hata} · ${kimlikNotu}` };
   }
-  return { ok: false, mesaj: `${sonuc.hata}${sonuc.durum ? ` (HTTP ${sonuc.durum})` : ""}` };
+  return { ok: false, mesaj: `${sonuc.hata}${sonuc.durum ? ` (HTTP ${sonuc.durum})` : ""} · ${kimlikNotu}` };
 }

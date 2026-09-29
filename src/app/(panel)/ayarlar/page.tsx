@@ -270,8 +270,14 @@ export default async function Settings(){
           <div className="payment-title"><div><small>KARTLA ÖDEME</small><h4>Tami ortak ödeme sayfası</h4></div><label className="check-inline"><input type="checkbox" name="tami_enabled" defaultChecked={settings?.tami_enabled}/><span>Etkin</span></label></div>
           <p>Kart bilgileri ArvoARC sunucularına gelmeden Tami’nin ödeme sayfasında işlenir; Masterpass’e kayıtlı kartlar da orada çıkar.</p>
           <div className="payment-fields">
-            <label>İşyeri numarası<input name="tami_merchant_number" defaultValue={settings?.tami_merchant_number??""} placeholder="merchantNumber" autoComplete="off"/></label>
-            <label>Terminal numarası<input name="tami_terminal_number" defaultValue={settings?.tami_terminal_number??""} placeholder="terminalNumber" autoComplete="off"/></label>
+            {/*
+              YALNIZCA RAKAM. Tami'nin örneğinde ikisi de Long ve
+              PG-Auth-Token'ın özeti o sayıdan hesaplanıyor; portalde
+              "Terminal-84032909" görünen değer olduğu gibi yazılırsa
+              özet tutmuyor ve Tami 4003 dönüyor (29.09.2026'da oldu).
+            */}
+            <label>İşyeri numarası<input name="tami_merchant_number" inputMode="numeric" defaultValue={settings?.tami_merchant_number??""} placeholder="yalnızca rakam, ör. 1000" autoComplete="off"/></label>
+            <label>Terminal numarası<input name="tami_terminal_number" inputMode="numeric" defaultValue={settings?.tami_terminal_number??""} placeholder="yalnızca rakam, “Terminal-” yazmayın" autoComplete="off"/></label>
             <label className="wide">JWK kid<input name="tami_jwk_kid" defaultValue={settings?.tami_jwk_kid??""} placeholder="Portal → İşyeri Ayarları → POS Yönetimi" autoComplete="off"/></label>
             <label>Gizli anahtar (secretKey)<input name="tami_secret_key" type="password" placeholder={tamiKeysStored?"Kayıtlı · değiştirmek için yazın":"secretKey"} autoComplete="new-password"/></label>
             <label>JWK “k” değeri<input name="tami_jwk_k" type="password" placeholder={tamiKeysStored?"Kayıtlı · değiştirmek için yazın":"k"} autoComplete="new-password"/></label>
