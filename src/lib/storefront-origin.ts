@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { konakSadelestir, vitrinDefteri } from "@/lib/magaza-adresi";
 
 /**
  * Vitrin isteğinin hangi mağazadan geldiğini bulur.
@@ -16,15 +17,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const FALLBACK_ORIGIN = process.env.STOREFRONT_URL ?? "https://arvoculture.com";
 
-/** "www." öneki yok sayılır: aynı mağazanın iki adresi. */
-export function normalizeHost(value: string) {
-  const withScheme = value.includes("://") ? value : `https://${value}`;
-  try {
-    return new URL(withScheme).host.toLowerCase().replace(/^www\./, "");
-  } catch {
-    return value.toLowerCase().replace(/^www\./, "");
-  }
-}
+/* Eşleştirme kuralı lib/magaza-adresi.ts'te: panelin "adresin bu"
+   dediği yerle buranın kabul ettiği yer aynı olmak zorunda. */
+export const normalizeHost = konakSadelestir;
 
 export function storefrontCorsHeaders(origin: string | null, allow: boolean) {
   return {
@@ -40,28 +35,21 @@ export function storefrontCorsHeaders(origin: string | null, allow: boolean) {
   delerdi. Alan adı nadiren değişir; bir dakikalık gecikme yeni mağazanın ilk
   isteğini geciktirir, o kadar.
 */
-let storeCache: { at: number; rows: { organizationId: string; hosts: string[] }[] } | null = null;
+let storeCache: { at: number; defter: Map<string, string> } | null = null;
 const CACHE_MS = 60_000;
 
 async function storeDirectory(supabase: SupabaseClient) {
-  if (storeCache && Date.now() - storeCache.at < CACHE_MS) return storeCache.rows;
+  if (storeCache && Date.now() - storeCache.at < CACHE_MS) return storeCache.defter;
   const { data, error } = await supabase
     .from("arc_store_settings")
-    .select("organization_id, custom_domain, platform_subdomain, storefront_url");
-  if (error || !data) return storeCache?.rows ?? [];
-  const rows = data.map((store) => ({
-    organizationId: store.organization_id as string,
-    hosts: [store.custom_domain, store.platform_subdomain, store.storefront_url]
-      .filter(Boolean)
-      .map((value) => normalizeHost(String(value))),
-  }));
-  storeCache = { at: Date.now(), rows };
-  return rows;
+    .select("organization_id, custom_domain, domain_verified_at, platform_subdomain, storefront_url");
+  if (error || !data) return storeCache?.defter ?? new Map<string, string>();
+  const defter = vitrinDefteri(data);
+  storeCache = { at: Date.now(), defter };
+  return defter;
 }
 
 export async function resolveStore(supabase: SupabaseClient, origin: string | null) {
   if (!origin) return null;
-  const host = normalizeHost(origin);
-  const rows = await storeDirectory(supabase);
-  return rows.find((store) => store.hosts.includes(host))?.organizationId ?? null;
+  return (await storeDirectory(supabase)).get(normalizeHost(origin)) ?? null;
 }

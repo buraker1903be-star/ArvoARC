@@ -385,7 +385,13 @@ export async function POST(request: Request) {
   */
   let config: PaytrStoreConfig;
   try {
-    config = await storePaytrConfig(supabase, organizationId);
+    config = await storePaytrConfig(supabase, organizationId, origin);
+    /*
+      Dönüş adresi olmadan ödeme başlatılmıyor. Eskiden yedek adres
+      ArvoCulture'dı: adresi çözülemeyen başka bir mağazanın müşterisi,
+      ödedikten sonra o markanın sitesinde "sipariş bulunamadı" görürdü.
+    */
+    if (!config.storeUrl) throw new Error("Mağazanın vitrin adresi tanımlı değil");
     // Mağaza panelden kartla ödemeyi kapattıysa yeni ödeme başlatılmaz.
     // (İade ve gelen bildirim doğrulaması bu bayrağa bakmaz; onlar çalışmaya
     // devam etmeli.)

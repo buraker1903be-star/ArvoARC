@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { decryptSecret } from "@/lib/payment-credentials";
+import { magazaAdresi } from "@/lib/magaza-adresi";
 
 /**
  * PayTR yapılandırması. MERCHANT_KEY ve MERCHANT_SALT gizlidir ve
@@ -33,7 +34,14 @@ export interface PaytrStoreConfig {
   merchantSalt: string;
   /** "1" = test modu. */
   testMode: string;
-  storeUrl: string;
+  /*
+    Ödeme sonrası müşterinin döneceği yer. Adresi çözülemeyen mağaza
+    için NULL: yedek adres ArvoCulture'dı ve kendi PayTR hesabıyla
+    tahsilat yapan BAŞKA bir mağazanın müşterisi, ödedikten sonra o
+    markanın sitesine düşüyordu. Yalnızca ödeme başlatan yol bu alanı
+    kullanıyor; iade ve bildirim doğrulaması kullanmıyor.
+  */
+  storeUrl: string | null;
 }
 
 /**
@@ -41,7 +49,7 @@ export interface PaytrStoreConfig {
  * hesabına ait; ArvoARC'ın değil. Yeni mağazalar bunları KULLANMAZ, yoksa
  * tahsilatları ArvoCulture'ın hesabına düşer.
  */
-function legacyConfig(storeUrl: string): PaytrStoreConfig {
+function legacyConfig(storeUrl: string | null): PaytrStoreConfig {
   return {
     enabled: true,
     merchantId: required("PAYTR_MERCHANT_ID"),
@@ -66,6 +74,9 @@ type SettingsRow = {
   paytr_merchant_salt_enc: string | null;
   paytr_test_mode: boolean | null;
   storefront_url: string | null;
+  custom_domain: string | null;
+  domain_verified_at: string | null;
+  platform_subdomain: string | null;
   organizations?: { slug: string | null } | { slug: string | null }[] | null;
 };
 
@@ -83,17 +94,23 @@ const slugOf = (row: SettingsRow) =>
 export async function storePaytrConfig(
   supabase: SupabaseClient,
   organizationId: string,
+  /*
+    İsteğin geldiği kök (https://konak). resolveStore bunu zaten
+    mağazanın kayıtlı adresleriyle eşleştirdiği için güvenilir ve
+    en doğrusu: müşteri ödemeden sonra BULUNDUĞU vitrine dönüyor.
+  */
+  istekKoku?: string | null,
 ): Promise<PaytrStoreConfig> {
   const { data, error } = await supabase
     .from("arc_store_settings")
     .select(
-      "paytr_enabled, paytr_merchant_id, paytr_merchant_key_enc, paytr_merchant_salt_enc, paytr_test_mode, storefront_url, organizations(slug)",
+      "paytr_enabled, paytr_merchant_id, paytr_merchant_key_enc, paytr_merchant_salt_enc, paytr_test_mode, storefront_url, custom_domain, domain_verified_at, platform_subdomain, organizations(slug)",
     )
     .eq("organization_id", organizationId)
     .maybeSingle<SettingsRow>();
   if (error) throw error;
 
-  const storeUrl = (data?.storefront_url ?? process.env.STOREFRONT_URL ?? "https://arvoculture.com").replace(/\/$/, "");
+  const storeUrl = (istekKoku?.trim() || (data ? magazaAdresi(data) : null))?.replace(/\/$/, "") ?? null;
 
   if (data?.paytr_merchant_id && data.paytr_merchant_key_enc && data.paytr_merchant_salt_enc) {
     return {
