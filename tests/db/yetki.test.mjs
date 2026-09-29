@@ -32,6 +32,27 @@ const ANON = [
   "public.get_arvoculture_storefront_search_index",
   "public.get_arvoculture_storefront_settings",
   "public.get_arvoculture_storefront_variants",
+  /*
+    ÇOK KİRACILI VİTRİN. Kiracı alan adından çözülüyor
+    (arc_storefront_org); müşteri tarafı anonim çalıştığı için hepsi
+    anon'a BİLEREK açık. Eski get_arvoculture_* fonksiyonları da
+    listede duruyor: vitrin uygulaması geçene kadar canlıdalar.
+  */
+  "public.arc_storefront_org",
+  "public.arc_storefront_collection_products",
+  "public.arc_storefront_collections",
+  "public.arc_storefront_deals",
+  "public.arc_storefront_discounts",
+  "public.arc_storefront_facets",
+  "public.arc_storefront_product",
+  "public.arc_storefront_product_badges",
+  "public.arc_storefront_product_count",
+  "public.arc_storefront_product_slugs",
+  "public.arc_storefront_products",
+  "public.arc_storefront_products_page",
+  "public.arc_storefront_search_index",
+  "public.arc_storefront_settings",
+  "public.arc_storefront_variants",
   "public.get_storefront_seller",
 ];
 
