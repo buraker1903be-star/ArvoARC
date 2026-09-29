@@ -31,10 +31,27 @@ export interface TamiJwk {
 
 const base64url = (veri: Buffer) => veri.toString("base64url");
 
+/*
+  İŞYERİ VE TERMİNAL NUMARASI SAYIDIR. Tami'nin örneğinde ikisi de Long
+  ve hash'e `merchantNumber.toString()` ile giriyor: portalde "0001234"
+  görünen bir numara Java'da "1234" olur. Dizgeyi olduğu gibi kullanmak
+  BAŞKA BİR HASH üretir ve Tami 4003 ("PG-Auth-Token uyuşmuyor") döner —
+  29.09.2026'da ilk denemede tam bu hata alındı.
+
+  Sayı olmayan değere dokunulmuyor: biçim ileride değişirse sessizce
+  bozmaktansa olduğu gibi göndermek yeğdir.
+*/
+const sayisal = (deger: string): string => {
+  const sade = String(deger ?? "").trim();
+  return /^\d+$/.test(sade) ? String(BigInt(sade)) : sade;
+};
+
 export function pgAuthToken({ merchantNumber, terminalNumber, secretKey }: TamiKimligi): string {
-  const metin = `${merchantNumber}${terminalNumber}${secretKey}`;
+  const merchant = sayisal(merchantNumber);
+  const terminal = sayisal(terminalNumber);
+  const metin = `${merchant}${terminal}${secretKey}`;
   const ozet = createHash("sha256").update(metin, "utf8").digest("base64");
-  return `${merchantNumber}:${terminalNumber}:${ozet}`;
+  return `${merchant}:${terminal}:${ozet}`;
 }
 
 /**

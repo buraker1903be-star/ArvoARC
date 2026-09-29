@@ -22,6 +22,22 @@ test("PG-Auth-Token merchant:terminal:base64(sha256) biçiminde", () => {
   assert.match(ozet, /^[A-Za-z0-9+/]+=*$/);
 });
 
+test("İŞYERİ/TERMİNAL numarasındaki baştaki sıfırlar atılıyor", () => {
+  /*
+    Tami'nin örneğinde ikisi de Long: "0001234" Java'da "1234" olur.
+    Dizgeyi olduğu gibi hash'lemek başka bir özet üretiyor ve Tami 4003
+    ("PG-Auth-Token uyuşmuyor") dönüyor — 29.09.2026'da ilk denemede
+    tam bu hata alındı.
+  */
+  assert.equal(
+    pgAuthToken({ merchantNumber: "0001000", terminalNumber: "0020", secretKey: "sir" }),
+    pgAuthToken({ merchantNumber: "1000", terminalNumber: "20", secretKey: "sir" }),
+  );
+  /* Sayı olmayan değere dokunulmuyor. */
+  const harfli = pgAuthToken({ merchantNumber: "M-01", terminalNumber: "T-2", secretKey: "sir" });
+  assert.ok(harfli.startsWith("M-01:T-2:"));
+});
+
 test("securityHash üç parçalı JWS; başlık HS512 ve kid taşıyor", () => {
   const imza = securityHash({ orderId: "abc", amount: 10 }, JWK);
   const [baslik, yuk, mac] = imza.split(".");

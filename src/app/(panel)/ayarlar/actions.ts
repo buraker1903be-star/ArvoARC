@@ -10,6 +10,7 @@ import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/verce
 import { encryptSecret,paymentCredentialsConfigured } from "@/lib/payment-credentials";
 import { tamiAyariCoz, TAMI_ALANLARI } from "@/lib/odeme/tami/ayar";
 import { sorgula } from "@/lib/odeme/tami/istemci";
+import { pgAuthToken } from "@/lib/odeme/tami/imza";
 import { jetonlariUnut } from "@/lib/tryoto/istemci";
 
 const roles=new Set(["owner","admin","manager"]);
@@ -437,6 +438,15 @@ export async function tamiBaglantisiniDene(): Promise<{ ok: boolean; mesaj: stri
       mesaj: "Tami yapılandırması tamamlanmamış: “Etkin” işaretli olmalı ve beş alanın hepsi dolu olmalı.",
     };
   }
+
+  /*
+    Kullanılan kimliğin GÖRÜNEN kısmı ekrana yazılıyor: "1000:20:…".
+    Portaldeki numaralarla karşılaştırmak, baştaki sıfır ya da yanlış
+    alana yazılmış bir değeri tek bakışta gösteriyor. Hash ve sır
+    gösterilmiyor.
+  */
+  const jetonOnEki = pgAuthToken(ayar.kimlik).split(":").slice(0, 2).join(":");
+  const ortam = ayar.testModu ? "sandbox" : "canlı";
 
   /* Var olmayan ama biçime uyan bir kimlik (Tami: 2-36, harf/rakam, - ve _). */
   const sonuc = await sorgula(ayar, crypto.randomUUID());
