@@ -6,7 +6,7 @@ import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
 import { stogaDonecekler } from "@/lib/iade-stok";
 import { getStoreBrand } from "@/lib/store-brand";
-import { refundPayment } from "@/lib/paytr/refund";
+import { odemeyiIadeEt } from "@/lib/odeme/iade";
 import { sendEmail } from "@/lib/email/resend";
 import { returnDecisionEmail } from "@/lib/email/order-confirmation";
 import { calculateRefund, refundOutcome } from "@/lib/refund";
@@ -235,12 +235,10 @@ export async function resolveReturn(formData: FormData) {
   const lockedMeta = await claimOrderLock(supabase, organization.id, { id: request.order_id, updated_at: order.updated_at, metadata: order.metadata }, "refund_lock");
   if (!lockedMeta) return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("busy")});
 
-  const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
-
-  const result = await refundPayment({
+  const result = await odemeyiIadeEt({
     supabase,
     organizationId: organization.id,
-    merchantOid,
+    order: { id: request.order_id, order_number: order.order_number, metadata: order.metadata },
     amountKurus,
     referenceNo: `ARCIADE${id.replace(/-/g, "").slice(0, 12)}`,
   });

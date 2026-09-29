@@ -7,7 +7,7 @@ import { basariMetni, hataMetni } from "./mesajlar";
 import { sendEmail } from "@/lib/email/resend";
 import { partialRefundEmail, shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { notifyTransferPaid } from "@/lib/email/transfer-paid";
-import { refundPayment } from "@/lib/paytr/refund";
+import { odemeyiIadeEt } from "@/lib/odeme/iade";
 import { isBankTransfer } from "@/lib/payment-method";
 import { refundOutcome } from "@/lib/refund";
 import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock";
@@ -250,16 +250,14 @@ export async function refundOrder(formData: FormData) {
     PayTR sipariş numarasını harf ve rakam dışındaki karakterler
     olmadan bekliyor; ödeme oluşturulurken de böyle gönderilmişti.
   */
-  const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
-
   /* Sipariş iade için kilitlenir: çift tıklama ya da ikinci sekme aynı iadeyi PayTR'a iki kez göndermesin (bkz. lib/order-lock). */
   const lockedMeta = await claimOrderLock(supabase, organization.id, order, "refund_lock");
   if (!lockedMeta) return await siparise(orderId,{hata:"busy"});
 
-  const result = await refundPayment({
+  const result = await odemeyiIadeEt({
     supabase,
     organizationId: organization.id,
-    merchantOid,
+    order: { id: order.id, order_number: order.order_number, metadata: (order.metadata ?? null) as Record<string, unknown> | null },
     amountKurus,
     referenceNo: `ArvoARC${orderId.replace(/-/g, "").slice(0, 12)}${priorRefunds ? `K${priorRefunds + 1}` : ""}`,
   });
