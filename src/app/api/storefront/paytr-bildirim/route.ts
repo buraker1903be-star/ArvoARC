@@ -1,9 +1,8 @@
 import crypto from "node:crypto";
 import { storePaytrConfig } from "@/lib/paytr/config";
-import { sendEmail } from "@/lib/email/resend";
-import { orderConfirmationHtml } from "@/lib/email/order-confirmation";
 import { createServiceClient } from "@/lib/paytr/service-client";
-import { getStoreBrand } from "@/lib/store-brand";
+import { sendOrderConfirmation } from "@/lib/siparis-onay-postasi";
+import { recordOrderEvent } from "@/lib/siparis-olayi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -220,20 +219,6 @@ type OrderRow = { id: string; organization_id: string; total: number | null };
  * Siparişe görünür bir olay yazar. Olay yazılamazsa akış kesilmez —
  * bildirim yanıtı zaten OK olmalı — ama sessiz de kalınmaz.
  */
-async function recordOrderEvent(
-  supabase: ReturnType<typeof createServiceClient>,
-  order: OrderRow,
-  eventType: string,
-  eventData: Record<string, string | number | null>,
-) {
-  const { error } = await supabase.from("arc_order_events").insert({
-    organization_id: order.organization_id,
-    order_id: order.id,
-    event_type: eventType,
-    event_data: eventData,
-  });
-  if (error) console.error("PayTR bildirimi: sipariş olayı yazılamadı", { eventType, message: error.message });
-}
 
 /**
  * Sipariş onay e-postasını hazırlayıp gönderir.
@@ -241,62 +226,3 @@ async function recordOrderEvent(
  * Kalemler ve tutarlar veritabanından okunur; PayTR
  * bildiriminden gelen değerlere güvenilmez.
  */
-async function sendOrderConfirmation(
-  supabase: ReturnType<typeof createServiceClient>,
-  orderId: string,
-) {
-  const { data: order } = await supabase
-    .from("arc_orders")
-    .select(
-      "order_number, customer_name, customer_email, subtotal, shipping, total, metadata, organization_id",
-    )
-    .eq("id", orderId)
-    .single();
-
-  if (!order?.customer_email) return;
-
-  const { data: items } = await supabase
-    .from("arc_order_items")
-    .select("product_name, quantity, total")
-    .eq("order_id", orderId);
-
-  const meta = (order.metadata ?? {}) as Record<string, unknown>;
-  const rawAddress = (meta.shipping_address ?? meta.address ?? {}) as Record<
-    string,
-    string | null
-  >;
-
-  const brand = await getStoreBrand(supabase, order.organization_id);
-  const html = orderConfirmationHtml({
-    brand,
-    orderNumber: order.order_number,
-    customerName: order.customer_name || "değerli müşterimiz",
-    items: (items ?? []).map((item: {
-      product_name: string;
-      quantity: number;
-      total: number;
-    }) => ({
-      name: item.product_name,
-      quantity: item.quantity,
-      total: item.total,
-    })),
-    subtotal: order.subtotal ?? 0,
-    discount: Number(meta.discount ?? 0),
-    shipping: order.shipping ?? 0,
-    total: order.total ?? 0,
-    address: {
-      line: rawAddress.line ?? rawAddress.address1 ?? undefined,
-      district: rawAddress.district ?? rawAddress.province ?? undefined,
-      city: rawAddress.city ?? undefined,
-      postal: rawAddress.postal ?? rawAddress.zip ?? undefined,
-    },
-  });
-
-  await sendEmail({
-    from: brand.from,
-    replyTo: brand.replyTo,
-    to: order.customer_email,
-    subject: `${brand.name} · siparişiniz alındı · ${order.order_number}`,
-    html,
-  });
-}

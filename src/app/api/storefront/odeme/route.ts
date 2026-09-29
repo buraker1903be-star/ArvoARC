@@ -1,6 +1,10 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { storePaytrConfig, type PaytrStoreConfig } from "@/lib/paytr/config";
+import { saglayiciSirasi, type Saglayici } from "@/lib/odeme/secim";
+import { tamiAyariCoz, TAMI_ALANLARI, type TamiAyari } from "@/lib/odeme/tami/ayar";
+import { odemeSayfasiAdresi } from "@/lib/odeme/tami/istek";
+import { jetonAl } from "@/lib/odeme/tami/istemci";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { resolveStore, storefrontCorsHeaders } from "@/lib/storefront-origin";
 import { getStoreBrand } from "@/lib/store-brand";
@@ -230,6 +234,8 @@ export async function POST(request: Request) {
   */
   let transferSettings: { bank_transfer_enabled: boolean | null; bank_transfer_discount_percent: number | null } | null = null;
   let paytrConfig: PaytrStoreConfig | null = null;
+  let tamiAyar: TamiAyari | null = null;
+  let saglayicilar: Saglayici[] = [];
 
   if (isTransfer) {
     /*
@@ -270,6 +276,20 @@ export async function POST(request: Request) {
       kullanılıyor. Havale yolu ayrı döndüğü için, PayTR bilgisi girilmemiş
       mağaza hâlâ havaleyle satış yapabilir.
     */
+    /*
+      SAĞLAYICI SIRASI. Kart artık "PayTR" demek değil: mağaza Tami'yi
+      birincil seçebiliyor (lib/odeme/secim.ts). Biri hazır değilse
+      öteki devralıyor; hiçbiri hazır değilse kartla ödeme kapalı.
+    */
+    const { data: saglayiciSatiri, error: saglayiciHatasi } = await supabase
+      .from("arc_store_settings")
+      .select(`odeme_saglayicisi,${TAMI_ALANLARI}`)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    /* Okunamadıysa Tami hazır sayılmıyor; PayTR yolu aşağıda kendi denetiminden geçiyor. */
+    if (saglayiciHatasi) console.error("Ödeme sağlayıcısı ayarı okunamadı:", saglayiciHatasi.message);
+    tamiAyar = tamiAyariCoz(saglayiciSatiri as never);
+
     try {
       paytrConfig = await storePaytrConfig(supabase, organizationId, origin);
       /*
@@ -283,7 +303,20 @@ export async function POST(request: Request) {
       // devam etmeli.)
       if (!paytrConfig.enabled) throw new Error("Mağaza kartla ödemeyi kapatmış");
     } catch (configError) {
+      /*
+        PayTR'ın düşmesi artık tek başına kartla ödemeyi kapatmıyor:
+        Tami hazırsa ödeme oradan açılır. Hata yine de günlüğe yazılıyor
+        — "yedek devraldı" ile "iki sağlayıcı da bozuk" farklı şeyler.
+      */
       console.error("PayTR yapılandırması alınamadı:", organizationId, configError);
+      paytrConfig = null;
+    }
+
+    saglayicilar = saglayiciSirasi(saglayiciSatiri?.odeme_saglayicisi, {
+      tami: Boolean(tamiAyar),
+      paytr: Boolean(paytrConfig),
+    });
+    if (!saglayicilar.length) {
       return NextResponse.json(
         {
           error: "paytr_unavailable",
@@ -425,7 +458,63 @@ export async function POST(request: Request) {
     );
   }
 
-  // --- 2. PayTR token iste -----------------------------------
+  // --- 2. Ödeme oturumu aç -----------------------------------
+
+  /*
+    TAMİ ORTAK ÖDEME SAYFASI. Kart Tami'nin sayfasında giriliyor, bize
+    hiç uğramıyor. Tami'nin sipariş numarası SİPARİŞİN UUID'Sİ: Tami
+    2-36 karakter, yalnızca harf/rakam, "-" ve "_" kabul ediyor ve
+    bizim numaralarımızın bir kısmı "#" taşıyor (SPR#1018).
+
+    Dönüş adresi PANELİN kendi ucu: müşteri oraya döndüğünde sonuç
+    /payment/query ile doğrulanıp sipariş kapatılıyor, sonra vitrine
+    yönlendiriliyor. Tarayıcı dönüşü tek başına kanıt değil.
+  */
+  if (saglayicilar[0] === "tami" && tamiAyar) {
+    const panelKokeni = new URL(request.url).origin;
+    const jeton = await jetonAl(tamiAyar, {
+      odemeKimligi: order.order_id,
+      tutarKurus: order.total,
+      telefon: phone,
+      donusAdresi: `${panelKokeni}/api/storefront/tami-donus?odeme=${encodeURIComponent(order.order_id)}`,
+    });
+
+    if (jeton.ok) {
+      const { error: tamiMetaError } = await mergeMetadata({
+        odeme_saglayicisi: "tami",
+        tami_order_id: order.order_id,
+        tami_test_modu: tamiAyar.testModu,
+        ...(note ? { notes: note } : {}),
+      });
+      if (tamiMetaError) console.error("Sipariş üstverisi kaydedilemedi:", tamiMetaError);
+
+      return NextResponse.json(
+        {
+          saglayici: "tami",
+          odemeAdresi: odemeSayfasiAdresi(tamiAyar.uclar.sayfa, jeton.veri.oneTimeToken),
+          orderNumber: order.order_number,
+          total: order.total,
+        },
+        { headers },
+      );
+    }
+
+    /*
+      YEDEĞE DÜŞME BURADA VE YALNIZCA BURADA: müşteri henüz Tami'nin
+      sayfasına gitmedi, ortada açık bir ödeme oturumu yok. Müşteri
+      sayfaya düştükten sonra ikinci bir sağlayıcıda oturum açmak çift
+      çekim riski demek olurdu.
+    */
+    console.error("Tami ödeme oturumu açılamadı:", order.order_number, jeton.hata);
+    if (!paytrConfig) {
+      return NextResponse.json(
+        { error: "payment_failed", message: "Kartla ödeme şu an başlatılamadı. Lütfen tekrar deneyin." },
+        { status: 502, headers },
+      );
+    }
+  }
+
+  // --- PayTR token iste --------------------------------------
   /*
     Yapılandırma sipariş oluşmadan önce alındı ve denetlendi; havale dalı
     yukarıda döndüğü için buraya yalnızca kart yolu geliyor. Denetim yine
