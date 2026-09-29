@@ -275,7 +275,6 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
               <span className="vl-compare">KARŞILAŞTIRMA ₺</span>
               {canManage?<span className="vl-indirim">İNDİRİM %</span>:null}
               <span className="vl-stock">STOK</span>
-              {canManage?<><span className="vl-backorder">POLİTİKA</span><span className="vl-save"/></>:null}
             </div>
             {variantList.map(variant=>{
               const stockTone=variant.stock<0?"bad":variant.stock===0?"warn":undefined;
@@ -284,7 +283,11 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
                 <form action={updateVariant} className="list-row" key={variant.id}>
                   <input type="hidden" name="product_id" value={product.id}/>
                   <input type="hidden" name="variant_id" value={variant.id}/>
-                  <span className="vl-title">{varyantGorseli(variant.image_path)}<span><b>{variant.title||"Default"}</b>{variant.cost_price?<small>Alış {money.format(variant.cost_price/100)}</small>:null}</span></span>
+                  {/* Alış fiyatı artık kâr şeridinde (satırın ikinci satırı):
+                      orada kâr oranlarıyla birlikte duruyor, burada tek
+                      başına dururken "bu rakam neye yarıyor" sorusunun
+                      ekranda cevabı yoktu. */}
+                  <span className="vl-title">{varyantGorseli(variant.image_path)}<span><b>{variant.title||"Default"}</b></span></span>
                   {/*
                     GÖRSEL ÜRÜNÜN GALERİSİNDEN SEÇİLİYOR, yüklenmiyor:
                     varyantın kendi deposu olsaydı aynı fotoğraf iki kez
@@ -300,7 +303,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
                     ):<small className="vl-gorsel-bos">Galeri boş</small>}
                   </label>
                   <label className="vl-sku"><span className="vl-label">SKU</span><input name="sku" defaultValue={variant.sku??""} required aria-label="SKU"/></label>
-                  <VaryantFiyatlari fiyat={(variant.price/100).toFixed(2)} karsilastirma={variant.compare_at_price?(variant.compare_at_price/100).toFixed(2):""}/>
+                  <VaryantFiyatlari fiyat={(variant.price/100).toFixed(2)} karsilastirma={variant.compare_at_price?(variant.compare_at_price/100).toFixed(2):""} alis={variant.cost_price?variant.cost_price/100:undefined}/>
                   <span className="vl-stock"><span className="vl-label">Stok</span>{stockLink}</span>
                   <label className="check-inline vl-backorder"><input name="allow_backorder" type="checkbox" defaultChecked={variant.allow_backorder}/> Stoksuz satış</label>
                   <span className="vl-save"><button className="ac-btn" type="submit">Kaydet</button></span>

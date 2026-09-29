@@ -65,14 +65,34 @@
 /* Varyantlar: her satır kendi kaydet düğmesiyle bir form */
 .variant-list[data-manage] .list-row{
   /* KARŞILAŞTIRMA ₺ başlığı 130px'in altında iki satıra düşüyor ve
-     başlık şeridini büyütüyor; ölçülerek bulundu.
-
-     İNDİRİM % sütunu eklenince satır 1280px'lik ekranda 47px taşıdı
-     (eskiden tam sığıyordu). Kalan sütunlar ölçülerek daraltıldı;
-     taşmayı geri getirmeden bu değerlerin altına inilemiyor. */
-  grid-template-columns:minmax(96px,1fr) 84px minmax(100px,1fr) 96px 130px 78px 82px minmax(112px,auto) auto;
-  grid-template-areas:"title gorsel sku price compare indirim stock backorder save";
+     başlık şeridini büyütüyor; ölçülerek bulundu. */
+  grid-template-columns:minmax(120px,1fr) 96px minmax(120px,1fr) 104px 130px 88px 88px;
+  grid-template-areas:"title gorsel sku price compare indirim stock";
 }
+/*
+  SATIR İKİ KATLI: üstte alanlar, altta politika · kâr · Kaydet.
+
+  Tek katken İNDİRİM % sütunu eklenince satır 1280px'lik ekranda
+  sığmadı ve bunu SESSİZ bir biçimde yaptı: Kaydet'in `auto` izi 17px'e
+  çöktü, 65px'lik düğme sola taşıp "Stoksuz satış"ın üstüne bindi.
+  Tablo taşmadığı için ilk ölçüm bunu temiz gösterdi. Politika ve
+  Kaydet aşağı alınınca üst kattan 200px basınç kalktı.
+
+  Kaydet izi artık `auto` değil sabit: `auto` yer kalmayınca sessizce
+  çöküyor, sabit iz taşırıp tabloyu kaydırılabilir yapıyor — görünen
+  hata, görünmeyen hatadan iyidir.
+*/
+.variant-list[data-manage] .list-row:not(.th){
+  /* Politika iki iz kaplıyor: tek izde (88px) "Stoksuz satış" iki
+     satıra düşüp onay kutusunu eziyordu. */
+  grid-template-areas:"title gorsel sku price compare indirim stock" "kar kar kar kar backorder backorder save";
+  grid-template-columns:minmax(120px,1fr) 96px minmax(120px,1fr) 104px 130px 88px 88px;
+  row-gap:8px;
+}
+.vl-kar{grid-area:kar;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;min-height:21px}
+.variant-list .vl-kar small{margin:0;color:var(--muted);font-size:12.5px}
+.variant-list .vl-kar b{display:inline;color:var(--success);font-weight:650}
+.variant-list .vl-kar b[data-loss]{color:var(--danger)}
 .variant-list:not([data-manage]) .list-row{
   grid-template-columns:minmax(130px,1fr) minmax(130px,1fr) 120px 130px 90px;
   grid-template-areas:"title sku price compare stock";
@@ -87,6 +107,7 @@
 .vl-gorsel-bos{color:var(--muted);font-size:12px}
 .panel-root .variant-list select{min-height:36px;margin:0;padding:6px 8px;font-size:13px}.vl-sku{grid-area:sku}.vl-price{grid-area:price}.vl-compare{grid-area:compare}.vl-indirim{grid-area:indirim}.vl-stock{grid-area:stock}.vl-backorder{grid-area:backorder}
 .vl-save{grid-area:save;display:flex;justify-content:flex-end}
+.variant-list .vl-backorder{align-self:center}
 .variant-list label{display:grid;margin:0}
 .vl-label{display:none}
 .panel-root .variant-list input:not([type=checkbox]){min-height:36px;margin:0;padding:6px 10px;font-size:13.5px}
@@ -178,7 +199,8 @@
   .sl-policy{justify-self:start;text-align:left}
   .stock-list .sl-name b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow:hidden}
   .sl-adjust{justify-content:flex-start}
-  .variant-list[data-manage] .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title title" "sku stock" "price compare" "indirim gorsel" "backorder save";row-gap:8px;padding:14px}
+  .variant-list[data-manage] .list-row,
+  .variant-list[data-manage] .list-row:not(.th){grid-template-columns:1fr 1fr;grid-template-areas:"title title" "sku stock" "price compare" "indirim gorsel" "kar kar" "backorder save";row-gap:8px;padding:14px}
   .variant-list:not([data-manage]) .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title stock" "sku price" ". compare";row-gap:6px;padding:14px}
   .vl-label{display:block;margin-bottom:4px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.1em}
   .catalog-form,.stock-detailed-form,.variant-create-grid,.variant-matrix-grid,.variant-matrix-option{grid-template-columns:1fr}

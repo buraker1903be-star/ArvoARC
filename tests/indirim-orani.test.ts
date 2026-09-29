@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   fiyatDurumu,
   indirimOrani,
+  karOrani,
+  karOranlari,
   listeYazildi,
   oranYazildi,
   satisYazildi,
@@ -134,4 +136,45 @@ test("taban fiyat yokken oran alanı kapalı", () => {
   assert.equal(tabanVar(fiyatDurumu("100.00", "")), true);
   /* Kapalıyken yazılan değer fiyatları bozmuyor. */
   assert.deepEqual(oranYazildi(fiyatDurumu("", ""), "20"), { satis: "", liste: "", oran: "20" });
+});
+
+test("kâr oranı alış üzerine hesaplanıyor", () => {
+  /* Ürünler listesindeki ALIŞ / KÂR sütunuyla aynı tanım; Siparişler
+     ekranındaki brüt marj (kâr ÷ satış) DEĞİL. */
+  assert.equal(karOrani(100, 200), 100);
+  assert.equal(karOrani(1204.5, 3423.63), 184.2);
+});
+
+test("zararda kâr oranı negatif", () => {
+  /* Alışın altına inen fiyat gizlenmiyor: operasyoncu tam da bunu
+     görmek için bakıyor. */
+  assert.equal(karOrani(100, 80), -20);
+});
+
+test("alış bilinmiyorsa kâr gösterilmiyor", () => {
+  assert.equal(karOrani(0, 200), null);
+  assert.equal(karOrani(Number.NaN, 200), null);
+  assert.equal(karOranlari(0, fiyatDurumu("200.00", "")), null);
+});
+
+test("indirim yoksa iki oran aynı", () => {
+  assert.deepEqual(karOranlari(100, fiyatDurumu("200.00", "")), {
+    indirimsiz: 100,
+    indirimli: 100,
+  });
+});
+
+test("indirim varsa iki oran ayrışıyor", () => {
+  /* Alanın eklenme sebebi: indirim kârın ne kadarını yiyor. */
+  assert.deepEqual(karOranlari(100, fiyatDurumu("160.00", "200.00")), {
+    indirimsiz: 100,
+    indirimli: 60,
+  });
+});
+
+test("oran yazarken kâr anında düşüyor", () => {
+  /* Kaydetmeden görülmesi gerekiyor: indirimi verip kârı sonra
+     öğrenmek geç olur. */
+  const d = oranYazildi(fiyatDurumu("200.00", ""), "20");
+  assert.deepEqual(karOranlari(100, d), { indirimsiz: 100, indirimli: 60 });
 });

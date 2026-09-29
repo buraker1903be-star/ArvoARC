@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   fiyatDurumu,
+  karOranlari,
   listeYazildi,
   oranYazildi,
   satisYazildi,
@@ -27,7 +28,12 @@ import {
   Alanların birbirini nasıl güncellediği `@/lib/indirim-orani` içinde
   ve sınanıyor; burada yalnızca durum tutuluyor.
 */
-type Baslangic = { fiyat: string; karsilastirma: string };
+type Baslangic = {
+  fiyat: string;
+  karsilastirma: string;
+  /** Birim alış fiyatı (TL). Bilinmiyorsa kâr satırı hiç çizilmez. */
+  alis?: number;
+};
 
 function useFiyatlar({ fiyat, karsilastirma }: Baslangic) {
   const [durum, setDurum] = useState<FiyatDurumu>(() => fiyatDurumu(fiyat, karsilastirma));
@@ -38,6 +44,43 @@ function useFiyatlar({ fiyat, karsilastirma }: Baslangic) {
     listeDegisti: (deger: string) => setDurum((d) => listeYazildi(d, deger)),
     oranDegisti: (deger: string) => setDurum((d) => oranYazildi(d, deger)),
   };
+}
+
+const para = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
+const yuzde = (oran: number) => `%${oran.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`;
+
+/*
+  KÂR ŞERİDİ SATIRIN İKİNCİ SATIRINDA, yeni bir sütunda değil: satır
+  indirim sütunu eklenince 1280px'lik ekranda zaten sınırına dayanmıştı
+  (ölçüldü). Dikey yer yatay yerden ucuz.
+
+  Sayılar KAYDETMEDEN güncelleniyor. Kaydedilmiş değerden hesaplansaydı
+  indirimi verip kârın ne olduğunu ancak sonradan öğrenirdin — alanın
+  eklenme sebebi tam olarak bunu önlemek.
+*/
+function KarSeridi({ alis, durum }: { alis: number; durum: FiyatDurumu }) {
+  const oranlar = karOranlari(alis, durum);
+  if (!oranlar) return null;
+  const indirimliMi = oranlar.indirimli !== oranlar.indirimsiz;
+  return (
+    <span className="vl-kar">
+      <small>Alış {para.format(alis)}</small>
+      <small>
+        Kâr{" "}
+        <b className="profit" data-loss={oranlar.indirimsiz <= 0 ? "" : undefined}>
+          {yuzde(oranlar.indirimsiz)}
+        </b>
+        {indirimliMi ? (
+          <>
+            {" · indirimli "}
+            <b className="profit" data-loss={oranlar.indirimli <= 0 ? "" : undefined}>
+              {yuzde(oranlar.indirimli)}
+            </b>
+          </>
+        ) : null}
+      </small>
+    </span>
+  );
 }
 
 /** Varyant satırındaki üçlü (ızgara alanlarına oturur). */
@@ -71,6 +114,7 @@ export function VaryantFiyatlari(baslangic: Baslangic) {
           title="Oran yazın: şu anki fiyat karşılaştırma fiyatına taşınır, satış fiyatı indirimli tutara düşer. Alanı boşaltmak indirimi kaldırır."
         />
       </label>
+      {baslangic.alis ? <KarSeridi alis={baslangic.alis} durum={f} /> : null}
     </>
   );
 }

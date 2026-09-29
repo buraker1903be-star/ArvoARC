@@ -108,3 +108,43 @@ export function oranYazildi(durum: FiyatDurumu, deger: string): FiyatDurumu {
 
   return { satis: tutarMetni(indirimli), liste: tutarMetni(taban), oran: deger };
 }
+
+/* ---------- Kâr oranı ---------- */
+
+/**
+ * Kâr oranı (%): (satış − alış) / ALIŞ.
+ *
+ * Alış üzerine hesaplanıyor, satış üzerine değil — Ürünler
+ * listesindeki "ALIŞ / KÂR" sütunuyla aynı tanım. Panelde iki tanım
+ * dolaşıyor (Siparişler ekranı kârı gelire bölüyor, brüt marj);
+ * katalog ekranlarının kendi içinde tutarlı olması, komşu iki sütunun
+ * aynı ürün için farklı sayı göstermesinden önemli.
+ *
+ * Alış bilinmiyorsa null: yarım bir kâr, kâr olmamasından daha
+ * yanıltıcı — operasyoncu ona bakıp fiyat kararı veriyor.
+ */
+export function karOrani(alis: number, satis: number): number | null {
+  if (!Number.isFinite(alis) || !Number.isFinite(satis)) return null;
+  if (alis <= 0) return null;
+  return Math.round(((satis - alis) / alis) * 1000) / 10;
+}
+
+/**
+ * Satırdaki iki kâr oranı: indirimsiz (karşılaştırma fiyatından) ve
+ * indirimli (fiili satış fiyatından).
+ *
+ * İndirim yoksa ikisi aynıdır ve çağıran tek sayı gösterir; indirim
+ * varsa aradaki fark "bu indirim kârımın ne kadarını yiyor" sorusunun
+ * cevabı — alanın eklenme sebebi bu.
+ */
+export function karOranlari(
+  alis: number,
+  durum: FiyatDurumu,
+): { indirimsiz: number; indirimli: number } | null {
+  const satis = tutar(durum.satis);
+  const liste = tutar(durum.liste);
+  const indirimli = karOrani(alis, satis);
+  if (indirimli === null) return null;
+  const indirimsiz = liste > satis ? karOrani(alis, liste) : indirimli;
+  return { indirimsiz: indirimsiz ?? indirimli, indirimli };
+}
