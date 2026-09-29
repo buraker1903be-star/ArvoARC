@@ -802,6 +802,9 @@ a.is-pending-link{pointer-events:none;opacity:.68}
 .toplayici-liste[data-tone="uyari"] ul{margin:6px 0 0;padding-left:18px;display:grid;gap:2px}
 .toplayici-liste[data-tone="uyari"] li{color:var(--ink);font-size:12px}
 .toplayici-liste[data-tone="uyari"] small{color:var(--muted)}
+/* Tami bağlantı denemesi: düğme ve sonucu ödeme kartının içinde. */
+.tami-deneme{display:grid;gap:8px;margin-top:10px;justify-items:start}
+.tami-deneme .maliyet-sonuc{margin:0}
 /* Sürüklenecek yer imi düğmesi: tıklanacak değil, taşınacak bir şey
    olduğu görünsün. */
 .toplayici-suruk{display:flex;align-items:center;gap:10px;margin-top:10px}

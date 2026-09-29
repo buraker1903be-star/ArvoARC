@@ -10,6 +10,8 @@ const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending
 
 /* DNS kaydı henüz yayılmadıysa hata değil, bekleme durumu. */
 
+import { TamiDeneme } from "./tami-deneme";
+
 export default async function Settings(){
   const {supabase,organization,membership}=await requireTenant();
   const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,tami_enabled,tami_test_mode,tami_merchant_number,tami_terminal_number,tami_jwk_kid,tami_secret_key_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
@@ -288,6 +290,7 @@ export default async function Settings(){
               </select>
             </label>
           </div>
+          {tamiKeysStored?<TamiDeneme/>:null}
           <div className="security-note"><b>{tamiKeysStored?"Anahtarlarınız kayıtlı.":"Tahsilat kendi Tami işyerinize yapılır."}</b><p>Gizli anahtar ve JWK “k” değeri şifrelenerek saklanır, hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazmanız yeterli; boş bırakırsanız kayıtlı olan korunur. Seçilen sağlayıcı hazır değilse ödeme öteki sağlayıcıyla açılır.</p></div>
         </article>
         <article className="payment-method">

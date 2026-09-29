@@ -8,6 +8,8 @@ import { requireTenant } from "@/lib/tenant";
 import { altAlanAdresi } from "@/lib/magaza-adresi";
 import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/vercel-domains";
 import { encryptSecret,paymentCredentialsConfigured } from "@/lib/payment-credentials";
+import { tamiAyariCoz, TAMI_ALANLARI } from "@/lib/odeme/tami/ayar";
+import { sorgula } from "@/lib/odeme/tami/istemci";
 import { jetonlariUnut } from "@/lib/tryoto/istemci";
 
 const roles=new Set(["owner","admin","manager"]);
@@ -401,4 +403,49 @@ export async function updateShippingIntegration(formData:FormData){
      unutulmazsa sonraki gönderi yanlış hesapta açılırdı. */
   if(yenilemeAnahtari)jetonlariUnut(organization.id);
   revalidatePath("/ayarlar");return await bildirimliDonus("/ayarlar",{basari:basariMetni("shipping")});
+}
+
+/*
+  TAMİ BAĞLANTISINI DENE.
+
+  Her denemede sipariş oluşturmak pahalı ve kirletici: ödeme oturumu
+  açmadan, yalnızca sorgulama ucuna var olmayan bir kimlikle istek
+  atıyoruz. Amaç işlemi bulmak değil, KİMLİĞİN kabul edilip
+  edilmediğini görmek:
+
+    4003 → PG-Auth-Token uyuşmuyor (işyeri/terminal/secretKey yanlış)
+    imza/securityHash hatası → JWK kid ya da k yanlış
+    "işlem bulunamadı" → kimlik DOĞRU, yalnızca sipariş yok (beklenen)
+
+  Sır hiçbir şekilde ekrana dönmüyor; yalnızca Tami'nin mesajı.
+*/
+export async function tamiBaglantisiniDene(): Promise<{ ok: boolean; mesaj: string }> {
+  const { supabase, organization, membership } = await requireTenant();
+  if (!PAYMENT_ROLES.has(membership.role)) return { ok: false, mesaj: hataMetni("forbidden") };
+
+  const { data, error } = await supabase
+    .from("arc_store_settings")
+    .select(TAMI_ALANLARI)
+    .eq("organization_id", organization.id)
+    .maybeSingle();
+  if (error) return { ok: false, mesaj: `Ayarlar okunamadı: ${error.message}` };
+
+  const ayar = tamiAyariCoz(data as never);
+  if (!ayar) {
+    return {
+      ok: false,
+      mesaj: "Tami yapılandırması tamamlanmamış: “Etkin” işaretli olmalı ve beş alanın hepsi dolu olmalı.",
+    };
+  }
+
+  /* Var olmayan ama biçime uyan bir kimlik (Tami: 2-36, harf/rakam, - ve _). */
+  const sonuc = await sorgula(ayar, crypto.randomUUID());
+  if (sonuc.ok) {
+    return { ok: true, mesaj: "Bağlantı çalışıyor: Tami isteği kabul etti." };
+  }
+  if (/bulunamad|not found|4009|4010/i.test(sonuc.hata)) {
+    /* İşlem yok ama kimlik kabul edildi: aradığımız cevap bu. */
+    return { ok: true, mesaj: `Kimlik doğrulandı. Tami’nin cevabı: ${sonuc.hata}` };
+  }
+  return { ok: false, mesaj: `${sonuc.hata}${sonuc.durum ? ` (HTTP ${sonuc.durum})` : ""}` };
 }
