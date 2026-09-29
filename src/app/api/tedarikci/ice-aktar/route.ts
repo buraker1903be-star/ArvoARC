@@ -166,6 +166,18 @@ async function runSync(mode: "tam" | "stok") {
   const orgId = rule.organization_id as string;
 
   /*
+    MARKA YEDEĞİ "ArvoCulture" SABİTİYDİ. brand_override tanımlamamış
+    başka bir salonun içe aktardığı her ürün, panelde ve vitrinde o
+    markanın adıyla listeleniyordu. Yedek artık mağazanın kendi adı.
+  */
+  const { data: magaza } = await supabase
+    .from("arc_store_settings")
+    .select("store_name")
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  const markaYedegi = (magaza?.store_name ?? "").trim() || null;
+
+  /*
     Boş akış geçici bir kesinti demektir. Önceden "bitti" sayılıp
     imleç sıfırlanıyordu; aktarım hep aynı yerde başa dönüyor ve
     sonsuz döngüye giriyordu. Artık hata döndürülüyor, imleç
@@ -341,7 +353,7 @@ async function runSync(mode: "tam" | "stok") {
           metadata: {
             specs: detail.specs,
             size_guide: detail.sizeGuide,
-            vendor: rule.brand_override ?? "ArvoCulture",
+            vendor: rule.brand_override ?? markaYedegi,
             product_type: product.subCategory,
             subtitle: product.description,
             image_paths: product.images,

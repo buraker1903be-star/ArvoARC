@@ -7,17 +7,24 @@ type SeoFieldsProps = {
   defaultDescription: string;
   defaultSlug: string;
   productName: string;
+  /*
+    Mağazanın alan adı. Önizlemede "arvoculture.com" sabitti: BAŞKA bir
+    salonun sahibi, kendi ürününün Google'da o markanın alan adıyla
+    çıkacağını okuyordu. Adres çözülemezse yer tutucu yazılıyor.
+  */
+  alanAdi: string | null;
 };
 
-export function SeoFields({ defaultTitle, defaultDescription, defaultSlug, productName }: SeoFieldsProps) {
+export function SeoFields({ defaultTitle, defaultDescription, defaultSlug, productName, alanAdi }: SeoFieldsProps) {
   const [title, setTitle] = useState(defaultTitle);
   const [description, setDescription] = useState(defaultDescription);
   const [slug, setSlug] = useState(defaultSlug);
+  const alan = alanAdi ?? "magazaniz.com";
 
   return <section className="product-editor-section seo-editor">
     <div className="product-editor-heading"><div><small>GOOGLE VE BAĞLANTI</small><h4>Arama motoru görünümü</h4></div><span>Google önizlemesi</span></div>
     <div className="seo-preview" aria-label="Google arama sonucu önizlemesi">
-      <span>https://arvoculture.com › urun › {slug || "urun-baglantisi"}</span>
+      <span>https://{alan} › urun › {slug || "urun-baglantisi"}</span>
       <strong>{title || productName}</strong>
       <p>{description || "Ürününüz için Google arama sonuçlarında gösterilecek açıklamayı ekleyin."}</p>
     </div>
@@ -31,7 +38,7 @@ export function SeoFields({ defaultTitle, defaultDescription, defaultSlug, produ
         <small>Google için önerilen uzunluk 140–160 karakterdir.</small>
       </label>
       <label className="full-field">Ürün bağlantısı
-        <div className="slug-input"><span>arvoculture.com/urun/</span><input name="slug" value={slug} onChange={(event)=>setSlug(event.target.value.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-"))} required maxLength={160} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></div>
+        <div className="slug-input"><span>{alan}/urun/</span><input name="slug" value={slug} onChange={(event)=>setSlug(event.target.value.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-"))} required maxLength={160} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></div>
         <small>Kısa, anlaşılır ve ürün adıyla uyumlu bir bağlantı kullanın.</small>
       </label>
     </div>

@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
+import { magazaAdresi } from "@/lib/magaza-adresi";
 import { createVariant, kitapliktanGorselEkle, removeProductImage, updateProduct, updateVariant, uploadProductImages, urunuKopyala, varyantMatrisi } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel, sourceLabel } from "@/lib/commerce-labels";
@@ -30,7 +31,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
   const [{data:product,error},{data:variants,error:variantError},{data:settings}]=await Promise.all([
     supabase.from("arc_products").select("id,name,slug,description,status,source,metadata,created_at,publish_at,unpublish_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
     supabase.from("arc_product_variants").select("id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price,image_path").eq("organization_id",organization.id).eq("product_id",id).order("title"),
-    supabase.from("arc_store_settings").select("storefront_url").eq("organization_id",organization.id).maybeSingle(),
+    supabase.from("arc_store_settings").select("storefront_url,custom_domain,domain_verified_at,platform_subdomain").eq("organization_id",organization.id).maybeSingle(),
   ]);
   if(error)throw new Error(error.message);if(variantError)throw new Error(variantError.message);if(!product)notFound();
   const canManage=["owner","admin","manager"].includes(membership.role);
@@ -94,12 +95,14 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
   const totalStock=variantList.reduce((sum,variant)=>sum+variant.stock,0);
   const backorderCount=variantList.filter(variant=>variant.allow_backorder).length;
 
-  /* Mağaza bağlantısı yalnızca yayındaki üründe; adres mağaza ayarlarından. */
-  let storeHref:string|null=null;
-  try{
-    const storefront=new URL(settings?.storefront_url??"");
-    if(storefront.protocol==="https:"&&product.status==="active"&&product.slug)storeHref=`${storefront.origin}/urun/${product.slug}`;
-  }catch{storeHref=null;}
+  /*
+    Mağaza bağlantısı yalnızca yayındaki üründe. Adres eskiden yalnızca
+    storefront_url'den okunuyordu; tek adresi platform alt alan adı olan
+    yeni salonun ürününde bağlantı hiç çıkmıyordu. Artık ortak çözücüden
+    (lib/magaza-adresi.ts).
+  */
+  const magazaKoku=settings?magazaAdresi(settings):null;
+  const storeHref=magazaKoku&&product.status==="active"&&product.slug?`${new URL(magazaKoku).origin}/urun/${product.slug}`:null;
 
   const statusTone=product.status==="active"?undefined:product.status==="draft"?"warn":"muted";
   const planOzeti=yayinOzeti(product.publish_at,product.unpublish_at);
@@ -212,7 +215,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
               <div className="editor-field-grid">
                 <label className="full-field">Ürün adı<input name="name" defaultValue={product.name} required maxLength={200}/></label>
                 <label className="full-field">Ürün alt başlığı<input name="subtitle" defaultValue={meta.subtitle??""} maxLength={240} placeholder="Ürünün temel faydasını tek cümlede anlatın"/></label>
-                <label>Marka<input name="vendor" defaultValue={meta.vendor??""} maxLength={120} placeholder="Örn. ARVOCULTURE"/></label>
+                <label>Marka<input name="vendor" defaultValue={meta.vendor??""} maxLength={120} placeholder="Ürünün markası"/></label>
                 <label>Ürün türü<input name="type" defaultValue={meta.type??""} maxLength={120} placeholder="Örn. Kişisel bakım"/></label>
                 <label>Durum<select name="status" defaultValue={product.status}><option value="active">Aktif</option><option value="draft">Taslak</option><option value="archived">Arşivlenmiş</option></select></label>
                 {/*
@@ -237,7 +240,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
               </div>
             </section>
 
-            <SeoFields defaultTitle={meta.seo_title??product.name} defaultDescription={meta.seo_description??""} defaultSlug={product.slug??""} productName={product.name}/>
+            <SeoFields defaultTitle={meta.seo_title??product.name} defaultDescription={meta.seo_description??""} defaultSlug={product.slug??""} productName={product.name} alanAdi={magazaKoku?new URL(magazaKoku).host:null}/>
 
             <section className="product-editor-section">
               <div className="product-editor-heading"><div><small>EK META BİLGİLERİ</small><h4>Google Merchant ve katalog verileri</h4></div><span>İsteğe bağlı</span></div>

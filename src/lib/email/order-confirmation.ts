@@ -35,7 +35,18 @@ const brandLogo = (brand: StoreBrand) =>
 const brandFooter = (brand: StoreBrand) =>
   [brand.legalName, brand.legalAddress].filter(Boolean).map((satir) => escapeHtml(String(satir))).join("<br>");
 
-const hesapLinki = (brand: StoreBrand) => `${brand.siteUrl}/hesap`;
+/*
+  Mağazanın adresi çözülemiyorsa düğme hiç çizilmiyor: eskiden yedek
+  adres ArvoCulture'dı ve "Siparişimi görüntüle" başka bir markanın
+  sitesine gidip "sipariş bulunamadı" diyordu.
+*/
+const hesapDugmesi = (brand: StoreBrand, ustBosluk = "0") =>
+  brand.siteUrl
+    ? `<a href="${escapeHtml(brand.siteUrl)}/hesap"
+           style="display:inline-block;margin:${ustBosluk} 0 0;padding:13px 26px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
+          Siparişimi görüntüle
+        </a>`
+    : "";
 
 export function orderConfirmationHtml({
   brand,
@@ -168,10 +179,7 @@ export function orderConfirmationHtml({
 
     <tr>
       <td style="padding:28px;">
-        <a href="${hesapLinki(brand)}"
-           style="display:inline-block;padding:13px 24px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
-          Siparişimi görüntüle
-        </a>
+        ${hesapDugmesi(brand)}
       </td>
     </tr>
 
@@ -221,10 +229,7 @@ export function paymentReceivedEmail(orderNumber: string, customerName: string, 
           Sipariş numaranız <strong style="color:#10120f;"> ${escapeHtml(orderNumber)}</strong>
         </td></tr>
       </table>
-      <a href="${hesapLinki(brand)}"
-         style="display:inline-block;margin:20px 0 0;padding:13px 26px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
-        Siparişimi görüntüle
-      </a>
+      ${hesapDugmesi(brand, "20px")}
     </td></tr>
   </table>
   <p style="max-width:520px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
@@ -506,10 +511,7 @@ function noticeEmail(message: { title: string; body: string }, orderNumber: stri
           </tr>
         </table>
 
-        <a href="${hesapLinki(brand)}"
-           style="display:inline-block;margin:20px 0 0;padding:13px 26px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
-          Siparişimi görüntüle
-        </a>
+        ${hesapDugmesi(brand, "20px")}
       </td>
     </tr>
   </table>

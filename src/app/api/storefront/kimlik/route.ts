@@ -89,8 +89,17 @@ export async function POST(request: Request) {
   const byEmail = emailLimiter(email);
   if (!byEmail.ok) return tooMany(CORS, byEmail.retryAfterSeconds);
 
-  // Marka ve yönlendirme adresi mağazanın kendi kaydından.
-  const brand = await getStoreBrand(supabase, organizationId);
+  /*
+    Marka ve yönlendirme adresi mağazanın kendi kaydından; adres olarak
+    da isteğin geldiği kök kullanılıyor (resolveStore onu zaten mağazanın
+    kayıtlı adresleriyle eşleştirdi). Eskiden yedek ArvoCulture'dı:
+    başka bir mağazanın müşterisi, hesabını doğruladıktan sonra o
+    markanın sitesine düşerdi.
+  */
+  const brand = await getStoreBrand(supabase, organizationId, origin);
+  /* Dönüş adresi yoksa bağlantı nereye gideceğini bilmiyor. */
+  if (!brand.siteUrl) return NextResponse.json({ error: "magaza_adresi_yok" }, { status: 503, headers: CORS });
+  const hesapAdresi = `${brand.siteUrl}/hesap`;
 
   try {
     if (islem === "kayit") {
@@ -106,7 +115,7 @@ export async function POST(request: Request) {
         type: "signup",
         email,
         password: sifre,
-        options: { redirectTo: `${brand.siteUrl}/hesap` },
+        options: { redirectTo: hesapAdresi },
       });
 
       if (error) {
@@ -131,7 +140,7 @@ export async function POST(request: Request) {
       const { data, error } = await supabase.auth.admin.generateLink({
         type: "recovery",
         email,
-        options: { redirectTo: `${brand.siteUrl}/hesap` },
+        options: { redirectTo: hesapAdresi },
       });
 
       /*

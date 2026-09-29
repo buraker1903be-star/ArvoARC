@@ -1,5 +1,7 @@
 import "server-only";
 
+import { YEDEK_GONDEREN, YEDEK_YANIT } from "@/lib/eposta-gonderen";
+
 /**
  * Resend üzerinden e-posta gönderimi.
  *
@@ -11,13 +13,10 @@ import "server-only";
  * kimliği ArvoCulture.
  */
 /*
-  Varsayılan gönderen. Mağaza kendi adresini ayarına yazana kadar bu kullanılır
-  — bir alan adından e-posta gönderebilmek için o alan adının Resend'de
-  doğrulanmış olması gerekiyor (DNS işi), yani yeni mağaza kendi adresini ancak
-  doğrulamayı tamamladıktan sonra kullanabilir.
+  Varsayılan gönderen tek yerde (lib/eposta-gonderen.ts): buradaki sabit
+  bir KİRACININ adresiydi ve mağaza kimliği geçmeyen her çağrı, müşteriye
+  o markanın adıyla e-posta gönderiyordu.
 */
-const FROM = "ArvoCulture <siparis@arvoculture.com>";
-const REPLY_TO = "info@arvoculture.com";
 
 export async function sendEmail({
   to,
@@ -50,9 +49,9 @@ export async function sendEmail({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: from || FROM,
+        from: from || YEDEK_GONDEREN,
         to: [to],
-        reply_to: replyTo || REPLY_TO,
+        reply_to: replyTo || YEDEK_YANIT,
         subject,
         html,
       }),

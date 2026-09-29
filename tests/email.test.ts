@@ -110,3 +110,23 @@ test("onay e-postasında tutarlar TL biçiminde", () => {
   assert.ok(html.includes("₺3.418,20"), "toplam");
   assert.ok(html.includes("Ücretsiz"), "kargo");
 });
+
+/*
+  MAĞAZA ADRESİ YOKKA "SİPARİŞİMİ GÖRÜNTÜLE" ÇİZİLMEMELİ. Yedek adres
+  ArvoCulture'dı: başka bir mağazanın müşterisi düğmeye bastığında o
+  markanın sitesinde "sipariş bulunamadı" görürdü.
+*/
+const ADRESSIZ: StoreBrand = { ...TEST_BRAND, siteUrl: null };
+
+test("adresi olan mağazada hesap düğmesi kendi adresine gidiyor", () => {
+  const html = paymentReceivedEmail("#AC-9", "Elif", 1000, TEST_BRAND).html;
+  assert.ok(html.includes("https://test.example/hesap"), "kendi adresi");
+  assert.ok(html.includes("Siparişimi görüntüle"));
+});
+
+test("adresi olmayan mağazada düğme hiç yok", () => {
+  const html = paymentReceivedEmail("#AC-9", "Elif", 1000, ADRESSIZ).html;
+  assert.ok(!html.includes("Siparişimi görüntüle"), "düğme çizilmemeli");
+  assert.ok(!html.includes("null/hesap"), "boş adres bağlantıya sızmamalı");
+  assert.ok(html.includes("#AC-9"), "e-postanın kalanı yerinde");
+});

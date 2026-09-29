@@ -34,6 +34,8 @@ export default async function Settings(){
     ayrı bir Vercel projesi. Ekranda vitrin adresi yazıyordu; o adres 404
     döndüğü için bildirim hiç ulaşmıyordu.
   */
+  /* Açıklamadaki örnek mağazanın kendi alan adından; yoksa yer tutucu. */
+  const ornekAlan=(settings?.custom_domain??(settings?.platform_subdomain?altAlanAdresi(settings.platform_subdomain):null))??"magazaniz.com";
   const callbackHost=panelDomainStatus==="verified"&&settings?.panel_custom_domain?settings.panel_custom_domain:"arc.arvo-os.com";
   return <>
     <section className="ac-bar"><div><h1>Mağaza Ayarları</h1><p>Marka kimliği, alan adları ve ödeme yöntemleri.</p></div></section>
@@ -119,7 +121,8 @@ export default async function Settings(){
             <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli mağaza bağlantısı etkinleşir.</small></p></div>
             {canManage&&<form action={verifyStorefrontDomain}><button type="submit">DNS bağlantısını doğrula</button></form>}
           </div>}
-          <div className="domain-note"><b>Doğru ayrım</b><p><strong>app.arvoculture.com</strong> yönetim panelidir; <strong>arvoculture.com</strong> ise müşterilerin alışveriş yaptığı mağazadır.</p></div>
+          <div className="domain-note"><b>Doğru ayrım</b><p>{/* Örnekler ArvoCulture'ın alan adlarıydı: başka bir salon, kendi
+              adresini kurarken o markanın adresini okuyordu. */}<strong>panel.{ornekAlan}</strong> yönetim panelidir; <strong>{ornekAlan}</strong> ise müşterilerin alışveriş yaptığı mağazadır.</p></div>
         </section>
       </section>
     </div>
