@@ -7,7 +7,17 @@
   (lib/odeme/tami/yanit.ts).
 */
 
-export const TAMI_UCLARI = {
+export interface TamiUclari {
+  /** Ortak ödeme sayfası için tek kullanımlık jeton. */
+  token: string;
+  /** Müşterinin yönlendirildiği ödeme sayfası. */
+  sayfa: string;
+  /** Sonucun doğrulandığı yer; tarayıcı dönüşü kanıt sayılmıyor. */
+  sorgu: string;
+  iade: string;
+}
+
+export const TAMI_UCLARI: { test: TamiUclari; canli: TamiUclari } = {
   test: {
     token: "https://sandbox-paymentapi.tami.com.tr/hosted/create-one-time-hosted-token",
     sayfa: "https://sandbox-portal.tami.com.tr/hostedPaymentPage",
@@ -20,7 +30,7 @@ export const TAMI_UCLARI = {
     sorgu: "https://paymentapi.tami.com.tr/payment/query",
     iade: "https://paymentapi.tami.com.tr/payment/reverse",
   },
-} as const;
+};
 
 /*
   SİPARİŞ NUMARASI. Tami 2–36 karakter, yalnızca harf/rakam, "-" ve "_"

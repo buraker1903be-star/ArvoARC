@@ -12,13 +12,14 @@ const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending
 
 export default async function Settings(){
   const {supabase,organization,membership}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,tami_enabled,tami_test_mode,tami_merchant_number,tami_terminal_number,tami_jwk_kid,tami_secret_key_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
   /* Ödemenin gittiği hesap (IBAN, PayTR) yalnızca owner/admin: bkz. actions.ts PAYMENT_ROLES. */
   const canManagePayments=["owner","admin"].includes(membership.role);
   // Anahtarın kendisi hiç okunmaz; yalnızca kayıtlı olup olmadığı gösterilir.
   const keysStored=Boolean(settings?.paytr_merchant_key_enc);
+  const tamiKeysStored=Boolean(settings?.tami_secret_key_enc);
   /* Bağlantı yalnızca yetkiliye sınanıyor: OTO'ya gereksiz istek atmamak
      ve firma listesini görmeye yetkisi olmayana göstermemek için. */
   const kargoBaglantisi=canManagePayments
@@ -256,6 +257,38 @@ export default async function Settings(){
             <div className="check-stack"><label className="check-inline"><input type="checkbox" name="paytr_test_mode" defaultChecked={settings?.paytr_test_mode??true}/> Test modu</label><label className="check-inline"><input type="checkbox" name="paytr_no_installment" defaultChecked={settings?.paytr_no_installment}/> Taksiti kapat</label></div>
           </div>
           <div className="security-note"><b>{keysStored?"Anahtarlarınız kayıtlı.":"Tahsilat kendi PayTR hesabınıza yapılır."}</b><p>Anahtar ve salt şifrelenerek saklanır, hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazmanız yeterli; boş bırakırsanız kayıtlı olan korunur.</p><code>{`https://${callbackHost}/api/storefront/paytr-bildirim`}</code></div>
+        </article>
+        {/*
+          TAMİ ORTAK ÖDEME SAYFASI. Kart yine bizim sunucumuza uğramıyor:
+          müşteri Tami'nin sayfasında ödüyor, Masterpass da orada.
+          Doğrudan 3D API'si kart verisini bizim isteğimizde taşıyordu ve
+          bilerek seçilmedi.
+        */}
+        <article className="payment-method">
+          <div className="payment-title"><div><small>KARTLA ÖDEME</small><h4>Tami ortak ödeme sayfası</h4></div><label className="check-inline"><input type="checkbox" name="tami_enabled" defaultChecked={settings?.tami_enabled}/><span>Etkin</span></label></div>
+          <p>Kart bilgileri ArvoARC sunucularına gelmeden Tami’nin ödeme sayfasında işlenir; Masterpass’e kayıtlı kartlar da orada çıkar.</p>
+          <div className="payment-fields">
+            <label>İşyeri numarası<input name="tami_merchant_number" defaultValue={settings?.tami_merchant_number??""} placeholder="merchantNumber" autoComplete="off"/></label>
+            <label>Terminal numarası<input name="tami_terminal_number" defaultValue={settings?.tami_terminal_number??""} placeholder="terminalNumber" autoComplete="off"/></label>
+            <label className="wide">JWK kid<input name="tami_jwk_kid" defaultValue={settings?.tami_jwk_kid??""} placeholder="Portal → İşyeri Ayarları → POS Yönetimi" autoComplete="off"/></label>
+            <label>Gizli anahtar (secretKey)<input name="tami_secret_key" type="password" placeholder={tamiKeysStored?"Kayıtlı · değiştirmek için yazın":"secretKey"} autoComplete="new-password"/></label>
+            <label>JWK “k” değeri<input name="tami_jwk_k" type="password" placeholder={tamiKeysStored?"Kayıtlı · değiştirmek için yazın":"k"} autoComplete="new-password"/></label>
+            <div className="check-stack"><label className="check-inline"><input type="checkbox" name="tami_test_mode" defaultChecked={settings?.tami_test_mode??true}/> Test modu (sandbox)</label></div>
+          </div>
+          {/*
+            HANGİSİ ÖNCE. Yedeğe düşme yalnızca ödeme oturumu açılırken
+            geçerli: müşteri ödeme sayfasına düştükten sonra ikinci bir
+            sağlayıcıda oturum açılmaz, yoksa çift çekim riski doğar.
+          */}
+          <div className="payment-fields">
+            <label className="wide">Kartla ödemede önce hangisi denensin
+              <select name="odeme_saglayicisi" defaultValue={settings?.odeme_saglayicisi??"paytr"}>
+                <option value="paytr">PayTR (Tami yedek)</option>
+                <option value="tami">Tami (PayTR yedek)</option>
+              </select>
+            </label>
+          </div>
+          <div className="security-note"><b>{tamiKeysStored?"Anahtarlarınız kayıtlı.":"Tahsilat kendi Tami işyerinize yapılır."}</b><p>Gizli anahtar ve JWK “k” değeri şifrelenerek saklanır, hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazmanız yeterli; boş bırakırsanız kayıtlı olan korunur. Seçilen sağlayıcı hazır değilse ödeme öteki sağlayıcıyla açılır.</p></div>
         </article>
         <article className="payment-method">
           <div className="payment-title"><div><small>MÜŞTERİ E-POSTALARI</small><h4>Gönderen adresi</h4></div></div>

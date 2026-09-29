@@ -27,6 +27,8 @@ export const ERRORS:Record<string,string>={
   forbidden: yetkiYok("mağaza ayarları"),
   "invalid-bank-transfer":"Havale için banka adı, hesap sahibi ve TR ile başlayan 26 haneli IBAN gerekli.",
   "paytr-merchant-required":"PayTR’ı açmak için mağaza numarası gerekli.",
+  "tami-merchant-required":"Tami’yi açmak için işyeri numarası, terminal numarası ve JWK kid gerekli.",
+  "tami-key-pair-required":"Tami gizli anahtarı ve JWK “k” değeri birlikte girilmeli.",
   "invalid-installment":"Taksit sayısı 0 ile 12 arasında olmalı.",
   "invalid-email-sender":"Gönderen adresi geçersiz. Ya düz adres yazın (siparis@alanadiniz.com) ya da \"Mağaza Adı <siparis@alanadiniz.com>\" biçiminde.",
   "file-required":"Bir dosya seçin.",

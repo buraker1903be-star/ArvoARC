@@ -148,6 +148,20 @@ export async function updatePaymentSettings(formData:FormData){
   // Anahtarlar yalnızca yazılır, geri gösterilmez: boş bırakılırsa kayıtlı olan korunur.
   const paytrMerchantKey=String(formData.get("paytr_merchant_key")??"").trim();
   const paytrMerchantSalt=String(formData.get("paytr_merchant_salt")??"").trim();
+  /*
+    TAMİ. Birincil sağlayıcı kararı verildi (29.09.2026) ama varsayılan
+    hâlâ PayTR: anahtarı girilmemiş bir mağazayı Tami'ye almak kartla
+    ödemeyi durdururdu. Geçiş mağaza başına ve bilinçli.
+  */
+  const tamiEnabled=formData.get("tami_enabled")==="on";
+  const tamiTestMode=formData.get("tami_test_mode")==="on";
+  const tamiMerchant=String(formData.get("tami_merchant_number")??"").trim();
+  const tamiTerminal=String(formData.get("tami_terminal_number")??"").trim();
+  const tamiKid=String(formData.get("tami_jwk_kid")??"").trim();
+  // Sırlar yalnızca yazılır, geri gösterilmez: boş bırakılırsa kayıtlı olan korunur.
+  const tamiSecret=String(formData.get("tami_secret_key")??"").trim();
+  const tamiJwkK=String(formData.get("tami_jwk_k")??"").trim();
+  const saglayiciTercihi=String(formData.get("odeme_saglayicisi")??"paytr")==="tami"?"tami":"paytr";
   const emailFrom=String(formData.get("email_from")??"").trim();
   const emailReplyTo=String(formData.get("email_reply_to")??"").trim();
   if(bankTransferEnabled&&(!bankName||!bankAccountHolder||!/^TR\d{24}$/.test(bankIban)))return await bildirimliDonus("/ayarlar",{hata:hataMetni("invalid-bank-transfer")});
@@ -160,6 +174,13 @@ export async function updatePaymentSettings(formData:FormData){
     o yüzden ikisi birlikte istenir.
   */
   if((paytrMerchantKey?1:0)!==(paytrMerchantSalt?1:0))return await bildirimliDonus("/ayarlar",{hata:hataMetni("paytr-key-pair-required")});
+  /*
+    Tami'de üç açık alan (işyeri, terminal, kid) ve iki sır var. Sırlar
+    ikisi birlikte istenir: biri girilip öteki boş bırakılınca yarım
+    yapılandırma oluşur ve ödeme isteği imza hatasıyla döner.
+  */
+  if(tamiEnabled&&(!tamiMerchant||!tamiTerminal||!tamiKid))return await bildirimliDonus("/ayarlar",{hata:hataMetni("tami-merchant-required")});
+  if((tamiSecret?1:0)!==(tamiJwkK?1:0))return await bildirimliDonus("/ayarlar",{hata:hataMetni("tami-key-pair-required")});
   /*
     Gönderen adresi doğrudan e-posta başlığına giriyor. Satır sonu ya da
     fazladan alan enjekte edilmesini engellemek için biçim sınırlı tutuluyor:
@@ -174,6 +195,11 @@ export async function updatePaymentSettings(formData:FormData){
     if(!paymentCredentialsConfigured())return await bildirimliDonus("/ayarlar",{hata:hataMetni("paytr-encryption-missing")});
     paytrSecrets={paytr_merchant_key_enc:encryptSecret(paytrMerchantKey),paytr_merchant_salt_enc:encryptSecret(paytrMerchantSalt)};
   }
+  let tamiSecrets:{tami_secret_key_enc:string;tami_jwk_k_enc:string}|null=null;
+  if(tamiSecret&&tamiJwkK){
+    if(!paymentCredentialsConfigured())return await bildirimliDonus("/ayarlar",{hata:hataMetni("paytr-encryption-missing")});
+    tamiSecrets={tami_secret_key_enc:encryptSecret(tamiSecret),tami_jwk_k_enc:encryptSecret(tamiJwkK)};
+  }
   /* upsert, update DEĞİL. Hiçbir migration varsayılan bir arc_store_settings
      satırı oluşturmuyor; yeni bir mağaza doğrudan Ödeme sekmesine giderse
      update 0 satır günceller, error null döner ve ekranda "kaydedildi"
@@ -186,6 +212,10 @@ export async function updatePaymentSettings(formData:FormData){
     paytr_enabled:paytrEnabled,paytr_test_mode:paytrTestMode,paytr_merchant_id:paytrMerchantId||null,
     paytr_no_installment:paytrNoInstallment,paytr_max_installment:paytrMaxInstallment,
     ...(paytrSecrets??{}),
+    tami_enabled:tamiEnabled,tami_test_mode:tamiTestMode,tami_merchant_number:tamiMerchant||null,
+    tami_terminal_number:tamiTerminal||null,tami_jwk_kid:tamiKid||null,
+    ...(tamiSecrets??{}),
+    odeme_saglayicisi:saglayiciTercihi,
     email_from:emailFrom||null,email_reply_to:emailReplyTo||null,
     updated_at:new Date().toISOString()
   },{onConflict:"organization_id"});
