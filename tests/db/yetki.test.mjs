@@ -63,6 +63,13 @@ const PANEL = [
   "private.can_manage_organization_assets",
   "public.arc_address_line",
   "public.arc_adjust_inventory",
+  /*
+    Çok kiracılı vitrinin yazma yolu. Kupon ve sipariş oluşturma
+    BİLEREK burada DEĞİL: yalnızca service_role'a açık (vitrin
+    bunları kendi sunucusundan çağırıyor). İade talebi auth.uid()
+    istediği için oturumlu kullanıcıya açık.
+  */
+  "public.arc_storefront_return_request",
   /* Medya kitaplığı: panel okuması, anon'a kapalı. */
   "public.arc_medya_listesi",
   /*
