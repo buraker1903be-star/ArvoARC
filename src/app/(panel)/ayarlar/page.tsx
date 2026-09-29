@@ -1,5 +1,5 @@
 import { requireTenant } from "@/lib/tenant";
-import { ALT_ALAN_SONEKI, altAlanAdresi } from "@/lib/magaza-adresi";
+import { ALT_ALAN_SONEKI, altAlanAdresi, magazaAdresi } from "@/lib/magaza-adresi";
 import { PanelBildirimi } from "@/components/panel/bildirim";
 import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
 import { baglantiyiSina } from "@/lib/tryoto/ayar";
@@ -34,8 +34,14 @@ export default async function Settings(){
     ayrı bir Vercel projesi. Ekranda vitrin adresi yazıyordu; o adres 404
     döndüğü için bildirim hiç ulaşmıyordu.
   */
-  /* Açıklamadaki örnek mağazanın kendi alan adından; yoksa yer tutucu. */
-  const ornekAlan=(settings?.custom_domain??(settings?.platform_subdomain?altAlanAdresi(settings.platform_subdomain):null))??"magazaniz.com";
+  /*
+    "Doğru ayrım" notu ÖRNEK değil, kiracının GERÇEK iki adresini
+    gösteriyor. Örnekler önce ArvoCulture'ınkilerdi; onları kiracının
+    alan adından türetince bu sefer olmayan bir adres uyduruyordu
+    ("panel.salon-beta.shop.arvo-os.com"). Panelin adresi zaten
+    callbackHost'ta duruyor ve hemen yukarıdaki kutuda yazıyor.
+  */
+  const vitrinAdresi=magazaAdresi(settings)?.replace(/^https:\/\//,"")??null;
   const callbackHost=panelDomainStatus==="verified"&&settings?.panel_custom_domain?settings.panel_custom_domain:"arc.arvo-os.com";
   return <>
     <section className="ac-bar"><div><h1>Mağaza Ayarları</h1><p>Marka kimliği, alan adları ve ödeme yöntemleri.</p></div></section>
@@ -63,7 +69,16 @@ export default async function Settings(){
 
         {canManage?<form action={updateStoreSettings} className="settings-form">
           <label>Mağaza adı<input name="store_name" defaultValue={settings?.store_name??organization.name} required maxLength={160}/></label>
-          <label>Yayınlanan mağaza<span className="readonly-field">{settings?.storefront_url??"Henüz tanımlanmadı"}</span></label>
+          {/*
+            AYNI SAYFA İKİ FARKLI CEVAP VERİYORDU. Burası yalnızca
+            storefront_url'e bakıyordu; kiracı açılışının verdiği alt
+            alan adı o sütuna yazılmıyor. Yeni bir salon burada "Henüz
+            tanımlanmadı" okuyor, 1000 piksel aşağıda aynı sayfada
+            "MAĞAZA ADRESİ: salon-beta.shop.arvo-os.com · Aktif"
+            görüyordu. Adres artık ortak çözücüden (lib/magaza-adresi.ts),
+            yani alan adı bölümüyle aynı kaynaktan.
+          */}
+          <label>Yayınlanan mağaza<span className="readonly-field">{magazaAdresi(settings)??"Henüz tanımlanmadı"}</span></label>
           <label>Ana marka rengi<span className="color-input"><input name="primary_color" type="color" defaultValue={settings?.primary_color??"#002045"}/><input value={settings?.primary_color??"#002045"} readOnly aria-label="Ana marka rengi kodu"/></span></label>
           <label>Vurgu rengi<span className="color-input"><input name="accent_color" type="color" defaultValue={settings?.accent_color??"#6f9548"}/><input value={settings?.accent_color??"#6f9548"} readOnly aria-label="Vurgu rengi kodu"/></span></label>
           <label>Para birimi<select name="currency" defaultValue={settings?.currency??"TRY"}><option value="TRY">TRY · Türk Lirası</option><option value="USD">USD · ABD Doları</option><option value="EUR">EUR · Euro</option></select></label>
@@ -121,8 +136,7 @@ export default async function Settings(){
             <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli mağaza bağlantısı etkinleşir.</small></p></div>
             {canManage&&<form action={verifyStorefrontDomain}><button type="submit">DNS bağlantısını doğrula</button></form>}
           </div>}
-          <div className="domain-note"><b>Doğru ayrım</b><p>{/* Örnekler ArvoCulture'ın alan adlarıydı: başka bir salon, kendi
-              adresini kurarken o markanın adresini okuyordu. */}<strong>panel.{ornekAlan}</strong> yönetim panelidir; <strong>{ornekAlan}</strong> ise müşterilerin alışveriş yaptığı mağazadır.</p></div>
+          <div className="domain-note"><b>Doğru ayrım</b><p><strong>{callbackHost}</strong> yönetim panelidir; {vitrinAdresi?<><strong>{vitrinAdresi}</strong> ise müşterilerin alışveriş yaptığı mağazadır.</>:"mağaza adresi ise müşterilerin alışveriş yaptığı yerdir ve yukarıdan bağlanır."}</p></div>
         </section>
       </section>
     </div>
