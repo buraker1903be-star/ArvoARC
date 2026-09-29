@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
+import { NOTR_ANA, NOTR_ARKA, NOTR_VURGU } from "@/lib/tema-varsayilanlari";
 
 const roles=new Set(["owner","admin","manager"]);
 const text=(fd:FormData,key:string,max:number)=>String(fd.get(key)??"").trim().slice(0,max);
@@ -59,9 +60,12 @@ async function writeDraft(formData:FormData){
     featured_title:text(formData,"featured_title",100),
     campaign_title:text(formData,"campaign_title",100),
     campaign_description:text(formData,"campaign_description",240),
-    primary_color:color(text(formData,"primary_color",7),"#111210"),
-    accent_color:color(text(formData,"accent_color",7),"#D9FF43"),
-    background_color:color(text(formData,"background_color",7),"#F5F2EC"),
+    /* Renk yedekleri ArvoCulture'ın paletiydi (#D9FF43 o markanın
+       limonu): geçersiz bir değer gönderen BAŞKA bir salon, sessizce
+       o markanın rengine düşüyordu. Yedek artık nötr. */
+    primary_color:color(text(formData,"primary_color",7),NOTR_ANA),
+    accent_color:color(text(formData,"accent_color",7),NOTR_VURGU),
+    background_color:color(text(formData,"background_color",7),NOTR_ARKA),
     typography:["editorial","modern","minimal"].includes(text(formData,"typography",20))?text(formData,"typography",20):"editorial",
     hero_style:["editorial-orbs","minimal","split"].includes(text(formData,"hero_style",30))?text(formData,"hero_style",30):"editorial-orbs",
     header_layout:["centered","logo-left","minimal"].includes(text(formData,"header_layout",20))?text(formData,"header_layout",20):"centered",

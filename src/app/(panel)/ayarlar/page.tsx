@@ -1,4 +1,5 @@
 import { requireTenant } from "@/lib/tenant";
+import { ALT_ALAN_SONEKI, altAlanAdresi } from "@/lib/magaza-adresi";
 import { PanelBildirimi } from "@/components/panel/bildirim";
 import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
 import { baglantiyiSina } from "@/lib/tryoto/ayar";
@@ -105,9 +106,9 @@ export default async function Settings(){
         <section className="card settings-section domain-section" id="magaza-alan-adi">
           <div className="head"><div><small>E-TİCARET MAĞAZASI</small><h3>Mağaza alan adı</h3></div><em className={domainStatus}>{statusLabel[domainStatus]??domainStatus}</em></div>
           <p className="domain-explainer"><b>Herkese açık mağaza</b> · Ürünlerin, koleksiyonların ve ödeme akışının yayınlandığı müşteri adresidir.</p>
-          <div className="domain-current storefront"><small>MAĞAZA ADRESİ</small><strong>{settings?.custom_domain??(settings?.platform_subdomain?`${settings.platform_subdomain}.shop.arvo-os.com`:"Henüz tanımlanmadı")}</strong><span>{settings?.domain_verified_at?"SSL ve alan adı doğrulandı":"DNS bağlantısı bekleniyor"}</span></div>
+          <div className="domain-current storefront"><small>MAĞAZA ADRESİ</small><strong>{settings?.custom_domain??(settings?.platform_subdomain?altAlanAdresi(settings.platform_subdomain):"Henüz tanımlanmadı")}</strong><span>{settings?.domain_verified_at?"SSL ve alan adı doğrulandı":"DNS bağlantısı bekleniyor"}</span></div>
           {canManage&&<form action={updateStorefrontDomainSettings} className="domain-form">
-            <label>ARVO mağaza alt alan adı<div className="domain-input"><input name="storefront_subdomain" defaultValue={settings?.platform_subdomain??""} placeholder="magazaadi" pattern="[a-z0-9-]+"/><span>.shop.arvo-os.com</span></div></label>
+            <label>ARVO mağaza alt alan adı<div className="domain-input"><input name="storefront_subdomain" defaultValue={settings?.platform_subdomain??""} placeholder="magazaadi" pattern="[a-z0-9-]+"/><span>.{ALT_ALAN_SONEKI}</span></div></label>
             <div className="domain-divider"><span>veya özel alan adı</span></div>
             <label>Mağaza alan adı<input name="storefront_custom_domain" defaultValue={settings?.custom_domain??""} placeholder="markaniz.com"/></label>
             <button type="submit">Mağaza alan adını kaydet</button>

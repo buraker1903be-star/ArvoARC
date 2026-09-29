@@ -35,7 +35,8 @@ const catalog: Section[] = [
     fields: [{ key: "campaign_title", label: "Başlık" }, { key: "campaign_description", label: "Açıklama", type: "textarea" }],
   },
   {
-    type: "values", label: "Neden ArvoCulture", group: "Şablon",
+    /* Etiket marka taşımıyor: bu ekranı her salon görüyor. */
+    type: "values", label: "Güven bandı", group: "Şablon",
     fields: [{ key: "trust_one", label: "Avantaj 1" }, { key: "trust_two", label: "Avantaj 2" }, { key: "trust_three", label: "Avantaj 3" }, { key: "trust_four", label: "Avantaj 4" }],
   },
   {
@@ -92,7 +93,13 @@ const initialLayout = (theme: Theme): LayoutItem[] =>
 
 const formValue = (value: Theme[string]) => (typeof value === "boolean" ? (value ? "on" : "") : String(value ?? ""));
 
-export function ThemeEditor({ initial, store }: { initial: Theme; store: string }) {
+/*
+  `store` NULL OLABİLİR. Önizleme adresi eskiden adresi olmayan
+  mağazalarda ArvoCulture'a düşüyordu: başka bir salon, kendi temasını
+  düzenlerken o markanın vitrinini izliyordu. Artık adres yoksa null
+  geliyor ve önizleme yerine ne yapılacağını söyleyen bir kart çıkıyor.
+*/
+export function ThemeEditor({ initial, store }: { initial: Theme; store: string | null }) {
   const [config, setConfig] = useState(initial);
   const [layout, setLayout] = useState(() => initialLayout(initial));
   const [baseline] = useState(() => JSON.stringify({ config: initial, layout: initialLayout(initial) }));
@@ -324,7 +331,15 @@ export function ThemeEditor({ initial, store }: { initial: Theme; store: string 
 
       <div className={`visual-preview device-${device}`}>
         <div className="preview-shell">
-          <iframe ref={frame} src={store} title="Canlı mağaza önizlemesi" onLoad={send} />
+          {store ? (
+            <iframe ref={frame} src={store} title="Canlı mağaza önizlemesi" onLoad={send} />
+          ) : (
+            <div className="preview-bos">
+              <b>Mağaza adresi tanımlı değil</b>
+              <p>Önizleme, mağazanın kendi adresini açıyor. Adres bağlanınca değişiklikleri burada canlı görebilirsiniz.</p>
+              <a className="ac-btn" href="/ayarlar#magaza-alan-adi">Alan adını bağla</a>
+            </div>
+          )}
         </div>
       </div>
     </form>

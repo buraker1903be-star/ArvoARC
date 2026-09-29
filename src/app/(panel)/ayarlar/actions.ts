@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
 import { requireTenant } from "@/lib/tenant";
+import { altAlanAdresi } from "@/lib/magaza-adresi";
 import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/vercel-domains";
 import { encryptSecret,paymentCredentialsConfigured } from "@/lib/payment-credentials";
 import { jetonlariUnut } from "@/lib/tryoto/istemci";
@@ -264,7 +265,7 @@ export async function updateStorefrontDomainSettings(formData:FormData){
     try{provision=await ensureVercelProjectDomain(customDomain,"storefront");}
     catch(error){return await bildirimliDonus("/ayarlar",{hata:hataMetni(error instanceof Error?error.message:"Vercel alan adı eklenemedi")});}
   }
-  const storefrontUrl=customDomain?`https://${customDomain}`:`https://${platformSubdomain}.shop.arvo-os.com`;
+  const storefrontUrl=customDomain?`https://${customDomain}`:`https://${altAlanAdresi(platformSubdomain)}`;
   const {error}=await supabase.from("arc_store_settings").upsert({
     organization_id:organization.id,
     ...(await magazaAdiTabani(supabase,organization.id,organization.name)),

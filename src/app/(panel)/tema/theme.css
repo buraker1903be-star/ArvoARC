@@ -107,6 +107,11 @@ html[data-theme="dark"] .panel-root .device-switch button[aria-pressed="true"]{b
 .panel-root .visual-preview{min-height:0;display:grid;place-items:start center;overflow:auto;padding:16px;background:var(--surface-2)}
 .panel-root .preview-shell{width:100%;height:100%;min-height:560px;overflow:hidden;border:1px solid var(--line);border-radius:var(--r-md);background:#fff;box-shadow:var(--shadow-md);transition:width .3s var(--ease-spring)}
 .panel-root .preview-shell iframe{display:block;width:100%;height:100%;border:0;background:#fff}
+/* Adresi olmayan mağazada iframe yerine ne yapılacağını söyleyen kart. */
+.panel-root .preview-bos{height:100%;min-height:560px;display:grid;align-content:center;justify-items:center;gap:8px;padding:24px;text-align:center}
+.panel-root .preview-bos b{font-size:15px}
+.panel-root .preview-bos p{margin:0;max-width:44ch;color:var(--ink-2);font-size:13px;line-height:1.5}
+.panel-root .preview-bos .ac-btn{margin-top:8px}
 .panel-root .device-tablet .preview-shell{width:min(820px,100%)}
 .panel-root .device-mobile .preview-shell{width:390px;max-width:100%}
 
