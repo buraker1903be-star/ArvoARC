@@ -462,7 +462,27 @@ export async function tamiBaglantisiniDene(): Promise<{ ok: boolean; mesaj: stri
   const uyari = rakamDisi.length
     ? ` · ${rakamDisi.join(" ve ")} rakam dışı karakter içeriyor; Tami bunları sayı olarak bekliyor.`
     : "";
-  const kimlikNotu = `İstek ${ortam} ortamına, ${jetonOnEki} kimliğiyle gitti.${uyari}`;
+  /*
+    DEĞERLERİN BİÇİMİ. Sır ekrana yazılmıyor; yalnızca "neye benziyor"
+    söyleniyor. 29.09.2026'da 4003 hem sandbox hem canlı ortamda geldi
+    ve numaralar doğruydu: geriye secretKey kalıyordu. Tami'de secretKey
+    bir UUID, JWK "k" ise ~86 karakterlik base64url dizgesi — ikisinin
+    yer değiştirmesi tam olarak bu hatayı üretiyor ve ekrandan
+    anlaşılmıyordu.
+  */
+  const biciminiSoyle = (deger: string) => {
+    const sade = deger.trim();
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sade)) return "UUID";
+    if (/^[A-Za-z0-9_-]{40,}$/.test(sade)) return `${sade.length} karakter, base64url`;
+    return `${sade.length} karakter`;
+  };
+  const secretBicimi = biciminiSoyle(ayar.kimlik.secretKey);
+  const kBicimi = biciminiSoyle(ayar.jwk.k);
+  const kidBicimi = biciminiSoyle(ayar.jwk.kid);
+  const bicimNotu = ` · Biçimler — secretKey: ${secretBicimi}, JWK kid: ${kidBicimi}, JWK k: ${kBicimi}.${
+    secretBicimi !== "UUID" ? " Tami'de secretKey bir UUID'dir; buraya JWK “k” değeri yazılmış olabilir." : ""
+  }`;
+  const kimlikNotu = `İstek ${ortam} ortamına, ${jetonOnEki} kimliğiyle gitti.${uyari}${bicimNotu}`;
 
   if (sonuc.ok) return { ok: true, mesaj: `Bağlantı çalışıyor: Tami isteği kabul etti. ${kimlikNotu}` };
   if (/bulunamad|not found|4009|4010/i.test(sonuc.hata)) {
