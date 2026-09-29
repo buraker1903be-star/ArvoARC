@@ -215,6 +215,85 @@ export async function POST(request: Request) {
     }
   }
 
+  /*
+    ÖDEME YÖNTEMİ SİPARİŞTEN ÖNCE DENETLENİYOR.
+
+    Sipariş burada oluşuyor, yöntemin kullanılabilir olup olmadığı ise
+    AŞAĞIDA denetleniyordu. Havalesi kapalı ya da PayTR bilgisi girilmemiş
+    bir mağazada müşteri her denemede arkasında bir sipariş bırakıp
+    "kullanılamıyor" görüyordu. Yeni bir salonun varsayılan hâli tam olarak
+    bu: havale kapalı (sütun varsayılanı false), PayTR boş. Yani kiracı
+    daha ilk gününde, sipariş listesi hiç ödenmeyecek "Bekliyor"
+    kayıtlarıyla dolarken satış yapamıyordu.
+
+    Stok etkilenmiyordu: stok siparişte değil, ödeme kesinleşince düşülüyor.
+  */
+  let transferSettings: { bank_transfer_enabled: boolean | null; bank_transfer_discount_percent: number | null } | null = null;
+  let paytrConfig: PaytrStoreConfig | null = null;
+
+  if (isTransfer) {
+    /*
+      Havalenin açık olup olmadığı ve indirim oranı mağazanın ayarında.
+      Eskiden ikisi de yoktu: havaleyi panelden kapatmış bir mağazadan da
+      havale siparişi geçiyor, indirim ise kodda sabit %3 olduğu için her
+      mağazaya uygulanıyordu.
+    */
+    const { data, error: transferSettingsError } = await supabase
+      .from("arc_store_settings")
+      .select("bank_transfer_enabled, bank_transfer_discount_percent")
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
+    /*
+      Ayar okunamazsa havale AÇIK sayılamaz: "=== false" kontrolü undefined'ı
+      geçirdiği için geçici bir arızada, havaleyi panelden kapatmış mağazadan
+      da sipariş geçiyor ve indirim varsayılan %3'e düşüyordu.
+    */
+    if (transferSettingsError) {
+      console.error("Havale ayarları okunamadı:", transferSettingsError.message);
+      return NextResponse.json(
+        { error: "transfer_unavailable", message: "Havale ile ödeme şu anda kullanılamıyor, lütfen kartla deneyin." },
+        { status: 503, headers },
+      );
+    }
+
+    if (data?.bank_transfer_enabled === false) {
+      return NextResponse.json(
+        { error: "transfer_disabled", message: "Bu mağazada havale ile ödeme kapalı." },
+        { status: 422, headers },
+      );
+    }
+    transferSettings = data;
+  } else {
+    /*
+      Anahtarlar mağaza başına: isteğin geldiği mağazanın kendi PayTR hesabı
+      kullanılıyor. Havale yolu ayrı döndüğü için, PayTR bilgisi girilmemiş
+      mağaza hâlâ havaleyle satış yapabilir.
+    */
+    try {
+      paytrConfig = await storePaytrConfig(supabase, organizationId, origin);
+      /*
+        Dönüş adresi olmadan ödeme başlatılmıyor. Eskiden yedek adres
+        ArvoCulture'dı: adresi çözülemeyen başka bir mağazanın müşterisi,
+        ödedikten sonra o markanın sitesinde "sipariş bulunamadı" görürdü.
+      */
+      if (!paytrConfig.storeUrl) throw new Error("Mağazanın vitrin adresi tanımlı değil");
+      // Mağaza panelden kartla ödemeyi kapattıysa yeni ödeme başlatılmaz.
+      // (İade ve gelen bildirim doğrulaması bu bayrağa bakmaz; onlar çalışmaya
+      // devam etmeli.)
+      if (!paytrConfig.enabled) throw new Error("Mağaza kartla ödemeyi kapatmış");
+    } catch (configError) {
+      console.error("PayTR yapılandırması alınamadı:", organizationId, configError);
+      return NextResponse.json(
+        {
+          error: "paytr_unavailable",
+          message: "Kartla ödeme şu an kullanılamıyor. Havale/EFT ile ödeyebilir ya da bizimle iletişime geçebilirsiniz.",
+        },
+        { status: 503, headers },
+      );
+    }
+  }
+
   // --- 1. Sipariş oluştur (tutar sunucuda hesaplanır) --------
   const { data, error } = await supabase.rpc(
     "arc_create_storefront_order",
@@ -279,38 +358,7 @@ export async function POST(request: Request) {
     üstverisine yazılıyor; panelde ve faturada görünüyor.
   */
   if (isTransfer) {
-    /*
-      Havalenin açık olup olmadığı ve indirim oranı mağazanın ayarında.
-      Eskiden ikisi de yoktu: havaleyi panelden kapatmış bir mağazadan da
-      havale siparişi geçiyor, indirim ise kodda sabit %3 olduğu için her
-      mağazaya uygulanıyordu.
-    */
-    const { data: transferSettings, error: transferSettingsError } = await supabase
-      .from("arc_store_settings")
-      .select("bank_transfer_enabled, bank_transfer_discount_percent")
-      .eq("organization_id", organizationId)
-      .maybeSingle();
-
-    /*
-      Ayar okunamazsa havale AÇIK sayılamaz: "=== false" kontrolü undefined'ı
-      geçirdiği için geçici bir arızada, havaleyi panelden kapatmış mağazadan
-      da sipariş geçiyor ve indirim varsayılan %3'e düşüyordu.
-    */
-    if (transferSettingsError) {
-      console.error("Havale ayarları okunamadı:", transferSettingsError.message);
-      return NextResponse.json(
-        { error: "transfer_unavailable", message: "Havale ile ödeme şu anda kullanılamıyor, lütfen kartla deneyin." },
-        { status: 503, headers },
-      );
-    }
-
-    if (transferSettings?.bank_transfer_enabled === false) {
-      return NextResponse.json(
-        { error: "transfer_disabled", message: "Bu mağazada havale ile ödeme kapalı." },
-        { status: 422, headers },
-      );
-    }
-
+    /* Ayar yukarıda, sipariş oluşmadan önce okundu ve denetlendi. */
     /*
       İndirim YALNIZCA mal bedeline uygulanır. Eskiden taban order.total idi,
       yani kargo da indiriliyordu: 120 TL kargonun %3'ü müşteriye hediye
@@ -379,25 +427,13 @@ export async function POST(request: Request) {
 
   // --- 2. PayTR token iste -----------------------------------
   /*
-    Anahtarlar mağaza başına: isteğin geldiği mağazanın kendi PayTR hesabı
-    kullanılıyor. Havale yolu yukarıda döndüğü için, PayTR bilgisi girilmemiş
-    mağaza hâlâ havaleyle satış yapabilir.
+    Yapılandırma sipariş oluşmadan önce alındı ve denetlendi; havale dalı
+    yukarıda döndüğü için buraya yalnızca kart yolu geliyor. Denetim yine
+    de duruyor: "as" ile susturmak, ileride dalların biri değişirse
+    müşteriyi boş bir ödeme ekranına gönderirdi.
   */
-  let config: PaytrStoreConfig;
-  try {
-    config = await storePaytrConfig(supabase, organizationId, origin);
-    /*
-      Dönüş adresi olmadan ödeme başlatılmıyor. Eskiden yedek adres
-      ArvoCulture'dı: adresi çözülemeyen başka bir mağazanın müşterisi,
-      ödedikten sonra o markanın sitesinde "sipariş bulunamadı" görürdü.
-    */
-    if (!config.storeUrl) throw new Error("Mağazanın vitrin adresi tanımlı değil");
-    // Mağaza panelden kartla ödemeyi kapattıysa yeni ödeme başlatılmaz.
-    // (İade ve gelen bildirim doğrulaması bu bayrağa bakmaz; onlar çalışmaya
-    // devam etmeli.)
-    if (!config.enabled) throw new Error("Mağaza kartla ödemeyi kapatmış");
-  } catch (configError) {
-    console.error("PayTR yapılandırması alınamadı:", order.order_number, configError);
+  if (!paytrConfig) {
+    console.error("PayTR yapılandırması beklenmedik biçimde boş:", order.order_number);
     return NextResponse.json(
       {
         error: "paytr_unavailable",
@@ -406,6 +442,7 @@ export async function POST(request: Request) {
       { status: 503, headers },
     );
   }
+  const config = paytrConfig;
 
   /*
     PayTR sipariş kimliği siparişe kaydedilir: bildirim siparişi

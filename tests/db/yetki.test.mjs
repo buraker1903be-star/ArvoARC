@@ -52,6 +52,11 @@ const ANON = [
   "public.arc_storefront_products_page",
   "public.arc_storefront_search_index",
   "public.arc_storefront_settings",
+  /*
+    Ödeme yöntemleri: vitrin, gösterebileceği yöntemleri ödeme adımından
+    ÖNCE bilmeli. Yalnızca boolean dönüyor, PayTR anahtarları değil.
+  */
+  "public.arc_storefront_payment_methods",
   "public.arc_storefront_variants",
   "public.get_storefront_seller",
 ];
