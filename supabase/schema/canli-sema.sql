@@ -1,4 +1,4 @@
--- Canlı şema dışa aktarımı: 2026-09-28
+-- Canlı şema dışa aktarımı: 2026-09-29
 -- scripts/sema-disa-aktar.sql ile üretildi. Elle düzenlemeyin.
 -- Sıra: tipler, sekanslar, tablolar, fonksiyonlar, varsayılanlar,
 -- kısıtlar, yabancı anahtarlar, indeksler, görünümler, RLS, politikalar,
@@ -563,6 +563,80 @@ begin
 
   return new;
 end
+$function$
+;
+
+CREATE OR REPLACE FUNCTION private.arc_magaza_varsayilanlari()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_slug text;
+  v_taban text;
+begin
+  select coalesce(o.slug, '') into v_slug
+  from public.organizations o where o.id = new.organization_id;
+
+  /* ---------- Sipariş öneki ---------- */
+  if new.order_prefix is null then
+    /* Slug zaten ASCII küçük harf ve tireli; ilk iki HARF alınıyor. */
+    v_taban := upper(substring(regexp_replace(coalesce(v_slug, ''), '[^a-z]', '', 'g') from 1 for 2));
+    if length(coalesce(v_taban, '')) < 2 then v_taban := 'MG'; end if;
+
+    /*
+      Serbest olan İLK aday: önce iki harf, sonra üç, sonra dört.
+      676 + 26 + 1 aday, hepsi ^[A-Z]{1,6}$ kısıtına uyuyor.
+    */
+    select a.aday into new.order_prefix
+    from (
+      select v_taban as aday, 0 as sira
+      union all
+      select v_taban || chr(64 + i), i from generate_series(1, 26) i
+      union all
+      select v_taban || chr(64 + i) || chr(64 + j), 26 + (i - 1) * 26 + j
+        from generate_series(1, 26) i, generate_series(1, 26) j
+    ) a
+    where not exists (
+      select 1 from public.arc_store_settings s
+      where upper(s.order_prefix) = a.aday
+    )
+    order by a.sira
+    limit 1;
+  end if;
+
+  /* ---------- Platform alt alan adı ---------- */
+  /*
+    Yeni salonun GÜNÜ BİRİNDE mağaza adresi olsun: vitrin çözücüsü
+    (arc_storefront_org) doğrulanmış özel alan adına ya da alt alan
+    adına bakıyor; ikisi de yoksa mağaza hiç açılmıyor. Özel alan adı
+    DNS ve doğrulama istiyor, alt alan adı istemiyor.
+
+    Alt alan adı biçimi rakama izin veriyor, numaralandırma sayıyla.
+  */
+  if new.platform_subdomain is null then
+    v_slug := regexp_replace(v_slug, '[^a-z0-9-]', '', 'g');
+    v_slug := regexp_replace(v_slug, '^-+|-+$', '', 'g');
+    if coalesce(v_slug, '') = '' then v_slug := 'magaza'; end if;
+    v_slug := substring(v_slug from 1 for 50);
+
+    select a.aday into new.platform_subdomain
+    from (
+      select v_slug as aday, 0 as sira
+      union all
+      select v_slug || '-' || i::text, i from generate_series(2, 200) i
+    ) a
+    where not exists (
+      select 1 from public.arc_store_settings s
+      where lower(s.platform_subdomain) = a.aday
+    )
+    order by a.sira
+    limit 1;
+  end if;
+
+  return new;
+end;
 $function$
 ;
 
@@ -2283,6 +2357,602 @@ AS $function$
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.arc_storefront_collection_products(p_host text, p_collection_slug text DEFAULT NULL::text, p_menu_groups text[] DEFAULT NULL::text[], p_limit integer DEFAULT 200)
+ RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, specs jsonb, size_guide jsonb, sizes jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    p.slug,
+    p.name,
+    p.description,
+    coalesce(
+      nullif(p.metadata ->> 'subtitle', ''),
+      left(regexp_replace(coalesce(p.description, ''), '<[^>]*>', '', 'g'), 140)
+    ) as subtitle,
+    coalesce(p.metadata ->> 'vendor', 'ARVO') as vendor,
+    coalesce(p.metadata ->> 'product_type', '') as product_type,
+    min(v.price) as price,
+    min(v.compare_at_price) filter (where v.compare_at_price > v.price)
+      as compare_at_price,
+    bool_or(v.stock > 0 or v.allow_backorder) as available,
+    coalesce(p.metadata -> 'image_paths', '[]'::jsonb) as image_paths,
+    coalesce(p.metadata -> 'specs', '[]'::jsonb) as specs,
+    coalesce(p.metadata -> 'size_guide', '[]'::jsonb) as size_guide,
+    coalesce(
+      jsonb_agg(distinct upper(trim(split_part(v.title, '/', 2))))
+        filter (
+          where trim(coalesce(split_part(v.title, '/', 2), '')) <> ''
+            and (v.stock > 0 or v.allow_backorder)
+        ),
+      '[]'::jsonb
+    ) as sizes
+  from public.arc_products p
+  join public.arc_product_variants v
+    on v.product_id = p.id
+   and v.organization_id = p.organization_id
+  join public.organizations o
+    on o.id = p.organization_id
+   and o.id = public.arc_storefront_org(p_host)
+  join public.arc_collection_products cp
+    on cp.product_id = p.id
+  join public.arc_collections c
+    on c.id = cp.collection_id
+   and c.status = 'active'
+  where p.status = 'active'
+    and (
+      (p_collection_slug is not null and c.slug = p_collection_slug)
+      or (
+        p_menu_groups is not null
+        and (c.metadata ->> 'menu_group') = any (p_menu_groups)
+      )
+    )
+  group by p.id, p.slug, p.name, p.description, p.metadata, p.updated_at
+  order by p.updated_at desc
+  limit greatest(1, least(coalesce(p_limit, 200), 5000));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_collections(p_host text)
+ RETURNS TABLE(title text, slug text, description text, menu_group text, parent text, product_count integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    c.title,
+    c.slug,
+    c.description,
+    coalesce(c.metadata ->> 'menu_group', '') as menu_group,
+    coalesce(c.metadata ->> 'parent', '') as parent,
+    count(distinct p.id)::integer as product_count
+  from public.arc_collections c
+  join public.organizations o
+    on o.id = c.organization_id
+   and o.id = public.arc_storefront_org(p_host)
+  left join public.arc_collection_products cp
+    on cp.collection_id = c.id
+  left join public.arc_products p
+    on p.id = cp.product_id
+   and p.status = 'active'
+  where c.status = 'active'
+  group by c.id, c.title, c.slug, c.description, c.metadata
+  -- Boş koleksiyon menüde yer kaplamasın.
+  having count(distinct p.id) > 0
+  order by count(distinct p.id) desc;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_deals(p_host text, p_limit integer DEFAULT 12)
+ RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, specs jsonb, size_guide jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    p.slug,
+    p.name,
+    p.description,
+    coalesce(
+      nullif(p.metadata ->> 'subtitle', ''),
+      left(regexp_replace(coalesce(p.description, ''), '<[^>]*>', '', 'g'), 140)
+    ) as subtitle,
+    coalesce(p.metadata ->> 'vendor', 'ARVO') as vendor,
+    coalesce(p.metadata ->> 'product_type', '') as product_type,
+    min(v.price) as price,
+    min(v.compare_at_price) filter (where v.compare_at_price > v.price)
+      as compare_at_price,
+    bool_or(v.stock > 0 or v.allow_backorder) as available,
+    coalesce(p.metadata -> 'image_paths', '[]'::jsonb) as image_paths,
+    coalesce(p.metadata -> 'specs', '[]'::jsonb) as specs,
+    coalesce(p.metadata -> 'size_guide', '[]'::jsonb) as size_guide
+  from public.arc_products p
+  join public.arc_product_variants v
+    on v.product_id = p.id
+   and v.organization_id = p.organization_id
+  join public.organizations o
+    on o.id = p.organization_id
+   and o.id = public.arc_storefront_org(p_host)
+  where p.status = 'active'
+  group by p.id, p.slug, p.name, p.description, p.metadata
+  -- Yalnızca gerçekten indirimli ve stokta olanlar.
+  having min(v.compare_at_price) filter (where v.compare_at_price > v.price)
+         is not null
+     and bool_or(v.stock > 0 or v.allow_backorder)
+  -- En yüksek indirim oranı başta.
+  order by
+    (
+      min(v.compare_at_price) filter (where v.compare_at_price > v.price)
+      - min(v.price)
+    )::numeric
+    / nullif(
+        min(v.compare_at_price) filter (where v.compare_at_price > v.price),
+        0
+      ) desc
+  limit greatest(1, least(coalesce(p_limit, 12), 100));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_discounts(p_host text)
+ RETURNS TABLE(id uuid, name text, code text, discount_type text, value bigint, minimum_subtotal bigint, combinable boolean, badge text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select d.id,d.name,d.code,d.discount_type,d.value,d.minimum_subtotal,d.combinable,
+    coalesce(nullif(d.metadata ->> 'badge', ''), d.name) as badge
+  from public.arc_discounts d
+  join public.organizations o on o.id=d.organization_id
+  where o.id = public.arc_storefront_org(p_host) and d.status='active'
+    and (d.starts_at is null or d.starts_at<=now())
+    and (d.ends_at is null or d.ends_at>now())
+    and (d.usage_limit is null or d.usage_count<d.usage_limit)
+  order by d.code nulls first,d.created_at;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_facets(p_host text)
+ RETURNS TABLE(brands jsonb, sizes jsonb, max_price bigint, total_count bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+with base as (
+  select
+    coalesce(p.metadata ->> 'vendor', 'ARVO') as vendor,
+    min(v.price) as price,
+    coalesce(
+      jsonb_agg(distinct upper(trim(split_part(v.title, '/', 2))))
+        filter (
+          where trim(coalesce(split_part(v.title, '/', 2), '')) <> ''
+            and public.arc_variant_available(v.stock, v.allow_backorder, v.supplier)
+        ),
+      '[]'::jsonb
+    ) as sizes
+  from public.arc_products p
+  join public.arc_product_variants v
+    on v.product_id = p.id and v.organization_id = p.organization_id
+  join public.organizations o
+    on o.id = p.organization_id and o.id = public.arc_storefront_org(p_host)
+  where p.status = 'active'
+  group by p.id, p.metadata
+)
+select
+  (select coalesce(jsonb_agg(v order by v), '[]'::jsonb)
+     from (select distinct vendor as v from base where vendor <> '') b1) as brands,
+  (select coalesce(jsonb_agg(s order by s), '[]'::jsonb)
+     from (select distinct e as s
+             from base, lateral jsonb_array_elements_text(base.sizes) e) b2) as sizes,
+  (select coalesce(max(price), 0) from base) as max_price,
+  (select count(*) from base) as total_count;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_org(p_host text)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  with istek as (
+    /* Şema, port ve yol düşürülüp küçük harfe iniliyor: çağıran
+       "https://magaza.com/urun" da yollasa aynı sonuca varmalı. */
+    select lower(regexp_replace(regexp_replace(coalesce(p_host, ''), '^[a-z]+://', ''), '[:/?#].*$', '')) as host
+  ),
+  adaylar as (
+    /* www'lu ve www'suz biçim birlikte aranıyor; ikisi aynı mağaza. */
+    select host, case when host like 'www.%' then substring(host from 5) else host end as kok from istek
+  )
+  select s.organization_id
+  from public.arc_store_settings s, adaylar a
+  where a.kok <> ''
+    and (
+      (s.domain_verified_at is not null
+        and s.custom_domain is not null
+        and lower(s.custom_domain) in (a.host, a.kok))
+      or (s.platform_subdomain is not null
+        and lower(s.platform_subdomain) || '.shop.arvo-os.com' in (a.host, a.kok))
+    )
+  limit 1
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_product(p_host text, p_slug text)
+ RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    p.slug,
+    p.name,
+    p.description,
+    coalesce(
+      nullif(p.metadata ->> 'subtitle', ''),
+      left(regexp_replace(coalesce(p.description, ''), '<[^>]*>', '', 'g'), 140)
+    ) as subtitle,
+    coalesce(p.metadata ->> 'vendor', 'ARVO') as vendor,
+    coalesce(p.metadata ->> 'product_type', '') as product_type,
+    min(v.price) as price,
+    min(v.compare_at_price) filter (where v.compare_at_price > v.price) as compare_at_price,
+    bool_or(v.stock > 0 or v.allow_backorder) as available,
+    coalesce(p.metadata -> 'image_paths', '[]'::jsonb) as image_paths
+  from public.arc_products p
+  join public.arc_product_variants v
+    on v.product_id = p.id
+   and v.organization_id = p.organization_id
+  join public.organizations o
+    on o.id = p.organization_id
+   and o.id = public.arc_storefront_org(p_host)
+  where p.status = 'active'
+    and p.slug = p_slug
+    and p_slug ~ '^[a-z0-9][a-z0-9-]{0,199}$'
+  group by p.id, p.slug, p.name, p.description, p.metadata
+  limit 1;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_product_badges(p_host text)
+ RETURNS TABLE(slug text, badge text, badge_tone text, is_best_seller boolean, discount_percent integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    p.slug,
+    nullif(p.metadata ->> 'badge', '') as badge,
+    coalesce(nullif(p.metadata ->> 'badge_tone', ''), 'green') as badge_tone,
+    exists (
+      select 1
+      from public.arc_collection_products cp
+      join public.arc_collections c
+        on c.id = cp.collection_id
+       and c.organization_id = cp.organization_id
+      where cp.organization_id = p.organization_id
+        and cp.product_id = p.id
+        and c.status = 'active'
+        and c.title = 'Çok Satanlar'
+    ) as is_best_seller,
+    coalesce((
+      select max(
+        round(
+          (1 - v.price::numeric / nullif(v.compare_at_price, 0)::numeric) * 100
+        )
+      )::integer
+      from public.arc_product_variants v
+      where v.organization_id = p.organization_id
+        and v.product_id = p.id
+        and v.compare_at_price > v.price
+        and v.price >= 0
+    ), 0) as discount_percent
+  from public.arc_products p
+  join public.organizations o
+    on o.id = p.organization_id
+   and o.id = public.arc_storefront_org(p_host)
+  where p.status = 'active';
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_product_count(p_host text)
+ RETURNS integer
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select count(distinct p.id)::integer
+  from public.arc_products p
+  join public.arc_product_variants v
+    on v.product_id = p.id
+   and v.organization_id = p.organization_id
+  join public.organizations o
+    on o.id = p.organization_id
+   and o.id = public.arc_storefront_org(p_host)
+  where p.status = 'active';
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_product_slugs(p_host text, p_limit integer DEFAULT 20000)
+ RETURNS TABLE(slug text, updated_at timestamp with time zone)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select p.slug, p.updated_at
+  from public.arc_products p
+  join public.organizations o
+    on o.id = p.organization_id and o.id = public.arc_storefront_org(p_host)
+  where p.status = 'active'
+    /*
+      Varyantı olmayan ürünün sayfası da yok; sitemap'e girmemeli.
+      Ama varyantları toplamaya gerek yok — varlık kontrolü yeter.
+      Asıl fonksiyon burada group by yapıp fiyat ve beden
+      hesaplıyor, sitemap ise hiçbirini kullanmıyor.
+    */
+    and exists (
+      select 1
+      from public.arc_product_variants v
+      where v.product_id = p.id
+        and v.organization_id = p.organization_id
+    )
+  order by p.updated_at desc
+  limit greatest(1, least(coalesce(p_limit, 20000), 50000));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_products(p_host text, p_limit integer DEFAULT 24, p_offset integer DEFAULT 0)
+ RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, specs jsonb, size_guide jsonb, sizes jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    p.slug, p.name, p.description,
+    coalesce(
+      nullif(p.metadata ->> 'subtitle', ''),
+      left(regexp_replace(coalesce(p.description, ''), '<[^>]*>', '', 'g'), 140)
+    ) as subtitle,
+    coalesce(p.metadata ->> 'vendor', 'ARVO') as vendor,
+    coalesce(p.metadata ->> 'product_type', '') as product_type,
+    min(v.price) as price,
+    min(v.compare_at_price) filter (where v.compare_at_price > v.price)
+      as compare_at_price,
+    bool_or(public.arc_variant_available(v.stock, v.allow_backorder, v.supplier))
+      as available,
+    coalesce(p.metadata -> 'image_paths', '[]'::jsonb) as image_paths,
+    coalesce(p.metadata -> 'specs', '[]'::jsonb) as specs,
+    coalesce(p.metadata -> 'size_guide', '[]'::jsonb) as size_guide,
+    coalesce(
+      jsonb_agg(distinct upper(trim(split_part(v.title, '/', 2))))
+        filter (
+          where trim(coalesce(split_part(v.title, '/', 2), '')) <> ''
+            and public.arc_variant_available(v.stock, v.allow_backorder, v.supplier)
+        ),
+      '[]'::jsonb
+    ) as sizes
+  from public.arc_products p
+  join public.arc_product_variants v
+    on v.product_id = p.id and v.organization_id = p.organization_id
+  join public.organizations o
+    on o.id = p.organization_id and o.id = public.arc_storefront_org(p_host)
+  where p.status = 'active'
+  group by p.id, p.slug, p.name, p.description, p.metadata, p.updated_at
+  order by p.updated_at desc
+  limit greatest(1, least(coalesce(p_limit, 24), 5000))
+  offset greatest(0, coalesce(p_offset, 0));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_products_page(p_host text, p_limit integer DEFAULT 24, p_offset integer DEFAULT 0, p_brand text DEFAULT NULL::text, p_size text DEFAULT NULL::text, p_max_price bigint DEFAULT NULL::bigint, p_only_discounted boolean DEFAULT false, p_only_available boolean DEFAULT false, p_sort text DEFAULT 'onerilen'::text)
+ RETURNS TABLE(slug text, name text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, sizes jsonb, total_count bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+with base as (
+  select
+    p.slug,
+    p.name,
+    coalesce(
+      nullif(p.metadata ->> 'subtitle', ''),
+      left(regexp_replace(coalesce(p.description, ''), '<[^>]*>', '', 'g'), 140)
+    ) as subtitle,
+    coalesce(p.metadata ->> 'vendor', 'ARVO') as vendor,
+    coalesce(p.metadata ->> 'product_type', '') as product_type,
+    min(v.price) as price,
+    min(v.compare_at_price) filter (where v.compare_at_price > v.price)
+      as compare_at_price,
+    bool_or(public.arc_variant_available(v.stock, v.allow_backorder, v.supplier))
+      as available,
+    coalesce(p.metadata -> 'image_paths', '[]'::jsonb) as image_paths,
+    coalesce(
+      jsonb_agg(distinct upper(trim(split_part(v.title, '/', 2))))
+        filter (
+          where trim(coalesce(split_part(v.title, '/', 2), '')) <> ''
+            and public.arc_variant_available(v.stock, v.allow_backorder, v.supplier)
+        ),
+      '[]'::jsonb
+    ) as sizes,
+    p.updated_at
+  from public.arc_products p
+  join public.arc_product_variants v
+    on v.product_id = p.id and v.organization_id = p.organization_id
+  join public.organizations o
+    on o.id = p.organization_id and o.id = public.arc_storefront_org(p_host)
+  where p.status = 'active'
+  group by p.id, p.slug, p.name, p.description, p.metadata, p.updated_at
+),
+scored as (
+  select
+    b.*,
+    case
+      when b.compare_at_price is not null and b.compare_at_price > b.price
+        then round(100.0 * (b.compare_at_price - b.price) / b.compare_at_price)::int
+      else 0
+    end as discount_percent
+  from base b
+),
+narrowed as (
+  select * from scored
+  where (nullif(p_brand, '') is null or vendor = p_brand)
+    and (coalesce(p_max_price, 0) <= 0 or price <= p_max_price)
+    and (not coalesce(p_only_available, false) or available)
+    and (nullif(p_size, '') is null or sizes ? upper(p_size))
+    and (not coalesce(p_only_discounted, false) or discount_percent > 0)
+)
+select
+  slug, name, subtitle, vendor, product_type,
+  price, compare_at_price, available, image_paths, sizes,
+  count(*) over () as total_count
+from narrowed
+order by
+  case when p_sort = 'ucuz'    then price            end asc  nulls last,
+  case when p_sort = 'pahali'  then price            end desc nulls last,
+  case when p_sort = 'indirim' then discount_percent end desc nulls last,
+  case when p_sort = 'yeni'    then updated_at       end desc nulls last,
+  -- Önerilen (varsayılan): stokta olanlar önce, sonra en çok indirim.
+  case when p_sort not in ('ucuz', 'pahali', 'indirim', 'yeni')
+       then (case when available then 0 else 1 end) end asc  nulls last,
+  case when p_sort not in ('ucuz', 'pahali', 'indirim', 'yeni')
+       then discount_percent end desc nulls last,
+  updated_at desc
+limit  greatest(1, least(coalesce(p_limit, 24), 200))
+offset greatest(0, coalesce(p_offset, 0));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_search_index(p_host text, p_limit integer DEFAULT 20000)
+ RETURNS TABLE(slug text, name text, vendor text, product_type text, price bigint, compare_at_price bigint, image_path text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    p.slug,
+    p.name,
+    coalesce(p.metadata ->> 'vendor', 'ARVO') as vendor,
+    coalesce(p.metadata ->> 'product_type', '') as product_type,
+    min(v.price) as price,
+    min(v.compare_at_price) filter (where v.compare_at_price > v.price)
+      as compare_at_price,
+    /*
+      Yalnızca ilk görsel. Arama sonucu tek küçük resim gösteriyor
+      ama katalog fonksiyonu her ürünün tüm galerisini taşıyordu —
+      3.400 ürün için tek başına 1,7 MB.
+    */
+    (p.metadata -> 'image_paths' ->> 0) as image_path
+  from public.arc_products p
+  join public.arc_product_variants v
+    on v.product_id = p.id and v.organization_id = p.organization_id
+  join public.organizations o
+    on o.id = p.organization_id and o.id = public.arc_storefront_org(p_host)
+  where p.status = 'active'
+  group by p.id, p.slug, p.name, p.metadata, p.updated_at
+  /*
+    Stokta olmayan ürün aramada zaten gösterilmiyordu; süzme
+    uygulama tarafında yapılıyordu. Veritabanında yapmak hem
+    satır sayısını hem taşınan veriyi düşürüyor.
+  */
+  having bool_or(
+    public.arc_variant_available(v.stock, v.allow_backorder, v.supplier)
+  )
+  order by p.updated_at desc
+  limit greatest(1, least(coalesce(p_limit, 20000), 50000));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_settings(p_host text)
+ RETURNS TABLE(shipping_fee bigint, free_shipping_threshold bigint, bank_transfer_enabled boolean, bank_transfer_discount_percent numeric)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    coalesce(s.shipping_fee, 12000),
+    coalesce(s.free_shipping_threshold, 200000),
+    coalesce(s.bank_transfer_enabled, true),
+    coalesce(s.bank_transfer_discount_percent, 3)
+  from public.organizations o
+  left join public.arc_store_settings s
+    on s.organization_id = o.id
+  where o.id = public.arc_storefront_org(p_host)
+  limit 1;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_variants(p_host text, p_slug text)
+ RETURNS TABLE(sku text, title text, color text, size text, price bigint, compare_at_price bigint, stock integer, available boolean, image_path text, attributes jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  with hesaplanan as (
+    select
+      v.sku as v_sku,
+      coalesce(nullif(trim(v.title), ''), v.sku) as v_title,
+      /*
+        Nitelikten okuma. order by ile SABİT: aynı varyantta hem
+        "Renk" hem "Color" bulunursa sonuç turdan tura değişmesin.
+      */
+      coalesce(
+        (select n.value from jsonb_each_text(coalesce(v.attributes, '{}'::jsonb)) n
+          where lower(n.key) in ('renk', 'renkler', 'color', 'colour')
+            and nullif(trim(n.value), '') is not null
+          order by n.key limit 1),
+        nullif(trim(split_part(coalesce(v.title, ''), '/', 1)), '')
+      ) as v_color,
+      coalesce(
+        (select n.value from jsonb_each_text(coalesce(v.attributes, '{}'::jsonb)) n
+          where lower(n.key) in ('beden', 'size', 'numara', 'ölçü', 'olcu')
+            and nullif(trim(n.value), '') is not null
+          order by n.key limit 1),
+        nullif(trim(split_part(coalesce(v.title, ''), '/', 2)), '')
+      ) as v_size,
+      v.price as v_price,
+      v.compare_at_price as v_compare,
+      v.stock as v_stock,
+      public.arc_variant_available(v.stock, v.allow_backorder, v.supplier) as v_available,
+      /*
+        Ürünün galerisinde OLMAYAN yol dönmüyor: elle yazılmış ya da
+        görseli silinmiş varyant, vitrinde kırık resim demekti.
+      */
+      case
+        when v.image_path is not null
+         and coalesce(p.metadata -> 'image_paths', '[]'::jsonb) ? v.image_path
+        then v.image_path
+      end as v_image_path,
+      coalesce(v.attributes, '{}'::jsonb) as v_attributes
+    from public.arc_product_variants v
+    join public.arc_products p
+      on p.id = v.product_id
+     and p.organization_id = v.organization_id
+    join public.organizations o
+      on o.id = p.organization_id
+     and o.id = public.arc_storefront_org(p_host)
+    where p.status = 'active'
+      and p.slug = p_slug
+      and p_slug ~ '^[a-z0-9][a-z0-9-]{0,199}$'
+  )
+  select
+    h.v_sku, h.v_title, h.v_color, h.v_size, h.v_price,
+    h.v_compare, h.v_stock, h.v_available, h.v_image_path, h.v_attributes
+  from hesaplanan h
+  /* Beden sıralaması artık TÜRETİLMİŞ bedene bakıyor; eskiden başlığı
+     ikinci kez bölüyordu ve nitelikten gelen beden sıralanamazdı. */
+  order by
+    case upper(trim(coalesce(h.v_size, '')))
+      when 'XXS' then 1 when 'XS' then 2 when 'S' then 3
+      when 'M' then 4 when 'L' then 5 when 'XL' then 6
+      when '2XL' then 7 when 'XXL' then 7
+      when '3XL' then 8 when '4XL' then 9
+      else 50
+    end,
+    h.v_price,
+    h.v_sku
+  limit 60;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.arc_total_stock_units()
  RETURNS bigint
  LANGUAGE sql
@@ -3652,8 +4322,6 @@ alter table public.arc_store_settings alter column locale set default 'tr-TR'::t
 
 alter table public.arc_store_settings alter column low_stock_threshold set default 5;
 
-alter table public.arc_store_settings alter column order_prefix set default 'AC'::text;
-
 alter table public.arc_store_settings alter column panel_domain_status set default 'not_configured'::text;
 
 alter table public.arc_store_settings alter column paytr_enabled set default false;
@@ -4639,22 +5307,25 @@ grant execute on function private.arc_guard_payment_settings() to public;
 revoke all on function private.arc_guard_store_domains() from public;
 grant execute on function private.arc_guard_store_domains() to public;
 
+revoke all on function private.arc_magaza_varsayilanlari() from public;
+grant execute on function private.arc_magaza_varsayilanlari() to public;
+
 revoke all on function private.arvo_is_org_admin(target_org uuid) from public;
-grant execute on function private.arvo_is_org_admin(target_org uuid) to service_role;
 grant execute on function private.arvo_is_org_admin(target_org uuid) to authenticated;
+grant execute on function private.arvo_is_org_admin(target_org uuid) to service_role;
 
 revoke all on function private.can_manage_organization_assets(organization_id_text text) from public;
 grant execute on function private.can_manage_organization_assets(organization_id_text text) to authenticated;
 
 revoke all on function public.arc_address_before_write() from public;
-grant execute on function public.arc_address_before_write() to public;
 grant execute on function public.arc_address_before_write() to authenticated;
-grant execute on function public.arc_address_before_write() to anon;
+grant execute on function public.arc_address_before_write() to public;
 grant execute on function public.arc_address_before_write() to service_role;
+grant execute on function public.arc_address_before_write() to anon;
 
 revoke all on function public.arc_address_line(p_addr jsonb) from public;
-grant execute on function public.arc_address_line(p_addr jsonb) to authenticated;
 grant execute on function public.arc_address_line(p_addr jsonb) to service_role;
+grant execute on function public.arc_address_line(p_addr jsonb) to authenticated;
 
 revoke all on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) from public;
 grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to service_role;
@@ -4683,14 +5354,14 @@ revoke all on function public.arc_categorize_supplier_products(p_supplier text, 
 grant execute on function public.arc_categorize_supplier_products(p_supplier text, p_organization_id uuid) to service_role;
 
 revoke all on function public.arc_check_coupon(p_organization_id uuid, p_code text, p_subtotal bigint, p_email text) from public;
-grant execute on function public.arc_check_coupon(p_organization_id uuid, p_code text, p_subtotal bigint, p_email text) to service_role;
 grant execute on function public.arc_check_coupon(p_organization_id uuid, p_code text, p_subtotal bigint, p_email text) to authenticated;
+grant execute on function public.arc_check_coupon(p_organization_id uuid, p_code text, p_subtotal bigint, p_email text) to service_role;
 
 revoke all on function public.arc_check_supplier_stock() from public;
-grant execute on function public.arc_check_supplier_stock() to anon;
-grant execute on function public.arc_check_supplier_stock() to service_role;
-grant execute on function public.arc_check_supplier_stock() to authenticated;
 grant execute on function public.arc_check_supplier_stock() to public;
+grant execute on function public.arc_check_supplier_stock() to anon;
+grant execute on function public.arc_check_supplier_stock() to authenticated;
+grant execute on function public.arc_check_supplier_stock() to service_role;
 
 revoke all on function public.arc_clean(p_value text) from public;
 grant execute on function public.arc_clean(p_value text) to authenticated;
@@ -4700,8 +5371,8 @@ revoke all on function public.arc_count_coupon_use() from public;
 grant execute on function public.arc_count_coupon_use() to service_role;
 
 revoke all on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) from public;
-grant execute on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) to authenticated;
 grant execute on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) to service_role;
+grant execute on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) to authenticated;
 
 revoke all on function public.arc_create_storefront_order(p_organization_id uuid, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) from public;
 grant execute on function public.arc_create_storefront_order(p_organization_id uuid, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
@@ -4713,13 +5384,13 @@ grant execute on function public.arc_decode_entities(t text) to service_role;
 grant execute on function public.arc_decode_entities(t text) to public;
 
 revoke all on function public.arc_delete_order(p_order_id uuid) from public;
-grant execute on function public.arc_delete_order(p_order_id uuid) to service_role;
 grant execute on function public.arc_delete_order(p_order_id uuid) to authenticated;
+grant execute on function public.arc_delete_order(p_order_id uuid) to service_role;
 
 revoke all on function public.arc_extract_vat(p_gross bigint, p_rate numeric) from public;
+grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to authenticated;
 grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to service_role;
 grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to anon;
-grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to authenticated;
 
 revoke all on function public.arc_fill_order_tax() from public;
 grant execute on function public.arc_fill_order_tax() to authenticated;
@@ -4728,8 +5399,8 @@ grant execute on function public.arc_fill_order_tax() to public;
 grant execute on function public.arc_fill_order_tax() to anon;
 
 revoke all on function public.arc_find_address(p_meta jsonb) from public;
-grant execute on function public.arc_find_address(p_meta jsonb) to authenticated;
 grant execute on function public.arc_find_address(p_meta jsonb) to service_role;
+grant execute on function public.arc_find_address(p_meta jsonb) to authenticated;
 
 revoke all on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) from public;
 grant execute on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) to service_role;
@@ -4754,36 +5425,111 @@ grant execute on function public.arc_resolve_commerce_tenant() to service_role;
 grant execute on function public.arc_resolve_commerce_tenant() to authenticated;
 
 revoke all on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) from public;
-grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to authenticated;
 grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to service_role;
+grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to authenticated;
 
 revoke all on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) from public;
-grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to service_role;
 grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to authenticated;
+grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to service_role;
 
 revoke all on function public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) from public;
 grant execute on function public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) to service_role;
 
 revoke all on function public.arc_slugify(p_text text) from public;
-grant execute on function public.arc_slugify(p_text text) to service_role;
 grant execute on function public.arc_slugify(p_text text) to authenticated;
+grant execute on function public.arc_slugify(p_text text) to service_role;
 
 revoke all on function public.arc_store_stage(p_organization_id uuid) from public;
 grant execute on function public.arc_store_stage(p_organization_id uuid) to anon;
-grant execute on function public.arc_store_stage(p_organization_id uuid) to authenticated;
 grant execute on function public.arc_store_stage(p_organization_id uuid) to service_role;
+grant execute on function public.arc_store_stage(p_organization_id uuid) to authenticated;
+
+revoke all on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
+grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
+grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to authenticated;
+grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
+
+revoke all on function public.arc_storefront_collections(p_host text) from public;
+grant execute on function public.arc_storefront_collections(p_host text) to authenticated;
+grant execute on function public.arc_storefront_collections(p_host text) to service_role;
+grant execute on function public.arc_storefront_collections(p_host text) to anon;
+
+revoke all on function public.arc_storefront_deals(p_host text, p_limit integer) from public;
+grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to anon;
+grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to service_role;
+grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to authenticated;
+
+revoke all on function public.arc_storefront_discounts(p_host text) from public;
+grant execute on function public.arc_storefront_discounts(p_host text) to authenticated;
+grant execute on function public.arc_storefront_discounts(p_host text) to anon;
+grant execute on function public.arc_storefront_discounts(p_host text) to service_role;
+
+revoke all on function public.arc_storefront_facets(p_host text) from public;
+grant execute on function public.arc_storefront_facets(p_host text) to service_role;
+grant execute on function public.arc_storefront_facets(p_host text) to anon;
+grant execute on function public.arc_storefront_facets(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_org(p_host text) from public;
+grant execute on function public.arc_storefront_org(p_host text) to authenticated;
+grant execute on function public.arc_storefront_org(p_host text) to service_role;
+grant execute on function public.arc_storefront_org(p_host text) to anon;
+
+revoke all on function public.arc_storefront_product(p_host text, p_slug text) from public;
+grant execute on function public.arc_storefront_product(p_host text, p_slug text) to service_role;
+grant execute on function public.arc_storefront_product(p_host text, p_slug text) to anon;
+grant execute on function public.arc_storefront_product(p_host text, p_slug text) to authenticated;
+
+revoke all on function public.arc_storefront_product_badges(p_host text) from public;
+grant execute on function public.arc_storefront_product_badges(p_host text) to service_role;
+grant execute on function public.arc_storefront_product_badges(p_host text) to anon;
+grant execute on function public.arc_storefront_product_badges(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_product_count(p_host text) from public;
+grant execute on function public.arc_storefront_product_count(p_host text) to service_role;
+grant execute on function public.arc_storefront_product_count(p_host text) to anon;
+grant execute on function public.arc_storefront_product_count(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_product_slugs(p_host text, p_limit integer) from public;
+grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to authenticated;
+grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to service_role;
+grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to anon;
+
+revoke all on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) from public;
+grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to service_role;
+grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to authenticated;
+grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to anon;
+
+revoke all on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
+grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
+grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
+grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
+
+revoke all on function public.arc_storefront_search_index(p_host text, p_limit integer) from public;
+grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer) to service_role;
+grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer) to authenticated;
+grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer) to anon;
+
+revoke all on function public.arc_storefront_settings(p_host text) from public;
+grant execute on function public.arc_storefront_settings(p_host text) to service_role;
+grant execute on function public.arc_storefront_settings(p_host text) to anon;
+grant execute on function public.arc_storefront_settings(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_variants(p_host text, p_slug text) from public;
+grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to service_role;
+grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to anon;
+grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to authenticated;
 
 revoke all on function public.arc_total_stock_units() from public;
 grant execute on function public.arc_total_stock_units() to authenticated;
 grant execute on function public.arc_total_stock_units() to service_role;
 
 revoke all on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) from public;
-grant execute on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) to service_role;
 grant execute on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) to authenticated;
+grant execute on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) to service_role;
 
 revoke all on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) from public;
-grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to authenticated;
 grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to service_role;
+grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to authenticated;
 grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to anon;
 
 revoke all on function public.attach_arvoculture_order_owner() from public;
@@ -4796,8 +5542,8 @@ revoke all on function public.check_arvoculture_coupon(p_code text, p_subtotal b
 grant execute on function public.check_arvoculture_coupon(p_code text, p_subtotal bigint, p_email text) to service_role;
 
 revoke all on function public.claim_arvoculture_orders() from public;
-grant execute on function public.claim_arvoculture_orders() to service_role;
 grant execute on function public.claim_arvoculture_orders() to authenticated;
+grant execute on function public.claim_arvoculture_orders() to service_role;
 
 revoke all on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) from public;
 grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to authenticated;
@@ -4816,39 +5562,39 @@ grant execute on function public.get_arvoculture_my_returns() to service_role;
 
 revoke all on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
 grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to authenticated;
-grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
 grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
+grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
 
 revoke all on function public.get_arvoculture_storefront_collections() from public;
+grant execute on function public.get_arvoculture_storefront_collections() to anon;
 grant execute on function public.get_arvoculture_storefront_collections() to authenticated;
 grant execute on function public.get_arvoculture_storefront_collections() to service_role;
-grant execute on function public.get_arvoculture_storefront_collections() to anon;
 
 revoke all on function public.get_arvoculture_storefront_deals(p_limit integer) from public;
-grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to service_role;
-grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to anon;
 grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to authenticated;
+grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to anon;
+grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to service_role;
 
 revoke all on function public.get_arvoculture_storefront_discounts() from public;
 grant execute on function public.get_arvoculture_storefront_discounts() to authenticated;
-grant execute on function public.get_arvoculture_storefront_discounts() to anon;
 grant execute on function public.get_arvoculture_storefront_discounts() to service_role;
+grant execute on function public.get_arvoculture_storefront_discounts() to anon;
 
 revoke all on function public.get_arvoculture_storefront_facets() from public;
-grant execute on function public.get_arvoculture_storefront_facets() to service_role;
 grant execute on function public.get_arvoculture_storefront_facets() to authenticated;
 grant execute on function public.get_arvoculture_storefront_facets() to anon;
+grant execute on function public.get_arvoculture_storefront_facets() to service_role;
 grant execute on function public.get_arvoculture_storefront_facets() to public;
 
 revoke all on function public.get_arvoculture_storefront_product(p_slug text) from public;
-grant execute on function public.get_arvoculture_storefront_product(p_slug text) to service_role;
-grant execute on function public.get_arvoculture_storefront_product(p_slug text) to authenticated;
 grant execute on function public.get_arvoculture_storefront_product(p_slug text) to anon;
+grant execute on function public.get_arvoculture_storefront_product(p_slug text) to authenticated;
+grant execute on function public.get_arvoculture_storefront_product(p_slug text) to service_role;
 
 revoke all on function public.get_arvoculture_storefront_product_badges() from public;
-grant execute on function public.get_arvoculture_storefront_product_badges() to authenticated;
 grant execute on function public.get_arvoculture_storefront_product_badges() to anon;
 grant execute on function public.get_arvoculture_storefront_product_badges() to service_role;
+grant execute on function public.get_arvoculture_storefront_product_badges() to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_product_count() from public;
 grant execute on function public.get_arvoculture_storefront_product_count() to authenticated;
@@ -4858,40 +5604,40 @@ grant execute on function public.get_arvoculture_storefront_product_count() to a
 revoke all on function public.get_arvoculture_storefront_product_slugs(p_limit integer) from public;
 grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer) to authenticated;
 grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer) to public;
-grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer) to anon;
 grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer) to service_role;
+grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer) to anon;
 
 revoke all on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) from public;
 grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to authenticated;
-grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to service_role;
 grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to anon;
+grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to service_role;
 
 revoke all on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
-grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
+grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
 grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to public;
 grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
-grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
+grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_search_index(p_limit integer) from public;
-grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer) to anon;
 grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer) to public;
-grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer) to service_role;
+grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer) to anon;
 grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer) to authenticated;
+grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer) to service_role;
 
 revoke all on function public.get_arvoculture_storefront_settings() from public;
 grant execute on function public.get_arvoculture_storefront_settings() to anon;
-grant execute on function public.get_arvoculture_storefront_settings() to service_role;
 grant execute on function public.get_arvoculture_storefront_settings() to authenticated;
+grant execute on function public.get_arvoculture_storefront_settings() to service_role;
 
 revoke all on function public.get_arvoculture_storefront_variants(p_slug text) from public;
 grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to authenticated;
-grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to service_role;
 grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to anon;
+grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to service_role;
 
 revoke all on function public.get_storefront_seller(p_tenant text) from public;
 grant execute on function public.get_storefront_seller(p_tenant text) to service_role;
-grant execute on function public.get_storefront_seller(p_tenant text) to authenticated;
 grant execute on function public.get_storefront_seller(p_tenant text) to anon;
+grant execute on function public.get_storefront_seller(p_tenant text) to authenticated;
 
 revoke all on function public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) from public;
 grant execute on function public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) to service_role;
@@ -4923,3 +5669,5 @@ CREATE TRIGGER arvo_arc_shipment_touch BEFORE UPDATE ON public.arc_shipments FOR
 CREATE TRIGGER arc_guard_payment_settings BEFORE INSERT OR UPDATE ON public.arc_store_settings FOR EACH ROW EXECUTE FUNCTION private.arc_guard_payment_settings();
 
 CREATE TRIGGER arc_guard_store_domains BEFORE INSERT OR UPDATE OF custom_domain, panel_custom_domain ON public.arc_store_settings FOR EACH ROW EXECUTE FUNCTION private.arc_guard_store_domains();
+
+CREATE TRIGGER arc_magaza_varsayilanlari BEFORE INSERT ON public.arc_store_settings FOR EACH ROW EXECUTE FUNCTION private.arc_magaza_varsayilanlari();
