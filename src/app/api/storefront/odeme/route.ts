@@ -5,6 +5,7 @@ import { saglayiciSirasi, type Saglayici } from "@/lib/odeme/secim";
 import { tamiAyariCoz, TAMI_ALANLARI, type TamiAyari } from "@/lib/odeme/tami/ayar";
 import { odemeSayfasiAdresi } from "@/lib/odeme/tami/istek";
 import { jetonAl } from "@/lib/odeme/tami/istemci";
+import { recordOrderEvent } from "@/lib/siparis-olayi";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { resolveStore, storefrontCorsHeaders } from "@/lib/storefront-origin";
 import { getStoreBrand } from "@/lib/store-brand";
@@ -505,7 +506,19 @@ export async function POST(request: Request) {
       sayfaya düştükten sonra ikinci bir sağlayıcıda oturum açmak çift
       çekim riski demek olurdu.
     */
+    /*
+      Sebep SİPARİŞE de yazılıyor. Yalnızca sunucu günlüğüne yazmak,
+      "PayTR açıldı ama neden" sorusunu Vercel günlüklerinde aramak
+      demekti; aynı kusuru OTO tarafında da yaşadık. Panelde sipariş
+      detayındaki akışta görünüyor.
+    */
     console.error("Tami ödeme oturumu açılamadı:", order.order_number, jeton.hata);
+    await recordOrderEvent(
+      supabase,
+      { id: order.order_id, organization_id: organizationId },
+      "payment_session_failed",
+      { saglayici: "tami", reason: jeton.hata, durum: jeton.durum, yedek: paytrConfig ? "paytr" : null },
+    );
     if (!paytrConfig) {
       return NextResponse.json(
         { error: "payment_failed", message: "Kartla ödeme şu an başlatılamadı. Lütfen tekrar deneyin." },

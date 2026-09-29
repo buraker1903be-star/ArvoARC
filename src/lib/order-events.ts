@@ -68,6 +68,25 @@ export function describeOrderEvent(
     };
   }
 
+  /*
+    Ödeme oturumu hiç açılamadı: sağlayıcı isteği reddetti ya da
+    ulaşılamadı. Müşteri ödemesiz kalmıyor — yedek sağlayıcı devralıyor
+    — ama sebep GÖRÜNÜR olmalı, yoksa "neden PayTR açıldı" sorusu
+    yalnızca sunucu günlüklerinden cevaplanır.
+  */
+  if (eventType === "payment_session_failed") {
+    const saglayici = text(data.saglayici) || "sağlayıcı";
+    const yedek = text(data.yedek);
+    return {
+      kind: "payment",
+      /* Ödeme yedekle tamamlandığı için "danger" değil: müşteri
+         etkilenmedi, ama kayıt görünür kalmalı. */
+      tone: "muted",
+      title: `${saglayici === "tami" ? "Tami" : saglayici} ödeme oturumu açılamadı`,
+      detail: `${text(data.reason) || "Sebep kaydedilmedi"}${yedek ? ` · ${yedek === "paytr" ? "PayTR" : yedek} ile devam edildi` : " · yedek sağlayıcı yok"}`,
+    };
+  }
+
   /* Ödeme alındı ama stok yetmedi. Sipariş ödendi kalır (müşterinin parası
      alınmışken sessizce iptal etmek yanlış olur), ekip müdahale eder. */
   if (eventType === "stock_shortfall") {
