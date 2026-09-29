@@ -13,6 +13,7 @@ import { trIsoToLocal } from "@/lib/tr-time";
 import { yayinOzeti } from "@/lib/yayin-plani";
 import { terimiTemizle } from "@/lib/panel-arama";
 import { SeoFields } from "./seo-fields";
+import { VaryantFiyatlari, YeniVaryantFiyatlari } from "./fiyat-alanlari";
 import "../../catalog.css";
 
 const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"});
@@ -272,6 +273,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
               <span className="vl-sku">SKU</span>
               <span className="vl-price">FİYAT ₺</span>
               <span className="vl-compare">KARŞILAŞTIRMA ₺</span>
+              {canManage?<span className="vl-indirim">İNDİRİM %</span>:null}
               <span className="vl-stock">STOK</span>
               {canManage?<><span className="vl-backorder">POLİTİKA</span><span className="vl-save"/></>:null}
             </div>
@@ -298,8 +300,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
                     ):<small className="vl-gorsel-bos">Galeri boş</small>}
                   </label>
                   <label className="vl-sku"><span className="vl-label">SKU</span><input name="sku" defaultValue={variant.sku??""} required aria-label="SKU"/></label>
-                  <label className="vl-price"><span className="vl-label">Fiyat ₺</span><input name="price" type="number" min="0" step="0.01" defaultValue={(variant.price/100).toFixed(2)} required aria-label="Satış fiyatı"/></label>
-                  <label className="vl-compare"><span className="vl-label">Karşılaştırma ₺</span><input name="compare_at_price" type="number" min="0" step="0.01" defaultValue={variant.compare_at_price?(variant.compare_at_price/100).toFixed(2):""} placeholder="İndirim yok" aria-label="Karşılaştırma fiyatı"/></label>
+                  <VaryantFiyatlari fiyat={(variant.price/100).toFixed(2)} karsilastirma={variant.compare_at_price?(variant.compare_at_price/100).toFixed(2):""}/>
                   <span className="vl-stock"><span className="vl-label">Stok</span>{stockLink}</span>
                   <label className="check-inline vl-backorder"><input name="allow_backorder" type="checkbox" defaultChecked={variant.allow_backorder}/> Stoksuz satış</label>
                   <span className="vl-save"><button className="ac-btn" type="submit">Kaydet</button></span>
@@ -340,8 +341,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
               </div>
               <div className="variant-matrix-grid">
                 <label>SKU öneki<input name="sku_oneki" maxLength={16} defaultValue={variantList[0]?.sku?.split("-")[0]??""} placeholder={product.slug?.slice(0,16)??"Üründen türetilir"} className="ac-input"/></label>
-                <label>Satış fiyatı ₺<input name="price" type="number" min="0" step="0.01" required defaultValue={prices.length?(minPrice/100).toFixed(2):""} className="ac-input"/></label>
-                <label>Karşılaştırma fiyatı ₺<input name="compare_at_price" type="number" min="0" step="0.01" placeholder="İndirim yoksa boş" className="ac-input"/></label>
+                <YeniVaryantFiyatlari fiyat={prices.length?(minPrice/100).toFixed(2):""} karsilastirma=""/>
                 <label>Her varyantın başlangıç stoku<input name="stock" type="number" step="1" min="0" defaultValue="0" required className="ac-input"/></label>
               </div>
               <div className="catalog-form-actions">
@@ -356,8 +356,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
               <input type="hidden" name="product_id" value={product.id}/>
               <label>Varyant adı<input name="title" placeholder="Örn. Siyah / M" required className="ac-input"/></label>
               <label>SKU<input name="sku" required className="ac-input"/></label>
-              <label>Satış fiyatı ₺<input name="price" type="number" min="0" step="0.01" required className="ac-input"/></label>
-              <label>Karşılaştırma fiyatı ₺<input name="compare_at_price" type="number" min="0" step="0.01" placeholder="İndirim yoksa boş" className="ac-input"/></label>
+              <YeniVaryantFiyatlari fiyat="" karsilastirma=""/>
               <label>Başlangıç stoku<input name="stock" type="number" step="1" defaultValue="0" required className="ac-input"/></label>
               <div className="catalog-form-actions">
                 <label className="check-inline"><input name="allow_backorder" type="checkbox" defaultChecked/> Stoksuz satış</label>

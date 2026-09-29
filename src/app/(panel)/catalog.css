@@ -65,9 +65,13 @@
 /* Varyantlar: her satır kendi kaydet düğmesiyle bir form */
 .variant-list[data-manage] .list-row{
   /* KARŞILAŞTIRMA ₺ başlığı 130px'in altında iki satıra düşüyor ve
-     başlık şeridini büyütüyor; ölçülerek bulundu. */
-  grid-template-columns:minmax(120px,1fr) 100px minmax(120px,1fr) 108px 130px 84px minmax(118px,auto) auto;
-  grid-template-areas:"title gorsel sku price compare stock backorder save";
+     başlık şeridini büyütüyor; ölçülerek bulundu.
+
+     İNDİRİM % sütunu eklenince satır 1280px'lik ekranda 47px taşıdı
+     (eskiden tam sığıyordu). Kalan sütunlar ölçülerek daraltıldı;
+     taşmayı geri getirmeden bu değerlerin altına inilemiyor. */
+  grid-template-columns:minmax(96px,1fr) 84px minmax(100px,1fr) 96px 130px 78px 82px minmax(112px,auto) auto;
+  grid-template-areas:"title gorsel sku price compare indirim stock backorder save";
 }
 .variant-list:not([data-manage]) .list-row{
   grid-template-columns:minmax(130px,1fr) minmax(130px,1fr) 120px 130px 90px;
@@ -81,13 +85,13 @@
 .vl-thumb{width:32px;height:32px;flex:none;border-radius:var(--r-xs);border:1px solid var(--line);object-fit:cover}
 .vl-gorsel{grid-area:gorsel}
 .vl-gorsel-bos{color:var(--muted);font-size:12px}
-.panel-root .variant-list select{min-height:36px;margin:0;padding:6px 8px;font-size:13px}.vl-sku{grid-area:sku}.vl-price{grid-area:price}.vl-compare{grid-area:compare}.vl-stock{grid-area:stock}.vl-backorder{grid-area:backorder}
+.panel-root .variant-list select{min-height:36px;margin:0;padding:6px 8px;font-size:13px}.vl-sku{grid-area:sku}.vl-price{grid-area:price}.vl-compare{grid-area:compare}.vl-indirim{grid-area:indirim}.vl-stock{grid-area:stock}.vl-backorder{grid-area:backorder}
 .vl-save{grid-area:save;display:flex;justify-content:flex-end}
 .variant-list label{display:grid;margin:0}
 .vl-label{display:none}
 .panel-root .variant-list input:not([type=checkbox]){min-height:36px;margin:0;padding:6px 10px;font-size:13.5px}
 .panel-root .variant-list .ac-btn{min-height:34px;padding:6px 12px;font-size:12.5px}
-.variant-create-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:end;margin-top:14px}
+.variant-create-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:end;margin-top:14px}
 .variant-create-wrap{padding:14px 18px;border-top:1px solid var(--line);background:var(--surface-2)}
 .variant-create-wrap>summary{color:var(--ink);font-size:14px;font-weight:700;cursor:pointer}
 
@@ -99,7 +103,7 @@
 .variant-matrix{display:grid;gap:12px;margin-top:12px}
 .variant-matrix-options{display:grid;gap:8px}
 .variant-matrix-option{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.4fr);gap:10px;align-items:end}
-.variant-matrix-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end}
+.variant-matrix-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:end}
 
 /* ---------- Stok ---------- */
 .stock-list[data-manage] .list-row{
@@ -174,7 +178,7 @@
   .sl-policy{justify-self:start;text-align:left}
   .stock-list .sl-name b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow:hidden}
   .sl-adjust{justify-content:flex-start}
-  .variant-list[data-manage] .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title title" "sku stock" "price compare" "gorsel gorsel" "backorder save";row-gap:8px;padding:14px}
+  .variant-list[data-manage] .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title title" "sku stock" "price compare" "indirim gorsel" "backorder save";row-gap:8px;padding:14px}
   .variant-list:not([data-manage]) .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title stock" "sku price" ". compare";row-gap:6px;padding:14px}
   .vl-label{display:block;margin-bottom:4px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.1em}
   .catalog-form,.stock-detailed-form,.variant-create-grid,.variant-matrix-grid,.variant-matrix-option{grid-template-columns:1fr}
