@@ -321,6 +321,7 @@
       "paytr_test_mode",
       "platform_subdomain",
       "primary_color",
+      "sales_configured_at",
       "shipping_fee",
       "store_name",
       "storefront_url",

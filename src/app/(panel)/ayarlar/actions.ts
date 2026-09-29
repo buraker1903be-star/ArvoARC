@@ -119,6 +119,10 @@ export async function updateSalesSettings(formData:FormData){
     shipping_fee:Math.round(shippingFee*100),
     free_shipping_threshold:Math.round(freeThreshold*100),
     bank_transfer_discount_percent:transferDiscount,
+    /* Tarifeyi kiracı SEÇTİ. Sütunlar NOT NULL ve varsayılanları
+       ArvoCulture'ın tarifesi olduğu için "seçildi mi" başka türlü
+       anlaşılamıyor; rehber bu damgaya bakıyor (20260929081212). */
+    sales_configured_at:new Date().toISOString(),
     updated_at:new Date().toISOString(),
   },{onConflict:"organization_id"});
   /* Önek mağaza başına tekil (20260917160000); çakışmada 23505 döner. */

@@ -366,7 +366,8 @@ create table if not exists public.arc_store_settings (
   tryoto_enabled boolean not null,
   tryoto_refresh_token_enc text,
   tryoto_pickup_location_code text,
-  tryoto_test_mode boolean not null
+  tryoto_test_mode boolean not null,
+  sales_configured_at timestamp with time zone
 );
 
 create table if not exists public.arc_store_themes (

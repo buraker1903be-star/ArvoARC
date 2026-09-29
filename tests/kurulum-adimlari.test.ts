@@ -72,11 +72,27 @@ test("anahtarı olmayan PayTR ödeme açık saymıyor", () => {
   );
 });
 
-test("sıfır kargo ücreti geçerli, eksik ücret değil", () => {
-  /* Ücretsiz kargo bir karar; NULL ise ayar hiç yapılmamış. */
-  assert.equal(ayarlardanOlgular({ shipping_fee: 0 }, SAYILAR).kargoUcretiVar, true);
-  assert.equal(ayarlardanOlgular({ shipping_fee: null }, SAYILAR).kargoUcretiVar, false);
+test("tarifeyi seçmemiş mağaza kargo adımını geçemiyor", () => {
+  /*
+    shipping_fee NOT NULL ve sütun varsayılanı 12000 kuruş —
+    ArvoCulture'ın tarifesi. Eski ölçüt "sayı mı" idi ve her zaman
+    doğru çıkıyordu: yeni salon başkasının tarifesiyle satarken
+    rehber "tamam" diyordu.
+  */
+  assert.equal(ayarlardanOlgular({ shipping_fee: 12000 }, SAYILAR).kargoUcretiVar, false);
   assert.equal(ayarlardanOlgular({}, SAYILAR).kargoUcretiVar, false);
+  assert.equal(
+    ayarlardanOlgular({ shipping_fee: 12000, sales_configured_at: "2026-09-29T08:00:00Z" }, SAYILAR).kargoUcretiVar,
+    true,
+  );
+});
+
+test("sıfır kargo ücreti geçerli bir seçim", () => {
+  /* Ücretsiz kargo bir karar; damga varsa adım tamam. */
+  assert.equal(
+    ayarlardanOlgular({ shipping_fee: 0, sales_configured_at: "2026-09-29T08:00:00Z" }, SAYILAR).kargoUcretiVar,
+    true,
+  );
 });
 
 test("doğrulanmamış özel alan adı vitrin adresi sayılmıyor", () => {

@@ -69,7 +69,7 @@ export default async function Dashboard() {
       sıfırlarla doluydu ve sıradaki işi söylemiyordu; rehber tam
       olarak o boşluğu dolduruyor ve kurulum bitince kayboluyor.
     */
-    supabase.from("arc_store_settings").select("logo_path,bank_transfer_enabled,bank_iban,paytr_enabled,paytr_merchant_id,paytr_merchant_key_enc,shipping_fee,storefront_url,custom_domain,platform_subdomain,domain_verified_at").eq("organization_id", organization.id).maybeSingle(),
+    supabase.from("arc_store_settings").select("logo_path,bank_transfer_enabled,bank_iban,paytr_enabled,paytr_merchant_id,paytr_merchant_key_enc,shipping_fee,sales_configured_at,storefront_url,custom_domain,platform_subdomain,domain_verified_at").eq("organization_id", organization.id).maybeSingle(),
     /* Süresi geçen havale: ödenmemiş, kapanmamış ve 72 saatten eski havale siparişleri. */
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).in("payment_status", ["pending", "authorized"]).not("status", "in", "(cancelled,refunded)").ilike("metadata->>payment_method", "%havale%").lt("created_at", new Date(now - TRANSFER_STALE_HOURS * 3_600_000).toISOString()),
   ]);

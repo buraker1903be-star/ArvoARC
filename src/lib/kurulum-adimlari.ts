@@ -77,7 +77,7 @@ export function kurulumAdimlari(olgular: KurulumOlgulari): KurulumAdimi[] {
     {
       anahtar: "kargo",
       baslik: "Kargo ücretini belirle",
-      aciklama: "Sipariş toplamı kargo ücretiyle hesaplanıyor. Ücretsiz kargo için 0 yazabilirsin.",
+      aciklama: "Seçmediğin sürece mağazan platform varsayılanıyla satar. Sipariş toplamı bu ücretle hesaplanıyor; ücretsiz kargo için 0 yazabilirsin.",
       yol: "/ayarlar#satis-ayarlari",
       eylem: "Satış ayarları",
       tamam: olgular.kargoUcretiVar,
@@ -142,6 +142,7 @@ export type AyarSatiri = {
   paytr_merchant_id?: string | null;
   paytr_merchant_key_enc?: string | null;
   shipping_fee?: number | null;
+  sales_configured_at?: string | null;
   storefront_url?: string | null;
   custom_domain?: string | null;
   platform_subdomain?: string | null;
@@ -160,8 +161,16 @@ export function ayarlardanOlgular(
     yayindaUrunSayisi: sayilar.yayindaUrunSayisi,
     logoVar: dolu(ayar?.logo_path),
     odemeAcik: havale || paytr,
-    /* 0 geçerli bir ücret (ücretsiz kargo); denetim NULL üzerinden. */
-    kargoUcretiVar: typeof ayar?.shipping_fee === "number",
+    /*
+      TARİFEYİ KİRACI SEÇTİ Mİ, "bir sayı var mı" değil. shipping_fee
+      NOT NULL ve sütun varsayılanı 12000 kuruş — sistem tek mağazalıyken
+      konmuş, ArvoCulture'ın tarifesi. Eski ölçüt ("sayı mı") her zaman
+      doğruydu: yeni salon 120 TL kargoyla, 2000 TL ücretsiz kargo
+      eşiğiyle satmaya başlıyor ve rehber bu adımı TAMAM gösteriyordu.
+      Artık satış ayarlarını kaydettiğinde damgalanan sütuna bakılıyor
+      (20260929081212). 0 hâlâ geçerli bir ücret: ücretsiz kargo bir karar.
+    */
+    kargoUcretiVar: dolu(ayar?.sales_configured_at),
     /*
       ADRES ÖLÇÜTÜ ÇÖZÜCÜDEN GENİŞ, BİLEREK. arc_storefront_org yalnızca
       doğrulanmış özel alan adına ve platform alt alan adına bakıyor;
