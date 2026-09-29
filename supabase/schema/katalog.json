@@ -476,6 +476,7 @@
     "arc_storefront_discounts",
     "arc_storefront_facets",
     "arc_storefront_org",
+    "arc_storefront_payment_methods",
     "arc_storefront_product",
     "arc_storefront_product_badges",
     "arc_storefront_product_count",

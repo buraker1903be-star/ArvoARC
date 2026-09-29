@@ -137,11 +137,25 @@ a.dash-activity-row:hover{background:color-mix(in srgb,var(--ink) 4%,transparent
 }
 .panel-root .kurulum-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:16px}
 .panel-root .kurulum-head h2{margin:6px 0 4px;font-size:19px}
-.panel-root .kurulum-head p{margin:0;max-width:62ch;color:var(--muted);font-size:13px;line-height:1.6}
+/* 62ch, cümleyi tek kelimelik ikinci satıra düşürüyordu ("…aşağıda /
+   işaretli."). Kart zaten geniş; sınır yalnızca satırın çok uzamasını
+   engellemek için var. */
+.panel-root .kurulum-head p{margin:0;max-width:78ch;color:var(--muted);font-size:13px;line-height:1.6}
 .panel-root .kurulum-ilerleme{display:grid;justify-items:end;gap:6px;min-width:160px}
 .panel-root .kurulum-ilerleme strong{font-size:20px;font-variant-numeric:tabular-nums}
 .panel-root .kurulum-ilerleme small{color:var(--muted);font-size:11.5px}
-.panel-root .kurulum-bar{display:block;width:160px;height:6px;border-radius:var(--r-pill);background:var(--surface-2);overflow:hidden}
+/*
+  BOŞ ÇUBUK GÖRÜNMELİ. Zemin var(--surface-2) idi ve kartın kendi zemini
+  de açık: hiçbir adımı bitmemiş mağazada — yani rehberi ilk gören
+  herkeste — çubuk kaybolup geriye "0 / 6" ile "adım tamam" arasında
+  anlamsız bir boşluk kalıyordu. Ölçüde dolu kısım yoksa ölçek yine
+  okunmalı; çerçeve onu ölçek yapıyor.
+*/
+.panel-root .kurulum-bar{
+  display:block;width:160px;height:6px;border-radius:var(--r-pill);overflow:hidden;
+  background:color-mix(in srgb,var(--accent-500) 12%,var(--surface-2));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent-500) 22%,var(--line));
+}
 .panel-root .kurulum-bar>span{display:block;height:100%;border-radius:var(--r-pill);background:var(--accent-500)}
 
 .panel-root .kurulum-liste{display:grid;gap:4px;margin:0;padding:0;list-style:none;counter-reset:adim}
@@ -159,7 +173,15 @@ a.dash-activity-row:hover{background:color-mix(in srgb,var(--ink) 4%,transparent
 .panel-root .kurulum-liste>li[data-tamam] .kurulum-metin>b{color:var(--muted);font-weight:600}
 .panel-root .kurulum-metin>small{color:var(--muted);font-size:12.5px;line-height:1.55}
 .panel-root .kurulum-durum{flex:none;color:var(--success);font-size:12px;font-weight:700}
-.panel-root .kurulum-liste .ac-btn{flex:none;min-height:34px;padding:7px 14px;font-size:12.5px}
+/*
+  DÜĞME SÜTUNU HİZALI. Genişlikler metne göre 83–118px arasında
+  değişiyordu ve sağa yaslı sütunun sol kenarı tırtıklı çıkıyordu;
+  altı satırlık listede en çok göze batan şey buydu. min-width en uzun
+  etiketi (118px) geçiyor, metin ortalanıyor.
+*/
+.panel-root .kurulum-liste .ac-btn{
+  flex:none;min-height:34px;min-width:132px;justify-content:center;padding:7px 14px;font-size:12.5px;
+}
 
 @media (max-width:760px){
   .panel-root .kurulum{padding:16px}
