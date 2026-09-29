@@ -144,6 +144,7 @@ export type AyarSatiri = {
   shipping_fee?: number | null;
   storefront_url?: string | null;
   custom_domain?: string | null;
+  platform_subdomain?: string | null;
   domain_verified_at?: string | null;
 } | null;
 
@@ -161,7 +162,22 @@ export function ayarlardanOlgular(
     odemeAcik: havale || paytr,
     /* 0 geçerli bir ücret (ücretsiz kargo); denetim NULL üzerinden. */
     kargoUcretiVar: typeof ayar?.shipping_fee === "number",
-    /* Doğrulanmamış özel alan adı henüz çalışmıyor; vitrin adresi sayılmaz. */
-    vitrinAdresiVar: dolu(ayar?.storefront_url) || (dolu(ayar?.custom_domain) && Boolean(ayar?.domain_verified_at)),
+    /*
+      ADRES ÖLÇÜTÜ ÇÖZÜCÜDEN GENİŞ, BİLEREK. arc_storefront_org yalnızca
+      doğrulanmış özel alan adına ve platform alt alan adına bakıyor;
+      orada ölçüt dar, çünkü soru "bu adres KİMİN" ve yanlış cevap
+      komşunun mağazasını açar.
+
+      Rehberin sorusu başka: "bu salonun bir adresi var mı". Eski
+      mağazaların adresi storefront_url'de duruyor ve onları adressiz
+      saymak, yıllardır satan bir mağazaya eksik varmış gibi gösterirdi.
+
+      Doğrulanmamış özel alan adı yine sayılmıyor: o adres gerçekten
+      çalışmıyor.
+    */
+    vitrinAdresiVar:
+      dolu(ayar?.platform_subdomain)
+      || dolu(ayar?.storefront_url)
+      || (dolu(ayar?.custom_domain) && Boolean(ayar?.domain_verified_at)),
   };
 }

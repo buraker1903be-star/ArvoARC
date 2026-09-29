@@ -99,3 +99,13 @@ test("ayar satırı hiç yoksa çökmeden hepsi eksik dönüyor", () => {
   });
   assert.equal(kurulumDurumu(olgular).gorunsun, true);
 });
+
+test("platform alt alan adı da vitrin adresi sayılıyor", () => {
+  /*
+    Kiracı açılışında alt alan adı otomatik atanıyor
+    (20260929065948) ve vitrin çözücüsü onu tanıyor; rehber de
+    tanımalı, yoksa yeni salon adresi VARKEN eksik görünürdü.
+  */
+  assert.equal(ayarlardanOlgular({ platform_subdomain: "salon-beta" }, SAYILAR).vitrinAdresiVar, true);
+  assert.equal(ayarlardanOlgular({ platform_subdomain: "  " }, SAYILAR).vitrinAdresiVar, false);
+});
