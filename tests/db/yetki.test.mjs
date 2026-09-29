@@ -10,7 +10,7 @@
 // Yeni fonksiyon eklerken bu listeye BİLEREK ekleyin.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { veritabani } from "./ortam.mjs";
+import { islem, rol, veritabani } from "./ortam.mjs";
 
 /** Müşteri vitrini: yalnızca okuyan, satıcıyı ve ürünleri getiren fonksiyonlar. */
 const ANON = [
@@ -140,4 +140,55 @@ test("para, stok, fiyat ve aktarım fonksiyonları müşteriye kapalı", async (
     assert.equal(anon.has(ad), false, `${ad} anon'a açık`);
     assert.equal(panel.has(ad), false, `${ad} oturumlu kullanıcıya açık`);
   }
+});
+
+/*
+  TETİKLEYİCİ FONKSİYONLARI BU DENETİMİN DIŞINDAYDI: yukarıdaki sorgu
+  prorettype <> 'trigger' ile onları eliyor, çünkü soru "kim çağırabilir"
+  ve bir tetikleyici fonksiyonu zaten doğrudan çağrılamaz.
+
+  Boşluk buradan sızdı. private şemasındaki üç tetikleyici fonksiyonu
+  PUBLIC'e açıktı ve gerekçe olarak "satırı yazan rolün çalıştırabilmesi
+  gerekiyor" yazılmıştı. 29.09.2026'da ölçüldü: PostgreSQL tetikleyici
+  tetiklenirken EXECUTE yetkisini DENETLEMİYOR — yetki kaldırılınca
+  INSERT ve tetikleyici çalışmaya devam ediyor (20260929090233).
+
+  Gerekmeyen yetki, bir sonraki fonksiyonu yazanın kopyalayacağı kalıp
+  oluyor; ben de öyle yazmıştım. Test artık kalıbı kapatıyor.
+*/
+test("tetikleyici fonksiyonları kimseye açık değil", async () => {
+  const db = await veritabani();
+  const { rows } = await db.query(
+    `select n.nspname || '.' || p.proname as ad,
+            coalesce(p.proacl::text, '(varsayılan)') as yetkiler
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname in ('public', 'private')
+        and p.prorettype = 'trigger'::regtype
+        and (has_function_privilege('anon', p.oid, 'execute')
+          or has_function_privilege('authenticated', p.oid, 'execute'))
+      order by 1`,
+  );
+  assert.deepEqual(rows, [], "tetikleyici fonksiyonuna EXECUTE gerekmiyor");
+});
+
+test("tetikleyiciler yetki olmadan da çalışıyor", async () => {
+  /*
+    Kuralın dayandığı olgu. Bozulursa kiracı açılışı sessizce durur:
+    yeni salonun ayar satırı öneksiz kalır ve tekillik kısıtına takılır.
+  */
+  const db = await veritabani();
+  await islem(db, async () => {
+    await rol(db, "postgres");
+    await db.query(
+      `insert into public.organizations (id,name,slug,sector,status,plan_code,created_at,updated_at,provisioning_state,primary_color)
+       values ('00000000-0000-4000-8000-00000000cd01','Yetki Salonu','yetki-salonu','retail','active','starter',now(),now(),'active','#000000')`,
+    );
+    const { rows } = await db.query(
+      `insert into public.arc_store_settings (organization_id, store_name)
+       values ('00000000-0000-4000-8000-00000000cd01','Yetki Salonu')
+       returning order_prefix, platform_subdomain`,
+    );
+    assert.match(rows[0].order_prefix, /^[A-Z]{1,6}$/);
+    assert.equal(rows[0].platform_subdomain, "yetki-salonu");
+  });
 });
