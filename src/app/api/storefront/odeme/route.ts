@@ -504,6 +504,40 @@ export async function POST(request: Request) {
       });
       if (garantiMetaError) console.error("Sipariş üstverisi kaydedilemedi:", garantiMetaError);
 
+      /*
+        NE GÖNDERDİĞİMİZ DE KÜTÜĞE YAZILIYOR.
+
+        07.10.2026'da ilk denemelerde banka ödemeyi açmadı ve elimizde
+        hiçbir şey yoktu: bankanın cevabını kaydetmeye başlamıştık ama
+        KENDİ İSTEĞİMİZİ kaydetmiyorduk. "Form üretildi mi, hangi
+        değerlerle" sorusunun cevabı hiçbir yerde durmuyordu — oysa
+        yarısı bizim elimizde.
+
+        İMZANIN KENDİSİ YAZILMIYOR, yalnızca uzunluğu: imza mağaza
+        anahtarından türüyor ve kütük panelde görünüyor. Uzunluk bile
+        işe yarıyor — 128 ise SHA512, 40 ise SHA1, yani hangi sürümün
+        çalıştığı tek bakışta belli.
+      */
+      await recordOrderEvent(
+        supabase,
+        { id: order.order_id, organization_id: organizationId },
+        "payment_session_opened",
+        {
+          saglayici: "garanti",
+          uc: garantiAyar.uclar.form,
+          mode: alanlar.mode,
+          apiversion: alanlar.apiversion,
+          secure3dsecuritylevel: alanlar.secure3dsecuritylevel,
+          terminalid: alanlar.terminalid,
+          terminalmerchantid: alanlar.terminalmerchantid,
+          txnamount: alanlar.txnamount,
+          txncurrencycode: alanlar.txncurrencycode,
+          txninstallmentcount: alanlar.txninstallmentcount,
+          successurl: alanlar.successurl,
+          imza_uzunlugu: alanlar.secure3dhash.length,
+        },
+      );
+
       return NextResponse.json(
         {
           saglayici: "garanti",

@@ -64,3 +64,38 @@ test("tanılama alanları kart verisi taşıyabilecek adları içermiyor", () =>
     assert.ok(!liste.toLowerCase().includes(yasak), `tanılama listesinde kart alanı: ${yasak}`);
   }
 });
+
+/*
+  NE GÖNDERDİĞİMİZ DE KAYITLI OLMALI.
+
+  Bankanın cevabını kaydetmeye başladık ama kendi isteğimizi
+  kaydetmiyorduk: "form üretildi mi, hangi değerlerle" sorusunun cevabı
+  hiçbir yerde durmuyordu. 07.10.2026'da ödeme açılmadığında teşhisin
+  yarısı bu yüzden eksikti.
+*/
+const ODEME = fs.readFileSync(
+  path.join(process.cwd(), "src/app/api/storefront/odeme/route.ts"),
+  "utf8",
+);
+const odemeYorumsuz = ODEME.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+test("garanti oturumu açılınca gönderilen alanlar kütüğe yazılıyor", () => {
+  const bas = odemeYorumsuz.indexOf('"payment_session_opened"');
+  assert.notEqual(bas, -1, "oturum açılışı kütüğe yazılmıyor");
+  const blok = odemeYorumsuz.slice(bas, bas + 900);
+  for (const alan of ["apiversion", "secure3dsecuritylevel", "terminalid", "txnamount", "successurl"]) {
+    assert.ok(blok.includes(alan), `${alan} kütüğe yazılmıyor`);
+  }
+});
+
+test("imzanın KENDİSİ kütüğe yazılmıyor, yalnızca uzunluğu", () => {
+  /* İmza mağaza anahtarından türüyor ve kütük panelde görünüyor.
+     Uzunluk zaten yetiyor: 128 ise SHA512, 40 ise SHA1. */
+  const bas = odemeYorumsuz.indexOf('"payment_session_opened"');
+  const blok = odemeYorumsuz.slice(bas, bas + 900);
+  assert.ok(blok.includes("imza_uzunlugu: alanlar.secure3dhash.length"), "imza uzunluğu yazılmıyor");
+  assert.ok(
+    !/secure3dhash: alanlar\.secure3dhash\b(?!\.length)/.test(blok),
+    "imzanın kendisi kütüğe giriyor",
+  );
+});
