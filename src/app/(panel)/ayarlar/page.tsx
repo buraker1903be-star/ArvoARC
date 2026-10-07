@@ -10,18 +10,17 @@ const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending
 
 /* DNS kaydı henüz yayılmadıysa hata değil, bekleme durumu. */
 
-import { TamiDeneme } from "./tami-deneme";
 
 export default async function Settings(){
   const {supabase,organization,membership}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,tami_enabled,tami_test_mode,tami_merchant_number,tami_terminal_number,tami_jwk_kid,tami_secret_key_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,garanti_enabled,garanti_test_mode,garanti_isyeri_no,garanti_terminal_no,garanti_api_surumu,garanti_guvenlik_duzeyi,garanti_yari_guvenli_kabul,garanti_provizyon_sifresi_enc,garanti_magaza_anahtari_enc,garanti_iade_sifresi_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
   /* Ödemenin gittiği hesap (IBAN, PayTR) yalnızca owner/admin: bkz. actions.ts PAYMENT_ROLES. */
   const canManagePayments=["owner","admin"].includes(membership.role);
   // Anahtarın kendisi hiç okunmaz; yalnızca kayıtlı olup olmadığı gösterilir.
   const keysStored=Boolean(settings?.paytr_merchant_key_enc);
-  const tamiKeysStored=Boolean(settings?.tami_secret_key_enc);
+  const garantiKeysStored=Boolean(settings?.garanti_provizyon_sifresi_enc&&settings?.garanti_magaza_anahtari_enc);
   /* Bağlantı yalnızca yetkiliye sınanıyor: OTO'ya gereksiz istek atmamak
      ve firma listesini görmeye yetkisi olmayana göstermemek için. */
   const kargoBaglantisi=canManagePayments
@@ -267,21 +266,45 @@ export default async function Settings(){
           bilerek seçilmedi.
         */}
         <article className="payment-method">
-          <div className="payment-title"><div><small>KARTLA ÖDEME</small><h4>Tami ortak ödeme sayfası</h4></div><label className="check-inline"><input type="checkbox" name="tami_enabled" defaultChecked={settings?.tami_enabled}/><span>Etkin</span></label></div>
-          <p>Kart bilgileri ArvoARC sunucularına gelmeden Tami’nin ödeme sayfasında işlenir; Masterpass’e kayıtlı kartlar da orada çıkar.</p>
+          <div className="payment-title"><div><small>KARTLA ÖDEME</small><h4>Garanti BBVA Sanal POS</h4></div><label className="check-inline"><input type="checkbox" name="garanti_enabled" defaultChecked={settings?.garanti_enabled}/><span>Etkin</span></label></div>
+          <p>Kart bilgileri ArvoARC sunucularına gelmeden bankanın 3D ödeme sayfasında işlenir (3D Pay Hosting).</p>
           <div className="payment-fields">
+            <label>İşyeri (firma) kodu<input name="garanti_isyeri_no" inputMode="numeric" defaultValue={settings?.garanti_isyeri_no??""} placeholder="bankanın verdiği firma kodu" autoComplete="off"/></label>
+            <label>Terminal numarası<input name="garanti_terminal_no" inputMode="numeric" defaultValue={settings?.garanti_terminal_no??""} placeholder="ör. 30691297" autoComplete="off"/></label>
             {/*
-              YALNIZCA RAKAM. Tami'nin örneğinde ikisi de Long ve
-              PG-Auth-Token'ın özeti o sayıdan hesaplanıyor; portalde
-              "Terminal-84032909" görünen değer olduğu gibi yazılırsa
-              özet tutmuyor ve Tami 4003 dönüyor (29.09.2026'da oldu).
+              PROVAUT tahsilat, PROVRFN iptal/iade kullanıcısı. İade
+              şifresi ZORUNLU DEĞİL: girilmezse tahsilat çalışır,
+              yalnızca panelden iade yapılamaz. Zorunlu tutmak, iadeyi
+              henüz tanımlamamış bir mağazanın kartlı ödemesini hiç
+              açmamak olurdu.
             */}
-            <label>İşyeri numarası<input name="tami_merchant_number" inputMode="numeric" defaultValue={settings?.tami_merchant_number??""} placeholder="yalnızca rakam, ör. 1000" autoComplete="off"/></label>
-            <label>Terminal numarası<input name="tami_terminal_number" inputMode="numeric" defaultValue={settings?.tami_terminal_number??""} placeholder="yalnızca rakam, “Terminal-” yazmayın" autoComplete="off"/></label>
-            <label className="wide">JWK kid<input name="tami_jwk_kid" defaultValue={settings?.tami_jwk_kid??""} placeholder="Portal → İşyeri Ayarları → POS Yönetimi" autoComplete="off"/></label>
-            <label>Gizli anahtar (secretKey)<input name="tami_secret_key" type="password" placeholder={tamiKeysStored?"Kayıtlı · değiştirmek için yazın":"secretKey"} autoComplete="new-password"/></label>
-            <label>JWK “k” değeri<input name="tami_jwk_k" type="password" placeholder={tamiKeysStored?"Kayıtlı · değiştirmek için yazın":"k"} autoComplete="new-password"/></label>
-            <div className="check-stack"><label className="check-inline"><input type="checkbox" name="tami_test_mode" defaultChecked={settings?.tami_test_mode??true}/> Test modu (sandbox)</label></div>
+            <label>PROVAUT şifresi<input name="garanti_provizyon_sifresi" type="password" placeholder={garantiKeysStored?"Kayıtlı · değiştirmek için yazın":"tahsilat kullanıcısının şifresi"} autoComplete="new-password"/></label>
+            <label>3D anahtarı (StoreKey)<input name="garanti_magaza_anahtari" type="password" placeholder={garantiKeysStored?"Kayıtlı · değiştirmek için yazın":"banka panelinden"} autoComplete="new-password"/></label>
+            <label>PROVRFN şifresi <small>(iade için)</small><input name="garanti_iade_sifresi" type="password" placeholder={settings?.garanti_iade_sifresi_enc?"Kayıtlı · değiştirmek için yazın":"girilmezse panelden iade yapılamaz"} autoComplete="new-password"/></label>
+            {/*
+              HASH SÜRÜMÜ TAHMİN EDİLMİYOR. Üye işyeri hesabına göre
+              değişiyor ve yanlış seçim HER ödemenin "hash hatalı" ile
+              dönmesi demek; banka hangi alanın uymadığını söylemiyor.
+              Doğru değer bankanın entegrasyon belgesinde yazıyor.
+            */}
+            <label>Hash sürümü
+              <select name="garanti_api_surumu" defaultValue={settings?.garanti_api_surumu??"v512"}>
+                <option value="v512">512 — SHA512 (yeni hesaplar)</option>
+                <option value="v0.01">v0.01 — SHA1 (eski hesaplar)</option>
+              </select>
+            </label>
+            <label>Güvenlik düzeyi<input name="garanti_guvenlik_duzeyi" defaultValue={settings?.garanti_guvenlik_duzeyi??"3D_PAY_HOSTING"} placeholder="3D_PAY_HOSTING" autoComplete="off"/></label>
+            <div className="check-stack">
+              <label className="check-inline"><input type="checkbox" name="garanti_test_mode" defaultChecked={settings?.garanti_test_mode??true}/> Test modu (sandbox)</label>
+              {/*
+                Kart ya da banka 3D'ye kayıtlı değilse doğrulama "yarı
+                güvenli" bitiyor ama provizyon yine yapılıyor.
+                Reddetmek, parası çekilmiş müşterinin siparişini
+                açmamak; kabul etmek ters ibraz riskini işyerine almak.
+                Karar mağazanın.
+              */}
+              <label className="check-inline"><input type="checkbox" name="garanti_yari_guvenli_kabul" defaultChecked={settings?.garanti_yari_guvenli_kabul??false}/> 3D’ye kayıtlı olmayan kartları da kabul et (ters ibraz riski işyerinde)</label>
+            </div>
           </div>
           {/*
             HANGİSİ ÖNCE. Yedeğe düşme yalnızca ödeme oturumu açılırken
@@ -291,13 +314,12 @@ export default async function Settings(){
           <div className="payment-fields">
             <label className="wide">Kartla ödemede önce hangisi denensin
               <select name="odeme_saglayicisi" defaultValue={settings?.odeme_saglayicisi??"paytr"}>
-                <option value="paytr">PayTR (Tami yedek)</option>
-                <option value="tami">Tami (PayTR yedek)</option>
+                <option value="paytr">PayTR (Garanti yedek)</option>
+                <option value="garanti">Garanti Sanal POS (PayTR yedek)</option>
               </select>
             </label>
           </div>
-          {tamiKeysStored?<TamiDeneme/>:null}
-          <div className="security-note"><b>{tamiKeysStored?"Anahtarlarınız kayıtlı.":"Tahsilat kendi Tami işyerinize yapılır."}</b><p>Gizli anahtar ve JWK “k” değeri şifrelenerek saklanır, hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazmanız yeterli; boş bırakırsanız kayıtlı olan korunur. Seçilen sağlayıcı hazır değilse ödeme öteki sağlayıcıyla açılır.</p></div>
+          <div className="security-note"><b>{garantiKeysStored?"Anahtarlarınız kayıtlı.":"Tahsilat kendi Garanti üye işyerinize yapılır."}</b><p>PROVAUT/PROVRFN şifreleri ve 3D anahtarı şifrelenerek saklanır, hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazmanız yeterli; boş bırakırsanız kayıtlı olan korunur. Seçilen sağlayıcı hazır değilse ödeme öteki sağlayıcıyla açılır.</p></div>
         </article>
         <article className="payment-method">
           <div className="payment-title"><div><small>MÜŞTERİ E-POSTALARI</small><h4>Gönderen adresi</h4></div></div>

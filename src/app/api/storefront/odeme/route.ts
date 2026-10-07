@@ -2,9 +2,8 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { storePaytrConfig, type PaytrStoreConfig } from "@/lib/paytr/config";
 import { saglayiciSirasi, type Saglayici } from "@/lib/odeme/secim";
-import { tamiAyariCoz, TAMI_ALANLARI, type TamiAyari } from "@/lib/odeme/tami/ayar";
-import { odemeSayfasiAdresi } from "@/lib/odeme/tami/istek";
-import { jetonAl } from "@/lib/odeme/tami/istemci";
+import { garantiAyariCoz, GARANTI_ALANLARI, type GarantiAyari } from "@/lib/odeme/garanti/ayar";
+import { formAlanlari } from "@/lib/odeme/garanti/istek";
 import { recordOrderEvent } from "@/lib/siparis-olayi";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { resolveStore, storefrontCorsHeaders } from "@/lib/storefront-origin";
@@ -235,7 +234,10 @@ export async function POST(request: Request) {
   */
   let transferSettings: { bank_transfer_enabled: boolean | null; bank_transfer_discount_percent: number | null } | null = null;
   let paytrConfig: PaytrStoreConfig | null = null;
-  let tamiAyar: TamiAyari | null = null;
+  let garantiAyar: GarantiAyari | null = null;
+  /* Bankanın ödeme ekranında görünen işyeri adı. Ayar satırı zaten
+     okunuyor; marka için ikinci bir sorgu atmıyoruz. */
+  let isyeriAdi = "";
   let saglayicilar: Saglayici[] = [];
 
   if (isTransfer) {
@@ -278,18 +280,19 @@ export async function POST(request: Request) {
       mağaza hâlâ havaleyle satış yapabilir.
     */
     /*
-      SAĞLAYICI SIRASI. Kart artık "PayTR" demek değil: mağaza Tami'yi
-      birincil seçebiliyor (lib/odeme/secim.ts). Biri hazır değilse
-      öteki devralıyor; hiçbiri hazır değilse kartla ödeme kapalı.
+      SAĞLAYICI SIRASI. Kart artık "PayTR" demek değil: mağaza Garanti
+      Sanal POS'u birincil seçebiliyor (lib/odeme/secim.ts). Biri hazır
+      değilse öteki devralıyor; hiçbiri hazır değilse kartla ödeme kapalı.
     */
     const { data: saglayiciSatiri, error: saglayiciHatasi } = await supabase
       .from("arc_store_settings")
-      .select(`odeme_saglayicisi,${TAMI_ALANLARI}`)
+      .select(`odeme_saglayicisi,store_name,${GARANTI_ALANLARI}`)
       .eq("organization_id", organizationId)
       .maybeSingle();
-    /* Okunamadıysa Tami hazır sayılmıyor; PayTR yolu aşağıda kendi denetiminden geçiyor. */
+    /* Okunamadıysa Garanti hazır sayılmıyor; PayTR yolu aşağıda kendi denetiminden geçiyor. */
     if (saglayiciHatasi) console.error("Ödeme sağlayıcısı ayarı okunamadı:", saglayiciHatasi.message);
-    tamiAyar = tamiAyariCoz(saglayiciSatiri as never);
+    garantiAyar = garantiAyariCoz(saglayiciSatiri as never);
+    isyeriAdi = String((saglayiciSatiri as { store_name?: string | null } | null)?.store_name ?? "").trim();
 
     try {
       paytrConfig = await storePaytrConfig(supabase, organizationId, origin);
@@ -306,7 +309,7 @@ export async function POST(request: Request) {
     } catch (configError) {
       /*
         PayTR'ın düşmesi artık tek başına kartla ödemeyi kapatmıyor:
-        Tami hazırsa ödeme oradan açılır. Hata yine de günlüğe yazılıyor
+        Garanti hazırsa ödeme oradan açılır. Hata yine de günlüğe yazılıyor
         — "yedek devraldı" ile "iki sağlayıcı da bozuk" farklı şeyler.
       */
       console.error("PayTR yapılandırması alınamadı:", organizationId, configError);
@@ -314,7 +317,7 @@ export async function POST(request: Request) {
     }
 
     saglayicilar = saglayiciSirasi(saglayiciSatiri?.odeme_saglayicisi, {
-      tami: Boolean(tamiAyar),
+      garanti: Boolean(garantiAyar),
       paytr: Boolean(paytrConfig),
     });
     if (!saglayicilar.length) {
@@ -462,37 +465,49 @@ export async function POST(request: Request) {
   // --- 2. Ödeme oturumu aç -----------------------------------
 
   /*
-    TAMİ ORTAK ÖDEME SAYFASI. Kart Tami'nin sayfasında giriliyor, bize
-    hiç uğramıyor. Tami'nin sipariş numarası SİPARİŞİN UUID'Sİ: Tami
-    2-36 karakter, yalnızca harf/rakam, "-" ve "_" kabul ediyor ve
-    bizim numaralarımızın bir kısmı "#" taşıyor (SPR#1018).
+    GARANTİ SANAL POS — 3D PAY HOSTING. Kart formu bankanın sayfasında,
+    bize hiç uğramıyor.
 
-    Dönüş adresi PANELİN kendi ucu: müşteri oraya döndüğünde sonuç
-    /payment/query ile doğrulanıp sipariş kapatılıyor, sonra vitrine
-    yönlendiriliyor. Tarayıcı dönüşü tek başına kanıt değil.
+    Banka bir FORM POST'u bekliyor, gidilebilir bir bağlantı değil:
+    alanların arasında imza var. Bu yüzden Tami'deki gibi tek bir
+    `odemeAdresi` dönmüyoruz; alanları vitrine veriyoruz ve vitrin
+    gizli bir formu kendiliğinden gönderiyor. İmzayı tarayıcıya vermek
+    sır sızdırmıyor: imza zaten tarayıcının gördüğü değerlerden
+    üretiliyor, gizli olan mağaza anahtarı sunucuda kalıyor.
+
+    Bankanın sipariş numarası SİPARİŞİN UUID'Sİ: bizim numaralarımızın
+    bir kısmı "#" taşıyor (SPR#1018) ve banka özel karakter kabul
+    etmiyor. Dönüşte siparişi bu kimlikle buluyoruz.
   */
-  if (saglayicilar[0] === "tami" && tamiAyar) {
+  if (saglayicilar[0] === "garanti" && garantiAyar) {
     const panelKokeni = new URL(request.url).origin;
-    const jeton = await jetonAl(tamiAyar, {
-      odemeKimligi: order.order_id,
+    const donusAdresi = `${panelKokeni}/api/storefront/garanti-donus`;
+    const alanlar = formAlanlari(garantiAyar.kimlik, garantiAyar.guvenlikDuzeyi, garantiAyar.testModu, {
+      siparisNo: order.order_id,
       tutarKurus: order.total,
-      telefon: phone,
-      donusAdresi: `${panelKokeni}/api/storefront/tami-donus?odeme=${encodeURIComponent(order.order_id)}`,
+      /* Başarı ve hata aynı uca gidiyor: ikisini de imza denetiminden
+         geçirmek gerekiyor ve "hata" adresine gelen bir isteğin
+         gerçekten bankadan geldiğini de doğrulamak zorundayız. */
+      basariAdresi: donusAdresi,
+      hataAdresi: donusAdresi,
+      musteriEposta: email,
+      musteriIp: ip,
+      isyeriAdi,
     });
 
-    if (jeton.ok) {
-      const { error: tamiMetaError } = await mergeMetadata({
-        odeme_saglayicisi: "tami",
-        tami_order_id: order.order_id,
-        tami_test_modu: tamiAyar.testModu,
+    if (alanlar) {
+      const { error: garantiMetaError } = await mergeMetadata({
+        odeme_saglayicisi: "garanti",
+        garanti_order_id: order.order_id,
+        garanti_test_modu: garantiAyar.testModu,
         ...(note ? { notes: note } : {}),
       });
-      if (tamiMetaError) console.error("Sipariş üstverisi kaydedilemedi:", tamiMetaError);
+      if (garantiMetaError) console.error("Sipariş üstverisi kaydedilemedi:", garantiMetaError);
 
       return NextResponse.json(
         {
-          saglayici: "tami",
-          odemeAdresi: odemeSayfasiAdresi(tamiAyar.uclar.sayfa, jeton.veri.oneTimeToken),
+          saglayici: "garanti",
+          odemeFormu: { adres: garantiAyar.uclar.form, alanlar },
           orderNumber: order.order_number,
           total: order.total,
         },
@@ -501,23 +516,21 @@ export async function POST(request: Request) {
     }
 
     /*
-      YEDEĞE DÜŞME BURADA VE YALNIZCA BURADA: müşteri henüz Tami'nin
+      YEDEĞE DÜŞME BURADA VE YALNIZCA BURADA: müşteri henüz bankanın
       sayfasına gitmedi, ortada açık bir ödeme oturumu yok. Müşteri
       sayfaya düştükten sonra ikinci bir sağlayıcıda oturum açmak çift
       çekim riski demek olurdu.
-    */
-    /*
-      Sebep SİPARİŞE de yazılıyor. Yalnızca sunucu günlüğüne yazmak,
+
+      Sebep SİPARİŞE de yazılıyor; yalnızca sunucu günlüğüne yazmak
       "PayTR açıldı ama neden" sorusunu Vercel günlüklerinde aramak
-      demekti; aynı kusuru OTO tarafında da yaşadık. Panelde sipariş
-      detayındaki akışta görünüyor.
+      demekti.
     */
-    console.error("Tami ödeme oturumu açılamadı:", order.order_number, jeton.hata);
+    console.error("Garanti ödeme formu üretilemedi:", order.order_number);
     await recordOrderEvent(
       supabase,
       { id: order.order_id, organization_id: organizationId },
       "payment_session_failed",
-      { saglayici: "tami", reason: jeton.hata, durum: jeton.durum, yedek: paytrConfig ? "paytr" : null },
+      { saglayici: "garanti", reason: "imza üretilemedi", yedek: paytrConfig ? "paytr" : null },
     );
     if (!paytrConfig) {
       return NextResponse.json(

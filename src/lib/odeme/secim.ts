@@ -1,7 +1,12 @@
 /*
   SAĞLAYICI SEÇİMİ VE YEDEĞE DÜŞME. Saf modül; testi tests/odeme-secim.test.ts.
 
-  Karar (29.09.2026): birincil Tami, yedek PayTR. Devretme YALNIZCA
+  Karar (07.10.2026): birincil Garanti Sanal POS, yedek PayTR. Tami
+  bırakıldı — yerine Garanti geçti; Tami ile tahsil edilmiş GEÇMİŞ
+  siparişlerin iadesi hâlâ Tami'ye gidiyor (lib/odeme/iade.ts), ama yeni
+  ödeme Tami'den açılmıyor ve seçeneklerde de yok.
+
+  Devretme YALNIZCA
   müşteri ödeme sayfasına düşmeden önce geçerli — yani ödeme oturumu
   açılırken. Oturum açıldıktan sonra ikinci bir sağlayıcıda oturum
   açılmaz: iki sağlayıcıda birden açık ödeme, çift çekim demek. Ödeme
@@ -13,24 +18,24 @@
   sıradaki aday o yüzden önceden belli.
 */
 
-export type Saglayici = "tami" | "paytr";
+export type Saglayici = "garanti" | "paytr";
 
-export const SAGLAYICI_ADI: Record<Saglayici, string> = { tami: "Tami", paytr: "PayTR" };
+export const SAGLAYICI_ADI: Record<Saglayici, string> = { garanti: "Garanti Sanal POS", paytr: "PayTR" };
 
 /**
  * Denenecek sağlayıcılar, sırayla. Boş dizi "kartla ödeme kapalı"
  * demek: vitrin kart seçeneğini hiç göstermemeli.
  *
  * Tercih edilen sağlayıcı hazır değilse sessizce atlanıyor — mağaza
- * Tami'yi seçip anahtarlarını girmemişse kartla ödeme tamamen
+ * Garanti'yi seçip anahtarlarını girmemişse kartla ödeme tamamen
  * durmasın, hazır olan yedek devralsın.
  */
 export function saglayiciSirasi(
   tercih: string | null | undefined,
-  hazir: { tami: boolean; paytr: boolean },
+  hazir: { garanti: boolean; paytr: boolean },
 ): Saglayici[] {
-  const birincil: Saglayici = tercih === "tami" ? "tami" : "paytr";
-  const yedek: Saglayici = birincil === "tami" ? "paytr" : "tami";
+  const birincil: Saglayici = tercih === "garanti" ? "garanti" : "paytr";
+  const yedek: Saglayici = birincil === "garanti" ? "paytr" : "garanti";
   return [birincil, yedek].filter((s) => hazir[s]);
 }
 

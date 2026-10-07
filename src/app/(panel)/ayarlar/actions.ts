@@ -8,9 +8,6 @@ import { requireTenant } from "@/lib/tenant";
 import { altAlanAdresi } from "@/lib/magaza-adresi";
 import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/vercel-domains";
 import { encryptSecret,paymentCredentialsConfigured } from "@/lib/payment-credentials";
-import { tamiAyariCoz, TAMI_ALANLARI } from "@/lib/odeme/tami/ayar";
-import { sorgula } from "@/lib/odeme/tami/istemci";
-import { pgAuthToken } from "@/lib/odeme/tami/imza";
 import { jetonlariUnut } from "@/lib/tryoto/istemci";
 
 const roles=new Set(["owner","admin","manager"]);
@@ -152,19 +149,22 @@ export async function updatePaymentSettings(formData:FormData){
   const paytrMerchantKey=String(formData.get("paytr_merchant_key")??"").trim();
   const paytrMerchantSalt=String(formData.get("paytr_merchant_salt")??"").trim();
   /*
-    TAMİ. Birincil sağlayıcı kararı verildi (29.09.2026) ama varsayılan
-    hâlâ PayTR: anahtarı girilmemiş bir mağazayı Tami'ye almak kartla
+    GARANTİ SANAL POS. Tami'nin yerini aldı (07.10.2026). Varsayılan
+    hâlâ PayTR: anahtarı girilmemiş bir mağazayı Garanti'ye almak kartla
     ödemeyi durdururdu. Geçiş mağaza başına ve bilinçli.
   */
-  const tamiEnabled=formData.get("tami_enabled")==="on";
-  const tamiTestMode=formData.get("tami_test_mode")==="on";
-  const tamiMerchant=String(formData.get("tami_merchant_number")??"").trim();
-  const tamiTerminal=String(formData.get("tami_terminal_number")??"").trim();
-  const tamiKid=String(formData.get("tami_jwk_kid")??"").trim();
+  const garantiEnabled=formData.get("garanti_enabled")==="on";
+  const garantiTestMode=formData.get("garanti_test_mode")==="on";
+  const garantiYariGuvenli=formData.get("garanti_yari_guvenli_kabul")==="on";
+  const garantiIsyeri=String(formData.get("garanti_isyeri_no")??"").trim();
+  const garantiTerminal=String(formData.get("garanti_terminal_no")??"").trim();
+  const garantiSurum=String(formData.get("garanti_api_surumu")??"v512")==="v0.01"?"v0.01":"v512";
+  const garantiDuzey=String(formData.get("garanti_guvenlik_duzeyi")??"").trim()||"3D_PAY_HOSTING";
   // Sırlar yalnızca yazılır, geri gösterilmez: boş bırakılırsa kayıtlı olan korunur.
-  const tamiSecret=String(formData.get("tami_secret_key")??"").trim();
-  const tamiJwkK=String(formData.get("tami_jwk_k")??"").trim();
-  const saglayiciTercihi=String(formData.get("odeme_saglayicisi")??"paytr")==="tami"?"tami":"paytr";
+  const garantiProvizyon=String(formData.get("garanti_provizyon_sifresi")??"").trim();
+  const garantiAnahtar=String(formData.get("garanti_magaza_anahtari")??"").trim();
+  const garantiIade=String(formData.get("garanti_iade_sifresi")??"").trim();
+  const saglayiciTercihi=String(formData.get("odeme_saglayicisi")??"paytr")==="garanti"?"garanti":"paytr";
   const emailFrom=String(formData.get("email_from")??"").trim();
   const emailReplyTo=String(formData.get("email_reply_to")??"").trim();
   if(bankTransferEnabled&&(!bankName||!bankAccountHolder||!/^TR\d{24}$/.test(bankIban)))return await bildirimliDonus("/ayarlar",{hata:hataMetni("invalid-bank-transfer")});
@@ -178,12 +178,17 @@ export async function updatePaymentSettings(formData:FormData){
   */
   if((paytrMerchantKey?1:0)!==(paytrMerchantSalt?1:0))return await bildirimliDonus("/ayarlar",{hata:hataMetni("paytr-key-pair-required")});
   /*
-    Tami'de üç açık alan (işyeri, terminal, kid) ve iki sır var. Sırlar
-    ikisi birlikte istenir: biri girilip öteki boş bırakılınca yarım
-    yapılandırma oluşur ve ödeme isteği imza hatasıyla döner.
+    Garanti'de iki açık alan (işyeri, terminal) ve iki zorunlu sır var
+    (PROVAUT şifresi, 3D anahtarı). Sırlar ikisi birlikte istenir: biri
+    girilip öteki boş bırakılınca yarım yapılandırma oluşur ve ödeme
+    isteği imza hatasıyla döner.
+
+    PROVRFN (iade) şifresi bu denetime GİRMİYOR: iade ayrı bir yetki ve
+    zorunlu tutmak, iadeyi henüz tanımlamamış mağazanın tahsilatını da
+    engellerdi.
   */
-  if(tamiEnabled&&(!tamiMerchant||!tamiTerminal||!tamiKid))return await bildirimliDonus("/ayarlar",{hata:hataMetni("tami-merchant-required")});
-  if((tamiSecret?1:0)!==(tamiJwkK?1:0))return await bildirimliDonus("/ayarlar",{hata:hataMetni("tami-key-pair-required")});
+  if(garantiEnabled&&(!garantiIsyeri||!garantiTerminal))return await bildirimliDonus("/ayarlar",{hata:hataMetni("garanti-merchant-required")});
+  if((garantiProvizyon?1:0)!==(garantiAnahtar?1:0))return await bildirimliDonus("/ayarlar",{hata:hataMetni("garanti-key-pair-required")});
   /*
     Gönderen adresi doğrudan e-posta başlığına giriyor. Satır sonu ya da
     fazladan alan enjekte edilmesini engellemek için biçim sınırlı tutuluyor:
@@ -198,10 +203,19 @@ export async function updatePaymentSettings(formData:FormData){
     if(!paymentCredentialsConfigured())return await bildirimliDonus("/ayarlar",{hata:hataMetni("paytr-encryption-missing")});
     paytrSecrets={paytr_merchant_key_enc:encryptSecret(paytrMerchantKey),paytr_merchant_salt_enc:encryptSecret(paytrMerchantSalt)};
   }
-  let tamiSecrets:{tami_secret_key_enc:string;tami_jwk_k_enc:string}|null=null;
-  if(tamiSecret&&tamiJwkK){
+  let garantiSecrets:Record<string,string>|null=null;
+  if(garantiProvizyon&&garantiAnahtar){
     if(!paymentCredentialsConfigured())return await bildirimliDonus("/ayarlar",{hata:hataMetni("paytr-encryption-missing")});
-    tamiSecrets={tami_secret_key_enc:encryptSecret(tamiSecret),tami_jwk_k_enc:encryptSecret(tamiJwkK)};
+    garantiSecrets={garanti_provizyon_sifresi_enc:encryptSecret(garantiProvizyon),garanti_magaza_anahtari_enc:encryptSecret(garantiAnahtar)};
+  }
+  /* İade şifresi tek başına da güncellenebiliyor: tahsilat kurulduktan
+     sonra iade yetkisi ayrıca tanımlanıyor ve o gün diğer iki sırrın
+     yeniden yazılmasını istemek, kullanıcıyı onları bir yerden bulmaya
+     zorlardı. */
+  let garantiIadeSecret:Record<string,string>|null=null;
+  if(garantiIade){
+    if(!paymentCredentialsConfigured())return await bildirimliDonus("/ayarlar",{hata:hataMetni("paytr-encryption-missing")});
+    garantiIadeSecret={garanti_iade_sifresi_enc:encryptSecret(garantiIade)};
   }
   /* upsert, update DEĞİL. Hiçbir migration varsayılan bir arc_store_settings
      satırı oluşturmuyor; yeni bir mağaza doğrudan Ödeme sekmesine giderse
@@ -215,9 +229,11 @@ export async function updatePaymentSettings(formData:FormData){
     paytr_enabled:paytrEnabled,paytr_test_mode:paytrTestMode,paytr_merchant_id:paytrMerchantId||null,
     paytr_no_installment:paytrNoInstallment,paytr_max_installment:paytrMaxInstallment,
     ...(paytrSecrets??{}),
-    tami_enabled:tamiEnabled,tami_test_mode:tamiTestMode,tami_merchant_number:tamiMerchant||null,
-    tami_terminal_number:tamiTerminal||null,tami_jwk_kid:tamiKid||null,
-    ...(tamiSecrets??{}),
+    garanti_enabled:garantiEnabled,garanti_test_mode:garantiTestMode,
+    garanti_isyeri_no:garantiIsyeri||null,garanti_terminal_no:garantiTerminal||null,
+    garanti_api_surumu:garantiSurum,garanti_guvenlik_duzeyi:garantiDuzey,
+    garanti_yari_guvenli_kabul:garantiYariGuvenli,
+    ...(garantiSecrets??{}),...(garantiIadeSecret??{}),
     odeme_saglayicisi:saglayiciTercihi,
     email_from:emailFrom||null,email_reply_to:emailReplyTo||null,
     updated_at:new Date().toISOString()
@@ -404,90 +420,4 @@ export async function updateShippingIntegration(formData:FormData){
      unutulmazsa sonraki gönderi yanlış hesapta açılırdı. */
   if(yenilemeAnahtari)jetonlariUnut(organization.id);
   revalidatePath("/ayarlar");return await bildirimliDonus("/ayarlar",{basari:basariMetni("shipping")});
-}
-
-/*
-  TAMİ BAĞLANTISINI DENE.
-
-  Her denemede sipariş oluşturmak pahalı ve kirletici: ödeme oturumu
-  açmadan, yalnızca sorgulama ucuna var olmayan bir kimlikle istek
-  atıyoruz. Amaç işlemi bulmak değil, KİMLİĞİN kabul edilip
-  edilmediğini görmek:
-
-    4003 → PG-Auth-Token uyuşmuyor (işyeri/terminal/secretKey yanlış)
-    imza/securityHash hatası → JWK kid ya da k yanlış
-    "işlem bulunamadı" → kimlik DOĞRU, yalnızca sipariş yok (beklenen)
-
-  Sır hiçbir şekilde ekrana dönmüyor; yalnızca Tami'nin mesajı.
-*/
-export async function tamiBaglantisiniDene(): Promise<{ ok: boolean; mesaj: string }> {
-  const { supabase, organization, membership } = await requireTenant();
-  if (!PAYMENT_ROLES.has(membership.role)) return { ok: false, mesaj: hataMetni("forbidden") };
-
-  const { data, error } = await supabase
-    .from("arc_store_settings")
-    .select(TAMI_ALANLARI)
-    .eq("organization_id", organization.id)
-    .maybeSingle();
-  if (error) return { ok: false, mesaj: `Ayarlar okunamadı: ${error.message}` };
-
-  const ayar = tamiAyariCoz(data as never);
-  if (!ayar) {
-    return {
-      ok: false,
-      mesaj: "Tami yapılandırması tamamlanmamış: “Etkin” işaretli olmalı ve beş alanın hepsi dolu olmalı.",
-    };
-  }
-
-  /*
-    Kullanılan kimliğin GÖRÜNEN kısmı ekrana yazılıyor: "1000:20:…".
-    Portaldeki numaralarla karşılaştırmak, baştaki sıfır ya da yanlış
-    alana yazılmış bir değeri tek bakışta gösteriyor. Hash ve sır
-    gösterilmiyor.
-  */
-  const jetonOnEki = pgAuthToken(ayar.kimlik).split(":").slice(0, 2).join(":");
-  const ortam = ayar.testModu ? "sandbox" : "canlı";
-
-  /* Var olmayan ama biçime uyan bir kimlik (Tami: 2-36, harf/rakam, - ve _). */
-  const sonuc = await sorgula(ayar, crypto.randomUUID());
-  /*
-    Sayısal olmayan numara ayrıca söyleniyor: portalde
-    "Terminal-84032909" görünen değer olduğu gibi yazılırsa özet tutmuyor
-    ve Tami 4003 dönüyor; mesajdan bu anlaşılmıyordu.
-  */
-  const rakamDisi = [
-    /^\d+$/.test(ayar.kimlik.merchantNumber.trim()) ? null : "işyeri numarası",
-    /^\d+$/.test(ayar.kimlik.terminalNumber.trim()) ? null : "terminal numarası",
-  ].filter(Boolean);
-  const uyari = rakamDisi.length
-    ? ` · ${rakamDisi.join(" ve ")} rakam dışı karakter içeriyor; Tami bunları sayı olarak bekliyor.`
-    : "";
-  /*
-    DEĞERLERİN BİÇİMİ. Sır ekrana yazılmıyor; yalnızca "neye benziyor"
-    söyleniyor. 29.09.2026'da 4003 hem sandbox hem canlı ortamda geldi
-    ve numaralar doğruydu: geriye secretKey kalıyordu. Tami'de secretKey
-    bir UUID, JWK "k" ise ~86 karakterlik base64url dizgesi — ikisinin
-    yer değiştirmesi tam olarak bu hatayı üretiyor ve ekrandan
-    anlaşılmıyordu.
-  */
-  const biciminiSoyle = (deger: string) => {
-    const sade = deger.trim();
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sade)) return "UUID";
-    if (/^[A-Za-z0-9_-]{40,}$/.test(sade)) return `${sade.length} karakter, base64url`;
-    return `${sade.length} karakter`;
-  };
-  const secretBicimi = biciminiSoyle(ayar.kimlik.secretKey);
-  const kBicimi = biciminiSoyle(ayar.jwk.k);
-  const kidBicimi = biciminiSoyle(ayar.jwk.kid);
-  const bicimNotu = ` · Biçimler — secretKey: ${secretBicimi}, JWK kid: ${kidBicimi}, JWK k: ${kBicimi}.${
-    secretBicimi !== "UUID" ? " Tami'de secretKey bir UUID'dir; buraya JWK “k” değeri yazılmış olabilir." : ""
-  }`;
-  const kimlikNotu = `İstek ${ortam} ortamına, ${jetonOnEki} kimliğiyle gitti.${uyari}${bicimNotu}`;
-
-  if (sonuc.ok) return { ok: true, mesaj: `Bağlantı çalışıyor: Tami isteği kabul etti. ${kimlikNotu}` };
-  if (/bulunamad|not found|4009|4010/i.test(sonuc.hata)) {
-    /* İşlem yok ama kimlik kabul edildi: aradığımız cevap bu. */
-    return { ok: true, mesaj: `Kimlik doğrulandı. Tami: ${sonuc.hata} · ${kimlikNotu}` };
-  }
-  return { ok: false, mesaj: `${sonuc.hata}${sonuc.durum ? ` (HTTP ${sonuc.durum})` : ""} · ${kimlikNotu}` };
 }
