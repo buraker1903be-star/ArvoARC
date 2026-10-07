@@ -16,10 +16,26 @@ import { formHash, type GarantiKimligi } from "./imza";
   formla başlıyor (api/storefront/garanti-git).
 */
 
+/*
+  TEST VE CANLI AYRI ALAN ADLARINDA. Simetrik değil ve tahmin edilerek
+  yazılırsa yanlış çıkıyor — ilk sürümde tam öyle oldu: test ucu
+  canlıyla aynı alan adıyla (sanalposprovtest.garanti.com.tr) yazılmıştı
+  ve o ad HİÇ ÇÖZÜLMÜYOR.
+
+  07.10.2026'da DNS ile ölçüldü:
+    sanalposprovtest.garanti.com.tr      → yok
+    sanalposprovtest.garantibbva.com.tr  → 194.29.212.102   (test)
+    sanalposprov.garanti.com.tr          → 217.68.222.23    (canlı)
+    sanalposprov.garantibbva.com.tr      → yok
+
+  Yani test yeni alan adına taşınmış, canlı eskisinde kalmış. Canlıyı da
+  "tutarlı olsun" diye garantibbva.com.tr'ye çevirmek, canlı tahsilatı
+  çözülemeyen bir adrese göndermek olurdu.
+*/
 export const GARANTI_UCLARI = {
   test: {
-    form: "https://sanalposprovtest.garanti.com.tr/servlet/gt3dengine",
-    provizyon: "https://sanalposprovtest.garanti.com.tr/VPServlet",
+    form: "https://sanalposprovtest.garantibbva.com.tr/servlet/gt3dengine",
+    provizyon: "https://sanalposprovtest.garantibbva.com.tr/VPServlet",
   },
   canli: {
     form: "https://sanalposprov.garanti.com.tr/servlet/gt3dengine",

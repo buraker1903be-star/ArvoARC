@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formAlanlari, taksitAlani, tutarAlani, TRY_KODU } from "@/lib/odeme/garanti/istek";
+import { formAlanlari, GARANTI_UCLARI, taksitAlani, tutarAlani, TRY_KODU } from "@/lib/odeme/garanti/istek";
 import { formHash, type GarantiKimligi } from "@/lib/odeme/garanti/imza";
 
 const KIMLIK: GarantiKimligi = {
@@ -86,4 +86,36 @@ test("provizyon şifresi yoksa form üretilmiyor", () => {
   /* Eksik imzayla form göndermek, müşteriyi bankanın anlaşılmaz hata
      ekranına düşürmek demek; kart seçeneği hiç açılmamalı. */
   assert.equal(formAlanlari({ ...KIMLIK, provizyonSifresi: "" }, "3D", true, GIRDI), null);
+});
+
+/*
+  UÇ ADRESLERİ. İlk sürümde test ucu canlıyla aynı alan adıyla yazılmıştı
+  (sanalposprovtest.garanti.com.tr) ve o ad hiç çözülmüyor: tarayıcı
+  "Bu siteye ulaşılamıyor / ERR_NAME_NOT_RESOLVED" veriyordu. 07.10.2026'da
+  DNS ile ölçüldü — test garantibbva.com.tr'de, canlı garanti.com.tr'de.
+
+  Tahmin edilerek "tutarlı" hâle getirilmesi en pahalı hata olurdu:
+  canlı tarafta çözülemeyen bir adrese tahsilat göndermek demek.
+*/
+test("test ucu garantibbva.com.tr, canlı uç garanti.com.tr", () => {
+  assert.match(GARANTI_UCLARI.test.form, /^https:\/\/sanalposprovtest\.garantibbva\.com\.tr\//);
+  assert.match(GARANTI_UCLARI.test.provizyon, /^https:\/\/sanalposprovtest\.garantibbva\.com\.tr\//);
+  assert.match(GARANTI_UCLARI.canli.form, /^https:\/\/sanalposprov\.garanti\.com\.tr\//);
+  assert.match(GARANTI_UCLARI.canli.provizyon, /^https:\/\/sanalposprov\.garanti\.com\.tr\//);
+});
+
+test("çözülmeyen adlar hiçbir uçta geçmiyor", () => {
+  const hepsi = [GARANTI_UCLARI.test, GARANTI_UCLARI.canli].flatMap((u) => [u.form, u.provizyon]);
+  for (const adres of hepsi) {
+    assert.ok(!adres.includes("sanalposprovtest.garanti.com.tr"), `çözülmeyen test adı: ${adres}`);
+    assert.ok(!adres.includes("sanalposprov.garantibbva.com.tr"), `çözülmeyen canlı adı: ${adres}`);
+  }
+});
+
+test("yollar doğru servlet'lere gidiyor", () => {
+  // 3D formu gt3dengine'e, provizyon/iade VPServlet'e.
+  for (const u of [GARANTI_UCLARI.test, GARANTI_UCLARI.canli]) {
+    assert.ok(u.form.endsWith("/servlet/gt3dengine"), u.form);
+    assert.ok(u.provizyon.endsWith("/VPServlet"), u.provizyon);
+  }
 });
