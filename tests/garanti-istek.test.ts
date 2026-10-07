@@ -119,3 +119,33 @@ test("yollar doğru servlet'lere gidiyor", () => {
     assert.ok(u.provizyon.endsWith("/VPServlet"), u.provizyon);
   }
 });
+
+/*
+  HASH'E GİRMEYEN AMA ZORUNLU ALANLAR.
+
+  07.10.2026'da ilk canlı denemelerde banka kart ekranını hiç açmadan
+  reddetti. İmza doğruydu; eksik olan hash'e GİRMEYEN iki alandı. Bu
+  alanlar yanlış ya da eksik olunca imza hatası alınmıyor, istek
+  sessizce reddediliyor — ekranda "iptal edildi" gibi görünüyor, yani
+  en zor bulunan hata türü.
+*/
+test("txntimestamp gönderiliyor (unix saniye)", () => {
+  const alanlar = formAlanlari(KIMLIK, "3D_PAY_HOSTING", true, GIRDI)!;
+  assert.ok(alanlar.txntimestamp, "txntimestamp eksik: banka isteği reddeder");
+  assert.match(alanlar.txntimestamp, /^\d{10}$/, "unix saniye bekleniyor, milisaniye değil");
+});
+
+test("terminaluserid PROVAUT değil TERMİNAL NUMARASI", () => {
+  const alanlar = formAlanlari(KIMLIK, "3D_PAY_HOSTING", true, GIRDI)!;
+  assert.equal(alanlar.terminaluserid, KIMLIK.terminalNo);
+  assert.equal(alanlar.terminalprovuserid, "PROVAUT", "provizyon kullanıcısı PROVAUT kalmalı");
+  assert.notEqual(alanlar.terminaluserid, alanlar.terminalprovuserid);
+});
+
+test("hash'e girmeyen alanlar imzayı DEĞİŞTİRMİYOR", () => {
+  /* Bu alanların hash'e karışması, imzayı her istekte farklı yapar
+     (txntimestamp her saniye değişiyor) ve doğrulanamaz hâle getirirdi. */
+  const a = formAlanlari(KIMLIK, "3D_PAY_HOSTING", true, GIRDI)!;
+  const b = formAlanlari(KIMLIK, "3D", false, GIRDI)!;
+  assert.equal(a.secure3dhash, b.secure3dhash, "güvenlik düzeyi ve mode imzayı etkilememeli");
+});

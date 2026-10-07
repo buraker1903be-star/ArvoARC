@@ -529,6 +529,8 @@ export async function POST(request: Request) {
           apiversion: alanlar.apiversion,
           secure3dsecuritylevel: alanlar.secure3dsecuritylevel,
           terminalid: alanlar.terminalid,
+          terminaluserid: alanlar.terminaluserid,
+          txntimestamp: alanlar.txntimestamp,
           terminalmerchantid: alanlar.terminalmerchantid,
           txnamount: alanlar.txnamount,
           txncurrencycode: alanlar.txncurrencycode,

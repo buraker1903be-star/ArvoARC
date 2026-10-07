@@ -63,6 +63,14 @@ export const tutarAlani = (kurus: number): string => String(Math.round(kurus));
 export const taksitAlani = (taksit: number | null | undefined): string =>
   !taksit || taksit <= 1 ? "" : String(Math.trunc(taksit));
 
+/*
+  İSTEK ZAMAN DAMGASI (unix saniye). Hash'e GİRMİYOR ama banka zorunlu
+  tutuyor: olmadan istek reddediliyor ve kart ekranı hiç açılmıyor —
+  imza doğru olsa bile. İlk sürümde eksikti (07.10.2026).
+*/
+export const zamanDamgasi = (simdi: Date = new Date()): string =>
+  String(Math.floor(simdi.getTime() / 1000));
+
 export interface GarantiFormGirdisi {
   siparisNo: string;
   tutarKurus: number;
@@ -108,13 +116,21 @@ export function formAlanlari(
     apiversion: kimlik.surum === "v512" ? "512" : "v0.01",
     mode: testModu ? "TEST" : "PROD",
     terminalprovuserid: "PROVAUT",
-    terminaluserid: "PROVAUT",
+    /*
+      terminaluserid PROVAUT DEĞİL, TERMİNAL NUMARASI. İlk sürümde
+      ikisi de "PROVAUT" yazılmıştı; referans uygulamada bu alan
+      terminal numarasını taşıyor. Alan hash'e girmediği için yanlış
+      değer imza hatası vermiyor, bankanın isteği sessizce reddetmesine
+      yol açıyor — hata ekranda "iptal edildi" gibi görünüyor.
+    */
+    terminaluserid: kimlik.terminalNo,
     terminalmerchantid: kimlik.isyeriNo,
     secure3dsecuritylevel: guvenlikDuzeyi,
     customeremailaddress: girdi.musteriEposta,
     customeripaddress: girdi.musteriIp,
     companyname: girdi.isyeriAdi,
     lang: "tr",
+    txntimestamp: zamanDamgasi(),
     secure3dhash: hash,
   };
 }
