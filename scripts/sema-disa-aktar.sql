@@ -40,7 +40,32 @@ tablo_ddl as (
              E',\n' order by a.attnum)) as ddl
   from tablolar t
   join pg_attribute a on a.attrelid = t.oid and a.attnum > 0 and not a.attisdropped
+  -- ÜRETİLMİŞ sütunlar burada DEĞİL, aşağıda ayrı ekleniyor (sira 18).
+  where a.attgenerated = ''
   group by t.relname
+),
+-- ÜRETİLMİŞ (generated always as … stored) SÜTUNLAR.
+--
+-- Tablo gövdesinde yazılamıyorlar: ifade bir fonksiyon çağırabiliyor
+-- (ArvoOS'ta crm_proposals.teklif_grubu, arvo_proposal_effective_status'u
+-- çağırıyor) ve tablolar fonksiyonlardan ÖNCE kuruluyor. Fonksiyondan
+-- sonra, alter table ile ekleniyorlar.
+--
+-- Eskiden ifade HİÇ taşınmıyordu: döküm sütunu düz bir text olarak
+-- kuruyordu. Dökümden kurulan veritabanında sütun hep boş kalıyor ve
+-- onu sınayan test, kuralı değil boşluğu ölçüyordu (10.10.2026; test
+-- kırıldığı için fark edildi — sessizce yeşil kalsaydı kural canlıda
+-- değişse bile kimse görmezdi).
+uretilmis_ddl as (
+  select t.relname as ad, 18 as sira,
+         format('alter table public.%I add column if not exists %I %s generated always as (%s) stored%s;',
+           t.relname, a.attname, format_type(a.atttypid, a.atttypmod),
+           pg_get_expr(d.adbin, d.adrelid),
+           case when a.attnotnull then ' not null' else '' end) as ddl
+  from tablolar t
+  join pg_attribute a on a.attrelid = t.oid and a.attnum > 0 and not a.attisdropped
+  join pg_attrdef d on d.adrelid = t.oid and d.adnum = a.attnum
+  where a.attgenerated = 's'
 ),
 -- Varsayılanlar tablodan ayrı ve fonksiyonlardan SONRA: bir varsayılan
 -- public'teki bir fonksiyonu çağırabilir.
@@ -156,7 +181,7 @@ tetikleyici_ddl as (
 ),
 hepsi as (
   select * from tip_ddl union all select * from sekans_ddl union all
-  select * from varsayilan_ddl union all
+  select * from varsayilan_ddl union all select * from uretilmis_ddl union all
   select * from tablo_ddl union all select * from kisit_ddl union all
   select * from indeks_ddl union all select * from rls_ddl union all
   select * from politika_ddl union all select * from gorunum_ddl union all
