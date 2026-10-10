@@ -128,9 +128,20 @@ politika_ddl as (
   from pg_policies p
   where p.schemaname = 'public'
 ),
+-- GÖRÜNÜMÜN SEÇENEKLERİ (reloptions) de yazılıyor.
+--
+-- pg_get_viewdef yalnızca gövdeyi veriyor; "with (security_invoker =
+-- true)" taşınmazsa dökümden kurulan görünüm SAHİBİNİN yetkisiyle
+-- okunur ve altındaki tabloların RLS'ini ATLAR. Yani döküm, canlıdan
+-- daha açık bir veritabanı kuruyordu — üstelik tam da RLS'i sınayan
+-- testlerin koştuğu veritabanı (10.10.2026, crm_teklif_liste).
 gorunum_ddl as (
   select c.relname as ad, 45 as sira,
-         format(E'create or replace view public.%I as\n%s', c.relname, pg_get_viewdef(c.oid, true)) as ddl
+         format(E'create or replace view public.%I%s as\n%s',
+           c.relname,
+           case when c.reloptions is null then ''
+                else ' with (' || array_to_string(c.reloptions, ', ') || ')' end,
+           pg_get_viewdef(c.oid, true)) as ddl
   from pg_class c
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'v'
