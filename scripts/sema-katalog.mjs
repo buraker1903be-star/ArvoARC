@@ -79,7 +79,12 @@ export function buildCatalog(sql) {
     gözetilerek bölünüyor, çünkü jsonb_build_object(...) içindeki
     virgüller sütun ayırıcı değil.
   */
-  for (const m of sql.matchAll(/create or replace view public\.("?)([a-z_0-9]+)\1 as\n([\s\S]*?)\n\s*FROM /g)) {
+  /* "with (security_invoker=true, …)" da eşleşiyor: döküm görünümün
+     seçeneklerini taşımaya başlayınca (10.10.2026) bu desen tutmadı ve
+     BÜTÜN görünümler katalogdan düştü — ops_contracts dahil. Kod
+     onları kullanmaya devam ediyordu, yani şema denetimi var olan
+     tabloları "yok" diye bildirdi. */
+  for (const m of sql.matchAll(/create or replace view public\.("?)([a-z_0-9]+)\1(?: with \([^)]*\))? as\n([\s\S]*?)\n\s*FROM /g)) {
     tables[m[2]] = sutunlariAyikla(m[3]).sort();
   }
 
