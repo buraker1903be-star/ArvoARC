@@ -160,8 +160,44 @@ function sahipler(kaynak, baglar) {
 }
 
 /** Bir kaynak dosyadaki şema sözleşmesi sorunları. */
+/*
+  SABİT SÜTUN LİSTELERİ (12.10.2026).
+
+  `.select("a,b")` düz metin olduğunda sütunlar denetlenebiliyordu ama
+  liste bir sabite taşınınca denetimin görüş alanından çıkıyordu:
+
+    const SUTUNLAR = ["id", "title"].join(",");
+    …select(SUTUNLAR)
+
+  Kalıp iki yerde birden vardı — ArvoARC'ın Garanti sanal pos ayarları
+  (`GARANTI_ALANLARI`, on sütun, ÖDEME kodu) ve ArvoOS'ta yan sorgudan
+  kaçmak için sütunları sayan liste sayfaları. İkisinde de sütun adı
+  yanlış yazılsa derleme de CI de susardı.
+
+  Çözülen biçimler: aynı dosyada modül düzeyinde tanımlı `const AD =
+  "a,b"` ve `const AD = ["a","b"].join(",")`. Daha karmaşık bir ifade
+  (koşul, şablon, başka dosyadan içe alma) bilerek çözülmüyor: yanlış
+  çözmek, var olmayan bir sütunu "var" sanmaktan daha kötü.
+*/
+export function sabitSutunListeleri(kaynak) {
+  const liste = new Map();
+  for (const m of kaynak.matchAll(/(?:^|\n)\s*(?:export\s+)?const\s+([A-Z][A-Z0-9_]*)\s*=\s*([^;]+);/g)) {
+    const [, ad, ham] = m;
+    const govde = ham.trim();
+    const duz = govde.match(/^"([^"]*)"$/);
+    if (duz) { liste.set(ad, duz[1]); continue; }
+    const dizi = govde.match(/^\[([^\]]*)\]\s*\.join\(\s*","\s*\)$/s);
+    if (dizi) {
+      const parcalar = [...dizi[1].matchAll(/"([^"]*)"/g)].map((p) => p[1]);
+      if (parcalar.length) liste.set(ad, parcalar.join(","));
+    }
+  }
+  return liste;
+}
+
 export function dosyaSorunlari(kaynak, { tables, functions, etiket = "" }) {
   const sorunlar = [];
+  const sabitler = sabitSutunListeleri(kaynak);
   const satir = (index) => `${etiket}${etiket ? ":" : ""}${kaynak.slice(0, index).split("\n").length}`;
   const baglar = sorguBaglari(kaynak);
   const sahipListesi = sahipler(kaynak, baglar);
@@ -188,8 +224,11 @@ export function dosyaSorunlari(kaynak, { tables, functions, etiket = "" }) {
     if (cut >= 0) chain = chain.slice(0, cut);
 
     const select = chain.match(/\.select\(\s*"([^"]*)"/);
-    if (select) {
-      for (const col of selectColumns(select[1])) {
+    /* Düz metin yoksa sabite bakılıyor: .select(SUTUNLAR) */
+    const sabitSecim = select ? null : chain.match(/\.select\(\s*([A-Z][A-Z0-9_]*)\s*[,)]/);
+    const secimMetni = select ? select[1] : sabitSecim ? sabitler.get(sabitSecim[1]) : null;
+    if (secimMetni != null) {
+      for (const col of selectColumns(secimMetni)) {
         if (!cols.has(col)) sorunlar.push(`${satir(sahip.index)}  ${sahip.tablo}.${col} yok (select)`);
       }
     }
@@ -233,14 +272,27 @@ const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
 const tables = new Map(Object.entries(catalog.tables).map(([t, cols]) => [t, new Set(cols)]));
 const functions = new Set(catalog.functions);
 
+/*
+  SUPABASE FONKSİYONLARI DA TARANIYOR (11.10.2026).
+
+  Kenar fonksiyonları (supabase/functions) aynı veritabanını okuyor ve
+  RPC çağırıyor; yanlış bir ad burada derlemede de görünmüyor, CI'da da
+  görünmüyordu. Kimlik e-postası kancası yanlış bir ada baksa posta
+  HİÇ gitmezdi ve belirti "davet e-postası gelmedi"den öteye geçmezdi.
+  Deno'nun kendi tipleri Next derlemesine girmediği için tek denetim
+  burası.
+*/
 const SOURCE_DIRS = kaynakArg
   ? [kaynakArg]
-  : ["app", "lib", "src"].filter((d) => fs.existsSync(path.join(root, d)));
+  : ["app", "lib", "src", "supabase/functions"].filter((d) => fs.existsSync(path.join(root, d)));
 
 const problems = [];
 for (const dir of SOURCE_DIRS) {
   for (const file of walk(path.resolve(root, dir))) {
-    const rel = path.relative(root, file);
+    // Liste eğik çizgiyle yazılı. Eskiden Windows'ta path.relative
+    // "lib\arvolab.ts" döndürüyor, dosya listede bulunmuyor ve ArvoLab'ın
+    // kendi tabloları bu şemada aranıp 4 sahte sorun çıkıyordu (CI'da yeşil).
+    const rel = path.relative(root, file).replaceAll(path.sep, "/");
     if (OTHER_DATABASE_FILES.has(rel)) continue;
     problems.push(...dosyaSorunlari(fs.readFileSync(file, "utf8"), { tables, functions, etiket: rel }));
   }

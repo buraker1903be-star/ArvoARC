@@ -27,22 +27,24 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   uygulamaya gerek kalmadı.
 */
 /*
-  29.09.2026 akşam dökümü o güne kadarki bütün migration'ları içeriyor
-  (sonuncusu 20260929182709: Tami anahtarları).
+  11.10.2026 dökümü canlının o günkü TAMAMINI taşıyor: 54 migration'ın
+  sonuncusu (20261007132449, Garanti sanal pos) dahil. İmleç bu yüzden
+  sonuncunun bir ardında.
 
-  AMA İMLEÇ SONUNCUNUN ARDINDA DEĞİL, 20260929090233'ÜN ÜSTÜNDE.
-  Sebebi dökümün kendisi: dışa aktarma betiği, yalnızca sahibinde yetki
-  kalmış bir fonksiyonu yetki bölümünden tamamen düşürüyordu, yani
-  tetikleyici fonksiyonlarının "revoke all … from public" satırları
-  dökümde yok. Dökümden kurulan veritabanı canlıdan DAHA AÇIK kalıyor
-  ve yetki testi bunu yakalıyor. Betik düzeltildi
-  (scripts/sema-disa-aktar.sql); döküm yeniden üretildiğinde imleç
-  20260929182710'a alınabilir.
+  Eskiden imleç 20260929090233'teydi, yani döküm sonrası bir avuç
+  migration her testte yeniden uygulanıyordu. Sebebi dökümün kendisiydi:
+  dışa aktarma betiği, yalnızca sahibinde yetki kalmış bir fonksiyonu
+  yetki bölümünden tamamen düşürüyordu — tetikleyici fonksiyonlarının
+  "revoke all … from public" satırları dökümde yoktu ve dökümden
+  kurulan veritabanı canlıdan DAHA AÇIK kalıyordu (19.09.2026'da
+  ArvoARC'ta siparişi "ödendi" yapan fonksiyon anon'a açık kalmıştı;
+  yetki testi bu yüzden var). Betik düzeltildi; 11.10 dökümü 88
+  fonksiyonun yetki satırını olduğu gibi taşıyor, imleç de ileri
+  alındı.
 
-  O zamana kadar yetkileri kapatan migration testlerde yeniden
-  uygulanıyor — zararsız, çünkü revoke/grant tekrar edilebilir.
+  Döküm yenilendiğinde bu sürümü yine sonuncunun bir ardına alın.
 */
-const ILK_UYGULANAN = "20260929090233";
+const ILK_UYGULANAN = "20261007132450";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;

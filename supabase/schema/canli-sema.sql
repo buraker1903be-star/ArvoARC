@@ -1,4 +1,4 @@
--- Canlı şema dışa aktarımı: 2026-09-29
+-- Canlı şema dışa aktarımı: 2026-10-11
 -- scripts/sema-disa-aktar.sql ile üretildi. Elle düzenlemeyin.
 -- Sıra: tipler, sekanslar, tablolar, fonksiyonlar, varsayılanlar,
 -- kısıtlar, yabancı anahtarlar, indeksler, görünümler, RLS, politikalar,
@@ -376,7 +376,17 @@ create table if not exists public.arc_store_settings (
   tami_secret_key_enc text,
   tami_jwk_kid text,
   tami_jwk_k_enc text,
-  odeme_saglayicisi text not null
+  odeme_saglayicisi text not null,
+  garanti_enabled boolean not null,
+  garanti_test_mode boolean not null,
+  garanti_isyeri_no text,
+  garanti_terminal_no text,
+  garanti_provizyon_sifresi_enc text,
+  garanti_iade_sifresi_enc text,
+  garanti_magaza_anahtari_enc text,
+  garanti_api_surumu text not null,
+  garanti_guvenlik_duzeyi text not null,
+  garanti_yari_guvenli_kabul boolean not null
 );
 
 create table if not exists public.arc_store_themes (
@@ -3972,7 +3982,7 @@ AS $function$
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_product_slugs(p_limit integer DEFAULT 20000)
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_product_slugs(p_limit integer DEFAULT 1000, p_offset integer DEFAULT 0)
  RETURNS TABLE(slug text, updated_at timestamp with time zone)
  LANGUAGE sql
  STABLE SECURITY DEFINER
@@ -3995,8 +4005,9 @@ AS $function$
       where v.product_id = p.id
         and v.organization_id = p.organization_id
     )
-  order by p.updated_at desc
-  limit greatest(1, least(coalesce(p_limit, 20000), 50000));
+  order by p.updated_at desc, p.slug
+  limit greatest(1, least(coalesce(p_limit, 1000), 1000))
+  offset greatest(0, coalesce(p_offset, 0));
 $function$
 ;
 
@@ -4121,7 +4132,7 @@ offset greatest(0, coalesce(p_offset, 0));
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_search_index(p_limit integer DEFAULT 20000)
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_search_index(p_limit integer DEFAULT 1000, p_offset integer DEFAULT 0)
  RETURNS TABLE(slug text, name text, vendor text, product_type text, price bigint, compare_at_price bigint, image_path text)
  LANGUAGE sql
  STABLE SECURITY DEFINER
@@ -4156,8 +4167,9 @@ AS $function$
   having bool_or(
     public.arc_variant_available(v.stock, v.allow_backorder, v.supplier)
   )
-  order by p.updated_at desc
-  limit greatest(1, least(coalesce(p_limit, 20000), 50000));
+  order by p.updated_at desc, p.slug
+  limit greatest(1, least(coalesce(p_limit, 1000), 1000))
+  offset greatest(0, coalesce(p_offset, 0));
 $function$
 ;
 
@@ -4539,6 +4551,16 @@ alter table public.arc_store_settings alter column etbis_verified set default fa
 
 alter table public.arc_store_settings alter column free_shipping_threshold set default 200000;
 
+alter table public.arc_store_settings alter column garanti_api_surumu set default 'v512'::text;
+
+alter table public.arc_store_settings alter column garanti_enabled set default false;
+
+alter table public.arc_store_settings alter column garanti_guvenlik_duzeyi set default '3D_PAY_HOSTING'::text;
+
+alter table public.arc_store_settings alter column garanti_test_mode set default true;
+
+alter table public.arc_store_settings alter column garanti_yari_guvenli_kabul set default false;
+
 alter table public.arc_store_settings alter column locale set default 'tr-TR'::text;
 
 alter table public.arc_store_settings alter column low_stock_threshold set default 5;
@@ -4843,11 +4865,13 @@ alter table public.arc_store_settings add constraint arc_store_settings_custom_d
 
 alter table public.arc_store_settings add constraint arc_store_settings_domain_status_check CHECK ((domain_status = ANY (ARRAY['not_configured'::text, 'pending_dns'::text, 'verifying'::text, 'active'::text, 'failed'::text])));
 
+alter table public.arc_store_settings add constraint arc_store_settings_garanti_api_surumu_check CHECK ((garanti_api_surumu = ANY (ARRAY['v512'::text, 'v0.01'::text])));
+
 alter table public.arc_store_settings add constraint arc_store_settings_locale_check CHECK (((char_length(locale) >= 2) AND (char_length(locale) <= 20)));
 
 alter table public.arc_store_settings add constraint arc_store_settings_low_stock_threshold_check CHECK (((low_stock_threshold >= 0) AND (low_stock_threshold <= 10000)));
 
-alter table public.arc_store_settings add constraint arc_store_settings_odeme_saglayicisi_check CHECK ((odeme_saglayicisi = ANY (ARRAY['paytr'::text, 'tami'::text])));
+alter table public.arc_store_settings add constraint arc_store_settings_odeme_saglayicisi_check CHECK ((odeme_saglayicisi = ANY (ARRAY['paytr'::text, 'garanti'::text])));
 
 alter table public.arc_store_settings add constraint arc_store_settings_order_prefix_check CHECK ((order_prefix ~ '^[A-Z]{1,6}$'::text));
 
@@ -5532,6 +5556,20 @@ create policy arc_suppliers_members_read on public.arc_suppliers as PERMISSIVE f
 create policy arc_members_read_own_membership on public.organization_memberships as PERMISSIVE for SELECT to authenticated
   using ((user_id = ( SELECT auth.uid() AS uid)));
 
+revoke all on function private.arc_guard_payment_settings() from public;
+
+revoke all on function private.arc_guard_store_domains() from public;
+
+revoke all on function private.arc_magaza_varsayilanlari() from public;
+
+revoke all on function private.arc_order_item_cost() from public;
+
+revoke all on function private.arvo_arc_shipment_item_guard() from public;
+
+revoke all on function private.arvo_arc_shipment_source_guard() from public;
+
+revoke all on function private.arvo_arc_shipment_touch() from public;
+
 revoke all on function private.arvo_is_org_admin(target_org uuid) from public;
 grant execute on function private.arvo_is_org_admin(target_org uuid) to service_role;
 grant execute on function private.arvo_is_org_admin(target_org uuid) to authenticated;
@@ -5543,12 +5581,12 @@ revoke all on function public.arc_address_before_write() from public;
 grant execute on function public.arc_address_before_write() to service_role;
 
 revoke all on function public.arc_address_line(p_addr jsonb) from public;
-grant execute on function public.arc_address_line(p_addr jsonb) to authenticated;
 grant execute on function public.arc_address_line(p_addr jsonb) to service_role;
+grant execute on function public.arc_address_line(p_addr jsonb) to authenticated;
 
 revoke all on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) from public;
-grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to service_role;
 grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to authenticated;
+grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to service_role;
 
 revoke all on function public.arc_aktarim_hesap_yukle(p_kullanicilar jsonb, p_kimlikler jsonb) from public;
 grant execute on function public.arc_aktarim_hesap_yukle(p_kullanicilar jsonb, p_kimlikler jsonb) to service_role;
@@ -5580,33 +5618,33 @@ revoke all on function public.arc_check_supplier_stock() from public;
 grant execute on function public.arc_check_supplier_stock() to service_role;
 
 revoke all on function public.arc_clean(p_value text) from public;
-grant execute on function public.arc_clean(p_value text) to service_role;
 grant execute on function public.arc_clean(p_value text) to authenticated;
+grant execute on function public.arc_clean(p_value text) to service_role;
 
 revoke all on function public.arc_count_coupon_use() from public;
 grant execute on function public.arc_count_coupon_use() to service_role;
 
 revoke all on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) from public;
-grant execute on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) to service_role;
 grant execute on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) to authenticated;
+grant execute on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) to service_role;
 
 revoke all on function public.arc_create_storefront_order(p_organization_id uuid, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) from public;
 grant execute on function public.arc_create_storefront_order(p_organization_id uuid, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
 
 revoke all on function public.arc_decode_entities(t text) from public;
-grant execute on function public.arc_decode_entities(t text) to anon;
-grant execute on function public.arc_decode_entities(t text) to service_role;
 grant execute on function public.arc_decode_entities(t text) to authenticated;
 grant execute on function public.arc_decode_entities(t text) to public;
+grant execute on function public.arc_decode_entities(t text) to service_role;
+grant execute on function public.arc_decode_entities(t text) to anon;
 
 revoke all on function public.arc_delete_order(p_order_id uuid) from public;
-grant execute on function public.arc_delete_order(p_order_id uuid) to service_role;
 grant execute on function public.arc_delete_order(p_order_id uuid) to authenticated;
+grant execute on function public.arc_delete_order(p_order_id uuid) to service_role;
 
 revoke all on function public.arc_extract_vat(p_gross bigint, p_rate numeric) from public;
+grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to service_role;
 grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to anon;
 grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to authenticated;
-grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to service_role;
 
 revoke all on function public.arc_fill_order_tax() from public;
 grant execute on function public.arc_fill_order_tax() to service_role;
@@ -5616,8 +5654,8 @@ grant execute on function public.arc_find_address(p_meta jsonb) to service_role;
 grant execute on function public.arc_find_address(p_meta jsonb) to authenticated;
 
 revoke all on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) from public;
-grant execute on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) to authenticated;
 grant execute on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) to service_role;
+grant execute on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) to authenticated;
 
 revoke all on function public.arc_log_order_event() from public;
 grant execute on function public.arc_log_order_event() to service_role;
@@ -5637,28 +5675,28 @@ revoke all on function public.arc_reprice_supplier(p_supplier text, p_organizati
 grant execute on function public.arc_reprice_supplier(p_supplier text, p_organization_id uuid) to service_role;
 
 revoke all on function public.arc_resolve_commerce_tenant() from public;
-grant execute on function public.arc_resolve_commerce_tenant() to service_role;
 grant execute on function public.arc_resolve_commerce_tenant() to authenticated;
+grant execute on function public.arc_resolve_commerce_tenant() to service_role;
 
 revoke all on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) from public;
 grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to service_role;
 grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to authenticated;
 
 revoke all on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) from public;
-grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to authenticated;
 grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to service_role;
+grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to authenticated;
 
 revoke all on function public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) from public;
 grant execute on function public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) to service_role;
 
 revoke all on function public.arc_slugify(p_text text) from public;
-grant execute on function public.arc_slugify(p_text text) to service_role;
 grant execute on function public.arc_slugify(p_text text) to authenticated;
+grant execute on function public.arc_slugify(p_text text) to service_role;
 
 revoke all on function public.arc_store_stage(p_organization_id uuid) from public;
-grant execute on function public.arc_store_stage(p_organization_id uuid) to service_role;
 grant execute on function public.arc_store_stage(p_organization_id uuid) to authenticated;
 grant execute on function public.arc_store_stage(p_organization_id uuid) to anon;
+grant execute on function public.arc_store_stage(p_organization_id uuid) to service_role;
 
 revoke all on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
 grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
@@ -5667,8 +5705,8 @@ grant execute on function public.arc_storefront_collection_products(p_host text,
 
 revoke all on function public.arc_storefront_collections(p_host text) from public;
 grant execute on function public.arc_storefront_collections(p_host text) to service_role;
-grant execute on function public.arc_storefront_collections(p_host text) to authenticated;
 grant execute on function public.arc_storefront_collections(p_host text) to anon;
+grant execute on function public.arc_storefront_collections(p_host text) to authenticated;
 
 revoke all on function public.arc_storefront_coupon(p_host text, p_code text, p_subtotal bigint, p_email text) from public;
 grant execute on function public.arc_storefront_coupon(p_host text, p_code text, p_subtotal bigint, p_email text) to service_role;
@@ -5682,9 +5720,9 @@ grant execute on function public.arc_storefront_deals(p_host text, p_limit integ
 grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to authenticated;
 
 revoke all on function public.arc_storefront_discounts(p_host text) from public;
-grant execute on function public.arc_storefront_discounts(p_host text) to anon;
-grant execute on function public.arc_storefront_discounts(p_host text) to service_role;
 grant execute on function public.arc_storefront_discounts(p_host text) to authenticated;
+grant execute on function public.arc_storefront_discounts(p_host text) to service_role;
+grant execute on function public.arc_storefront_discounts(p_host text) to anon;
 
 revoke all on function public.arc_storefront_facets(p_host text) from public;
 grant execute on function public.arc_storefront_facets(p_host text) to authenticated;
@@ -5692,39 +5730,39 @@ grant execute on function public.arc_storefront_facets(p_host text) to service_r
 grant execute on function public.arc_storefront_facets(p_host text) to anon;
 
 revoke all on function public.arc_storefront_org(p_host text) from public;
-grant execute on function public.arc_storefront_org(p_host text) to authenticated;
-grant execute on function public.arc_storefront_org(p_host text) to anon;
 grant execute on function public.arc_storefront_org(p_host text) to service_role;
+grant execute on function public.arc_storefront_org(p_host text) to anon;
+grant execute on function public.arc_storefront_org(p_host text) to authenticated;
 
 revoke all on function public.arc_storefront_payment_methods(p_host text) from public;
+grant execute on function public.arc_storefront_payment_methods(p_host text) to service_role;
 grant execute on function public.arc_storefront_payment_methods(p_host text) to authenticated;
 grant execute on function public.arc_storefront_payment_methods(p_host text) to anon;
-grant execute on function public.arc_storefront_payment_methods(p_host text) to service_role;
 
 revoke all on function public.arc_storefront_product(p_host text, p_slug text) from public;
+grant execute on function public.arc_storefront_product(p_host text, p_slug text) to authenticated;
 grant execute on function public.arc_storefront_product(p_host text, p_slug text) to service_role;
 grant execute on function public.arc_storefront_product(p_host text, p_slug text) to anon;
-grant execute on function public.arc_storefront_product(p_host text, p_slug text) to authenticated;
 
 revoke all on function public.arc_storefront_product_badges(p_host text) from public;
-grant execute on function public.arc_storefront_product_badges(p_host text) to anon;
 grant execute on function public.arc_storefront_product_badges(p_host text) to authenticated;
 grant execute on function public.arc_storefront_product_badges(p_host text) to service_role;
+grant execute on function public.arc_storefront_product_badges(p_host text) to anon;
 
 revoke all on function public.arc_storefront_product_count(p_host text) from public;
-grant execute on function public.arc_storefront_product_count(p_host text) to service_role;
 grant execute on function public.arc_storefront_product_count(p_host text) to authenticated;
+grant execute on function public.arc_storefront_product_count(p_host text) to service_role;
 grant execute on function public.arc_storefront_product_count(p_host text) to anon;
 
 revoke all on function public.arc_storefront_product_slugs(p_host text, p_limit integer) from public;
-grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to service_role;
 grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to authenticated;
+grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to service_role;
 grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to anon;
 
 revoke all on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) from public;
+grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to anon;
 grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to service_role;
 grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to authenticated;
-grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to anon;
 
 revoke all on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
 grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
@@ -5737,13 +5775,13 @@ grant execute on function public.arc_storefront_return_request(p_host text, p_or
 
 revoke all on function public.arc_storefront_search_index(p_host text, p_limit integer) from public;
 grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer) to service_role;
-grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer) to authenticated;
 grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer) to anon;
+grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer) to authenticated;
 
 revoke all on function public.arc_storefront_settings(p_host text) from public;
 grant execute on function public.arc_storefront_settings(p_host text) to anon;
-grant execute on function public.arc_storefront_settings(p_host text) to service_role;
 grant execute on function public.arc_storefront_settings(p_host text) to authenticated;
+grant execute on function public.arc_storefront_settings(p_host text) to service_role;
 
 revoke all on function public.arc_storefront_variants(p_host text, p_slug text) from public;
 grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to anon;
@@ -5760,8 +5798,8 @@ grant execute on function public.arc_update_order_status(p_order_id uuid, p_stat
 
 revoke all on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) from public;
 grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to anon;
-grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to service_role;
 grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to authenticated;
+grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to service_role;
 
 revoke all on function public.attach_arvoculture_order_owner() from public;
 grant execute on function public.attach_arvoculture_order_owner() to service_role;
@@ -5770,12 +5808,12 @@ revoke all on function public.check_arvoculture_coupon(p_code text, p_subtotal b
 grant execute on function public.check_arvoculture_coupon(p_code text, p_subtotal bigint, p_email text) to service_role;
 
 revoke all on function public.claim_arvoculture_orders() from public;
-grant execute on function public.claim_arvoculture_orders() to service_role;
 grant execute on function public.claim_arvoculture_orders() to authenticated;
+grant execute on function public.claim_arvoculture_orders() to service_role;
 
 revoke all on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) from public;
-grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to authenticated;
 grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to service_role;
+grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to authenticated;
 
 revoke all on function public.create_arvoculture_storefront_order(p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) from public;
 grant execute on function public.create_arvoculture_storefront_order(p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
@@ -5790,67 +5828,65 @@ grant execute on function public.get_arvoculture_my_returns() to service_role;
 
 revoke all on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
 grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
-grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
 grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to authenticated;
+grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
 
 revoke all on function public.get_arvoculture_storefront_collections() from public;
+grant execute on function public.get_arvoculture_storefront_collections() to anon;
 grant execute on function public.get_arvoculture_storefront_collections() to service_role;
 grant execute on function public.get_arvoculture_storefront_collections() to authenticated;
-grant execute on function public.get_arvoculture_storefront_collections() to anon;
 
 revoke all on function public.get_arvoculture_storefront_deals(p_limit integer) from public;
 grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to authenticated;
-grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to service_role;
 grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to anon;
+grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to service_role;
 
 revoke all on function public.get_arvoculture_storefront_discounts() from public;
+grant execute on function public.get_arvoculture_storefront_discounts() to authenticated;
 grant execute on function public.get_arvoculture_storefront_discounts() to service_role;
 grant execute on function public.get_arvoculture_storefront_discounts() to anon;
-grant execute on function public.get_arvoculture_storefront_discounts() to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_facets() from public;
-grant execute on function public.get_arvoculture_storefront_facets() to anon;
-grant execute on function public.get_arvoculture_storefront_facets() to authenticated;
 grant execute on function public.get_arvoculture_storefront_facets() to public;
 grant execute on function public.get_arvoculture_storefront_facets() to service_role;
+grant execute on function public.get_arvoculture_storefront_facets() to authenticated;
+grant execute on function public.get_arvoculture_storefront_facets() to anon;
 
 revoke all on function public.get_arvoculture_storefront_product(p_slug text) from public;
-grant execute on function public.get_arvoculture_storefront_product(p_slug text) to anon;
 grant execute on function public.get_arvoculture_storefront_product(p_slug text) to service_role;
+grant execute on function public.get_arvoculture_storefront_product(p_slug text) to anon;
 grant execute on function public.get_arvoculture_storefront_product(p_slug text) to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_product_badges() from public;
+grant execute on function public.get_arvoculture_storefront_product_badges() to anon;
 grant execute on function public.get_arvoculture_storefront_product_badges() to service_role;
 grant execute on function public.get_arvoculture_storefront_product_badges() to authenticated;
-grant execute on function public.get_arvoculture_storefront_product_badges() to anon;
 
 revoke all on function public.get_arvoculture_storefront_product_count() from public;
+grant execute on function public.get_arvoculture_storefront_product_count() to service_role;
 grant execute on function public.get_arvoculture_storefront_product_count() to anon;
 grant execute on function public.get_arvoculture_storefront_product_count() to authenticated;
-grant execute on function public.get_arvoculture_storefront_product_count() to service_role;
 
-revoke all on function public.get_arvoculture_storefront_product_slugs(p_limit integer) from public;
-grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer) to public;
-grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer) to anon;
-grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer) to authenticated;
-grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer) to service_role;
+revoke all on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) from public;
+grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to service_role;
+grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to authenticated;
+grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to anon;
 
 revoke all on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) from public;
-grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to authenticated;
 grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to anon;
 grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to service_role;
+grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
 grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
-grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
 grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
+grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
 grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to public;
 
-revoke all on function public.get_arvoculture_storefront_search_index(p_limit integer) from public;
-grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer) to anon;
-grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer) to service_role;
-grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer) to public;
-grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer) to authenticated;
+revoke all on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) from public;
+grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to service_role;
+grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to anon;
+grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_settings() from public;
 grant execute on function public.get_arvoculture_storefront_settings() to authenticated;
@@ -5858,21 +5894,21 @@ grant execute on function public.get_arvoculture_storefront_settings() to servic
 grant execute on function public.get_arvoculture_storefront_settings() to anon;
 
 revoke all on function public.get_arvoculture_storefront_variants(p_slug text) from public;
+grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to authenticated;
 grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to anon;
 grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to service_role;
-grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to authenticated;
 
 revoke all on function public.get_storefront_seller(p_tenant text) from public;
 grant execute on function public.get_storefront_seller(p_tenant text) to service_role;
-grant execute on function public.get_storefront_seller(p_tenant text) to anon;
 grant execute on function public.get_storefront_seller(p_tenant text) to authenticated;
+grant execute on function public.get_storefront_seller(p_tenant text) to anon;
 
 revoke all on function public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) from public;
 grant execute on function public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) to service_role;
 
 revoke all on function public.update_arvoculture_profile(p_full_name text, p_phone text) from public;
-grant execute on function public.update_arvoculture_profile(p_full_name text, p_phone text) to service_role;
 grant execute on function public.update_arvoculture_profile(p_full_name text, p_phone text) to authenticated;
+grant execute on function public.update_arvoculture_profile(p_full_name text, p_phone text) to service_role;
 
 CREATE TRIGGER arc_addresses_before_write BEFORE INSERT OR UPDATE ON public.arc_customer_addresses FOR EACH ROW EXECUTE FUNCTION arc_address_before_write();
 
