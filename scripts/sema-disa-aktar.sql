@@ -16,7 +16,7 @@
 -- kısıtları, indeksleri, RLS'i, politikaları, görünümleri, fonksiyonları
 -- (public ve private), fonksiyon yetkilerini ve tetikleyicileri kapsar.
 -- ============================================================
-with
+with recursive
 tablolar as (
   select c.oid, c.relname,
          c.relrowsecurity as rls
@@ -135,8 +135,40 @@ politika_ddl as (
 -- okunur ve altındaki tabloların RLS'ini ATLAR. Yani döküm, canlıdan
 -- daha açık bir veritabanı kuruyordu — üstelik tam da RLS'i sınayan
 -- testlerin koştuğu veritabanı (10.10.2026, crm_teklif_liste).
+-- GÖRÜNÜMLER BAĞIMLILIK SIRASINDA.
+--
+-- Döküm görünümleri ada göre diziyordu; bir görünüm başka bir görünüme
+-- dayanınca (ArvoOS'ta operasyon_is_liste → ops_contracts) dökümden
+-- kurulan veritabanı "relation does not exist" ile düşüyor —
+-- yani BÜTÜN akış testleri. 11.10.2026'da yaşandı.
+--
+-- Derinlik: hiçbir görünüme dayanmayan 0, ona dayanan 1… Sıra numarası
+-- 45 + derinlik; bir sonraki aşama (RLS) 50'de, yani dört katman yeri
+-- var.
+gorunum_dayanak as (
+  select distinct r.ev_class as gorunum, d.refobjid as dayanak
+  from pg_rewrite r
+  join pg_depend d on d.objid = r.oid and d.classid = 'pg_rewrite'::regclass
+  join pg_class dc on dc.oid = d.refobjid and dc.relkind = 'v'
+  where r.ev_class <> d.refobjid
+),
+gorunum_derinlik as (
+  select c.oid, 0 as derinlik
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'v'
+    and not exists (select 1 from gorunum_dayanak g where g.gorunum = c.oid)
+  union all
+  select g.gorunum, gd.derinlik + 1
+  from gorunum_dayanak g
+  join gorunum_derinlik gd on gd.oid = g.dayanak
+  where gd.derinlik < 10
+),
+gorunum_sira as (
+  select oid, max(derinlik) as derinlik from gorunum_derinlik group by oid
+),
 gorunum_ddl as (
-  select c.relname as ad, 45 as sira,
+  select c.relname as ad, 45 + coalesce(gs.derinlik, 0) as sira,
          format(E'create or replace view public.%I%s as\n%s',
            c.relname,
            case when c.reloptions is null then ''
@@ -144,6 +176,7 @@ gorunum_ddl as (
            pg_get_viewdef(c.oid, true)) as ddl
   from pg_class c
   join pg_namespace n on n.oid = c.relnamespace
+  left join gorunum_sira gs on gs.oid = c.oid
   where n.nspname = 'public' and c.relkind = 'v'
 ),
 fonksiyon_ddl as (
