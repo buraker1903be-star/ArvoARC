@@ -179,10 +179,36 @@ gorunum_ddl as (
   left join gorunum_sira gs on gs.oid = c.oid
   where n.nspname = 'public' and c.relkind = 'v'
 ),
-fonksiyon_ddl as (
-  select n.nspname || '.' || p.proname as ad, 15 as sira, pg_get_functiondef(p.oid) || ';' as ddl
+-- GÖRÜNÜM TİPİNE DAYANAN FONKSİYON GÖRÜNÜMLERDEN SONRA.
+--
+-- Fonksiyonlar 15'te, görünümler 45+'ta yazılıyor; çünkü görünüm bir
+-- fonksiyonu çağırabiliyor (ArvoOS'ta crm_talep_liste,
+-- arvo_search_digits'i çağırıyor). Ama tersi de oluyor: bir fonksiyon
+-- görünümün SATIR TİPİNİ kullanabiliyor
+-- ("returns setof crm_talep_liste" — liste süzgeçleri böyle yazıldı).
+-- O fonksiyon görünümden önce yazılınca döküm hiç kurulamıyor:
+-- 13.10.2026'da ArvoOS'un bütün akış testleri (423 test) tek hatayla
+-- düştü — `type "crm_talep_liste" does not exist`.
+--
+-- Böyle fonksiyonlar 49'a alınıyor: görünümlerin derinlik payından
+-- (45–48) sonra, RLS'ten (50) önce. Ölçüt adın metninde aranmıyor,
+-- KATALOGDAN okunuyor: dönüş ya da parametre tipi bir görünümün
+-- bileşik tipiyse (pg_class.reltype).
+gorunum_tipli_fonksiyon as (
+  select distinct p.oid
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
+  join pg_class c on c.relkind = 'v' and (p.prorettype = c.reltype or c.reltype = any(p.proargtypes))
+  join pg_namespace cn on cn.oid = c.relnamespace and cn.nspname = 'public'
+  where n.nspname in ('public', 'private') and p.prokind in ('f', 'p')
+),
+fonksiyon_ddl as (
+  select n.nspname || '.' || p.proname as ad,
+         case when g.oid is null then 15 else 49 end as sira,
+         pg_get_functiondef(p.oid) || ';' as ddl
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  left join gorunum_tipli_fonksiyon g on g.oid = p.oid
   where n.nspname in ('public', 'private') and p.prokind in ('f', 'p')
     and not exists (select 1 from pg_depend dep where dep.objid = p.oid and dep.deptype = 'e')
 ),
