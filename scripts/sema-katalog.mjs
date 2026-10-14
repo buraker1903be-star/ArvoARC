@@ -37,9 +37,59 @@ function ustDuzeyParcalar(liste) {
   return parcalar;
 }
 
+/*
+  Bir görünüm gövdesinin SELECT listesi: SELECT ile ÜST DÜZEY FROM arası.
+
+  Eskiden gövde ilk "\n<boşluk>FROM " ile kesiliyordu. Bir sütun
+  korelasyonlu alt sorguyla hesaplanıyorsa (ArvoOS'ta
+  platform_cron_durumu.son_basarili) ilk FROM ALT SORGUNUNKİ oluyor:
+  liste orada kesiliyor, son sütun katalogda ya hiç görünmüyor ya da alt
+  sorgunun içindeki takma adla ("max") yazılıyordu. Katalog yanlış
+  olunca şema denetimi var olan bir sütunu "yok" diye bildiriyor ve
+  çalışan kod reddediliyor (14.10.2026).
+*/
+function selectListesi(govde) {
+  const bas = govde.match(/\bSELECT\b/i);
+  if (!bas) return "";
+  const basla = bas.index + bas[0].length;
+  let derinlik = 0, tirnak = null;
+  for (let i = basla; i < govde.length; i += 1) {
+    const ch = govde[i];
+    if (tirnak) { if (ch === tirnak) tirnak = null; continue; }
+    if (ch === "'" || ch === '"') { tirnak = ch; continue; }
+    if (ch === "(") { derinlik += 1; continue; }
+    if (ch === ")") { derinlik -= 1; continue; }
+    if (derinlik === 0 && /\s/.test(govde[i - 1] ?? " ") && /^from\b/i.test(govde.slice(i, i + 5))) {
+      return govde.slice(basla, i);
+    }
+  }
+  return govde.slice(basla);
+}
+
+/*
+  "DISTINCT" ve "DISTINCT ON (…)" önekini atar.
+
+  Parantezi dengeli atlamak gerekiyor: "SELECT DISTINCT ON (is_adi)
+  is_adi, …" listesinin ilk üst düzey parçası "DISTINCT ON (is_adi)
+  is_adi" oluyor ve düz sütun deseni tutmadığı için o sütun katalogdan
+  SESSİZCE düşüyordu.
+*/
+function distinctAyikla(liste) {
+  const sade = liste.replace(/^\s+/, "");
+  if (!/^distinct\b/i.test(sade)) return liste;
+  let kalan = sade.replace(/^distinct\s*/i, "");
+  if (!/^on\s*\(/i.test(kalan)) return kalan;
+  let i = kalan.indexOf("("), derinlik = 0;
+  for (; i < kalan.length; i += 1) {
+    if (kalan[i] === "(") derinlik += 1;
+    else if (kalan[i] === ")") { derinlik -= 1; if (derinlik === 0) { i += 1; break; } }
+  }
+  return kalan.slice(i);
+}
+
 /** Bir SELECT listesinin ürettiği sütun adları. */
 function sutunlariAyikla(liste) {
-  return ustDuzeyParcalar(liste.replace(/^\s*SELECT\s+/i, "")).flatMap((parca) => {
+  return ustDuzeyParcalar(distinctAyikla(liste.replace(/^\s*SELECT\s+/i, ""))).flatMap((parca) => {
     const sade = parca.trim();
     if (!sade) return [];
     /* "ifade AS ad" — AS yalnızca üst düzeydeyse geçerli; parantez
@@ -84,8 +134,11 @@ export function buildCatalog(sql) {
      BÜTÜN görünümler katalogdan düştü — ops_contracts dahil. Kod
      onları kullanmaya devam ediyordu, yani şema denetimi var olan
      tabloları "yok" diye bildirdi. */
-  for (const m of sql.matchAll(/create or replace view public\.("?)([a-z_0-9]+)\1(?: with \([^)]*\))? as\n([\s\S]*?)\n\s*FROM /g)) {
-    tables[m[2]] = sutunlariAyikla(m[3]).sort();
+  /* Gövdenin TAMAMI alınıp listesi ayrıca kesiliyor (selectListesi):
+     desenin kendisi "ilk FROM"da durursa alt sorgulu görünümler eksik
+     okunuyor. */
+  for (const m of sql.matchAll(/create or replace view public\.("?)([a-z_0-9]+)\1(?: with \([^)]*\))? as\n([\s\S]*?);(?=\n\n|\n*$)/g)) {
+    tables[m[2]] = sutunlariAyikla(selectListesi(m[3])).sort();
   }
 
   const functions = [...new Set(
