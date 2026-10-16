@@ -163,30 +163,73 @@
 /* Şeridin sağ ucunda; dar ekranda alt satıra iner. */
 .siparis-detay .siparis-serit-sag{margin-left:auto}
 .siparis-detay .siparis-serit-sag .panel-secondary{min-height:var(--ff-boy);padding:0 14px;font-size:var(--ff-yazi)}
-/* Pencere .panel-root'a taşınıyor (portal): kurallar .siparis-detay'a bağlanmıyor. */
-.fatura-belge{display:grid;gap:var(--sp-4)}
-.fatura-bas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-4);padding-bottom:var(--sp-4);border-bottom:1px solid var(--line-soft)}
-.fatura-bas>div{display:grid;gap:2px;font-size:var(--fs-sm);color:var(--ink-soft)}
-.fatura-bas small{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em}
-.fatura-bas b{color:var(--ink)}
-.fatura-belge .fatura-toplam{display:grid;gap:4px;margin:0 0 0 auto;min-width:280px;font-size:var(--fs-sm)}
-.fatura-belge .fatura-toplam>div{display:flex;justify-content:space-between;gap:var(--sp-4)}
-.fatura-belge .fatura-toplam dt{color:var(--muted)}
-.fatura-belge .fatura-toplam dd{margin:0;color:var(--ink);font-variant-numeric:tabular-nums}
-.fatura-belge .fatura-toplam .is-toplam{margin-top:4px;padding-top:6px;border-top:1px solid var(--line-soft);font-weight:var(--fw-semibold)}
-.fatura-not{margin:0;color:var(--muted);font-size:var(--fs-micro)}
-.fatura-eylem{display:flex;justify-content:flex-end;margin-top:var(--sp-4)}
-@media (max-width:760px){.fatura-bas{grid-template-columns:1fr}.fatura-belge .fatura-toplam{min-width:0;width:100%}}
 
 /*
-  YALNIZCA DÖKÜM KÂĞIDA ÇIKAR (fatura-yazdir.tsx gövdeye sınıfı ekliyor).
-  visibility ile: pencere portal olduğu için DOM'da panelin içinde değil,
-  display ile gizlemek kapsayıcısını da gizlerdi.
+  Pencere .panel-root'a taşınıyor (portal) ve yazdırma kopyası da
+  #fatura-baski'de: kurallar .siparis-detay'a bağlanmıyor.
 */
+.fatura-pencere{display:grid;gap:var(--sp-4)}
+.fatura-eylem{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);padding:10px 14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
+.fatura-eylem small{color:var(--muted);font-size:12px}
+
+.fatura-belge{display:grid;gap:22px;padding:28px 30px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);color:var(--ink)}
+.fatura-ust{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4);padding-bottom:18px;border-bottom:2px solid var(--ink)}
+.fatura-ust>div{display:grid;gap:2px}
+.fatura-satici{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.fatura-ust small{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.fatura-ust dl{display:grid;gap:4px;margin:0;text-align:right}
+.fatura-ust dl>div{display:flex;justify-content:flex-end;gap:12px;font-size:13px}
+.fatura-ust dt{color:var(--muted)}
+.fatura-ust dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+
+.fatura-taraflar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-5)}
+.fatura-taraflar>div{display:grid;align-content:start;gap:2px;font-size:13px;color:var(--ink-soft);line-height:1.5}
+.fatura-taraflar small{margin-bottom:4px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.fatura-taraflar b{color:var(--ink);font-size:14px}
+
+.fatura-tablo{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.fatura-tablo th{padding:0 8px 8px;border-bottom:1px solid var(--line);color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em;text-align:right;text-transform:uppercase;vertical-align:bottom;white-space:nowrap}
+.fatura-tablo th small{display:block;margin-top:2px;font-size:10.5px;font-weight:500;letter-spacing:0;text-transform:none}
+.fatura-tablo td{padding:11px 8px;border-bottom:1px solid var(--line-soft);text-align:right;vertical-align:top;white-space:nowrap}
+.fatura-tablo :is(th,td):first-child{padding-left:0;text-align:left;white-space:normal}
+.fatura-tablo :is(th,td):last-child{padding-right:0}
+.fatura-tablo td:first-child b{display:block;font-weight:600;line-height:1.4}
+.fatura-tablo td small{display:block;margin-top:2px;color:var(--muted);font-size:11px}
+.fatura-tablo td:first-child small{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+.fatura-ozet{display:grid;gap:6px;width:min(100%,340px);margin:0 0 0 auto;font-size:13px}
+.fatura-ozet>div{display:flex;justify-content:space-between;gap:var(--sp-4)}
+.fatura-ozet dt{color:var(--ink-soft)}
+.fatura-ozet dt small{margin-left:6px;color:var(--muted);font-size:11px}
+.fatura-ozet dd{margin:0;font-variant-numeric:tabular-nums}
+.fatura-ozet .is-vergi :is(dt,dd){color:var(--muted)}
+.fatura-ozet>div.is-vergi:not(.is-vergi + .is-vergi){margin-top:6px;padding-top:8px;border-top:1px solid var(--line-soft)}
+.fatura-ozet .is-toplam{margin-top:6px;padding-top:10px;border-top:2px solid var(--ink);font-size:16px;font-weight:700}
+.fatura-ozet .is-toplam dt{color:var(--ink)}
+.fatura-not{margin:0;padding-top:12px;border-top:1px solid var(--line-soft);color:var(--muted);font-size:11px}
+
+@media (max-width:760px){
+  .fatura-belge{padding:18px}
+  .fatura-ust{flex-direction:column}
+  .fatura-ust dl{text-align:left}
+  .fatura-taraflar{grid-template-columns:1fr}
+  .fatura-tablo th:nth-child(3),.fatura-tablo td:nth-child(3),.fatura-tablo th:nth-child(4),.fatura-tablo td:nth-child(4){display:none}
+}
+
+/*
+  YAZDIRMA: kâğıda yalnızca #fatura-baski (fatura-yazdir.tsx belgenin
+  kopyasını panelin en üstüne koyuyor). Pencere ekrana sabit ve kendi
+  içinde kayıyordu; içindeki belgeyi basmaya çalışmak boş sayfa
+  üretiyordu.
+*/
+#fatura-baski{display:none}
 @media print{
-  body.fatura-yazdir *{visibility:hidden}
-  body.fatura-yazdir .fatura-belge,body.fatura-yazdir .fatura-belge *{visibility:visible}
-  body.fatura-yazdir .fatura-belge{position:absolute;inset:0 0 auto 0;padding:0}
+  body.fatura-yazdir>:not(.panel-root),
+  body.fatura-yazdir .panel-root>:not(#fatura-baski){display:none!important}
+  body.fatura-yazdir,body.fatura-yazdir .panel-root{height:auto!important;min-height:0!important;overflow:visible!important;background:var(--surface)!important}
+  body.fatura-yazdir #fatura-baski{display:block}
+  body.fatura-yazdir #fatura-baski .fatura-belge{padding:0;border:0;border-radius:0;box-shadow:none}
+  body.fatura-yazdir #fatura-baski .fatura-tablo tr{break-inside:avoid}
 }
 
 /* ---------- Kargo paneli (sağ sütun, ilk sekme; 16.10.2026) ---------- */

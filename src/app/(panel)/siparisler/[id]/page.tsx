@@ -63,6 +63,10 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
     supabase.from("arc_shipments").select("id,sequence,source,status,carrier_code,carrier_name,tracking_number,tracking_url,awb_url,supplier,shipped_at,failure_reason,arc_shipment_items(order_item_id,quantity)").eq("organization_id",organization.id).eq("order_id",id).order("sequence")
   ]);
   const canManage=["owner","admin","manager"].includes(membership.role);
+  /* Dökümün başlığındaki satıcı adı: vitrindeki mağaza adı, yoksa kurum adı. */
+  const {data:magazaAyari,error:magazaHatasi}=await supabase.from("arc_store_settings").select("store_name").eq("organization_id",organization.id).maybeSingle();
+  if(magazaHatasi)throw new Error("Mağaza adı okunamadı: "+magazaHatasi.message);
+  const magazaAdi=String((magazaAyari as {store_name?:string|null}|null)?.store_name||organization.name||"Mağaza").trim();
   const meta=(order?.metadata??{}) as OrderMeta;
   if(error)throw new Error(error.message);if(itemsError)throw new Error(itemsError.message);if(eventsError)throw new Error(eventsError.message);if(!order)notFound();
 
@@ -214,6 +218,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   if((order.shipping??0)>0) addBracket(20,order.shipping);
 
   const bracketList=[...brackets.entries()].sort((a,b)=>a[0]-b[0]);
+  const toplamKdv=bracketList.reduce((t,[,v])=>t+v.kdv,0);
 
   /*
     Fatura satırları.
@@ -516,79 +521,85 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           dokuz sütunu orta sütuna sığmıyordu; pencerede tam genişlik.
         */}
         <div className="siparis-serit-sag">
-          <PanelModal triggerLabel="Fatura dökümü" boy="genis" kicker={`${order.order_number} · FATURA DÖKÜMÜ`} title="Fatura dökümü" description="Birim fiyatlar KDV hariç; indirim (kupon ve havale) kalemlere orantılı dağıtılır, KDV oranlara göre matrahıyla ayrılır.">
-            <div className="fatura-belge">
-              <header className="fatura-bas">
+          <PanelModal triggerLabel="Fatura dökümü" boy="genis" kicker={`${order.order_number} · SİPARİŞ DÖKÜMÜ`} title="Fatura dökümü" description="Birim fiyatlar KDV hariç. Kupon ve havale indirimi kalemlere orantılı dağıtılır; KDV oranına göre matrahıyla ayrılır.">
+            <div className="fatura-pencere">
+            <div className="fatura-eylem order-noprint">
+              <small>Bilgi amaçlıdır; yasal fatura yerine geçmez.</small>
+              <FaturaYazdir />
+            </div>
+            {/*
+              DÖKÜM BİR BELGE GİBİ (16.10.2026): üstte satıcı ve belge no,
+              altında alıcı ve ödeme, ortada kalem tablosu, sağ altta tek bir
+              toplam kutusu. İlk sürümde başlık sütunları birbirinden
+              kayıyordu ve iki ayrı toplam bloğu (matrah/KDV + ara toplam)
+              aynı KDV'yi iki farklı kuruşla yazıyordu (165,13 / 165,14).
+              KDV artık TEK kaynaktan: oranlara göre matrah dökümünün toplamı.
+            */}
+            <article className="fatura-belge">
+              <header className="fatura-ust">
                 <div>
-                  <small>SİPARİŞ</small>
-                  <b>{order.order_number}</b>
-                  <span>{when(order.created_at)}</span>
+                  <b className="fatura-satici">{magazaAdi}</b>
+                  <small>Sipariş dökümü</small>
                 </div>
+                <dl>
+                  <div><dt>Sipariş no</dt><dd>{order.order_number}</dd></div>
+                  <div><dt>Tarih</dt><dd>{when(order.created_at)}</dd></div>
+                </dl>
+              </header>
+              <section className="fatura-taraflar">
                 <div>
-                  <small>MÜŞTERİ</small>
+                  <small>Alıcı</small>
                   <b>{musteriAdi}</b>
                   {[meta.billing?.address1,meta.billing?.address2,[meta.billing?.zip,meta.billing?.city].filter(Boolean).join(" "),meta.billing?.province].filter(Boolean).map((satir,sira)=><span key={sira}>{satir}</span>)}
                   {order.customer_email?<span>{order.customer_email}</span>:null}
+                  {telefon?<span>{telefon}</span>:null}
                 </div>
                 <div>
-                  <small>ÖDEME</small>
+                  <small>Ödeme</small>
                   <b>{meta.payment_method??"Kredi kartı"}</b>
                   <span>{paymentStatusLabel(order.payment_status)}</span>
+                  {meta.coupon_code?<span>Kupon: {meta.coupon_code}</span>:null}
                 </div>
-              </header>
-              <div className="siparis-kalemler">
-          <div className="ac-lines">
-            <div className="ac-line ac-line-head">
-              <span>ÜRÜN / SKU</span>
-              <span>ADET</span>
-              <span>BİRİM (HARİÇ)</span>
-              <span>İND. %</span>
-              <span>İNDİRİM</span>
-              <span>İND. BİRİM (HARİÇ)</span>
-              <span>KDV %</span>
-              <span>KDV</span>
-              <span>TOPLAM (DÂHİL)</span>
-            </div>
-
-            {lines.map((line,index)=>(
-              <div className="ac-line" key={`${line.sku}-${index}`}>
-                <span>
-                  <b>{line.name}</b>
-                  <span className="ac-dim">{line.sku}</span>
-                </span>
-                <span>{line.quantity}</span>
-                <span>{money(line.unit,order.currency)}</span>
-                <span>{discountRate>0?`%${(discountRate*100).toLocaleString("tr-TR",{maximumFractionDigits:1})}`:"—"}</span>
-                <span>{line.discountAmount>0?`−${money(line.discountAmount,order.currency)}`:"—"}</span>
-                <span>{money(line.netUnit,order.currency)}</span>
-                <span>%{line.rate}</span>
-                <span>{money(line.vat,order.currency)}</span>
-                <span><b>{money(line.total,order.currency)}</b></span>
-              </div>
-            ))}
-          </div>
-
-          <div className="ac-totals">
-            {bracketList.map(([rate,v])=>(
-              <span key={rate}>%{rate} matrah <b>{money(v.matrah,order.currency)}</b></span>
-            ))}
-            {bracketList.map(([rate,v])=>(
-              <span key={`k${rate}`}>KDV %{rate} <b>{money(v.kdv,order.currency)}</b></span>
-            ))}
-          </div>
-              </div>
-              <dl className="siparis-toplamlar fatura-toplam">
-                <div><dt>Ara toplam (KDV dâhil)</dt><dd>{money(order.subtotal??0,order.currency)}</dd></div>
+              </section>
+              <table className="fatura-tablo">
+                <thead>
+                  <tr>
+                    <th>Ürün</th>
+                    <th>Adet</th>
+                    <th>Birim fiyat<small>KDV hariç</small></th>
+                    <th>İndirim{discountRate>0?<small>%{(discountRate*100).toLocaleString("tr-TR",{maximumFractionDigits:1})}</small>:null}</th>
+                    <th>KDV</th>
+                    <th>Tutar<small>KDV dâhil</small></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((line,index)=>(
+                    <tr key={`${line.sku}-${index}`}>
+                      <td><b>{line.name}</b>{line.sku!=="—"?<small>{line.sku}</small>:null}</td>
+                      <td>{line.quantity}</td>
+                      <td>{money(line.unit,order.currency)}</td>
+                      <td>{line.discountAmount>0?`−${money(line.discountAmount,order.currency)}`:"—"}</td>
+                      <td>{money(line.vat,order.currency)}<small>%{line.rate}</small></td>
+                      <td><b>{money(line.total,order.currency)}</b></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <dl className="fatura-ozet">
+                <div><dt>Ara toplam <small>KDV dâhil</small></dt><dd>{money(order.subtotal??0,order.currency)}</dd></div>
                 {(order.shipping??0)>0?<div><dt>Kargo</dt><dd>{money(order.shipping,order.currency)}</dd></div>:null}
-                {discount>0?<div><dt>İndirim{meta.coupon_code?` · ${meta.coupon_code}`:""}</dt><dd>−{money(discount,order.currency)}</dd></div>:null}
-                {havaleIndirimi>0?<div><dt>Havale indirimi{havaleYuzdesi?` · %${havaleYuzdesi}`:""}</dt><dd>−{money(havaleIndirimi,order.currency)}</dd></div>:null}
-                <div><dt>Toplam KDV</dt><dd>{money(order.tax??0,order.currency)}</dd></div>
+                {discount>0?<div><dt>Kupon indirimi{meta.coupon_code?<small>{meta.coupon_code}</small>:null}</dt><dd>−{money(discount,order.currency)}</dd></div>:null}
+                {havaleIndirimi>0?<div><dt>Havale indirimi{havaleYuzdesi?<small>%{havaleYuzdesi}</small>:null}</dt><dd>−{money(havaleIndirimi,order.currency)}</dd></div>:null}
+                {bracketList.map(([rate,v])=>(
+                  <div key={rate} className="is-vergi"><dt>Matrah <small>%{rate}</small></dt><dd>{money(v.matrah,order.currency)}</dd></div>
+                ))}
+                {bracketList.map(([rate,v])=>(
+                  <div key={`k${rate}`} className="is-vergi"><dt>KDV <small>%{rate}</small></dt><dd>{money(v.kdv,order.currency)}</dd></div>
+                ))}
                 <div className="is-toplam"><dt>Ödenecek toplam</dt><dd>{money(order.total,order.currency)}</dd></div>
               </dl>
-              <p className="fatura-not">Bu döküm bilgi amaçlıdır; yasal fatura yerine geçmez.</p>
-            </div>
-            <div className="fatura-eylem order-noprint">
-              <FaturaYazdir />
+              <p className="fatura-not">Bu döküm bilgi amaçlıdır; yasal fatura yerine geçmez. {magazaAdi}</p>
+            </article>
             </div>
           </PanelModal>
         </div>
@@ -754,7 +765,8 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             <div><dt>Kargo</dt><dd>{(order.shipping??0)>0?money(order.shipping,order.currency):"Ücretsiz"}</dd></div>
             {discount>0?<div><dt>İndirim{meta.coupon_code?` · ${meta.coupon_code}`:""}</dt><dd>−{money(discount,order.currency)}</dd></div>:null}
             {havaleIndirimi>0?<div><dt>Havale indirimi{havaleYuzdesi?` · %${havaleYuzdesi}`:""}</dt><dd>−{money(havaleIndirimi,order.currency)}</dd></div>:null}
-            <div><dt>KDV (dâhil)</dt><dd>{money(order.tax??0,order.currency)}</dd></div>
+            {/* KDV dökümle aynı kaynaktan: veritabanının yuvarlaması 1 kuruş ayrışabiliyordu ve aynı ekranda iki KDV yazıyordu. */}
+            <div><dt>KDV (dâhil)</dt><dd>{money(toplamKdv,order.currency)}</dd></div>
             <div className="is-toplam"><dt>Toplam</dt><dd>{money(order.total,order.currency)}</dd></div>
             {alacak>0?<div className="is-alacak"><dt>Müşteriye iade edilecek</dt><dd>{money(alacak,order.currency)}</dd></div>:null}
           </dl>
