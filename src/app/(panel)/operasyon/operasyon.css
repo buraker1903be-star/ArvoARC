@@ -1,0 +1,9 @@
+/* Operasyon merkezi: ArvoOS genel bakış kalıbı (16.10.2026). */
+.os-root .dash-v2 .kayit-serit small{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro)}
+.os-root .dash-v2 .kayit-serit .is-uyari dd,.os-root .dash-v2 .kayit-serit .is-uyari dd a{color:var(--warning)}
+.os-root .dash-v2 .kayit-serit .is-tehlike dd,.os-root .dash-v2 .kayit-serit .is-tehlike dd a{color:var(--danger)}
+.os-root .operasyon-temiz{margin:0;color:var(--muted);font-size:var(--fs-sm)}
+/* Havale satırı: bağlantı + altında onay/iptal düğmeleri. */
+.os-root .operasyon-havale{display:grid;gap:6px;padding-bottom:var(--sp-2)}
+.os-root .operasyon-havale form{margin:0}
+.os-root .operasyon-havale>:last-child{display:flex;flex-wrap:wrap;gap:var(--sp-2);padding:0 var(--sp-2)}

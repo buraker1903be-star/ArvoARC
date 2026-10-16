@@ -2,9 +2,9 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { orderStatusLabel, paymentStatusLabel } from "@/lib/commerce-labels";
 import { isBankTransfer, TRANSFER_STALE_HOURS } from "@/lib/payment-method";
-import { Icon, type IconName } from "@/components/panel/icons";
 import { HavaleEylemleri } from "./havale-eylemleri";
-import { PanelBildirimi } from "@/components/panel/bildirim";
+import { GenelBakis, ListeIzgarasi, ListeKarti, ListeSatiri } from "@/components/arvo-ui/genel-bakis";
+import "@/components/arvo-ui/kayit-detay.css";
 
 /* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
 function currentTime(){return Date.now();}
@@ -13,26 +13,15 @@ function waitingFor(createdAt:string,now:number){
   const hours=Math.max(0,Math.floor((now-Date.parse(createdAt))/3_600_000));
   return hours<24?`${hours} saattir`:`${Math.floor(hours/24)} gündür`;
 }
-import "../modules.css";
-// Eski ana ekran dili (dash-*); sayfa yeni kalıba geçince kalkacak. Yerleşimde dururken ArvoOS'un genel bakış CSS'iyle (aynı sınıf adları) çakışıyordu.
-import "../dashboard.css";
+import "./operasyon.css";
 
 
 type ProductMeta={image_paths?:string[];images?:string[];images_migrated?:boolean};
 const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"});
 const shortDate=new Intl.DateTimeFormat("tr-TR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Istanbul"});
 
-type Tone="info"|"gold"|"success"|"warning"|"danger"|"brand"|"muted";
-
-/* Aksiyon satırı: tonu anlam taşır (sarı dikkat, kırmızı sorun). */
-function ActionRow({href,icon,tone,title,detail,side}:{href:string;icon:IconName;tone:Tone;title:string;detail:string;side:React.ReactNode}){
-  return <Link prefetch={false} className="dash-row" data-tone={tone} href={href}>
-    <span className="dash-row-icon"><Icon name={icon} size={16}/></span>
-    <span className="dash-row-label"><span>{title}</span><small>{detail}</small></span>
-    {side}
-    <span className="dash-chevron"><Icon name="chevron" size={16}/></span>
-  </Link>;
-}
+/* Rozet: sağdaki küçük durum etiketi (ArvoOS status-pill). */
+const Rozet=({ton,children}:{ton:string;children:React.ReactNode})=><span className="status-pill" data-tone={ton}>{children}</span>;
 
 export default async function Operations(){
   const {supabase,organization,membership}=await requireTenant();
@@ -102,96 +91,82 @@ export default async function Operations(){
   const stockAlerts=(criticalCount??0)+(lowCount??0);
   const totalActions=(openCount??0)+(paymentCount??0)+stockAlerts+missingImages.length;
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <h1>Operasyon Merkezi</h1>
-        <p>{totalActions?`${totalActions.toLocaleString("tr-TR")} kayıt aksiyon bekliyor.`:"Her şey güncel; aksiyon bekleyen kayıt yok."}</p>
-      </div>
-    </section>
+  /*
+    SATIŞIN GENEL BAKIŞI = ArvoOS'un modül genel bakışı (16.10.2026):
+    gizli başlık (uygulamanın adı durum çubuğunda), özet şeridi, yan yana
+    dört liste kartı. Eskiden kendi kutu ve satır dili vardı (dash-*,
+    modules.css).
+  */
+  return (
+    <GenelBakis gizliBaslik="Operasyon merkezi">
+      <nav className="kayit-serit talep-serit" aria-label="Operasyon özeti">
+        <dl>
+          <div className={(openCount??0)>0?"is-uyari":undefined}><dt>Açık sipariş</dt><dd><Link prefetch={false} href="/siparisler?filter=pending">{(openCount??0).toLocaleString("tr-TR")}</Link></dd><small>bekliyor veya hazırlanıyor</small></div>
+          <div className={(paymentCount??0)>0?"is-uyari":undefined}><dt>Ödeme kontrolü</dt><dd>{(paymentCount??0).toLocaleString("tr-TR")}</dd><small>ödemesi tamamlanmamış</small></div>
+          <div className={(criticalCount??0)>0?"is-tehlike":(lowCount??0)>0?"is-uyari":undefined}><dt>Stok uyarısı</dt><dd><Link prefetch={false} href={(criticalCount??0)>0?"/stok?filter=zero":"/stok?filter=low"}>{stockAlerts.toLocaleString("tr-TR")}</Link></dd><small>{(criticalCount??0).toLocaleString("tr-TR")} satışa kapalı · {(lowCount??0).toLocaleString("tr-TR")} azalan</small></div>
+          <div className={missingImages.length>0?"is-uyari":undefined}><dt>Görsel eksiği</dt><dd>{missingImages.length.toLocaleString("tr-TR")}</dd><small>son güncellenen 200 aktif üründe</small></div>
+        </dl>
+      </nav>
+      {totalActions===0?<p className="operasyon-temiz">Her şey güncel; aksiyon bekleyen kayıt yok.</p>:null}
 
-    <PanelBildirimi />
-    {/* Buraya hata yazan bir işlem YOK: bu satır yalnızca adres
-        satırına elle ?error= eklenince çalışıyordu, yani dışarıdan
-        uydurulmuş mesajı göstermekten başka işe yaramıyordu. */}
+      <ListeIzgarasi etiket="Aksiyon bekleyenler">
+        <ListeKarti baslik="Açık siparişler" alt="Onay ve hazırlık bekleyenler" bos="Açık sipariş bulunmuyor." href="/siparisler?filter=pending" hrefEtiket="Siparişler" sayi={(openOrders??[]).length}>
+          {(openOrders??[]).map(order=>(
+            <ListeSatiri key={order.id} href={`/siparisler/${order.id}`}
+              baslik={order.customer_name||"Müşteri"}
+              alt={`${order.order_number} · ${orderStatusLabel(order.status)} · ${shortDate.format(new Date(order.created_at))}`}
+              sag={<Rozet ton={order.status==="pending"?"warning":"info"}>{money.format(order.total/100)}</Rozet>}/>
+          ))}
+        </ListeKarti>
 
-    <div className="dash">
-      {/* Renk anlamlı: sıfır olan sayaç nötr, dolu olan dikkat. */}
-      <section className="ac-metrics" aria-label="Operasyon özeti">
-        <Link prefetch={false} className="ac-metric ac-lift" data-tone={(openCount??0)>0?"warn":undefined} href="/siparisler?filter=pending">
-          <span>Açık sipariş</span><strong>{(openCount??0).toLocaleString("tr-TR")}</strong><small>Bekliyor veya hazırlanıyor</small>
-        </Link>
-        <article className="ac-metric" data-tone={(paymentCount??0)>0?"warn":undefined}>
-          <span>Ödeme kontrolü</span><strong>{(paymentCount??0).toLocaleString("tr-TR")}</strong><small>Ödemesi tamamlanmamış</small>
-        </article>
-        <Link prefetch={false} className="ac-metric ac-lift" data-tone={(criticalCount??0)>0?"bad":(lowCount??0)>0?"warn":undefined} href={(criticalCount??0)>0?"/stok?filter=zero":"/stok?filter=low"}>
-          <span>Stok uyarısı</span><strong>{stockAlerts.toLocaleString("tr-TR")}</strong><small>{(criticalCount??0).toLocaleString("tr-TR")} satışa kapalı · {(lowCount??0).toLocaleString("tr-TR")} azalan</small>
-        </Link>
-        <article className="ac-metric" data-tone={missingImages.length>0?"warn":undefined}>
-          <span>Görsel eksiği</span><strong>{missingImages.length.toLocaleString("tr-TR")}</strong><small>Son güncellenen 200 aktif üründe</small>
-        </article>
-      </section>
-
-      <div className="ops-grid">
-        <article className="dash-card">
-          <div className="dash-card-head">
-            <div><h2>Açık siparişler</h2><p>Onay ve hazırlık bekleyenler, en yeniden.</p></div>
-            <Link prefetch={false} className="dash-card-link" href="/siparisler?filter=pending">Siparişler <Icon name="chevron" size={16}/></Link>
-          </div>
-          {(openOrders??[]).length?<div className="dash-list">{(openOrders??[]).map(order=>(
-            <ActionRow key={order.id} href={`/siparisler/${order.id}`} icon="box" tone={order.status==="pending"?"warning":"info"} title={`${order.order_number} · ${order.customer_name||"Müşteri"}`} detail={`${orderStatusLabel(order.status)} · ${shortDate.format(new Date(order.created_at))}`} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>
-          ))}</div>:<p className="dash-empty">Açık sipariş bulunmuyor.</p>}
-        </article>
-
-        <article className="dash-card">
-          <div className="dash-card-head">
-            <div><h2>Ödeme kontrolü</h2><p>Ödeme bekleyen, onaylanmış ama tahsil edilmemiş veya başarısız.</p></div>
-          </div>
-          {(paymentPending??[]).length?<div className="dash-list">{(paymentPending??[]).map(order=>{
+        <ListeKarti baslik="Ödeme kontrolü" alt="Ödenmemiş, tahsil edilmemiş ya da başarısız" bos="Ödeme bekleyen sipariş bulunmuyor." sayi={(paymentPending??[]).length}>
+          {(paymentPending??[]).map(order=>{
             const transfer=isBankTransfer(order.metadata);
             /* Havalede bekleme süresi görünür; 72 saati geçen satır kırmızı ve iptal edilebilir. */
             const stale=transfer&&now-Date.parse(order.created_at)>TRANSFER_STALE_HOURS*3_600_000;
-            /* Açık siparişler kartıyla aynı düzen: müşteri başlıkta, açıklama kısa kalsın (dar kartta üç satıra kırılıyordu). */
             const detail=transfer?`Havale · ${waitingFor(order.created_at,now)} bekliyor${stale?" (süresi geçti)":""}`:paymentStatusLabel(order.payment_status);
-            const row=<ActionRow href={`/siparisler/${order.id}`} icon="lira" tone={order.payment_status==="failed"||stale?"danger":"warning"} title={`${order.order_number} · ${order.customer_name||"Müşteri"}`} detail={detail} side={<strong className="ops-amount">{money.format(order.total/100)}</strong>}/>;
-            /* Havale ödemesi burada tek tıkla onaylanır; kart ödemesi PayTR bildirimiyle kapanır. */
-            return transfer&&canManage&&order.payment_status!=="failed"?(
-              <div className="ops-pay" key={order.id}>
-                {row}
-                {/* Eylemler istemci bileşeninde: onay her seferinde sayfayı
-                    baştan çizdiriyordu ve bu ekranda genellikle birkaç
-                    havale birikiyor. Onay penceresi duruyor — e-posta
-                    geri alınamıyor. */}
-                <HavaleEylemleri
-                  siparisId={order.id}
-                  onayMesaji={`${order.order_number} için ${money.format(order.total/100)} havale ödemesi alındı olarak işaretlensin mi? Müşteriye “Ödemeniz alındı” e-postası gönderilir.`}
-                  iptalMesaji={stale?`${order.order_number} ${waitingFor(order.created_at,now)} ödenmedi. Sipariş iptal edilsin mi? Müşteriye “Siparişiniz iptal edildi” e-postası gönderilir.`:undefined}
-                />
-              </div>
-            ):<div key={order.id}>{row}</div>;
-          })}</div>:<p className="dash-empty">Ödeme bekleyen sipariş bulunmuyor.</p>}
-        </article>
+            const ton=order.payment_status==="failed"||stale?"danger":"warning";
+            /*
+              Havale ödemesi burada tek tıkla onaylanır. Düğmeler satırın
+              bağlantısının DIŞINDA: bağlantı içinde form geçersiz ve
+              tıklama satırı açardı.
+            */
+            if(transfer&&canManage&&order.payment_status!=="failed"){
+              return (
+                <li key={order.id} className="operasyon-havale">
+                  <Link prefetch={false} className="dash-col-row" href={`/siparisler/${order.id}`}>
+                    <span className="dash-col-main"><b>{order.customer_name||"Müşteri"}</b><small>{order.order_number} · {detail}</small></span>
+                    <Rozet ton={ton}>{money.format(order.total/100)}</Rozet>
+                  </Link>
+                  <HavaleEylemleri
+                    siparisId={order.id}
+                    onayMesaji={`${order.order_number} için ${money.format(order.total/100)} havale ödemesi alındı olarak işaretlensin mi? Müşteriye “Ödemeniz alındı” e-postası gönderilir.`}
+                    iptalMesaji={stale?`${order.order_number} ${waitingFor(order.created_at,now)} ödenmedi. Sipariş iptal edilsin mi? Müşteriye “Siparişiniz iptal edildi” e-postası gönderilir.`:undefined}
+                  />
+                </li>
+              );
+            }
+            return <ListeSatiri key={order.id} href={`/siparisler/${order.id}`} baslik={order.customer_name||"Müşteri"} alt={`${order.order_number} · ${detail}`} sag={<Rozet ton={ton}>{money.format(order.total/100)}</Rozet>}/>;
+          })}
+        </ListeKarti>
 
-        <article className="dash-card">
-          <div className="dash-card-head">
-            <div><h2>Kritik stoklar</h2><p>Satışa kapalı olanlar ve {threshold} adet altına düşenler.</p></div>
-            <Link prefetch={false} className="dash-card-link" href="/stok?filter=zero">Stok <Icon name="chevron" size={16}/></Link>
-          </div>
-          {stockVariants.length?<div className="dash-list">{stockVariants.map(variant=>(
-            <ActionRow key={variant.id} href={`/stok?q=${encodeURIComponent(variant.sku)}`} icon="alert" tone={variant.stock<=0?"danger":"warning"} title={productName.get(variant.product_id)??"Ürün"} detail={`${variant.sku} · ${variant.stock<=0?"mağazada satın alınamıyor":"azalıyor"}`} side={<span className="dash-row-count">{variant.stock}</span>}/>
-          ))}</div>:<p className="dash-empty">Stok uyarısı bulunmuyor.</p>}
-        </article>
+        <ListeKarti baslik="Kritik stoklar" alt={`Satışa kapalı ve ${threshold} adet altına düşenler`} bos="Stok uyarısı bulunmuyor." href="/stok?filter=zero" hrefEtiket="Stok" sayi={stockVariants.length}>
+          {stockVariants.map(variant=>(
+            <ListeSatiri key={variant.id} href={`/stok?q=${encodeURIComponent(variant.sku)}`}
+              baslik={productName.get(variant.product_id)??"Ürün"}
+              alt={variant.sku}
+              sag={<Rozet ton={variant.stock<=0?"danger":"warning"}>{variant.stock} adet</Rozet>}/>
+          ))}
+        </ListeKarti>
 
-        <article className="dash-card">
-          <div className="dash-card-head">
-            <div><h2>Görseli eksik ürünler</h2><p>Yayında ama kapak görseli yok.</p></div>
-            <Link prefetch={false} className="dash-card-link" href="/urunler?filter=active">Ürünler <Icon name="chevron" size={16}/></Link>
-          </div>
-          {missingImages.length?<div className="dash-list">{missingImages.slice(0,8).map(product=>(
-            <ActionRow key={product.id} href={`/urunler/${product.id}`} icon="tag" tone="gold" title={product.name} detail={product.source==="shopify"?"Shopify aktarımı":"ArvoARC"} side={<span className="ops-cta">Görsel ekle</span>}/>
-          ))}</div>:<p className="dash-empty">Aktif ürünlerde görsel eksiği bulunmuyor.</p>}
-        </article>
-      </div>
-    </div>
-  </>;
+        <ListeKarti baslik="Görseli eksik ürünler" alt="Yayında ama kapak görseli yok" bos="Aktif ürünlerde görsel eksiği bulunmuyor." href="/urunler?filter=active" hrefEtiket="Ürünler" sayi={Math.min(missingImages.length,8)}>
+          {missingImages.slice(0,8).map(product=>(
+            <ListeSatiri key={product.id} href={`/urunler/${product.id}`} baslik={product.name} baslikIpucu={product.name}
+              alt={product.source==="shopify"?"Shopify aktarımı":"ArvoARC"}
+              sag={<Rozet ton="gold">Görsel ekle</Rozet>}/>
+          ))}
+        </ListeKarti>
+      </ListeIzgarasi>
+    </GenelBakis>
+  );
 }

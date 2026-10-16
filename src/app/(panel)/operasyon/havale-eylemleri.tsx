@@ -68,7 +68,7 @@ export function HavaleEylemleri({
       >
         <input type="hidden" name="order_id" value={siparisId} />
         <input type="hidden" name="back" value="/operasyon" />
-        <ConfirmSubmit className="ac-btn ops-pay-btn" message={onayMesaji} disabled={calisiyor}>
+        <ConfirmSubmit className="panel-primary ops-pay-btn" message={onayMesaji} disabled={calisiyor}>
           {calisiyor ? "Gönderiliyor…" : "Ödeme alındı"}
         </ConfirmSubmit>
       </form>
@@ -83,7 +83,7 @@ export function HavaleEylemleri({
         >
           <input type="hidden" name="order_id" value={siparisId} />
           <input type="hidden" name="back" value="/operasyon" />
-          <ConfirmSubmit className="ac-btn ac-btn-danger ops-pay-btn" message={iptalMesaji} disabled={calisiyor}>
+          <ConfirmSubmit className="panel-danger ops-pay-btn" message={iptalMesaji} disabled={calisiyor}>
             İptal et
           </ConfirmSubmit>
         </form>
