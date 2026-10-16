@@ -37,7 +37,10 @@
 .os-root .siparis-manuel .panel-form-actions>span b{color:var(--ink);font-size:var(--fs-base);font-variant-numeric:tabular-nums}
 /* Düğme içeriği kadar: şerit flex ve düğme boşluğu yutup 735px'e
    uzuyordu (canlıda ölçüldü). Özet solda, düğme sağda. */
-.os-root .siparis-manuel .panel-form-actions>button{flex:none}
+/* Çekmecenin birincil düğmesi tam genişlik (.panel-form-actions
+   .panel-primary{width:100%}): burada solda özet var, düğme kendi
+   boyunda kalıyor — kampanya kaydet çubuğuyla aynı düzen. */
+.os-root .siparis-manuel .panel-form-actions>button{flex:none;width:auto}
 @media(min-width:621px){
   /* Satırın kendi etiketleri DURUYOR (ekran okuyucu okuyor), yalnızca
      görünmez: başlıklar üstte bir kez yazılı. globals.css alanlara

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent as KlavyeOlayi } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent as KlavyeOlayi } from "react";
 import { aramaSadesi } from "@/lib/arama-metni";
 import "./durum-secici.css";
 
@@ -67,10 +67,15 @@ export function DurumSecici({
   const [acik, setAcik] = useState(false);
   const [etkin, setEtkin] = useState(0);
   const [sorgu, setSorgu] = useState("");
-  /* Liste aşağı açılıyor ve pencerenin dibindeki seçicide ekranın
-     ALTINDAN TAŞIYORDU (canlıda ölçüldü: 941px, pencere 860px).
-     Altta yer yoksa yukarı açılır. */
+  /*
+    Liste hep aşağı açılıyordu ve pencerenin dibindeki seçicide
+    EKRANDAN TAŞIYORDU (canlıda ölçüldü: 941px, pencere 860px).
+    Yön ve boy açılırken ölçülüyor; sınır pencere değil, seçiciyi
+    KIRPAN kutu: çekmecenin gövdesi kendi içinde kayıyor, oraya
+    sığmayan liste görünmüyordu.
+  */
   const [yon, setYon] = useState<"alt" | "ust">("alt");
+  const [bosluk, setBosluk] = useState(320);
   const kok = useRef<HTMLDivElement>(null);
   const dugme = useRef<HTMLButtonElement>(null);
   const girdi = useRef<HTMLInputElement>(null);
@@ -124,8 +129,21 @@ export function DurumSecici({
     setSorgu("");
     const kutu = dugme.current?.getBoundingClientRect();
     if (kutu) {
-      const altBosluk = window.innerHeight - kutu.bottom;
-      setYon(altBosluk < 320 && kutu.top > altBosluk ? "ust" : "alt");
+      let sinirUst = 0;
+      let sinirAlt = window.innerHeight;
+      for (let ust = kok.current?.parentElement; ust; ust = ust.parentElement) {
+        if (/(auto|scroll)/.test(getComputedStyle(ust).overflowY)) {
+          const r = ust.getBoundingClientRect();
+          sinirUst = Math.max(sinirUst, r.top);
+          sinirAlt = Math.min(sinirAlt, r.bottom);
+          break;
+        }
+      }
+      const altBosluk = sinirAlt - kutu.bottom;
+      const ustBosluk = kutu.top - sinirUst;
+      setYon(altBosluk >= 360 || altBosluk >= ustBosluk ? "alt" : "ust");
+      /* 72px: arama kutusu, kutu dolgusu ve 6px'lik aralık. */
+      setBosluk(Math.max(140, Math.round(Math.max(altBosluk, ustBosluk) - 72)));
     }
     setEtkin(Math.max(0, secenekler.findIndex((s) => s.deger === secili)));
     setAcik(true);
@@ -160,7 +178,14 @@ export function DurumSecici({
   };
 
   return (
-    <div className="durum-secici" ref={kok} data-bicim={bicim} data-yon={yon} data-acik={acik ? "" : undefined}>
+    <div
+      className="durum-secici"
+      ref={kok}
+      data-bicim={bicim}
+      data-yon={yon}
+      data-acik={acik ? "" : undefined}
+      style={{ "--secici-bosluk": `${bosluk}px` } as CSSProperties}
+    >
       <input ref={girdi} type="hidden" name={name} defaultValue={deger} />
       <button
         ref={dugme}

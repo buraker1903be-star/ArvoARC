@@ -102,7 +102,7 @@
 .durum-secici-kutu>.durum-secici-liste{
   position:static;z-index:auto;padding:0;border:0;border-radius:0;
   background:none;box-shadow:none;animation:none;
-  max-height:min(320px,46vh);overflow-y:auto;overscroll-behavior:contain
+  max-height:min(320px,46vh,var(--secici-bosluk,320px));overflow-y:auto;overscroll-behavior:contain
 }
 .os-root .durum-secici-arama{
   flex:none;width:100%;margin:0 0 6px;
