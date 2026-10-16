@@ -24,6 +24,7 @@ import "./panel.css";
 import "@/components/os/panel-page-system.css";
 import "@/components/os/panel-ui.css";
 import "@/components/os/panel-tables.css";
+import "@/components/os/panel-premium.css";
 import "./activity.css";
 import "@/components/os/os-motion.css";
 import "@/components/os/os-shell.css";

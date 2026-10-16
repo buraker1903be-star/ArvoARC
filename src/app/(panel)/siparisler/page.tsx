@@ -5,14 +5,17 @@ import { nextOrderStep } from "@/lib/order-flow";
 import { gonderiSorunlu, kargoGorunumu } from "@/lib/kargo-bolme";
 import { siparisKari } from "@/lib/siparis-kari";
 import { isBankTransfer } from "@/lib/payment-method";
-import { PanelBildirimi } from "@/components/panel/bildirim";
 import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
 import { gorunumleriOku } from "../gorunumler/oku";
 import { gorunumSorgusu, SIPARIS_DONEMLERI, SIPARIS_DURUMLARI } from "@/lib/kayitli-gorunum";
 import { OrderForm } from "./order-form";
 import { OrderTable, type OrderRow } from "./order-table";
-import { OrdersTabs } from "./orders-tabs";
-import "./orders.css";
+import { PanelDrawer } from "@/components/arvo-ui/panel-drawer";
+// Liste kalıbı (talep-*, crm-data-table) ve kart dili: sayfa kullandığı sınıfın CSS'ini kendi import eder.
+import "@/components/arvo-ui/k-ui";
+import "@/components/arvo-ui/crm.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./siparis-listesi.css";
 
 const PAGE_SIZE = 50;
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
@@ -256,139 +259,114 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     })(),
   }));
 
-  const metrics = [
-    { label: "Onay bekliyor", value: counts.pending, note: "Onayla adımında", filter: "pending" as const, tone: counts.pending ? "warn" : undefined },
-    { label: "Hazırlanacak", value: counts.confirmed, note: "Onaylandı, hazırlanmadı", filter: "confirmed" as const, tone: counts.confirmed ? "warn" : undefined },
-    { label: "Hazırlanıyor", value: counts.processing, note: "Kargoya verilecek", filter: "processing" as const, tone: undefined },
-  ];
-
   /*
-    İade talebi de sayılıyor: o kutu çiplerde karşılığı olmayan tek
-    kutu (iade TALEBİ, iade edilmiş sipariş değil) ve bekleyen bir
-    talep varken şeridi gizlemek o işi görünmez yapardı.
+    DURUM ŞERİDİ (ArvoOS'un liste kalıbı, 16.10.2026). Eskiden üstte dört
+    büyük kutu (onay bekliyor, hazırlanacak…) ve altında aynı sayıları
+    tekrar eden durum çipleri vardı; şerit ikisinin yerini alıyor: her
+    durum bir sütun, sayısı o durumla süzen bir bağlantı. İade talebi
+    şeritte duruyor, çünkü çiplerde karşılığı olmayan tek iş o.
   */
-  const ozetGorunsun = metrics.some((metric) => metric.value > 0) || pendingReturns > 0;
+  const filtreli = Boolean(search) || statusFilter !== "all" || period !== "all" || Boolean(kargo);
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <h1>Siparişler</h1>
-        {/* İpucu buraya taşındı: liste üstünde ayrı bir bant olarak 56px tutuyordu. */}
-        <p>{counts.all.toLocaleString("tr-TR")} sipariş · {periodLabel}{search ? ` · “${search}”` : ""} · satıra tıklayarak detayı açın{canManage ? ", kutucuklarla toplu işlem yapın" : ""}</p>
-      </div>
-      <OrdersTabs active="orders" pendingReturns={pendingReturns} canExport={canManage} />
-    </section>
-
-    <div className="ac-stack">
-      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
-          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
-          gösterebiliyordu (lib/panel-bildirim.ts). */}
-      <PanelBildirimi />
-
-      {/*
-        ÖZET ŞERİDİ YALNIZCA İŞ VARKEN GÖRÜNÜYOR.
-
-        Üç kutunun üçü de filtre çipleriyle AYNI bağlantıya ve aynı sayıya
-        gidiyor (?filter=pending / confirmed / processing); çipler zaten
-        44px'te aynı bilgiyi veriyor. Hepsi sıfırken şerit 114px'i sıfır
-        göstermeye harcıyordu: 900px'lik ekranda ilk sipariş satırı 555.
-        pikselde başlıyor, 40 kayıttan 8'i görünüyordu (canlıda ölçüldü,
-        27.09.2026). Şerit gizlenince 11 satır görünüyor.
-
-        Sıfır olmayan bir sayı varsa şerit geri geliyor: o zaman bekleyen
-        iş demektir ve tam da göze çarpması gereken şeydir.
-      */}
-      {ozetGorunsun ? (
-      <section className="ac-metrics" aria-label="Sipariş özeti">
-        {metrics.map((metric) => (
-          <Link prefetch={false} className="ac-metric ac-lift" data-tone={metric.tone} href={listHref(state, { filter: metric.filter, page: 1 })} key={metric.label}>
-            <span>{metric.label}</span>
-            <strong>{metric.value.toLocaleString("tr-TR")}</strong>
-            <small>{metric.note}</small>
-          </Link>
-        ))}
-        <Link prefetch={false} className="ac-metric ac-lift" data-tone={pendingReturns ? "warn" : undefined} href="/siparisler/iadeler">
-          <span>İade talebi</span>
-          <strong>{pendingReturns.toLocaleString("tr-TR")}</strong>
-          <small>Karar bekliyor</small>
-        </Link>
-      </section>
-      ) : null}
-
-      <section className="ac ac-pad-sm list-toolbar">
-        <form className="ac-filter order-search" role="search">
-          {statusFilter !== "all" ? <input type="hidden" name="filter" value={statusFilter} /> : null}
-          {period !== "all" ? <input type="hidden" name="period" value={period} /> : null}
-          <input name="q" defaultValue={search} placeholder="Sipariş no, müşteri veya e-posta" aria-label="Siparişlerde ara" />
-          <button className="ac-btn ac-btn-primary" type="submit">Ara</button>
-          {search ? <Link prefetch={false} className="ac-btn" href={listHref(state, { q: "", page: 1 })}>Temizle</Link> : null}
-        </form>
-        <nav className="ac-filter" aria-label="Dönem">
-          {PERIODS.map(([key, label]) => (
-            <Link prefetch={false} key={key} className="ac-btn" href={listHref(state, { period: key, page: 1 })} aria-current={period === key ? "page" : undefined}>{label}</Link>
-          ))}
-        </nav>
-        <GorunumKaydet liste="siparisler" aktifSorgu={aktifSorgu} gorunumler={gorunumler} canManage={canManage} />
-      </section>
-
-      {/* Şerit yalnızca kayıtlı görünüm varken çiziliyor; boşken hiç yer kaplamıyor. */}
-      <KayitliGorunumler liste="siparisler" gorunumler={gorunumler} aktifSorgu={aktifSorgu} canManage={canManage} />
-
-      {/*
-        Durum filtreleri tek tıkla çalışır; her sekmede o durumdaki
-        kayıt sayısı görünür (arama ve dönem dâhil).
-      */}
-      <nav className="ac-filter" aria-label="Sipariş durumu">
-        {STATUS_TABS.map(([key, label]) => (
-          <Link prefetch={false} key={key} className="ac-btn" href={listHref(state, { filter: key, page: 1 })} aria-current={statusFilter === key ? "page" : undefined}>
-            {label}
-            <span className="ac-count">{counts[key].toLocaleString("tr-TR")}</span>
-          </Link>
-        ))}
-        {/*
-          SORUNLU KARGO çipi yalnızca sorun VARKEN görünüyor. Sıfır
-          gösteren bir çip, bugün üç listede kaldırdığımız gürültünün
-          aynısı olurdu; bu çip zaten olağan dışı bir duruma işaret
-          ediyor.
-        */}
-        {kargo === "sorunlu" || sorunluKargo > 0 ? (
-          <Link
-            prefetch={false}
-            className="ac-btn order-chip-danger"
-            href={listHref(state, { kargo: kargo === "sorunlu" ? "" : "sorunlu", page: 1 })}
-            aria-current={kargo === "sorunlu" ? "page" : undefined}
-          >
-            Sorunlu kargo
-            <span className="ac-count">{sorunluKargo.toLocaleString("tr-TR")}</span>
-          </Link>
-        ) : null}
-      </nav>
-
-      <OrderTable key={JSON.stringify(params)} rows={rows} canManage={canManage} canDelete={["owner","admin"].includes(membership.role)} back={listHref(state, {})} siparisYok={(siparisSayimi.count ?? 0) === 0}>
-        {/* Kayıt yokken şerit gizli: boş ekran zaten "kayıt yok" diyor ve
-              altındaki ikinci "Kayıt yok" 45px yeri tekrara harcıyordu. */}
-        <div className="list-pagination" data-bos={total ? undefined : ""}>
-          <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + rows.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} sipariş` : "Kayıt yok"}</span>
-          {pageCount > 1 ? (
-            <div>
-              {page > 1 ? <Link prefetch={false} className="ac-btn" href={listHref(state, { page: page - 1 })}>← Önceki</Link> : <span className="ac-btn" aria-disabled="true">← Önceki</span>}
-              <span className="order-page-number">{page} / {pageCount}</span>
-              {page < pageCount ? <Link prefetch={false} className="ac-btn" href={listHref(state, { page: page + 1 })}>Sonraki →</Link> : <span className="ac-btn" aria-disabled="true">Sonraki →</span>}
-            </div>
+  return (
+    <main className="talep liste-sayfa siparis-listesi">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker">Satış</small>
+          <h1>Siparişler</h1>
+          <p className="talep-bas-alt">{counts.all.toLocaleString("tr-TR")} sipariş · {periodLabel}{search ? ` · “${search}”` : ""}</p>
+        </div>
+        <div className="talep-bas-eylem">
+          {canManage ? <a className="panel-secondary" href="/api/disari-aktar/siparisler">CSV indir</a> : null}
+          {/* Manuel sipariş çekmecede: eskiden listenin dibinde açılır bir karttı. */}
+          {canManage ? (
+            <PanelDrawer triggerLabel="+ Manuel sipariş" title="Manuel sipariş" kicker="Satış" description="Telefonla veya elden alınan siparişler için · çok kalemli" genis>
+              <OrderForm variants={variantOptions} />
+            </PanelDrawer>
           ) : null}
         </div>
-      </OrderTable>
+      </header>
 
-      {/* Manuel sipariş listenin altında: günlük iş listeye bakmak,
-          form ara sıra kullanılıyor. */}
-      {canManage ? (
-        <details className="ac ac-pad order-create">
-          <summary>
-            <span><b>Manuel sipariş oluştur</b><small>Telefonla veya elden alınan siparişler için · çok kalemli</small></span>
-          </summary>
-          <OrderForm variants={variantOptions} />
-        </details>
-      ) : null}
-    </div>
-  </>;
+      <nav className="kayit-serit talep-serit" aria-label="Duruma göre süz">
+        <dl>
+          {STATUS_TABS.map(([key, label]) => (
+            <div key={key} className={statusFilter === key ? "is-active" : undefined}>
+              <dt>{label}</dt>
+              <dd><Link prefetch={false} href={listHref(state, { filter: key, page: 1 })} aria-current={statusFilter === key ? "page" : undefined}>{counts[key].toLocaleString("tr-TR")}</Link></dd>
+            </div>
+          ))}
+          <div className={pendingReturns ? "is-uyari" : undefined}>
+            <dt>İade talebi</dt>
+            <dd><Link prefetch={false} href="/siparisler/iadeler">{pendingReturns.toLocaleString("tr-TR")}</Link></dd>
+          </div>
+          {/*
+            SORUNLU KARGO yalnızca sorun VARKEN: sıfır gösteren bir sütun
+            gürültü olurdu; bu sütun olağan dışı bir duruma işaret ediyor.
+          */}
+          {kargo === "sorunlu" || sorunluKargo > 0 ? (
+            <div className={kargo === "sorunlu" ? "is-active is-tehlike" : "is-tehlike"}>
+              <dt>Sorunlu kargo</dt>
+              <dd><Link prefetch={false} href={listHref(state, { kargo: kargo === "sorunlu" ? "" : "sorunlu", page: 1 })} aria-current={kargo === "sorunlu" ? "page" : undefined}>{sorunluKargo.toLocaleString("tr-TR")}</Link></dd>
+            </div>
+          ) : null}
+        </dl>
+      </nav>
+
+      <section className="panel-card talep-bilgi" aria-label="Sipariş listesi">
+        <div className="ekip-suzgec talep-suzgec">
+          {PERIODS.map(([key, label]) => (
+            <Link prefetch={false} key={key} href={listHref(state, { period: key, page: 1 })} className={period === key ? "is-active" : undefined} aria-current={period === key ? "page" : undefined}>{label}</Link>
+          ))}
+          <form className="talep-ara" role="search">
+            {statusFilter !== "all" ? <input type="hidden" name="filter" value={statusFilter} /> : null}
+            {period !== "all" ? <input type="hidden" name="period" value={period} /> : null}
+            {kargo ? <input type="hidden" name="kargo" value={kargo} /> : null}
+            <input name="q" defaultValue={search} placeholder="Sipariş no, müşteri veya e-posta" aria-label="Siparişlerde ara" />
+          </form>
+          <GorunumKaydet liste="siparisler" aktifSorgu={aktifSorgu} gorunumler={gorunumler} canManage={canManage} />
+        </div>
+
+        {/* Şerit yalnızca kayıtlı görünüm varken çiziliyor; boşken hiç yer kaplamıyor. */}
+        <KayitliGorunumler liste="siparisler" gorunumler={gorunumler} aktifSorgu={aktifSorgu} canManage={canManage} />
+
+        <OrderTable
+          key={JSON.stringify(params)}
+          rows={rows}
+          canManage={canManage}
+          canDelete={["owner", "admin"].includes(membership.role)}
+          back={listHref(state, {})}
+          bos={
+            /*
+              Hiç sipariş almamış mağazaya "filtreyi değiştirin" demek,
+              ortada olmayan bir filtreyi aratmaktı.
+            */
+            <div className="crm-empty-state talep-bos-kutu">
+              <h2>{(siparisSayimi.count ?? 0) === 0 ? "Henüz sipariş yok" : "Bu ölçütlere uygun sipariş yok"}</h2>
+              <p>{(siparisSayimi.count ?? 0) === 0
+                ? "Vitrinden ilk sipariş geldiğinde burada görünür. Mağazanızı açıp alışveriş akışını kendiniz deneyebilirsiniz."
+                : "Durumu, dönemi veya aramayı değiştirin. Sipariş numarası, müşteri adı ve e-postada arama yapılır."}</p>
+              <div className="crm-empty-actions">
+                {filtreli ? <Link prefetch={false} className="panel-secondary" href="/siparisler">Süzgeci temizle</Link> : null}
+                {(siparisSayimi.count ?? 0) === 0 ? <a className="panel-primary" href="/magaza" target="_blank" rel="noreferrer">Mağazanı gör</a> : null}
+                {(siparisSayimi.count ?? 0) === 0 ? <Link prefetch={false} className="panel-secondary" href="/veri-aktarimi">Eski siparişleri aktar</Link> : null}
+              </div>
+            </div>
+          }
+        >
+          {/* Sayfalayıcı ArvoOS'taki gibi: tek sayfalık listede çizilmiyor, adres taşınıyor. */}
+          {pageCount > 1 ? (
+            <nav className="liste-sayfalar" aria-label="Sayfalar">
+              {page > 1
+                ? <Link prefetch={false} href={listHref(state, { page: page - 1 })}>← Önceki</Link>
+                : <span aria-disabled="true">← Önceki</span>}
+              <b>{page} / {pageCount} · {total.toLocaleString("tr-TR")} sipariş</b>
+              {page < pageCount
+                ? <Link prefetch={false} href={listHref(state, { page: page + 1 })}>Sonraki →</Link>
+                : <span aria-disabled="true">Sonraki →</span>}
+            </nav>
+          ) : null}
+        </OrderTable>
+      </section>
+    </main>
+  );
 }

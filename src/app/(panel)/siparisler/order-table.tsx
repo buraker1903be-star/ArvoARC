@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { bulkStatus, durumIlerletSonuc, quickStatus, siparisleriSil, topluDurumSonuc } from "./actions";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
-import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
-import { Notice } from "@/components/panel/notice";
+import { KNot } from "@/components/arvo-ui/k-ui";
+import { MobilSatir } from "@/components/arvo-ui/mobil-satir";
+import { SatirTiklama } from "@/components/arvo-ui/satir-tiklama";
+import { rozetTonu } from "@/lib/rozet-tonu";
 
 export type OrderRow = {
   id: string;
@@ -51,12 +53,12 @@ const KARGO_ETIKETI: Record<OrderRow["kargo"]["durum"], string> = {
   paket "info", teslim edilen yeşil; yeşil yalnızca işin bittiğini
   söylüyor.
 */
-const KARGO_TONU = (kargo: OrderRow["kargo"]): string | undefined =>
-  kargo.sorunlu ? "bad"
-  : kargo.durum === "teslim" ? "good"
-  : kargo.durum === "kismi" ? "warn"
+const KARGO_TONU = (kargo: OrderRow["kargo"]): string =>
+  kargo.sorunlu ? "danger"
+  : kargo.durum === "teslim" ? "success"
+  : kargo.durum === "kismi" ? "warning"
   : kargo.durum === "tamam" ? "info"
-  : "muted";
+  : "neutral";
 
 const BULK_STEPS = [
   { key: "confirmed", label: "Onayla" },
@@ -73,10 +75,14 @@ const BULK_STEPS = [
   olmayanlar (ör. zaten hazırlanan) sunucuda atlanır ve sayısı
   bildirilir.
 
-  Satırın tamamı detay bağlantısı (ilk hücredeki <a> kaplamayla):
-  orta tık ve "yeni sekmede aç" çalışır.
+  Satırın tamamı detay bağlantısı (ilk hücredeki .crm-row-link;
+  SatirTiklama): orta tık ve "yeni sekmede aç" çalışır.
+
+  GÖRÜNÜM ArvoOS'un liste tablosu (16.10.2026): .talep-tablo >
+  table.crm-data-table, telefonda her satır tek kompakt satır
+  (MobilSatir). Eskiden div tabanlı kendi ızgarası vardı (orders.css).
 */
-export function OrderTable({ rows, canManage, canDelete, back, siparisYok, children }: { rows: OrderRow[]; canManage: boolean; canDelete: boolean; back: string; siparisYok: boolean; children?: React.ReactNode }) {
+export function OrderTable({ rows, canManage, canDelete, back, bos, children }: { rows: OrderRow[]; canManage: boolean; canDelete: boolean; back: string; bos: React.ReactNode; children?: React.ReactNode }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const chosen = rows.filter((row) => selected.has(row.id));
   const allChecked = rows.length > 0 && chosen.length === rows.length;
@@ -147,41 +153,14 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
     });
   };
 
-  /*
-    list-table  paylaşılan liste davranışı (yapışkan başlık, satır
-                kaplaması, toplu işlem çubuğu, sayfalama)
-    order-table bu modülün ızgarası (orders.css)
-
-    Ayrım bilerek: ızgarayı paylaşılan sınıfa bağlamak, .list-table'ı
-    kullanan bir sonraki modüle sipariş sütunlarını sızdırırdı.
-  */
   return (
-    <section className="ac table list-table order-table" data-manage={canManage ? "" : undefined}>
+    <>
       {/*
-        Liste üstünde ne başlık ne ipucu bandı var.
-
-        Başlık 27.09.2026'da kaldırılmıştı (sayfa başlığı zaten
-        "Siparişler" diyordu; blok 82px yiyordu). İpucu bandı tek
-        satıra inip kalmıştı ve scripts/olc-yogunluk.mjs onun da 56px
-        tuttuğunu ölçtü — bir kez okunan bir cümle için her listede,
-        her açılışta. Cümle sayfa alt başlığına taşındı: bilgi duruyor,
-        yer açıldı.
+        Yerinde işlem sonucu. Liste yönlendirmediği için kabuktaki balon
+        (çerez) okunmuyor; sonuç listenin BAŞINDA, çünkü kullanıcının gözü
+        düğmeye bastığı satırda.
       */}
-
-      {/*
-        Yerinde işlem sonucu. Sayfa üstündeki çerezli şerit yalnızca
-        yönlendirmeli eylemlerde okunuyor; liste artık yönlendirmediği
-        için sonucu burada söylüyor. Listenin BAŞINDA, çünkü kullanıcı
-        düğmeye bastıktan sonra gözü satırda kalıyor ve sayfanın en
-        üstüne çıkmış bir mesajı görmüyor.
-      */}
-      {sonuc ? (
-        <div className="list-sonuc">
-          <Notice tone={sonuc.tur === "hata" ? "error" : "success"} title={sonuc.tur === "hata" ? "İşlem tamamlanamadı" : "İşlem tamamlandı"}>
-            {sonuc.metin}
-          </Notice>
-        </div>
-      ) : null}
+      {sonuc ? <KNot ton={sonuc.tur === "hata" ? "tehlike" : "basari"}>{sonuc.metin}</KNot> : null}
 
       {canManage && chosen.length > 0 ? (
         /*
@@ -192,7 +171,7 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
         */
         <form
           action={bulkStatus}
-          className="list-bulk-bar"
+          className="liste-toplu"
           onSubmit={(olay) => {
             const durum = ((olay.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value;
             if (!durum) return;
@@ -203,17 +182,16 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
           <input type="hidden" name="back" value={back} />
           {chosen.map((row) => <input key={row.id} type="hidden" name="order_id" value={row.id} />)}
           <b>{chosen.length} sipariş seçildi</b>
-          <span className="list-bulk-actions">
+          <span className="liste-toplu-eylem">
             {BULK_STEPS.map((step) => {
               const eligible = chosen.filter((row) => row.next?.key === step.key).length;
               return (
-                <button key={step.key} className="ac-btn" type="submit" name="status" value={step.key} disabled={!eligible || topluCalisiyor} title={eligible ? `${eligible} siparişe uygulanır` : "Seçilenlerde bu adıma uygun sipariş yok"}>
-                  {step.label}
-                  <span className="ac-count">{eligible}</span>
+                <button key={step.key} className="panel-secondary" type="submit" name="status" value={step.key} disabled={!eligible || topluCalisiyor} title={eligible ? `${eligible} siparişe uygulanır` : "Seçilenlerde bu adıma uygun sipariş yok"}>
+                  {step.label} <small>{eligible}</small>
                 </button>
               );
             })}
-            <button className="ac-btn" type="button" onClick={() => setSelected(new Set())}>Seçimi temizle</button>
+            <button className="panel-secondary" type="button" onClick={() => setSelected(new Set())}>Seçimi temizle</button>
           </span>
         </form>
       ) : null}
@@ -222,19 +200,15 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
         SİLME AYRI FORMDA. Durum düğmeleriyle aynı formda olsaydı yanlış
         düğmeye basmak kayıtları yok ederdi; ayrıca silme yetkisi daha
         dar (owner/admin), durum değiştirme manager'a da açık.
-
-        Onay penceresi kaç siparişin silineceğini ve geri alınamayacağını
-        yazıyor — sipariş numaralarıyla, çünkü "3 sipariş" yazan bir
-        uyarı hangi üçü olduğunu söylemiyor.
       */}
       {canDelete && chosen.length > 0 ? (
-        <form action={siparisleriSil} className="list-bulk-bar order-bulk-danger">
+        <form action={siparisleriSil} className="liste-toplu is-tehlike">
           <input type="hidden" name="back" value={back} />
           {chosen.map((row) => <input key={row.id} type="hidden" name="order_id" value={row.id} />)}
           <b>Seçilenleri kalıcı olarak sil</b>
-          <span className="list-bulk-actions">
+          <span className="liste-toplu-eylem">
             <ConfirmSubmit
-              className="ac-btn ac-btn-danger"
+              className="panel-danger"
               message={`${chosen.length} sipariş KALICI olarak silinecek:\n\n${chosen.slice(0, 10).map((row) => row.number).join("\n")}${chosen.length > 10 ? `\n… ve ${chosen.length - 10} sipariş daha` : ""}\n\nKalemleri, gönderileri ve işlem geçmişi de silinir. Açık siparişlerin stoğu iade edilir. Bu işlem geri alınamaz.`}
             >
               {chosen.length} siparişi sil
@@ -244,139 +218,102 @@ export function OrderTable({ rows, canManage, canDelete, back, siparisYok, child
       ) : null}
 
       {rows.length ? (
-        <>
-          <div className="list-row th">
-            {canManage ? (
-              <label className="list-check"><input type="checkbox" checked={allChecked} onChange={toggleAll} aria-label="Bu sayfadaki tüm siparişleri seç" /></label>
-            ) : null}
-            <span className="order-cell-main">SİPARİŞ</span>
-            <span className="order-cell-customer">MÜŞTERİ</span>
-            <span className="order-amount">TUTAR</span>
-            <span className="order-profit">KÂR</span>
-            <span className="order-status">OPERASYON</span>
-            <span className="order-shipping">KARGO</span>
-            {canManage ? <span className="order-action" /> : null}
-          </div>
-          {rows.map((row) => (
-            /* data-islenen: satır beklerken soluklaşıyor — düğmedeki
-               "Gönderiliyor…" tek başına satırın ucunda kalıyor ve göz
-               listenin ortasındayken fark edilmiyor. */
-            <div
-              className={selected.has(row.id) ? "list-row is-selected" : "list-row"}
-              data-islenen={islenen.has(row.id) ? "" : undefined}
-              key={row.id}
-            >
-              {canManage ? (
-                <label className="list-check"><input type="checkbox" checked={selected.has(row.id)} onChange={() => toggle(row.id)} aria-label={`${row.number} siparişini seç`} /></label>
-              ) : null}
-              {/*
-                title ŞART: satır metinleri üç nokta ile kırpılıyor
-                (panel.css, .list-row b/small) ve uzun müşteri adı
-                kaydı açmadan okunamıyordu.
-              */}
-              <span className="order-cell-main">
-                <Link prefetch={false} className="list-row-link" href={`/siparisler/${row.id}`}><b title={row.number}>{row.number}</b></Link>
-                <small>{row.date}</small>
-              </span>
-              <span className="order-cell-customer">
-                <b title={row.customer}>{row.customer}</b>
-                {/*
-                  Kaynak ve havale etiketi müşterinin altına indi:
-                  kendi sütununda 110px yer kaplıyordu ve satırda
-                  sorulan soru "kim, ne kadar, ne durumda" — kaynak
-                  ancak ayrım gerektiğinde bakılan bir ayrıntı.
-                */}
-                <small>
-                  {row.source}
-                  {row.transfer ? <em className="order-transfer-tag">Havale</em> : null}
-                </small>
-              </span>
-              <span className="order-amount">{row.total}</span>
-              <span className="order-profit">
-                {row.kar ? (
-                  <>
-                    <b data-eksi={row.kar.eksi ? "" : undefined}>{row.kar.tutar}</b>
-                    <small>%{row.kar.oran.toLocaleString("tr-TR")}</small>
-                  </>
-                ) : (
-                  /* Sebep başlıkta: maliyet eksik mi, sipariş kapalı mı. */
-                  <b className="is-empty" title="Maliyeti eksik ya da sipariş kapandı (iptal / iade)">—</b>
-                )}
-              </span>
-              <span className="order-status"><em className="ac-tag" data-tone={row.badge.tone}>{row.badge.label}</em></span>
-              <span className="order-shipping">
-                {/*
-                  Teslim edilmiş sipariş en güçlü işareti alıyor: iş
-                  bitti demek. "Kargoda" sakin kalıyor — henüz
-                  izlenmesi gereken bir şey.
-                */}
-                <em className="ac-tag" data-tone={KARGO_TONU(row.kargo)}>
-                  {row.kargo.sorunlu ? "Sorunlu" : KARGO_ETIKETI[row.kargo.durum]}
-                </em>
-              </span>
-              {canManage ? (
-                <span className="order-action">
-                  {row.next ? (
-                    /*
-                      FORM DURUYOR, yalnızca gönderimi kesiliyor.
-
-                      Düğmeyi type="button" yapmak JavaScript kapalıyken
-                      onu işlevsiz bırakırdı; önceden form POST'uydu ve
-                      çalışıyordu. Şimdi JS varsa preventDefault ile
-                      yerinde işleniyor, yoksa form normal gönderilip
-                      quickStatus'un yönlendirmeli yolundan geçiyor.
-                    */
-                    <form
-                      action={quickStatus}
-                      onSubmit={(olay) => {
-                        olay.preventDefault();
-                        ilerlet(row.id, row.next!.key);
-                      }}
-                    >
-                      <input type="hidden" name="order_id" value={row.id} />
-                      <input type="hidden" name="status" value={row.next.key} />
-                      <input type="hidden" name="back" value={back} />
-                      <button type="submit" className="row-action" disabled={islenen.has(row.id)}>
-                        {islenen.has(row.id) ? "Gönderiliyor…" : `${row.next.label} →`}
-                      </button>
-                    </form>
+        <div className="talep-tablo">
+          <table className="crm-data-table siparis-tablo" data-cols="siparisler">
+            <thead>
+              <tr>
+                {canManage ? (
+                  <th className="liste-secim"><input type="checkbox" checked={allChecked} onChange={toggleAll} aria-label="Bu sayfadaki tüm siparişleri seç" /></th>
+                ) : null}
+                <th>Sipariş</th>
+                <th>Müşteri</th>
+                <th className="crm-col-amount">Tutar</th>
+                <th className="crm-col-amount">Kâr</th>
+                <th>Durum</th>
+                <th>Kargo</th>
+                {canManage ? <th className="siparis-eylem-sutun"><span className="sr-only">Sonraki adım</span></th> : null}
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                /* data-islenen: satır beklerken soluklaşıyor. */
+                <tr key={row.id} className={selected.has(row.id) ? "is-selected" : undefined} data-islenen={islenen.has(row.id) ? "" : undefined}>
+                  {canManage ? (
+                    <td className="liste-secim"><input type="checkbox" checked={selected.has(row.id)} onChange={() => toggle(row.id)} aria-label={`${row.number} siparişini seç`} /></td>
                   ) : null}
-                </span>
-              ) : null}
-            </div>
-          ))}
-        </>
-      ) : (
-        /*
-          Hiç sipariş almamış mağazaya "filtreyi değiştirin" demek,
-          ortada olmayan bir filtreyi aratmaktı.
-        */
-        siparisYok ? (
-          /*
-            BİRİNCİL EYLEM ARTIK "MAĞAZANI GÖR". Tek düğme "Eski
-            siparişleri aktar" idi ve birincildi: hiç Shopify geçmişi
-            olmayan yeni bir salona, yapması gereken ilk şeymiş gibi
-            duruyordu — ArvoCulture'ın (taşınan mağaza) durumu herkesin
-            varsayılanıydı. Sipariş üretmek kiracının elinde değil;
-            elindeki tek anlamlı iş vitrinin çalıştığını görmek.
-          */
-          <ListeBos
-            baslik="Henüz sipariş yok."
-            aciklama="Vitrinden ilk sipariş geldiğinde burada görünür. Mağazanızı açıp alışveriş akışını kendiniz deneyebilirsiniz."
-          >
-            <ListeBosEylem href="/magaza" birincil>Mağazanı gör</ListeBosEylem>
-            <ListeBosEylem href="/veri-aktarimi">Eski siparişleri aktar</ListeBosEylem>
-          </ListeBos>
-        ) : (
-          <ListeBos
-            baslik="Bu ölçütlere uygun sipariş yok."
-            aciklama="Filtreyi veya dönemi değiştirin. Sipariş numarası, müşteri adı ve e-postada arama yapılır."
-          >
-            <ListeBosEylem href={back}>Filtreleri temizle</ListeBosEylem>
-          </ListeBos>
-        )
-      )}
-      {children}
-    </section>
+                  <td className="crm-table-mono" data-label="Sipariş">
+                    <Link prefetch={false} className="crm-row-link" href={`/siparisler/${row.id}`} title={row.number}>{row.number}</Link>
+                    <small className="crm-cell-sub">{row.date}</small>
+                  </td>
+                  <td data-label="Müşteri">
+                    <b className="crm-cell-main" title={row.customer}>{row.customer}</b>
+                    <small className="crm-cell-sub">
+                      {row.source}
+                      {row.transfer ? <span className="status-pill" data-tone="gold">Havale</span> : null}
+                    </small>
+                  </td>
+                  <td className="crm-col-amount" data-label="Tutar">{row.total}</td>
+                  <td className="crm-col-amount" data-label="Kâr">
+                    {row.kar ? (
+                      <>
+                        <b className={row.kar.eksi ? "is-eksi" : undefined}>{row.kar.tutar}</b>
+                        <small className="crm-cell-sub">%{row.kar.oran.toLocaleString("tr-TR")}</small>
+                      </>
+                    ) : (
+                      /* Sebep başlıkta: maliyet eksik mi, sipariş kapalı mı. */
+                      <span className="crm-cell-sub" title="Maliyeti eksik ya da sipariş kapandı (iptal / iade)">—</span>
+                    )}
+                  </td>
+                  <td data-label="Durum"><span className="status-pill" data-tone={rozetTonu(row.badge.tone)}>{row.badge.label}</span></td>
+                  <td data-label="Kargo">
+                    <span className="status-pill" data-tone={KARGO_TONU(row.kargo)}>{row.kargo.sorunlu ? "Sorunlu" : KARGO_ETIKETI[row.kargo.durum]}</span>
+                  </td>
+                  {canManage ? (
+                    <td className="siparis-eylem-sutun">
+                      {row.next ? (
+                        /*
+                          FORM DURUYOR, yalnızca gönderimi kesiliyor: JS varsa
+                          yerinde işleniyor, yoksa form normal gönderilip
+                          quickStatus'un yönlendirmeli yolundan geçiyor.
+                        */
+                        <form
+                          action={quickStatus}
+                          onSubmit={(olay) => {
+                            olay.preventDefault();
+                            ilerlet(row.id, row.next!.key);
+                          }}
+                        >
+                          <input type="hidden" name="order_id" value={row.id} />
+                          <input type="hidden" name="status" value={row.next.key} />
+                          <input type="hidden" name="back" value={back} />
+                          <button type="submit" className="panel-secondary siparis-ilerlet" disabled={islenen.has(row.id)}>
+                            {islenen.has(row.id) ? "Gönderiliyor…" : `${row.next.label} →`}
+                          </button>
+                        </form>
+                      ) : null}
+                    </td>
+                  ) : null}
+                  <td className="crm-table-actions"><span className="crm-row-chevron" aria-hidden="true">›</span></td>
+                  <MobilSatir
+                    href={`/siparisler/${row.id}`}
+                    baslik={row.customer}
+                    durum={{ etiket: row.badge.label, ton: rozetTonu(row.badge.tone) }}
+                    alt={[row.number, row.date]}
+                    isaretler={[
+                      { metin: row.total, ton: "guclu" },
+                      { metin: row.kargo.sorunlu ? "Kargo sorunlu" : `Kargo: ${KARGO_ETIKETI[row.kargo.durum]}`, ton: row.kargo.sorunlu ? "tehlike" : "sessiz" },
+                      row.transfer ? { metin: "Havale", ton: "uyari" } : null,
+                    ]}
+                  />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <SatirTiklama />
+          {children}
+        </div>
+      ) : bos}
+    </>
   );
 }

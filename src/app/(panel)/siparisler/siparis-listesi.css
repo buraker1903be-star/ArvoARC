@@ -1,0 +1,40 @@
+/*
+  Sipariş listesinin ArvoOS kalıbına eklediği parçalar (16.10.2026):
+  toplu işlem çubuğu, seçim sütunu, yerinde ilerletme düğmesi, kâr.
+  Liste düzeninin kendisi components/arvo-ui (talep-*, crm-data-table).
+*/
+.os-root .siparis-listesi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .siparis-listesi .talep-bilgi{display:grid;gap:var(--sp-3)}
+
+/* Seçim sütunu: dar, ortalı; satırın tıklama kaplamasının üstünde kalsın. */
+.os-root .siparis-tablo .liste-secim{width:36px;text-align:center}
+.os-root .siparis-tablo .liste-secim input{position:relative;z-index:2;width:16px;height:16px;margin:0;accent-color:var(--primary);cursor:pointer}
+.os-root .siparis-tablo tr.is-selected td{background:color-mix(in srgb,var(--primary) 6%,transparent)}
+.os-root .siparis-tablo tr[data-islenen] td{opacity:.55}
+
+.os-root .siparis-tablo .crm-cell-main{display:block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:var(--fw-semibold)}
+.os-root .siparis-tablo .crm-cell-sub{display:flex;align-items:center;gap:6px;margin-top:2px;color:var(--muted);font-size:var(--fs-micro);font-weight:var(--fw-regular)}
+.os-root .siparis-tablo .crm-cell-sub .status-pill{padding:1px 7px;font-size:11px}
+.os-root .siparis-tablo .is-eksi{color:var(--danger)}
+
+/* Yerinde ilerletme düğmesi kaplamanın üstünde: satıra tıklama detayı açar, düğme işlemi yapar. */
+.os-root .siparis-tablo .siparis-eylem-sutun{width:1%;white-space:nowrap}
+.os-root .siparis-tablo .siparis-eylem-sutun form{position:relative;z-index:2;margin:0}
+.os-root .siparis-tablo .siparis-ilerlet{min-height:32px;padding:4px 12px;font-size:var(--fs-sm);white-space:nowrap}
+
+/* Toplu işlem çubuğu: seçim varken listenin üstünde. */
+.os-root .liste-toplu{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--sp-2) var(--sp-3);
+  padding:var(--sp-2) var(--sp-3);border:1px solid color-mix(in srgb,var(--primary) 30%,var(--line));border-radius:var(--r-md);
+  background:var(--primary-soft)}
+.os-root .liste-toplu b{font-size:var(--fs-sm)}
+.os-root .liste-toplu-eylem{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+.os-root .liste-toplu-eylem small{margin-left:4px;color:var(--muted);font-variant-numeric:tabular-nums}
+.os-root .liste-toplu.is-tehlike{border-color:color-mix(in srgb,var(--danger) 35%,var(--line));background:var(--danger-soft)}
+
+/* Durum şeridinde dikkat isteyen sütunlar. */
+.os-root .siparis-listesi .kayit-serit .is-uyari dd a{color:var(--warning)}
+.os-root .siparis-listesi .kayit-serit .is-tehlike dd a{color:var(--danger)}
+
+@media (max-width:760px){
+  .os-root .siparis-tablo .liste-secim,.os-root .siparis-tablo .siparis-eylem-sutun{display:none}
+}

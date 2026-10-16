@@ -1,0 +1,616 @@
+/* Kaynak: ArvoOS/app/panel/panel-premium.css (16.10.2026). */
+/* ArvoOS premium product layer — shared across every panel module. */
+/* Palet artık YALNIZCA panel-tokens.css'te. Buraya renk tanımı eklemeyin:
+   son yüklenen dosya olduğu için sessizce token'ları ezer. */
+/* 2026-10: burada ikinci bir yüzey/mürekkep/gölge/köşe paleti vardı
+   (--surface, --ink, --r-sm:10px…). Son yüklenen dosya olduğu için
+   panel-tokens.css'i sessizce eziyordu; tasarım değerleri artık yalnızca
+   orada. check-css-tokens.mjs geri dönüşü yakalar. */
+.panel-root{
+  min-height:100dvh;
+  background:var(--bg);
+  font-synthesis:none;
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* Shell */
+.panel-org{margin-bottom:14px;padding:12px;border-radius:14px;background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.panel-nav{gap:3px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+.panel-nav a{min-height:45px;padding:8px 10px;border-radius:11px;font-size:13px;font-weight:650;color:var(--brand-200)}
+.panel-nav a i{width:29px;height:29px;border-radius:9px;background:rgba(255,255,255,.065)}
+.panel-nav a:hover{background:rgba(255,255,255,.085)}
+.panel-nav a[aria-current="page"],.panel-nav a.active{color:#fff;background:linear-gradient(135deg,rgba(255,255,255,.15),rgba(255,255,255,.08));box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
+
+.panel-top-actions{gap:10px}
+.workspace-switcher summary,.panel-icon-button{border-color:var(--line);box-shadow:var(--shadow-sm)}
+.panel-quick-action{min-height:40px;padding-inline:12px;font-size:12px}
+.panel-quick-icon{width:23px;height:23px;border-radius:8px}
+.panel-user>span{width:40px;height:40px;border-radius:13px;box-shadow:inset 0 0 0 1px rgba(178,138,73,.22)}
+.panel-user b{font-size:12px}.panel-user small{font-size:12px}
+
+/* Content rhythm */
+.panel-content{width:100%;max-width:none;padding:24px clamp(18px,2.4vw,36px) 64px}
+.panel-content>main,.panel-content>.crm-page-stack,.panel-content>.finance-page-stack,.panel-content>.finance-ledger-page,.panel-content>.operations-page,.panel-content>.reporting-page{max-width:1680px}
+.panel-pagehead{min-height:60px;margin-bottom:18px;align-items:center}
+.panel-pagehead h1{font-size:clamp(27px,2.2vw,34px);font-weight:760;letter-spacing:-.042em}
+.panel-pagehead p{max-width:780px;font-size:14px;line-height:1.55;color:var(--muted)}
+.panel-kicker{font-size:13px;letter-spacing:.13em}
+.section-heading{margin-bottom:14px}.section-heading h2{font-size:22px}.section-heading>span{font-size:13px}
+.panel-grid,.panel-modules,.platform-grid,.crm-page-stack,.finance-page-stack,.operations-page,.finance-cost-workspace,.finance-cost-detail-page,.notifications-page,.ops-page-stack{gap:16px}
+
+/* Premium surfaces */
+.panel-card,.panel-module,.report-card,.notification-card,
+.metric-strip,.metric-strip-five,.crm-metrics article,.finance-metrics article,.ops-metrics article,
+.report-kpi,.finance-cost-kpis article,.finance-cost-detail-kpis article,.finance-payment-kpis article,
+.finance-filter-panel,.finance-payment-toolbar,.report-range-bar{
+  border-color:var(--line);
+  background:var(--surface);
+  box-shadow:var(--shadow-sm);
+}
+.panel-card,.panel-module,.report-card,.notification-card{border-radius:var(--r-lg)}
+.panel-card,.panel-module{padding:18px}
+.panel-card h2,.panel-module h2{font-size:19px;letter-spacing:-.025em}
+.panel-card h3,.panel-module h3{font-size:16px}
+.panel-card p,.panel-module p{font-size:14px;line-height:1.55}
+
+/* KPIs */
+.metric-strip,.metric-strip-five,.crm-metrics,.finance-metrics,.ops-metrics,.report-kpi-grid,.finance-cost-kpis,.finance-cost-detail-kpis,.finance-payment-kpis{gap:12px}
+.metric-strip article,.metric-strip-five article,.crm-metrics article,.finance-metrics article,.ops-metrics article,.report-kpi,.finance-cost-kpis article,.finance-cost-detail-kpis article,.finance-payment-kpis article{
+  min-height:106px;padding:16px;border-radius:15px;
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.metric-strip article:hover,.metric-strip-five article:hover,.crm-metrics article:hover,.finance-metrics article:hover,.ops-metrics article:hover,.report-kpi:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--primary) 28%,var(--line));box-shadow:var(--shadow-md)}
+.metric-strip small,.metric-strip-five small,.crm-metrics small,.finance-metrics small,.ops-metrics small,.report-kpi small,.finance-cost-kpis small,.finance-cost-detail-kpis small,.finance-payment-kpis small{font-size:13px;letter-spacing:.075em}
+.metric-strip strong,.metric-strip-five strong,.crm-metrics strong,.finance-metrics strong,.ops-metrics strong,.report-kpi strong,.finance-cost-kpis strong,.finance-cost-detail-kpis strong,.finance-payment-kpis strong{font-size:23px;letter-spacing:-.025em}
+.metric-strip p,.metric-strip span,.crm-metrics span,.finance-metrics span,.ops-metrics span,.report-kpi p,.finance-cost-kpis span,.finance-cost-detail-kpis span,.finance-payment-kpis span{font-size:12px}
+
+/* Controls */
+.panel-primary,.panel-secondary,.panel-danger,.panel-text-link{
+  min-height:40px;padding:9px 14px;border-radius:11px;font-size:13px;font-weight:750;
+  transition:transform .15s ease,box-shadow .15s ease,background-color .15s ease,border-color .15s ease;
+}
+.panel-primary{background:var(--primary);box-shadow:0 1px 2px rgba(4,22,42,.2),inset 0 1px 0 rgba(255,255,255,.16)}
+.panel-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(8,42,74,.2)}
+.panel-secondary{background:linear-gradient(180deg,#fff,var(--n-0));box-shadow:0 1px 2px rgba(15,35,60,.045)}
+html[data-theme="dark"] .panel-secondary{background:linear-gradient(180deg,var(--n-800),var(--n-900))}
+.panel-primary:active,.panel-secondary:active,.panel-danger:active{transform:scale(.985)}
+.status-pill,.live-badge,.owner-badge{padding:6px 10px;border-radius:999px;font-size:12px}
+
+.panel-form{gap:14px}.panel-form label{font-size:13px;color:var(--ink)}
+.panel-form input,.panel-form select,.panel-form textarea,.finance-filter-panel input,.finance-payment-toolbar input,.report-custom-range input{
+  min-height:42px;padding:9px 12px;border-radius:11px;border-color:var(--line);background:var(--surface-raised);font-size:14px;box-shadow:inset 0 1px 1px rgba(15,35,60,.025);
+}
+.panel-form :is(input,select,textarea):focus,.finance-filter-panel input:focus,.finance-payment-toolbar input:focus,.report-custom-range input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 15%,transparent)}
+
+/* Tables and long feeds */
+.panel-table,.crm-data-table,.ops-table,.finance-cost-table,.finance-cost-movement-table{font-variant-numeric:tabular-nums}
+.panel-table th,.crm-data-table thead th,.finance-cost-table-head,.finance-cost-movement-table .head,.ops-table th{padding:11px 13px;font-size:13px;color:var(--muted);background:var(--surface-2)}
+.panel-table td,.crm-data-table tbody td,.ops-table td{padding:12px 13px;font-size:13px;line-height:1.45}
+.panel-table tbody tr,.crm-data-table tbody tr,.ops-table tbody tr{transition:background-color .14s ease}
+.panel-table tbody tr:hover,.crm-data-table tbody tr:hover,.ops-table tbody tr:hover{background:color-mix(in srgb,var(--primary-soft) 38%,var(--surface))}
+.crm-data-table .crm-table-title,.finance-cost-table h3{font-size:14px}
+.crm-data-table .crm-table-mono,.crm-data-table .crm-table-sub,.finance-cost-table p,.finance-cost-table a span{font-size:12px}
+.finance-cost-table>article,.finance-cost-movement-table>article,.finance-payment-list>article,.notification-card{content-visibility:auto;contain-intrinsic-size:auto 76px}
+
+/* Drawers and feedback */
+.panel-drawer-backdrop{background:rgba(4,14,28,.42);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.panel-drawer{box-shadow:0 32px 90px rgba(3,14,28,.34)}
+.panel-drawer-header{background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.panel-drawer-header h2{font-size:25px}.panel-drawer-header p{font-size:13px}
+.panel-action-feedback{background:rgba(8,25,45,.16);backdrop-filter:blur(4px)}
+.panel-action-feedback-card{border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);font-size:13px}
+.skel{background:linear-gradient(110deg,var(--surface-2) 25%,color-mix(in srgb,var(--surface) 72%,var(--surface-2)) 45%,var(--surface-2) 65%);background-size:250% 100%;animation:premiumSkeleton 1.35s ease-in-out infinite}
+.skel:after{display:none}@keyframes premiumSkeleton{0%{background-position:120% 0}100%{background-position:-120% 0}}
+
+@media(max-width:1100px){
+  .panel-content{padding-inline:18px}
+}
+
+@media(max-width:900px){
+  .panel-content{padding:18px 12px max(112px,calc(92px + env(safe-area-inset-bottom)))}
+  .panel-pagehead{align-items:stretch;gap:12px;margin-bottom:15px}
+  .panel-pagehead h1{font-size:28px}.panel-pagehead p{font-size:14px}
+  .panel-card,.panel-module,.report-card,.notification-card{border-radius:16px}
+  .panel-grid,.panel-modules,.platform-grid,.crm-page-stack,.finance-page-stack,.operations-page,.finance-cost-workspace,.finance-cost-detail-page,.notifications-page,.ops-page-stack{gap:12px}
+  .panel-content table{min-width:680px}
+}
+
+@media(max-width:620px){
+  .panel-content{padding-left:10px;padding-right:10px}
+  .panel-pagehead h1{font-size:27px}
+  .panel-page-actions{display:flex;overflow-x:auto;gap:8px;scroll-snap-type:x proximity;scrollbar-width:none}
+  .panel-page-actions>*{flex:0 0 auto;width:auto;scroll-snap-align:start}
+  .panel-primary,.panel-secondary,.panel-danger,.panel-text-link{min-height:44px;font-size:14px}
+  .panel-form{grid-template-columns:1fr}
+  .panel-form input,.panel-form select,.panel-form textarea,.finance-filter-panel input,.finance-payment-toolbar input,.report-custom-range input{min-height:46px;font-size:16px}
+  .metric-strip,.metric-strip-five,.crm-metrics,.finance-metrics,.ops-metrics,.report-kpi-grid,.finance-cost-kpis,.finance-cost-detail-kpis,.finance-payment-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .metric-strip article,.metric-strip-five article,.crm-metrics article,.finance-metrics article,.ops-metrics article,.report-kpi,.finance-cost-kpis article,.finance-cost-detail-kpis article,.finance-payment-kpis article{min-height:100px;padding:13px}
+  .metric-strip strong,.metric-strip-five strong,.crm-metrics strong,.finance-metrics strong,.ops-metrics strong,.report-kpi strong,.finance-cost-kpis strong,.finance-cost-detail-kpis strong,.finance-payment-kpis strong{font-size:20px}
+  .module-tabs a{min-height:44px;font-size:13px}
+  .panel-drawer{width:100%;border-radius:var(--r-lg)}
+  .panel-drawer-header{padding-top:max(22px,env(safe-area-inset-top))}
+}
+
+@media(max-width:380px){
+  .metric-strip,.metric-strip-five,.crm-metrics,.finance-metrics,.ops-metrics,.report-kpi-grid,.finance-cost-kpis,.finance-cost-detail-kpis,.finance-payment-kpis{grid-template-columns:1fr}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .panel-root *,.panel-root *:before,.panel-root *:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+
+@supports not (backdrop-filter:blur(1px)){
+  .panel-drawer-header{background:var(--surface)}
+}
+
+/* Phase 2 — navigation, messaging and interaction refinement */
+.panel-root :is(a,button,input,select,textarea,summary):focus-visible{
+  outline:3px solid color-mix(in srgb,var(--primary) 32%,transparent);
+  outline-offset:2px;
+}
+.panel-nav-v2 .panel-nav-group-link,.panel-nav-v2 .panel-nav-home,.panel-nav-v2 summary{position:relative}
+.panel-nav-v2 :is(.panel-nav-group-link,.panel-nav-home).active:before,.panel-nav-v2 .panel-nav-group.active>summary:before{
+  content:"";position:absolute;left:-7px;top:50%;width:3px;height:22px;border-radius:99px;background:var(--accent-bright);transform:translateY(-50%);box-shadow:0 0 14px rgba(201,166,106,.5)
+}
+.panel-nav-v2 .panel-nav-children{margin:3px 0 5px 19px;padding-left:15px;border-left:1px solid rgba(255,255,255,.1)}
+.panel-nav-v2 .panel-nav-children a{min-height:36px;padding:7px 10px;font-size:12px}
+.panel-nav-v2 .panel-nav-children a.active{color:#fff;background:rgba(255,255,255,.075)}
+
+.nav-progress{position:fixed!important;top:0!important;left:0!important;z-index:3000!important;height:3px!important;background:linear-gradient(90deg,var(--accent-bright),var(--accent-bright))!important;box-shadow:0 0 12px rgba(201,166,106,.65)!important}
+.panel-empty{min-height:180px;display:grid;place-items:center;padding:36px 20px;border:1px dashed var(--line);border-radius:16px;background:color-mix(in srgb,var(--surface-2) 72%,transparent);font-size:14px;line-height:1.55}
+
+.messages-drawer{border-radius:22px 0 0 22px;box-shadow:-36px 0 90px rgba(4,20,38,.28)}
+.messages-drawer-head{min-height:76px;padding:16px 20px;background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+.messages-drawer-head small{font-size:13px}.messages-drawer-head h2{font-size:25px;letter-spacing:-.035em}
+.messages-drawer-head>button{border-radius:12px;transition:transform .15s ease,background-color .15s ease}.messages-drawer-head>button:active{transform:scale(.94)}
+.messages-people{padding:15px;background:color-mix(in srgb,var(--surface-2) 88%,var(--surface))}
+.messages-people input{height:42px;border-radius:12px;font-size:13px}
+.messages-person-list button,.messages-channel-list button{min-height:46px;border-radius:12px;font-size:13px;transition:background-color .14s ease,box-shadow .14s ease,transform .14s ease}
+.messages-person-list button:active,.messages-channel-list button:active{transform:scale(.985)}
+.messages-thread>header{min-height:66px;background:color-mix(in srgb,var(--surface) 94%,transparent)}
+.messages-thread-scroll{gap:10px;padding:18px;background:radial-gradient(circle at 100% 0,rgba(178,138,73,.07),transparent 20rem),var(--surface-2)}
+.messages-thread-scroll article{padding:10px 12px;border-radius:7px 16px 16px;box-shadow:var(--shadow-sm)}
+.messages-thread-scroll article.mine{border-radius:16px 7px 16px 16px;background:var(--primary-soft)}
+.messages-thread-scroll article p{font-size:14px;line-height:1.5}.messages-thread-scroll article small{font-size:13px}
+.messages-composer{padding:12px 14px;background:color-mix(in srgb,var(--surface) 94%,transparent);box-shadow:0 -8px 28px rgba(8,35,62,.045)}
+.messages-composer textarea{min-height:44px;border-radius:14px;font-size:14px;background:var(--surface-2)}
+.messages-attach-button,.messages-send-button{height:44px;border-radius:12px}.messages-send-button{background:var(--primary);box-shadow:0 4px 12px rgba(9,47,85,.18)}
+
+.notification-filter-tabs{padding:4px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.notification-filter-tabs a{border:0!important;border-radius:10px;transition:background-color .15s ease,color .15s ease,transform .15s ease}
+.notification-filter-tabs a:active{transform:scale(.985)}
+.notification-card{position:relative;overflow:hidden}
+.notification-card:before{content:"";position:absolute;inset:14px auto 14px 0;width:3px;border-radius:0 99px 99px 0;background:var(--primary);opacity:.75}
+
+@media(max-width:900px){
+}
+
+@media(max-width:680px){
+  .messages-drawer{border-radius:0}
+  .messages-thread-scroll article p{font-size:14px}
+  .messages-composer textarea{font-size:16px}
+}
+
+/* Phase 3 — dense data surfaces and responsive finishing */
+.panel-content :is(.table-wrap,.panel-table-wrap,.data-table-wrap,.list-table-wrap){
+  position:relative;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--shadow-sm);overflow:auto;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 36%,transparent) transparent
+}
+.panel-content :is(.table-wrap,.panel-table-wrap,.data-table-wrap,.list-table-wrap) thead th{
+  position:sticky;top:0;z-index:2;background:color-mix(in srgb,var(--surface-2) 95%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)
+}
+.panel-content :is(.table-wrap,.panel-table-wrap,.data-table-wrap,.list-table-wrap)::-webkit-scrollbar{height:8px;width:8px}
+.panel-content :is(.table-wrap,.panel-table-wrap,.data-table-wrap,.list-table-wrap)::-webkit-scrollbar-thumb{border:2px solid transparent;border-radius:99px;background:color-mix(in srgb,var(--muted) 34%,transparent);background-clip:padding-box}
+.panel-table tbody tr:last-child td,.crm-data-table tbody tr:last-child td,.ops-table tbody tr:last-child td{border-bottom:0}
+.panel-table td:last-child,.crm-data-table td:last-child,.ops-table td:last-child{white-space:nowrap}
+
+.finance-filter-panel,.finance-payment-toolbar,.report-range-bar{border-radius:16px;padding:12px 14px}
+.finance-pagination{border-top:1px solid var(--line-soft);background:var(--surface-2)}
+.finance-pagination button:disabled,.panel-root button:disabled{cursor:not-allowed;opacity:.52;filter:saturate(.65)}
+.finance-pagination button:not(:disabled):active{transform:scale(.97)}
+
+.panel-page-actions,.finance-head-actions{scrollbar-width:none}.panel-page-actions::-webkit-scrollbar,.finance-head-actions::-webkit-scrollbar{display:none}
+.panel-page-actions:after,.finance-head-actions:after{content:"";flex:0 0 1px}
+.panel-card>header,.report-card>header{gap:12px}
+.panel-card :is(ul,ol){padding-left:20px}.panel-card li{margin-block:5px;font-size:14px;line-height:1.5}
+.panel-root :is(.panel-primary,.panel-secondary,.panel-danger,.panel-text-link,.panel-quick-action){-webkit-user-select:none;user-select:none}
+.panel-root :is(.panel-primary,.panel-secondary,.panel-danger,.panel-text-link)[aria-busy="true"]{pointer-events:none;opacity:.72}
+
+.panel-skeleton{gap:16px}.panel-skeleton-metrics{gap:12px}.skel-card{height:106px;border-radius:16px}.skel-block{height:210px;border-radius:18px}
+.panel-error{border-radius:14px;font-size:14px;line-height:1.5;box-shadow:var(--shadow-sm)}
+
+@media(hover:hover) and (pointer:fine){
+  .panel-card:has(>a:hover),.notification-card:hover{border-color:color-mix(in srgb,var(--primary) 24%,var(--line));box-shadow:var(--shadow-md)}
+}
+
+@media(max-width:900px){
+  .panel-content :is(.table-wrap,.panel-table-wrap,.data-table-wrap,.list-table-wrap){margin-inline:0;border-radius:14px;overscroll-behavior-x:contain;scroll-snap-type:x proximity}
+  .panel-content :is(.table-wrap,.panel-table-wrap,.data-table-wrap,.list-table-wrap):before{content:"";position:sticky;left:0;z-index:3;display:block;width:100%;height:3px;background:linear-gradient(90deg,var(--primary),color-mix(in srgb,var(--primary) 10%,transparent));pointer-events:none}
+  .panel-content :is(.table-wrap,.panel-table-wrap,.data-table-wrap,.list-table-wrap)::after{content:"← Yatay kaydır →";position:sticky;left:0;display:block;width:max-content;margin-left:auto;padding:7px 10px;color:var(--muted);font-size:13px;font-weight:650}
+  .panel-content table th:first-child,.panel-content table td:first-child{scroll-snap-align:start}
+  .finance-filter-panel,.finance-payment-toolbar,.report-range-bar{padding:10px;border-radius:14px}
+}
+
+@media(max-width:620px){
+  .panel-pagehead{padding-inline:2px}
+  .panel-pagehead p{line-height:1.45}
+  .panel-card,.panel-module,.report-card,.notification-card{padding:14px}
+  .panel-card h2,.panel-module h2{font-size:18px}
+  .panel-card h3,.panel-module h3{font-size:16px}
+  .panel-card p,.panel-module p,.panel-card li{font-size:14px}
+  .status-pill,.live-badge,.owner-badge{min-height:28px;align-items:center}
+}
+
+/*
+  İSKELETİN TELEFON ÖLÇÜLERİ TEK YERDE (15.10.2026): panel-page-system.css.
+  Burada ikinci bir takım vardı ve 380 altında ölçü kutularını TEK sütuna
+  indiriyordu — 375 piksellik telefonlarda (iPhone SE/mini/8) dört kutu alt
+  alta, iskelet gerçek sayfadan uzun. Bu dosya sonra yüklendiği için
+  oradaki 620 kuralını eziyordu. Kutular 62 piksele indiği için iki sütun
+  320 pikselde bile rahat; kural kaldırıldı, ötekiler de ölü kopyaydı.
+*/
+
+/* Phase 4 — CRM lists aligned with the Finance profitability table */
+.crm-page-stack .crm-filter-card{
+  padding:12px 14px;border-radius:16px;background:var(--surface);box-shadow:var(--shadow-sm)
+}
+.crm-page-stack .crm-filter-form{gap:10px}
+.crm-page-stack .crm-filter-form label>span{font-size:12px;letter-spacing:.02em;color:var(--muted)}
+.crm-page-stack .crm-filter-form :is(input,select){min-height:42px;border-radius:11px;padding:9px 12px;font-size:14px;background:var(--surface-raised)}
+
+.crm-page-stack .crm-table-wrap{
+  padding:0;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--shadow-sm);overflow:auto;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 30%,transparent) transparent
+}
+.crm-page-stack .crm-data-table{min-width:1060px;font-variant-numeric:tabular-nums}
+.crm-page-stack .crm-data-table thead th{
+  top:0;z-index:2;padding:13px 14px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--surface-2) 94%,transparent);color:var(--muted);font-size:13px;letter-spacing:.055em;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)
+}
+.crm-page-stack .crm-data-table tbody td{height:68px;padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;line-height:1.4}
+.crm-page-stack .crm-data-table tbody tr{content-visibility:auto;contain-intrinsic-size:auto 68px;transition:background-color .14s ease,box-shadow .14s ease}
+.crm-page-stack .crm-data-table tbody tr:hover{background:color-mix(in srgb,var(--primary-soft) 34%,var(--surface))}
+.crm-page-stack .crm-data-table .crm-table-mono{font-size:12px;font-weight:720;letter-spacing:-.01em;color:var(--muted)}
+.crm-page-stack .crm-data-table .crm-table-title{max-width:260px;font-size:14px;font-weight:780;letter-spacing:-.012em}
+.crm-page-stack .crm-data-table .crm-table-sub{margin-top:4px;font-size:12px;line-height:1.35}
+.crm-page-stack .crm-row-link{color:var(--ink);text-decoration:none}
+.crm-page-stack .crm-row-subject{display:block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:680}
+.crm-page-stack .crm-comment-count-badge{min-height:28px;padding:6px 10px;border-color:color-mix(in srgb,var(--primary) 24%,var(--line));background:var(--primary-soft);color:var(--primary);font-size:12px}
+.crm-page-stack .crm-table-actions{justify-content:flex-end}
+.crm-page-stack .crm-table-actions>.panel-secondary{min-width:76px;min-height:36px;padding:8px 12px;border-radius:10px;font-size:12px;background:linear-gradient(180deg,var(--surface-raised),var(--surface-2));box-shadow:0 1px 2px rgba(15,35,60,.04)}
+.crm-page-stack .crm-table-actions>.panel-secondary:after{content:"•••";margin-left:7px;color:var(--muted);font-size:13px;letter-spacing:1px}
+.crm-page-stack .crm-table-wrap::-webkit-scrollbar{height:9px}.crm-page-stack .crm-table-wrap::-webkit-scrollbar-thumb{border:2px solid transparent;border-radius:99px;background:color-mix(in srgb,var(--muted) 30%,transparent);background-clip:padding-box}
+
+.panel-sheet{border-radius:24px 24px 0 0;background:color-mix(in srgb,var(--surface) 97%,transparent);box-shadow:0 -30px 90px rgba(4,25,42,.24);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+.panel-sheet-backdrop{background:rgba(4,20,38,.46);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.panel-sheet-handle{width:46px;height:5px;background:color-mix(in srgb,var(--muted) 34%,transparent)}
+.panel-sheet header h2{font-size:20px;letter-spacing:-.025em}.panel-sheet-actions{gap:10px}
+.panel-sheet-actions .panel-primary,.panel-sheet-actions .panel-secondary,.panel-sheet-actions .panel-danger{min-height:42px;padding:9px 14px;border-radius:11px;font-size:13px}
+
+@media(max-width:900px){
+  .crm-page-stack .crm-table-wrap{margin-inline:0;width:100%;border-radius:16px}
+}
+
+@media(max-width:760px){
+  .crm-page-stack .crm-filter-card{padding:12px}
+  .crm-page-stack .crm-filter-form{grid-template-columns:1fr}
+  .crm-page-stack .crm-filter-form>div{grid-column:auto;display:grid;grid-template-columns:1fr 1fr}
+  .crm-page-stack .crm-filter-form :is(button,a){min-height:44px}
+  .crm-page-stack .crm-table-wrap{overflow:visible;border:0;border-radius:0;background:transparent;box-shadow:none}
+  .crm-page-stack .crm-data-table{min-width:0}
+  .crm-page-stack .crm-data-table tbody{display:grid;gap:10px}
+  .crm-page-stack .crm-data-table tbody tr{margin:0;padding:0 14px;border:1px solid var(--line);border-radius:17px;background:var(--surface);box-shadow:var(--shadow-sm);contain-intrinsic-size:auto 390px}
+  .crm-page-stack .crm-data-table tbody tr:hover{background:var(--surface)}
+  .crm-page-stack .crm-data-table tbody td{height:auto;min-height:43px;padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:14px;line-height:1.4}
+  .crm-page-stack .crm-data-table tbody td:before{font-size:13px;letter-spacing:.055em}
+  .crm-page-stack .crm-data-table tbody td:nth-child(2){padding-top:13px}
+  .crm-page-stack .crm-data-table .crm-table-title{font-size:15px}.crm-page-stack .crm-data-table .crm-table-sub{font-size:12px}
+  .crm-page-stack .crm-row-subject{max-width:62vw;white-space:normal;text-align:right;font-size:14px}
+  .crm-page-stack .crm-table-actions{padding:12px 0!important}
+  .crm-page-stack .crm-table-actions>.panel-secondary{width:100%;min-height:44px;font-size:14px;background:var(--primary);color:var(--primary-on);border:0;box-shadow:0 5px 14px rgba(9,47,85,.16)}
+  .crm-page-stack .crm-table-actions>.panel-secondary:after{color:rgba(255,255,255,.7)}
+  .panel-sheet-actions{display:grid;grid-template-columns:1fr 1fr}.panel-sheet-actions>*{width:100%}
+}
+
+@media(max-width:430px){
+  .crm-page-stack .crm-filter-form>div,.panel-sheet-actions{grid-template-columns:1fr}
+  .crm-page-stack .crm-row-subject{max-width:58vw}
+}
+
+/* Phase 5 — Cari Hesaplar reference: every CRM record is a horizontal list card */
+.crm-page-stack .crm-table-wrap{border:0;background:transparent;box-shadow:none;overflow:visible}
+.crm-page-stack .crm-data-table{display:block;width:100%;min-width:0;border-collapse:separate}
+.crm-page-stack .crm-data-table thead{display:none}
+.crm-page-stack .crm-data-table tbody{display:grid;width:100%;gap:10px}
+.crm-page-stack .crm-data-table tbody tr{
+  display:grid;
+  grid-template-columns:110px minmax(220px,1.55fr) minmax(150px,1fr) minmax(120px,.8fr) minmax(100px,.65fr) minmax(100px,.65fr) minmax(95px,.58fr) minmax(90px,.55fr) 92px;
+  align-items:center;gap:12px;min-height:92px;padding:14px 16px;border:1px solid var(--line);border-radius:17px;background:var(--surface);box-shadow:var(--shadow-sm);overflow:visible;contain-intrinsic-size:auto 92px
+}
+.crm-page-stack .crm-data-table tbody tr:hover{background:var(--surface);border-color:color-mix(in srgb,var(--primary) 24%,var(--line));box-shadow:var(--shadow-md)}
+.crm-page-stack .crm-data-table tbody td{
+  display:flex;min-width:0;height:auto;min-height:48px;padding:0;border:0;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;font-size:13px;text-align:left
+}
+.crm-page-stack .crm-data-table tbody td:before{content:attr(data-label);display:block;color:var(--muted);font-size:13px;font-weight:750;letter-spacing:.035em;text-transform:none;line-height:1.1}
+.crm-page-stack .crm-data-table tbody td:nth-child(2):before{display:none}
+.crm-page-stack .crm-data-table .crm-table-mono{padding-left:1px;color:var(--muted);font-size:13px;line-height:1.4;white-space:normal;overflow-wrap:anywhere}
+.crm-page-stack .crm-data-table .crm-table-title{max-width:100%;font-size:14px;line-height:1.32;white-space:normal}
+.crm-page-stack .crm-data-table .crm-table-sub{font-size:13px}
+.crm-page-stack .crm-row-subject{max-width:100%;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-clamp:2;overflow:hidden}
+.crm-page-stack .crm-table-actions{min-height:48px;align-items:center!important;justify-content:flex-end!important;padding:0!important;margin:0!important}
+.crm-page-stack .crm-table-actions:before{display:none!important}
+.crm-page-stack .crm-table-actions>.panel-secondary{width:100%;min-width:0;min-height:38px}
+
+@media(max-width:1320px){
+  .crm-page-stack .crm-data-table tbody tr{grid-template-columns:105px minmax(210px,1.4fr) repeat(6,minmax(90px,.7fr)) 88px;gap:9px;padding-inline:13px}
+  .crm-page-stack .crm-data-table tbody td{font-size:12px}.crm-page-stack .crm-data-table tbody td:before{font-size:12px}
+}
+
+@media(max-width:1100px){
+  .crm-page-stack .crm-data-table tbody tr{grid-template-columns:105px minmax(220px,1.4fr) repeat(3,minmax(110px,.72fr));min-height:0;gap:12px 16px;padding:15px}
+  .crm-page-stack .crm-data-table tbody td{min-height:44px}
+  .crm-page-stack .crm-data-table tbody td:nth-child(n+6):nth-child(-n+8){grid-row:2}
+  .crm-page-stack .crm-table-actions{grid-column:5;grid-row:2}
+}
+
+@media(max-width:760px){
+  .crm-page-stack .crm-data-table tbody{gap:10px}
+  .crm-page-stack .crm-data-table tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;padding:8px 14px 12px;border-radius:17px;overflow:hidden;contain-intrinsic-size:auto 350px}
+  .crm-page-stack .crm-data-table tbody td{display:flex;min-height:58px;padding:10px 0;border-bottom:1px solid var(--line-soft);align-items:flex-start;justify-content:center;text-align:left}
+  .crm-page-stack .crm-data-table tbody td:before{display:block;font-size:13px}
+  .crm-page-stack .crm-data-table tbody td:nth-child(1){grid-column:1/-1;min-height:40px;padding-bottom:4px;border-bottom:0}
+  .crm-page-stack .crm-data-table tbody td:nth-child(2){grid-column:1/-1;min-height:64px;padding-top:4px}.crm-page-stack .crm-data-table tbody td:nth-child(2):before{display:none}
+  .crm-page-stack .crm-data-table tbody td:nth-child(n+6):nth-child(-n+8){grid-row:auto}
+  .crm-page-stack .crm-data-table .crm-table-title{font-size:15px}.crm-page-stack .crm-data-table .crm-table-sub{font-size:12px}
+  .crm-page-stack .crm-row-subject{max-width:100%;text-align:left}
+  .crm-page-stack .crm-table-actions{grid-column:1/-1;grid-row:auto;min-height:56px;padding-top:12px!important;border-bottom:0!important}
+  .crm-page-stack .crm-table-actions>.panel-secondary{min-height:44px}
+}
+
+@media(max-width:480px){
+  .crm-page-stack .crm-data-table tbody tr{grid-template-columns:1fr}
+  .crm-page-stack .crm-data-table tbody td,.crm-page-stack .crm-data-table tbody td:nth-child(1),.crm-page-stack .crm-data-table tbody td:nth-child(2),.crm-page-stack .crm-table-actions{grid-column:1}
+  .crm-page-stack .crm-data-table tbody td{min-height:52px}
+}
+
+/* ============================================================
+   Masaüstünde tablo başlığı — tek satır, satırlarla hizalı.
+   Satırlar zaten sabit sütun genişlikleriyle grid; her kartta
+   etiketi tekrarlamak 25 kayıtta 175 gereksiz metin demek.
+   901px altında dokunmuyoruz: orada kart görünümü doğru.
+   ============================================================ */
+@media(min-width:901px){
+  .crm-page-stack .crm-data-table thead{display:block;position:sticky;top:78px;z-index:2}
+  .crm-page-stack .crm-data-table thead tr{
+    display:grid;
+    grid-template-columns:110px minmax(220px,1.55fr) minmax(150px,1fr) minmax(120px,.8fr) minmax(100px,.65fr) minmax(100px,.65fr) minmax(95px,.58fr) minmax(90px,.55fr) 92px;
+    align-items:center;gap:12px;padding:10px 16px;margin-bottom:6px
+  }
+  .crm-page-stack .crm-data-table thead th{
+    position:static;padding:0;background:transparent;border:0;
+    color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.07em;
+    text-transform:uppercase;text-align:left;white-space:nowrap
+  }
+  /* satır içi etiket tekrarını kaldır — başlık yukarıda */
+  .crm-page-stack .crm-data-table tbody td:before{display:none}
+  .crm-page-stack .crm-data-table tbody td{min-height:40px;justify-content:center}
+  .crm-page-stack .crm-data-table tbody tr{min-height:68px}
+}
+
+/* ============================================================
+   Satırın tamamı tıklanabilir.
+   İlk hücredeki .crm-row-link bir ::after ile tüm kartı kaplar.
+   Gerçek <a> olduğu için klavye, orta tık ve "yeni sekmede aç"
+   çalışmaya devam eder — onClick ile router.push olsaydı olmazdı.
+   ============================================================ */
+.crm-page-stack .crm-data-table tbody tr{position:static;cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}
+/* kaplama yalnızca ilk hücredeki bağlantıya: satırda birden fazla
+   crm-row-link var ve hepsi aynı yere gidiyor, üst üste bindirmeye gerek yok */
+.crm-page-stack .crm-data-table tbody td:first-child .crm-row-link{position:static}
+/* Kaplama kaldırıldı; gerekçe kayit-detay.css'teki nottadır (Safari <tr>'yi
+   kapsayıcı blok yapmıyor, kaplama kartın tamamına yayılıyordu). */
+.crm-page-stack .crm-data-table tbody td:first-child .crm-row-link{display:flex;flex-direction:column;justify-content:center;gap:2px;border-radius:var(--r-sm)}
+
+/* Satır içindeki gerçek etkileşimli öğeler kaplamanın üstünde kalmalı,
+   yoksa yorum rozeti veya işlem butonları tıklanamaz hale gelir. */
+.crm-page-stack .crm-data-table tbody td :is(a:not(.crm-row-link),button,select,input,summary,details,form){position:relative;z-index:1}
+
+.crm-page-stack .crm-data-table tbody tr:hover{transform:translateY(-1px)}
+.crm-page-stack .crm-data-table tbody tr:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Satır sonundaki yön oku — tıklanabilirliğin görsel ipucu */
+.crm-row-chevron{display:block;width:100%;text-align:right;padding-right:4px;color:var(--dim);font-size:20px;line-height:1;transition:color .15s ease,transform .15s ease}
+.crm-page-stack .crm-data-table tbody tr:hover .crm-row-chevron{color:var(--accent);transform:translateX(2px)}
+/* Pencere içindeki kalıcı/yıkıcı işlem bölgesi */
+.panel-danger-zone{margin-top:22px;padding:16px 18px;border:1px solid color-mix(in srgb,var(--danger) 28%,var(--line));border-radius:var(--r-md);background:var(--danger-soft)}
+.panel-danger-zone p{margin:8px 0 14px;color:var(--ink-soft);font-size:13px;line-height:1.55}
+
+/* Revizyon geçmişi — teklif detayının altında, yorumlar gibi gömülü */
+.crm-revision-history{margin-top:18px;padding:22px 24px}
+.crm-revision-history header{margin-bottom:16px}
+.crm-revision-history header h2{margin:6px 0 0;font:750 18px var(--font-heading);color:var(--ink)}
+.crm-revision-history ol{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.crm-revision-history li{display:grid;grid-template-columns:56px minmax(0,1fr) auto;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
+.crm-revision-history li.is-current{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));background:var(--accent-soft)}
+.crm-revision-mark{display:grid;place-items:center;height:36px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--line);color:var(--muted);font-size:13px;font-weight:800}
+.crm-revision-history li.is-current .crm-revision-mark{color:var(--accent-strong);border-color:transparent}
+.crm-revision-body{min-width:0}
+.crm-revision-body b{display:flex;align-items:center;gap:10px;color:var(--ink);font-size:14px}
+.crm-revision-body b em{padding:3px 8px;border-radius:var(--r-pill);background:var(--surface);color:var(--accent-strong);font-size:13px;font-style:normal;font-weight:800;letter-spacing:.04em}
+.crm-revision-body span{display:block;margin-top:4px;color:var(--muted);font-size:13px}
+.crm-revision-body p{margin:8px 0 0;color:var(--ink-soft);font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:620px){
+  .crm-revision-history{padding:18px 16px}
+  .crm-revision-history li{grid-template-columns:44px minmax(0,1fr);row-gap:10px}
+  .crm-revision-history li>.panel-secondary{grid-column:1/-1;width:100%}
+}
+
+/* ============================================================
+   YOĞUNLUK KATMANI
+   Sorun: Sözleşmeler ekranında ilk kayıt görünene kadar ~700px
+   harcanıyordu (başlık + sekme + 4 metrik kartı + filtre + tablo
+   başlığı), satırlar 68px'ti. 1080p ekranda 6 kaydın 3'ü görünüyordu.
+
+   Bir CRM'in işi hattı göstermek. Aşağıdaki ölçüler aynı ekrana
+   3 yerine 9-10 kayıt sığdırıyor. Yazı boyutlarına dokunulmadı —
+   okunabilirlik değil, boşluk kısıldı.
+   ============================================================ */
+@media(min-width:901px){
+  /* --- metrik kartları: dikey yığından yatay şeride --- */
+  .crm-metrics article,
+  .metric-strip article,
+  .metric-strip-five article,
+  .finance-metrics article{
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr);
+    align-items:center;
+    column-gap:12px;
+    min-height:0;
+    padding:12px 14px
+  }
+  .crm-metrics strong,
+  .metric-strip strong,
+  .metric-strip-five strong,
+  .finance-metrics strong{
+    grid-row:1/3;
+    margin:0;
+    font-size:24px;
+    line-height:1.05;
+    letter-spacing:-.02em
+  }
+  .crm-metrics small,
+  .metric-strip small,
+  .metric-strip-five small,
+  .finance-metrics small{
+    align-self:end;
+    font-size:11px;
+    letter-spacing:.07em
+  }
+  .crm-metrics span,
+  .metric-strip span,
+  .metric-strip-five span,
+  .finance-metrics span{
+    align-self:start;
+    font-size:12px;
+    line-height:1.3
+  }
+
+  /* --- satırlar: 68px -> 52px, aradaki boşluk 10px -> 6px --- */
+  .crm-page-stack .crm-data-table tbody{gap:6px}
+  .crm-page-stack .crm-data-table tbody tr{
+    min-height:52px;
+    padding-block:6px
+  }
+  .crm-page-stack .crm-data-table tbody td{min-height:36px}
+
+  /* Tablo başlığı da orantılı incelsin */
+  .crm-page-stack .crm-data-table thead tr{padding-block:6px;margin-bottom:4px}
+
+  /* Sayfa başlığı ile içerik arasındaki boşluk --- */
+  .crm-page-stack .panel-pagehead{margin-bottom:14px}
+}
+
+/* ============================================================
+   PENCERE İÇİ FORMLAR
+   panel.css formu iki sütun olarak tasarlamıştı; çekmece sağdan
+   kayan 560px'lik bir panelken tek sütuna zorlanmış. Pencere artık
+   ortada ve daha geniş, iki sütun rahat sığıyor. 16 alanlı talep
+   formu böylece yarı yüksekliğe iniyor ve kaydırma neredeyse bitiyor.
+   ============================================================ */
+@media(min-width:761px){
+  .panel-drawer{width:min(760px,100%)}
+  .panel-drawer-body .panel-form{grid-template-columns:1fr 1fr}
+  .panel-drawer-body .panel-form .wide{grid-column:1/-1}
+}
+
+/* Kaydet çubuğu içeriğin üstüne biniyordu: sticky + bottom:-38px
+   kombinasyonu çubuğu kaydırma alanının dışına taşırıyor, son alan
+   arkasında kalıyordu. Çubuk artık tam altta duruyor ve gövdeye
+   kendi yüksekliği kadar boşluk bırakılıyor. */
+.panel-drawer-body{padding-bottom:0}
+.panel-drawer-body .panel-form-actions{
+  position:sticky;
+  bottom:0;
+  margin:18px -30px 0;
+  padding:16px 30px calc(16px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);
+  background:var(--surface)
+}
+@media(max-width:760px){
+  .panel-drawer-body .panel-form-actions{margin-inline:-20px;padding-inline:20px}
+}
+
+/* ============================================================
+   GECE MAVİSİ VE ŞAMPANYA (2026-09)
+   Teklif ve sözleşme belgeleriyle aynı lüks dil: serif başlıklar,
+   gece mavisi derinlik, şampanya altını ince çizgiler. Renkler
+   yalnızca panel-tokens.css'ten gelir; kurum kendi marka rengini
+   seçtiyse --accent / --accent-bright altının yerini alır.
+   Düzen, yoğunluk ve mobil kurallarına dokunmaz; yalnızca görünüm.
+   ============================================================ */
+.panel-root ::selection{background:color-mix(in srgb,var(--primary) 26%,transparent)}
+
+/* --- Menü --- */
+.panel-org{background:rgba(255,255,255,.04);border-color:color-mix(in srgb,var(--accent-bright) 16%,transparent)}
+/* Menü her iki temada da koyu: --info-soft koyu temada koyu laciverte
+   döndüğü için "Güvenli oturum" yazısı kayboluyordu. */
+/* Grup sayacı: panel-ux.css rengini gri-maviye çeviriyor, altın zeminde
+   rakam kayboluyordu. */
+.panel-nav-group summary em{background:var(--accent-bright);color:var(--brand-900);border-radius:5px;padding:3px 7px;font-weight:800}
+.panel-nav a i{background:rgba(255,255,255,.05);color:var(--accent-bright)}
+.panel-nav a:hover{background:rgba(255,255,255,.06);color:var(--n-0)}
+.panel-nav a[aria-current="page"],.panel-nav a.active,.panel-nav-v2 .panel-nav-group.active>summary{
+  color:var(--n-0);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--accent-bright) 20%,transparent),color-mix(in srgb,var(--accent-bright) 3%,transparent));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent-bright) 22%,transparent)
+}
+.panel-nav a.active i{background:color-mix(in srgb,var(--accent-bright) 24%,transparent);color:var(--n-0)}
+.panel-nav-v2 .panel-nav-children{border-left-color:color-mix(in srgb,var(--accent-bright) 22%,transparent)}
+.panel-nav-v2 .panel-nav-children a.active{color:var(--n-0);background:color-mix(in srgb,var(--accent-bright) 12%,transparent)}
+
+/* --- Üst çubuk --- */
+.panel-user>span{background:linear-gradient(150deg,var(--primary-soft),color-mix(in srgb,var(--primary) 35%,transparent));color:var(--primary-strong)}
+
+/* --- Başlıklar: tek yazı tipi (SF Pro / Inter), iOS büyük başlık ölçüsü --- */
+.panel-kicker{color:var(--accent);font-weight:700;letter-spacing:.2em}
+.panel-pagehead h1{font-family:var(--font-display);font-weight:700;font-size:clamp(28px,2.3vw,34px);line-height:1.12;letter-spacing:-.025em;color:var(--ink)}
+.panel-card h2,.panel-module h2,.section-heading h2,.panel-drawer-header h2,.messages-drawer-head h2,.panel-sheet header h2,.crm-revision-history header h2{
+  font-family:var(--font-display);font-weight:650;font-size:20px;line-height:1.25;letter-spacing:-.015em
+}
+
+/* --- Özet kartları: büyük rakam + ince altın imleç --- */
+.metric-strip article,.metric-strip-five article,.crm-metrics article,.finance-metrics article,.ops-metrics article,.report-kpi,.finance-cost-kpis article,.finance-cost-detail-kpis article,.finance-payment-kpis article{
+  background-image:linear-gradient(var(--accent-bright),var(--accent-bright));
+  background-size:28px 2px;background-repeat:no-repeat;background-position:16px 0
+}
+.metric-strip strong,.metric-strip-five strong,.crm-metrics strong,.finance-metrics strong,.ops-metrics strong,.report-kpi strong,.finance-cost-kpis strong,.finance-cost-detail-kpis strong,.finance-payment-kpis strong,.dashboard-summary-number{
+  font-family:var(--font-display);font-weight:650;font-size:28px;letter-spacing:-.02em;font-variant-numeric:lining-nums tabular-nums;color:var(--ink)
+}
+.metric-strip small,.metric-strip-five small,.crm-metrics small,.finance-metrics small,.ops-metrics small,.report-kpi small,.finance-cost-kpis small,.finance-cost-detail-kpis small,.finance-payment-kpis small{letter-spacing:.16em}
+.metric-icon{color:var(--accent);background:var(--accent-soft)}
+
+/* --- Kartlar --- */
+.panel-card,.panel-module,.report-card,.notification-card{border-color:var(--line)}
+@media(hover:hover) and (pointer:fine){
+  .panel-card:hover,.panel-module:hover,.metric-strip article:hover,.metric-strip-five article:hover{border-color:color-mix(in srgb,var(--primary) 34%,var(--line))}
+}
+
+/* --- Düğmeler --- */
+/* Birincil düğme KURUMUN rengini taşır. Eskiden sabit lacivert gradyandı;
+   kurum marka rengini seçse de düğmeler Arvo lacivertinde kalıyordu. */
+.panel-primary{
+  color:var(--primary-on);
+  background:var(--primary);
+  box-shadow:var(--shadow-xs)
+}
+.panel-primary:hover{background:var(--primary-strong);box-shadow:var(--shadow-sm)}
+.panel-primary:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
+.panel-secondary{border-color:var(--line);color:var(--ink)}
+.panel-secondary:hover{border-color:color-mix(in srgb,var(--primary) 45%,var(--line))}
+.module-tabs a.active{box-shadow:inset 0 -2px 0 var(--accent-bright)}
+
+/* --- Tablo başlıkları --- */
+.panel-table th,.crm-data-table thead th,.ops-table th{letter-spacing:.12em}
+
+/* --- Koyu tema: vurgu parlak altın, başlıklar fildişi --- */
+html[data-theme="dark"] .panel-kicker{color:var(--accent-bright)}
+html[data-theme="dark"] .panel-user>span{background:color-mix(in srgb,var(--accent-bright) 18%,transparent);color:var(--accent-bright)}
+html[data-theme="dark"] .panel-secondary{color:var(--ink)}
