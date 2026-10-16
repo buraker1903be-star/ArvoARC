@@ -30,6 +30,8 @@ import "@/components/os/os-motion.css";
 import "@/components/os/os-shell.css";
 // Telefonda uygulama gibi: yalnızca ≤760px kuralları (masaüstüne dokunmaz).
 import "@/components/os/mobil-uygulama.css";
+// Düğme disiplini EN SON: iki boy, tek biçim (components/arvo-ui/dugmeler.css).
+import "@/components/arvo-ui/dugmeler.css";
 
 /*
   ŞİRKET İŞLETİM SİSTEMİ KABUĞU (16.10.2026, kurum sahibinin isteği:

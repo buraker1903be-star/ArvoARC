@@ -713,7 +713,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                 <span className="siparis-kalem-adet">{kalem.quantity} × {money(kalem.unit_price,order.currency)}</span>
                 <b className="siparis-kalem-tutar">{money(kalem.total,order.currency)}</b>
                 {duzenlenebilir&&!gonderide?(
-                  <PanelDrawer triggerLabel="Düzenle" triggerClassName="siparis-kalem-duzenle order-noprint" kicker={`${order.order_number} · KALEM`} title={kalem.product_name} description="Adedi değiştirin, başka bir varyantla değiştirin ya da kalemi siparişten çıkarın. Stok ve toplam aynı anda güncellenir.">
+                  <PanelDrawer triggerLabel="Düzenle" triggerClassName="panel-secondary dugme-kucuk order-noprint" kicker={`${order.order_number} · KALEM`} title={kalem.product_name} description="Adedi değiştirin, başka bir varyantla değiştirin ya da kalemi siparişten çıkarın. Stok ve toplam aynı anda güncellenir.">
                     <form action={kalemiDuzenle} className="order-form-grid">
                       <input type="hidden" name="order_id" value={order.id}/>
                       <input type="hidden" name="item_id" value={kalem.id}/>
@@ -731,7 +731,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                       <p className="list-hint">{odenmis
                         ?"Sipariş ödenmiş: toplam düşerse fark “müşteriye iade edilecek” olarak yazılır ve İade sekmesinden geri ödenir. Ödenen tutar aşılamaz."
                         :"Sipariş henüz ödenmedi: müşteri yeni toplamı öder."} Tedarikçi ürününde stok, ürünün canlı sayfasından doğrulanır.</p>
-                      <button className="ac-btn ac-btn-primary" type="submit">Kaydet</button>
+                      <button className="panel-primary" type="submit">Kaydet</button>
                     </form>
                     {(items?.length??0)>1?(
                       <form action={kalemiDuzenle} className="siparis-kalem-kaldir">
@@ -802,7 +802,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                     /* Durum OTO'dan ÇEKİLİYOR (webhook yükü belgelenmemiş; yanlış eşleşen bildirim paketi "teslim" yapardı). */
                     <form action={kargoDurumlariniGuncelle}>
                       <input type="hidden" name="order_id" value={order.id}/>
-                      <button type="submit" className="kargo-yenile" title="Kargo durumlarını tryOTO'dan güncelle">↻ Güncelle</button>
+                      <button type="submit" className="panel-secondary dugme-kucuk" title="Kargo durumlarını tryOTO'dan güncelle">↻ Güncelle</button>
                     </form>
                   ):null}
                 </div>
@@ -909,7 +909,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                               <label>En<input name="en" type="number" min="1" max="200" defaultValue={olcu.enCm}/></label>
                               <label>Boy<input name="boy" type="number" min="1" max="200" defaultValue={olcu.boyCm}/></label>
                               <label>Yük.<input name="yuk" type="number" min="1" max="200" defaultValue={olcu.yukseklikCm}/></label>
-                              <button type="submit" className="panel-secondary">Fiyatları yenile</button>
+                              <button type="submit" className="panel-secondary dugme-kucuk">Fiyatları yenile</button>
                             </form>
                             <small className="kargo-olcu-not">{(kargoAyarSatiri as {address_city?:string|null}|null)?.address_city||"?"} → {teslimatAdresi.city||"?"} · {sorgulananAgirlik} kg · hacimsel {hacimsel} kg{hacimsel>sorgulananAgirlik?" (fiyat buna göre)":""}</small>
                             <form action={otoEtiketUret} className="kargo-secenek">
@@ -936,25 +936,25 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                         ):null}
 
                         <div className="kargo-paket-eylem">
-                          {gonderi.awb_url?<a href={gonderi.awb_url} target="_blank" rel="noreferrer" className="panel-primary">Etiketi yazdır ↗</a>:null}
-                          {gonderi.tracking_url?<a href={gonderi.tracking_url} target="_blank" rel="noreferrer" className="panel-secondary">Takip ↗</a>:null}
+                          {gonderi.awb_url?<a href={gonderi.awb_url} target="_blank" rel="noreferrer" className="panel-primary dugme-kucuk">Etiketi yazdır ↗</a>:null}
+                          {gonderi.tracking_url?<a href={gonderi.tracking_url} target="_blank" rel="noreferrer" className="panel-secondary dugme-kucuk">Takip ↗</a>:null}
                           {/* AWB bazen gecikmeli üretiliyor; boş dönerse yeniden sorulur. */}
                           {canManage&&gonderi.source==="oto"&&gonderi.status!=="draft"&&gonderi.status!=="cancelled"&&!gonderi.awb_url
-                            ?<form action={etiketiAl}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit" className="panel-secondary">Etiketi al</button></form>
+                            ?<form action={etiketiAl}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit" className="panel-secondary dugme-kucuk">Etiketi al</button></form>
                             :null}
                           {/* Cron yalnızca tryOTO paketlerini izliyor; tedarikçinin gönderdiği paket elle kapatılır. */}
                           {canManage&&!["cancelled","delivered"].includes(gonderi.status)&&gonderi.tracking_number?(
                             <form action={gonderiTeslimEdildi}>
                               <input type="hidden" name="order_id" value={order.id}/>
                               <input type="hidden" name="shipment_id" value={gonderi.id}/>
-                              <button type="submit" className="panel-secondary">Teslim edildi</button>
+                              <button type="submit" className="panel-secondary dugme-kucuk">Teslim edildi</button>
                             </form>
                           ):null}
                           {canManage&&gonderi.status!=="cancelled"&&gonderi.status!=="delivered"?(
                             <form action={gonderiIptal} className="kargo-iptal">
                               <input type="hidden" name="order_id" value={order.id}/>
                               <input type="hidden" name="shipment_id" value={gonderi.id}/>
-                              <ConfirmSubmit className="kargo-iptal-dugme" message={
+                              <ConfirmSubmit className="panel-danger dugme-kucuk" message={
                                 gonderi.source==="oto"&&!["draft","failed"].includes(gonderi.status)
                                   ? `Paket ${gonderi.sequence} OTO'da da iptal edilecek ve üretilen etiket geçersiz olacak. Kurye alıma geldiyse önce kargo firmasıyla görüşün. Devam edilsin mi?`
                                   : `Paket ${gonderi.sequence} iptal edilsin mi? Kalemleri yeniden bölünebilir olur.`
@@ -967,7 +967,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                               <input type="hidden" name="order_id" value={order.id}/>
                               <input type="hidden" name="shipment_id" value={gonderi.id}/>
                               <input type="hidden" name="zorla" value="on"/>
-                              <ConfirmSubmit className="kargo-iptal-dugme" message={`Paket ${gonderi.sequence} OTO'da iptal EDİLMEDİ. Kargo firmasıyla görüşüp paketin durdurulduğundan emin olduysanız bu kaydı kapatabilirsiniz; kalemleri yeniden bölünebilir olur. Devam edilsin mi?`}>Yine de kapat</ConfirmSubmit>
+                              <ConfirmSubmit className="panel-danger dugme-kucuk" message={`Paket ${gonderi.sequence} OTO'da iptal EDİLMEDİ. Kargo firmasıyla görüşüp paketin durdurulduğundan emin olduysanız bu kaydı kapatabilirsiniz; kalemleri yeniden bölünebilir olur. Devam edilsin mi?`}>Yine de kapat</ConfirmSubmit>
                             </form>
                           ):null}
                         </div>
@@ -1023,7 +1023,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                 {order.status!=="fulfilled"?" Kısmi iadede sipariş açık kalır; kalan ürünler hazırlanıp kargoya verilebilir.":""}
                 {" "}Müşteriye iade tutarını bildiren e-posta gider.
               </p>
-              <button className="ac-btn ac-btn-danger" type="submit">İadeyi başlat</button>
+              <button className="panel-danger" type="submit">İadeyi başlat</button>
             </form>
             </div>
           ):null}

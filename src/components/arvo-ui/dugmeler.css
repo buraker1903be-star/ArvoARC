@@ -1,0 +1,79 @@
+/*
+  DÜĞME DİSİPLİNİ (16.10.2026, kurum sahibi: "bir düzen ve disiplin
+  içerisinde yok"). Sipariş detayında yan yana duran düğmeler dört ayrı
+  yükseklikte (30/32/36/40), dört ayrı yazı boyunda ve üç ayrı köşede
+  çıkıyordu. Üç kaynak vardı:
+    1. globals.css sınıfsız HER <button>'a eski vitrin düğmesini
+       veriyordu (degrade, altın halka, gölge, üzerine gelince zıplama);
+    2. eski panel düğmeleri (.ac-btn, design.css) ayrı bir dilde;
+    3. tek tek sayfalarda verilmiş ad hoc ölçüler (min-height:30px…).
+
+  KURAL: İKİ BOY, TEK BİÇİM — ArvoOS'un düğmesi (panel-ui.css).
+    * Standart 40px (--dugme-h): her eylem düğmesi.
+    * Küçük 32px (--dugme-h-kucuk, .dugme-kucuk): yalnızca TEKRAR EDEN
+      satır içi işlemler (kalem satırı, paket kartı). Sayfa ya da kart
+      düzeyinde küçük düğme yazılmaz.
+    * Köşe --r-md, yazı yarı kalın; renkler panel-primary / -secondary /
+      -danger. Yeni bir boy gerekiyorsa buraya değişken olarak eklenir,
+      sayfaya ölçü yazılmaz.
+
+  Dosya panel düzeninde (app/(panel)/layout.tsx) EN SON yükleniyor ve
+  .os-root önekli: eski kuralları sıradan bağımsız eziyor.
+*/
+.os-root{--dugme-h:40px;--dugme-h-kucuk:32px}
+
+/* ArvoOS düğmesinin kendisi (panel-ui.css) yalnızca min-height veriyordu
+   (içinde iki satır olan düğme boyu bozuyordu) ve sayfa stilleri yazı
+   boyunu eziyordu (indirimlerde 13px). Çift .os-root: sayfa stillerinin
+   önüne geçen özgüllük, !important yerine. */
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger){height:var(--dugme-h);min-height:var(--dugme-h);font-size:var(--fs-base);border-radius:var(--r-md)}
+
+/* Küçük boy: tekrar eden satır işlemleri. */
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger).dugme-kucuk{height:var(--dugme-h-kucuk);min-height:var(--dugme-h-kucuk);padding:0 var(--sp-3);font-size:var(--fs-sm)}
+
+/*
+  ESKİ PANEL DÜĞMELERİ (.ac-btn) ArvoOS biçimine bağlanıyor: işaretlemeye
+  dokunmadan bütün panelde aynı düğme. ac-btn → ikincil, ac-btn-primary →
+  birincil, ac-btn-danger → tehlike.
+*/
+.os-root :is(.ac-btn,.danger-button){
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
+  height:var(--dugme-h);min-height:var(--dugme-h);padding:0 var(--sp-4);margin:0;
+  border:1px solid var(--n-300);border-radius:var(--r-md);
+  background:var(--surface);color:var(--ink-soft);box-shadow:var(--shadow-xs);
+  font:inherit;font-size:var(--fs-base);font-weight:var(--fw-semibold);line-height:1;letter-spacing:0;
+  text-decoration:none;white-space:nowrap;cursor:pointer;filter:none;transform:none;
+}
+.os-root .ac-btn:hover{border-color:var(--n-400);background:var(--surface-2);color:var(--ink);transform:none;box-shadow:var(--shadow-xs)}
+.os-root .ac-btn.ac-btn-primary{border-color:transparent;background:var(--primary);color:var(--primary-on)}
+.os-root .ac-btn.ac-btn-primary:hover{background:var(--primary-strong);color:var(--primary-on)}
+.os-root :is(.ac-btn.ac-btn-danger,.danger-button){border-color:color-mix(in srgb,var(--danger) 30%,var(--line));background:var(--surface);color:var(--danger)}
+.os-root :is(.ac-btn.ac-btn-danger,.danger-button):hover{background:var(--danger-soft);color:var(--danger)}
+
+/*
+  SINIFSIZ DÜĞME. globals.css'in vitrin düğmesi panelde istenmiyor;
+  sınıfsız düğme (çoğu eski formların "Kaydet"i) birincil düğme olur.
+  Sınıfı olan düğmelere (dock, sekme, menü, seçici…) dokunulmuyor.
+*/
+.os-root .panel-content button:not([class]){
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
+  height:var(--dugme-h);min-height:var(--dugme-h);padding:0 var(--sp-4);
+  border:1px solid transparent;border-radius:var(--r-md);
+  background:var(--primary);color:var(--primary-on);box-shadow:var(--shadow-xs);
+  font:inherit;font-size:var(--fs-base);font-weight:var(--fw-semibold);line-height:1;letter-spacing:0;
+  white-space:nowrap;cursor:pointer;filter:none;transform:none;
+}
+.os-root .panel-content button:not([class]):hover{background:var(--primary-strong);filter:none;transform:none;box-shadow:var(--shadow-xs)}
+.os-root .panel-content button:not([class]):active{transform:none}
+
+/* Odak ve devre dışı: hepsi aynı. */
+.os-root :is(.ac-btn,.danger-button,.panel-content button:not([class])):focus-visible{outline:none;box-shadow:var(--shadow-glow)}
+.os-root :is(.ac-btn,.danger-button,.panel-content button:not([class])):disabled{opacity:.5;cursor:not-allowed}
+
+/* Kayıt detayındaki iletişim düğmeleri (Ara / E-posta) ArvoOS'ta 36px; burada standart boy. */
+.os-root.os-root .talep-iletisim>:is(a,button){height:var(--dugme-h);min-height:var(--dugme-h);font-size:var(--fs-base)}
+
+/* Telefon: parmakla dokunulduğu için hepsi 44px (panel-ui.css ile aynı). */
+@media (max-width:900px){
+  .os-root{--dugme-h:44px;--dugme-h-kucuk:36px}
+}

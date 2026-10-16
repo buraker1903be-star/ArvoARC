@@ -16,7 +16,7 @@
 /* ---------- Durum şeridi (ArvoOS: .opd-serit / .opd-ff) ----------
    Ölçüler değişkende: bağlam (telefon) kural değil değişken değiştirir;
    ArvoOS'ta özgüllük yarışı iki kez yanlış boyut üretmişti. */
-.siparis-detay{--ff-boy:32px;--ff-dolgu:9px;--ff-yazi:12.5px;--ff-aralik:7px}
+.siparis-detay{--durum-secici-h:var(--dugme-h);--ff-boy:32px;--ff-yazi:12.5px;--ff-dolgu:9px;--ff-yazi:12.5px;--ff-aralik:7px}
 .siparis-detay .opd-serit{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;margin:0;padding:11px 16px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);box-shadow:var(--shadow-sm)}
 .siparis-detay .opd-ff{display:inline-flex;align-items:center;gap:var(--ff-aralik);margin:0}
 .siparis-detay .opd-ff select{height:var(--ff-boy);max-width:100%;padding:0 var(--ff-dolgu);border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:var(--ff-yazi);transition:border-color .18s ease,box-shadow .18s ease}
@@ -134,8 +134,6 @@
 .siparis-detay .siparis-kalem-ad .status-pill{font-size:11px}
 .siparis-detay .siparis-kalem-adet{color:var(--muted);font-size:var(--fs-sm);white-space:nowrap;font-variant-numeric:tabular-nums}
 .siparis-detay .siparis-kalem-tutar{min-width:84px;text-align:right;color:var(--ink);font-size:var(--fs-sm);font-variant-numeric:tabular-nums}
-.os-root .siparis-detay .siparis-kalem-duzenle{min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink-soft);font:inherit;font-size:12px;box-shadow:none;cursor:pointer}
-.os-root .siparis-detay .siparis-kalem-duzenle:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));color:var(--ink)}
 .siparis-kalem-kaldir{margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--line-soft)}
 
 /* Toplamlar: sağa yaslı kısa döküm. */
@@ -162,7 +160,6 @@
 /* ---------- Fatura dökümü penceresi (16.10.2026) ---------- */
 /* Şeridin sağ ucunda; dar ekranda alt satıra iner. */
 .siparis-detay .siparis-serit-sag{margin-left:auto}
-.siparis-detay .siparis-serit-sag .panel-secondary{min-height:var(--ff-boy);padding:0 14px;font-size:var(--ff-yazi)}
 
 /*
   Pencere .panel-root'a taşınıyor (portal) ve yazdırma kopyası da
@@ -243,8 +240,6 @@
 .siparis-detay .kargo-ozet-bas b small{color:var(--muted);font-size:var(--fs-sm);font-weight:var(--fw-medium)}
 .siparis-detay .kargo-ozet-bas span{color:var(--muted);font-size:var(--fs-sm)}
 .siparis-detay .kargo-ozet-bas form{margin:0}
-.os-root .siparis-detay .kargo-yenile{min-height:30px;margin:0;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface);box-shadow:none;color:var(--ink-soft);font:inherit;font-size:12px;cursor:pointer}
-.os-root .siparis-detay .kargo-yenile:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));color:var(--ink)}
 .siparis-detay [data-tur="teslim"]{--tur:var(--success)}
 .siparis-detay [data-tur="yolda"]{--tur:var(--info)}
 .siparis-detay [data-tur="taslak"]{--tur:var(--warning)}
@@ -306,17 +301,13 @@
 .siparis-detay .kargo-hata{margin:0;color:var(--danger);font-size:12px}
 .siparis-detay .kargo-paket-eylem{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .siparis-detay .kargo-paket-eylem form{margin:0}
-.os-root .siparis-detay .kargo-paket-eylem :is(.panel-primary,.panel-secondary){min-height:30px;padding:0 12px;font-size:12px}
 .siparis-detay .kargo-paket-eylem .kargo-iptal{margin-left:auto}
-.os-root .siparis-detay .kargo-iptal-dugme{min-height:30px;margin:0;padding:0 10px;border:0;background:transparent;box-shadow:none;color:var(--danger);font:inherit;font-size:12px;cursor:pointer}
-.os-root .siparis-detay .kargo-iptal-dugme:hover{text-decoration:underline}
 
 /* Taslak paket: ölçü ve kargo seçenekleri (fiyat kartları) */
 .siparis-detay .kargo-taslak{display:grid;gap:8px;padding-top:8px;border-top:1px solid var(--line-soft)}
 .siparis-detay .kargo-olcu{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:end;gap:6px;margin:0}
 .siparis-detay .kargo-olcu label{display:grid;gap:3px;margin:0;color:var(--muted);font-size:11px}
-.os-root .siparis-detay .kargo-olcu input{width:100%;height:30px;min-height:0;padding:0 6px;border:1px solid var(--line);border-radius:var(--r-sm);font:inherit;font-size:12.5px}
-.os-root .siparis-detay .kargo-olcu .panel-secondary{min-height:30px;padding:0 10px;font-size:12px}
+.os-root .siparis-detay .kargo-olcu input{width:100%;height:var(--dugme-h-kucuk);min-height:0;padding:0 6px;border:1px solid var(--line);border-radius:var(--r-sm);font:inherit;font-size:12.5px}
 .siparis-detay .kargo-olcu-not{color:var(--muted);font-size:11px}
 .siparis-detay .kargo-secenek{display:grid;gap:8px;margin:0}
 .siparis-detay .kargo-secenekler{display:grid;gap:6px}
@@ -344,9 +335,9 @@
 .os-root .siparis-detay .siparis-not-duzenle>summary::after{content:none}
 .siparis-detay .siparis-not-duzenle[open]>summary{color:var(--muted)}
 .siparis-detay .siparis-not-duzenle form{display:grid;gap:8px;margin:8px 0 0}
+.siparis-detay .siparis-not-duzenle form>.panel-primary{justify-self:end}
 .os-root .siparis-detay .siparis-not-duzenle textarea{width:100%;min-height:76px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:13px;resize:vertical}
 .os-root .siparis-detay .siparis-not-duzenle textarea:focus{outline:none;border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
-.siparis-detay .siparis-not-duzenle .panel-primary{justify-self:end;min-height:32px;padding:0 14px;font-size:12.5px}
 
 /* Paket sisteminden önceki tek takip numarası (kargo özetinde). */
 .siparis-detay .kargo-eski-takip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0;color:var(--ink);font-size:12.5px}
