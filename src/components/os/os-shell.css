@@ -448,3 +448,9 @@ a.os-ws-item:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
    bir kutu gibi duruyordu, ArvoOS'ta düz (16.10.2026, ekran görüntüsüyle). */
 .os-root .os-dock button.os-dock-item{padding:0;margin:0;min-height:0;box-shadow:none;font:inherit;letter-spacing:normal}
 .os-root .os-dock button.os-dock-item:focus-visible{box-shadow:var(--shadow-glow)}
+/* Dock ipucu (simgenin adı) hiç görünmüyordu: dock'un overflow-x:auto'su
+   overflow-y'yi de kaydırılabilir yapıyor ve dock'un 46px üstüne çizilen
+   etiket kutunun dışında kalıp KESİLİYORDU (ArvoOS'ta da aynı; 16.10.2026).
+   Geniş ekranda dock her zaman sığıyor, kaydırmaya gerek yok; dar ekranda
+   kaydırma kalıyor, orada zaten fare yok. */
+@media (min-width:901px){.os-dock{overflow:visible}}
