@@ -1,4 +1,5 @@
 import { requireTenant } from "@/lib/tenant";
+import { trToday } from "@/lib/tr-time";
 import { currentTime, customerTags, loadCustomers } from "@/app/(panel)/musteriler/customer-data";
 
 function csvCell(value:unknown){
@@ -36,5 +37,5 @@ export async function GET(){
       customerTags(customer,now).map(tag=>tag.label).join(", "),
     ]);
   const csv="﻿"+[headers,...rows].map(row=>row.map(csvCell).join(";")).join("\r\n");
-  return new Response(csv,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":`attachment; filename="arvoarc-musteriler-${new Date().toISOString().slice(0,10)}.csv"`,"cache-control":"private, no-store"}});
+  return new Response(csv,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":`attachment; filename="arvoarc-musteriler-${trToday()}.csv"`,"cache-control":"private, no-store"}});
 }

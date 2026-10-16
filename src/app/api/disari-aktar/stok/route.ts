@@ -1,4 +1,5 @@
 import { requireTenant } from "@/lib/tenant";
+import { trToday } from "@/lib/tr-time";
 import { fetchAllRows } from "@/lib/fetch-all";
 
 function csvCell(value:unknown){
@@ -32,5 +33,5 @@ export async function GET(){
   const headers=["Ürün","Ürün Durumu","Varyant","SKU","Fiyat","Para Birimi","Stok","Stoksuz Satış"];
   const rows=variants.map(variant=>{const product=names.get(variant.product_id);return [product?.name??"Ürün",product?.status??"",variant.title??"Default",variant.sku,(variant.price/100).toFixed(2),variant.currency,variant.stock,variant.allow_backorder?"Açık":"Kapalı"];});
   const csv="﻿"+[headers,...rows].map(row=>row.map(csvCell).join(";")).join("\r\n");
-  return new Response(csv,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":`attachment; filename="arvoarc-stok-${new Date().toISOString().slice(0,10)}.csv"`,"cache-control":"private, no-store"}});
+  return new Response(csv,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":`attachment; filename="arvoarc-stok-${trToday()}.csv"`,"cache-control":"private, no-store"}});
 }

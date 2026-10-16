@@ -1,4 +1,5 @@
 import { requireTenant } from "@/lib/tenant";
+import { trToday } from "@/lib/tr-time";
 import { fetchAllRows } from "@/lib/fetch-all";
 
 function csvCell(value:unknown){
@@ -28,5 +29,5 @@ export async function GET(){
   const headers=["Sipariş No","Kaynak","Sipariş Durumu","Ödeme Durumu","Müşteri","E-posta","Para Birimi","Ara Toplam","Vergi","Kargo","Toplam","Tarih"];
   const rows=orders.map(order=>[order.order_number,order.source,order.status,order.payment_status,order.customer_name,order.customer_email,order.currency,((order.subtotal??0)/100).toFixed(2),((order.tax??0)/100).toFixed(2),((order.shipping??0)/100).toFixed(2),(order.total/100).toFixed(2),dateTime.format(new Date(order.created_at))]);
   const csv="﻿"+[headers,...rows].map(row=>row.map(csvCell).join(";")).join("\r\n");
-  return new Response(csv,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":`attachment; filename="arvoarc-siparisler-${new Date().toISOString().slice(0,10)}.csv"`,"cache-control":"private, no-store"}});
+  return new Response(csv,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":`attachment; filename="arvoarc-siparisler-${trToday()}.csv"`,"cache-control":"private, no-store"}});
 }

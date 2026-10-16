@@ -24,6 +24,13 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
 - **Tarih Türkiye saatiyle.** Gün sınırı, gün grupları ve `datetime-local`
   değerleri Türkiye saatine göre okunur; UTC'ye göre hesaplamak gece
   00:00–03:00 arasında siparişi bir önceki güne düşürür.
+  Veritabanının saat dilimi de Türkiye (20261016080951): sipariş
+  numarası `to_char(now(), …)` ile UTC gününü basıyordu ve 16.10.2026
+  02:23'teki sipariş "AC261015-…" oldu. Gün alan SQL yine dilimi açıkça
+  yazar (`now() at time zone 'Europe/Istanbul'`) — bağlantı ya da rol
+  düzeyindeki bir ayar veritabanı ayarını ezebilir. Kodda gün anahtarı
+  `trToday()` (lib/tr-time). `npm run check:saat-dilimi` CI'da ikisini
+  de arıyor; bilerek dilimsizse satıra `dilim-tamam: <sebep>` yazılır.
 - **Sırlar sabit zamanlı karşılaştırılır** ve uzunluk farkı önce elenir:
   `timingSafeEqual` farklı uzunlukta istisna fırlatır. Değişken tanımlı
   değilse karşılaştırma `false` döner — kapalı başarısızlık.

@@ -32,6 +32,10 @@ jobs:
       # elle uygulanıyor, sıralama hatası ancak burada yakalanır.
       - name: Migration denetimi
         run: npm run check:migrations
+      # UTC'ye göre alınan gün gece 00:00–03:00 arasında DÜN demek
+      # (scripts/check-saat-dilimi.mjs; 16.10.2026 sipariş numarası).
+      - name: Saat dilimi denetimi
+        run: npm run check:saat-dilimi
       - name: Veritabanı testleri
         run: npm run test:db
       # Koddaki tablo/sütun/fonksiyon adları canlı şemada var mı

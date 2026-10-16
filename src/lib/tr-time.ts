@@ -40,3 +40,10 @@ export function trIsoToLocal(iso: string | null | undefined): string {
      çalıştığı için getHours() yerel saati vermiyor. */
   return new Date(an.getTime() + TR_OFFSET).toISOString().slice(0, 16);
 }
+
+/**
+ * Türkiye gününün anahtarı ("2026-10-16"). `new Date().toISOString()
+ * .slice(0, 10)` UTC günü verir: gece 00:00–03:00 arasında DÜN. Dışa
+ * aktarılan CSV'lerin adı bu yüzden bir önceki günü taşıyordu.
+ */
+export const trToday = (ms: number = Date.now()) => new Date(ms + TR_OFFSET).toISOString().slice(0, 10);

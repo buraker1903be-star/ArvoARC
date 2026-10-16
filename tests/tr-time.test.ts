@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DAY, trDayStart, trLocalToIso } from "@/lib/tr-time";
+import { DAY, trDayStart, trLocalToIso, trToday } from "@/lib/tr-time";
 
 test("gün başlangıcı Türkiye saatine göre (UTC+3)", () => {
   // 15 Eylül 00:30 TR = 14 Eylül 21:30 UTC → gün 14 Eylül 21:00 UTC'de başlar
@@ -20,4 +20,11 @@ test("geçersiz tarih ya da biçim null döner", () => {
   for (const value of ["2026-02-31T10:00", "2026-09-20T24:00", "2026-09-20T10:60", "2026-09-20", "abc", ""]) {
     assert.equal(trLocalToIso(value), null, value);
   }
+});
+
+test("Türkiye günü: gece 00:00–03:00 arası dün değil bugün", () => {
+  // 16.10.2026 02:23 Türkiye = 15.10.2026 23:23 UTC.
+  assert.equal(trToday(Date.UTC(2026, 9, 15, 23, 23)), "2026-10-16");
+  assert.equal(trToday(Date.UTC(2026, 9, 15, 20, 59)), "2026-10-15");
+  assert.equal(trToday(Date.UTC(2026, 9, 15, 21, 0)), "2026-10-16");
 });
