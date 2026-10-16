@@ -74,6 +74,29 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
   /* Sipariş sıklığı: ilk ve son sipariş arasındaki gün / aralık sayısı. */
   const cadence = orders.length > 1 ? Math.max(1, Math.round((lastAt - firstAt) / DAY / (orders.length - 1))) : null;
 
+  /*
+    KARTTA YALNIZCA BAŞKA YERDE OLMAYAN BİLGİ. "Alışveriş alışkanlığı"
+    kartının üç satırının ikisi tekrardı: ilk sipariş başlıkta ("…
+    tarihinden beri müşteri"), son sipariş şeritte. Yerlerine
+    müşterinin başka hiçbir yerde görünmeyen üç gerçeği geldi.
+  */
+  const siparisTutarlari = paidOrders.map((order) =>
+    revenueAmount({ ...order, refunded_amount: (order.metadata as { refunded_amount?: unknown } | null)?.refunded_amount }),
+  );
+  const enYuksekSepet = siparisTutarlari.length ? Math.max(...siparisTutarlari) : 0;
+  /* İade edilen para siparişin metadata'sında birikiyor (iade akışı
+     oraya yazıyor); müşteri kartında toplamı görünmüyordu. */
+  const iadeEdilen = orders.reduce((toplam, order) => {
+    const tutar = Number((order.metadata as { refunded_amount?: unknown } | null)?.refunded_amount ?? 0);
+    return toplam + (Number.isFinite(tutar) && tutar > 0 ? tutar : 0);
+  }, 0);
+  const kaynakSayilari = new Map<string, number>();
+  for (const order of orders) {
+    const kaynak = sourceLabel(order.source ?? "");
+    kaynakSayilari.set(kaynak, (kaynakSayilari.get(kaynak) ?? 0) + 1);
+  }
+  const kaynaklar = [...kaynakSayilari.entries()].sort((a, b) => b[1] - a[1]);
+
   const latestMeta = (latestOrder.metadata ?? {}) as OrderMeta;
   const address = latestMeta.shipping_address ?? latestMeta.billing;
   const addressLines = [address?.address1, address?.address2, [address?.zip, address?.city].filter(Boolean).join(" "), address?.province, address?.country].filter(Boolean);
@@ -164,8 +187,10 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
           <KKart baslik="Alışveriş alışkanlığı">
             <dl className="customer-dl">
               <div><dt>Sipariş sıklığı</dt><dd>{cadence ? `Ortalama ${cadence.toLocaleString("tr-TR")} günde bir` : "Tek sipariş"}</dd></div>
-              <div><dt>İlk sipariş</dt><dd>{dateFormat.format(new Date(firstAt))}</dd></div>
-              <div><dt>Son sipariş</dt><dd>{dateFormat.format(new Date(lastAt))} · {daysAgo(lastAt, now)}</dd></div>
+              <div><dt>En yüksek sepet</dt><dd>{money.format(enYuksekSepet / 100)}</dd></div>
+              {/* İade yalnızca VARSA: sıfır yazan bir satır gürültü. */}
+              {iadeEdilen > 0 ? <div><dt>İade edilen</dt><dd>{money.format(iadeEdilen / 100)}</dd></div> : null}
+              <div><dt>Sipariş kaynağı</dt><dd>{kaynaklar.map(([ad, adet]) => `${ad} (${adet})`).join(" · ")}</dd></div>
             </dl>
           </KKart>
 
