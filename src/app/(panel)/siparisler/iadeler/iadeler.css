@@ -1,5 +1,71 @@
-/* İade talepleri: ArvoOS liste kalıbına uyarlama (16.10.2026). Kartın iç biçimi ../orders.css. */
+/*
+  İADE EKRANLARI (16.10.2026).
+
+  Liste ve detay sipariş ekranlarının kalıbını kullanıyor; burada
+  yalnızca iadeye özgü olan var. Eskiden iade kartlarının biçimi
+  siparis listesinin CSS'inde (orders.css, .return-*) duruyordu: iade
+  ekranı o dosyayı import etmek zorundaydı ve sipariş listesinde
+  yapılan bir düzen değişikliği iadeyi de sessizce etkiliyordu.
+
+  Sabit renk ve yarıçap YOK, jeton var (npm run check:css).
+*/
+
+/* ---------- Liste ---------- */
 .os-root .iade-listesi{display:grid;gap:var(--sp-4)}
 .os-root .iade-listesi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
-.os-root .iade-listesi .return-card{padding:var(--sp-5)}
+/* Bekleyen talep varken şerit sütunu uyarı rengine geçiyor: bu ekranın tek acil işi o. */
 .os-root .iade-listesi .kayit-serit .is-uyari dd a{color:var(--warning)}
+
+/* Eylem sütunu sağda ve daralmıyor: "Onayla →" satırdan satıra kaymasın. */
+.os-root .iade-tablo .iade-eylem-sutun{width:1%;white-space:nowrap;text-align:right}
+.os-root .iade-tablo .iade-ilerlet{white-space:nowrap}
+/* Tedarikçi hücresindeki "+1 ayrı yer": iki tedarikçili iade tek paketle gönderilemez. */
+.os-root .iade-tablo .crm-cell-sub.is-uyari{color:var(--warning);font-weight:650}
+/* Bekleme yaşı rozeti durumun altında, satır yükseklemesin diye küçük. */
+.os-root .iade-tablo .crm-cell-sub .status-pill{font-size:var(--fs-micro)}
+
+/* ---------- Detay ---------- */
+.os-root .iade-detay .iade-sebep{margin:0;color:var(--ink);font-size:var(--fs-sm)}
+.os-root .iade-detay .iade-not{margin:6px 0 0;color:var(--ink-soft);font-size:var(--fs-sm);white-space:pre-wrap}
+
+/* Geri dönecek yer kalemlerin ÜSTÜNDE: kalem kalem okumak yerine tepede görünmeli. */
+.os-root .iade-detay .iade-tedarikci{
+  margin:0 0 var(--sp-3);padding:var(--sp-3);border:1px solid var(--line);
+  border-radius:var(--r-md);background:var(--surface-soft);color:var(--ink-soft);font-size:var(--fs-sm)
+}
+.os-root .iade-detay .iade-tedarikci b{color:var(--ink)}
+.os-root .iade-detay .iade-tedarikci em{color:var(--danger);font-style:normal;font-weight:700}
+
+.os-root .iade-detay .iade-satirlar{display:grid}
+.os-root .iade-detay .iade-satir{
+  display:grid;grid-template-columns:minmax(0,1fr) 70px 130px;gap:var(--sp-3);align-items:center;
+  padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:var(--fs-sm);font-variant-numeric:tabular-nums
+}
+.os-root .iade-detay .iade-satir>span:nth-child(n+2){text-align:right}
+.os-root .iade-detay .iade-satir b{display:block;color:var(--ink);font-weight:650}
+.os-root .iade-detay .iade-satir small{display:block;color:var(--muted);font-size:var(--fs-micro)}
+.os-root .iade-detay .iade-satir.is-bas{
+  padding:8px 0;border-bottom:1px solid var(--line);color:var(--muted);
+  font-size:var(--fs-micro);font-weight:700;letter-spacing:.12em
+}
+/* Ürünün çıktığı paket: hangi tedarikçiye ve takip numarasına bakılacağı. */
+.os-root .iade-detay .iade-paket{margin-top:2px;font-variant-numeric:tabular-nums}
+.os-root .iade-detay .iade-paket.is-bos{color:var(--dim);font-style:italic}
+
+.os-root .iade-detay .iade-toplam{display:grid;gap:6px;margin:var(--sp-4) 0 0}
+.os-root .iade-detay .iade-toplam>div{display:flex;justify-content:space-between;gap:var(--sp-4);font-size:var(--fs-sm)}
+.os-root .iade-detay .iade-toplam dt{color:var(--muted)}
+.os-root .iade-detay .iade-toplam dd{margin:0;color:var(--ink);font-variant-numeric:tabular-nums}
+/* Hesaplanan iade, kararın sayısı: ötekilerden ayrılıyor. */
+.os-root .iade-detay .iade-toplam .is-vurgu{
+  margin-top:4px;padding-top:var(--sp-3);border-top:1px solid var(--line);font-weight:700
+}
+.os-root .iade-detay .iade-toplam .is-vurgu dt{color:var(--ink)}
+
+.os-root .iade-detay .iade-karar{margin-top:var(--sp-3)}
+.os-root .iade-detay .iade-karar-eylem{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+
+@media(max-width:760px){
+  /* Telefonda tutar sütunu daralıyor; adet ve tutar yan yana kalsın. */
+  .os-root .iade-detay .iade-satir{grid-template-columns:minmax(0,1fr) 48px 96px;gap:var(--sp-2)}
+}

@@ -137,22 +137,16 @@
 .order-timeline small{display:block;margin-top:2px;color:var(--muted);font-size:12.5px}
 .order-timeline time{padding-top:1px;color:var(--muted);font-size:12px;white-space:nowrap}
 
-/* ---------- İade talepleri ---------- */
-.return-card .ac-head h3 a{color:var(--ink);font-size:inherit;text-decoration:none}
-.return-card .ac-head h3 a:hover{color:var(--accent)}
-.return-reason{margin:0;color:var(--ink-soft);font-size:14px}
-.return-reason b{color:var(--ink)}
-.return-lines{display:grid;margin-top:12px}
-.return-line{display:grid;grid-template-columns:minmax(0,1fr) 70px 130px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px;font-variant-numeric:tabular-nums}
-.return-line>span:nth-child(n+2){text-align:right}
-.return-line b{display:block;color:var(--ink);font-weight:650}
-.return-line small{display:block;color:var(--muted);font-size:12px}
-.return-line.is-head{padding:8px 0;border-bottom:1px solid var(--line);color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em}
-.return-sum{display:flex;flex-wrap:wrap;gap:6px 18px;margin:12px 0 6px;color:var(--muted);font-size:13px}
-.return-sum b{color:var(--ink)}
-.return-done{margin:12px 0 0;color:var(--success);font-weight:700}
-.return-note{margin:12px 0 0;color:var(--muted);font-size:13px}
-.return-actions{display:flex;flex-wrap:wrap;gap:8px}
+/*
+  İADE KARTLARININ BİÇİMİ BURADAN TAŞINDI (16.10.2026). İade listesi
+  sipariş listesinin kalıbına geçti ve kart yerine tablo oldu; kalem
+  satırları ile karar formu iade DETAYINDA. Biçim artık iadelerin kendi
+  dosyasında (siparisler/iadeler/iadeler.css) — burada durduğu sürece
+  sipariş listesinde yapılan bir düzen değişikliği iadeyi de sessizce
+  etkiliyordu. .return-* kuralları bu ekranlardan başka yerde
+  kullanılmıyordu, elle kaldırıldı (betikle değil: 14.10'da ölü CSS
+  temizleyen bir betik seçiciyi bozup üretim derlemesini düşürmüştü).
+*/
 
 /* ---------- Duyarlı ---------- */
 @media(max-width:1100px){
@@ -385,27 +379,6 @@
 
 
 /* ---------- İade: geri dönecek yer ---------- */
-/*
-  İade edilen ürünün hangi tedarikçiden ve hangi paketten geldiği artık
-  satırda yazıyor. Önce yalnızca ürün adı ve tutar vardı; operasyoncu
-  her iade için sipariş detayına gidip aramak zorundaydı ve iki
-  tedarikçiyle çalışıldığı için bu her iadede tekrarlanıyordu.
-*/
-.return-suppliers{
-  margin:0 0 12px;padding:9px 12px;
-  border:1px solid color-mix(in srgb,var(--accent-500) 30%,var(--line));
-  border-radius:var(--r-sm);background:var(--accent-soft);
-  font-size:12.5px;line-height:1.5;
-}
-.return-suppliers em{color:var(--danger);font-style:normal;font-weight:700}
-
-.return-package{display:block;margin-top:2px;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
-.return-package.is-empty{color:var(--dim);font-style:italic}
-
-/* İade tamamlanırken stoğa ekleme seçeneği; forma göre hizalanıyor. */
-.return-restock{display:flex;align-items:center;gap:9px;font-size:12.5px}
-.return-restock input{width:16px;height:16px;margin:0}
-
 /* Sorunlu kargo çipi: olağan dışı bir durumu işaret ediyor, durum
    çiplerinden ayrışması gerekiyor. */
 .order-chip-danger{border-color:color-mix(in srgb,var(--danger) 40%,var(--line));color:var(--danger)}

@@ -27,7 +27,7 @@
   Saf dosya; testi tests/kayitli-gorunum.test.ts.
 */
 
-export type GorunumListesi = "siparisler" | "urunler";
+export type GorunumListesi = "siparisler" | "urunler" | "iadeler";
 
 /** [anahtar, kısa etiket] ya da [anahtar, kısa etiket, uzun etiket]. */
 type Secenek = readonly [string, string] | readonly [string, string, string];
@@ -47,6 +47,19 @@ export const SIPARIS_DONEMLERI = [
   ["today", "Bugün", "Bugün"],
   ["7", "7 gün", "Son 7 gün"],
   ["30", "30 gün", "Son 30 gün"],
+] as const satisfies readonly Secenek[];
+
+/*
+  İade durumları. Sipariş durumlarından ayrı bir liste: iade kendi
+  akışında yürüyor (bekleyen → ürün bekleniyor → iade edildi) ve
+  siparişin durumuyla aynı şey değil.
+*/
+export const IADE_DURUMLARI = [
+  ["all", "Tümü"],
+  ["beklemede", "Bekleyenler", "Karar bekleyenler"],
+  ["onaylandi", "Ürün bekleniyor", "Onaylandı · ürün bekleniyor"],
+  ["tamamlandi", "İade edilenler"],
+  ["reddedildi", "Reddedilenler"],
 ] as const satisfies readonly Secenek[];
 
 export const URUN_DURUMLARI = [
@@ -89,6 +102,23 @@ const SEMA: Record<GorunumListesi, readonly Alan[]> = {
     { anahtar: "filter", tur: "secim", secenekler: URUN_DURUMLARI, varsayilan: "all" },
     { anahtar: "source", tur: "secim", secenekler: URUN_KAYNAKLARI, varsayilan: "all" },
   ],
+  iadeler: [
+    { anahtar: "q", tur: "metin", onek: "Arama" },
+    { anahtar: "filter", tur: "secim", secenekler: IADE_DURUMLARI, varsayilan: "beklemede" },
+    { anahtar: "period", tur: "secim", secenekler: SIPARIS_DONEMLERI, varsayilan: "all" },
+  ],
+};
+
+/*
+  LİSTENİN ADRESİ. Görünüm adı ile yol çoğu listede aynı ("urunler" →
+  /urunler) ama iadeler siparişlerin ALTINDA duruyor. Yolu adından
+  türetmek, kaydedilmiş her iade görünümünü var olmayan bir /iadeler
+  adresine götürürdü.
+*/
+const YOLLAR: Record<GorunumListesi, string> = {
+  siparisler: "/siparisler",
+  urunler: "/urunler",
+  iadeler: "/siparisler/iadeler",
 };
 
 export const GORUNUM_LISTELERI = Object.keys(SEMA) as GorunumListesi[];
@@ -162,7 +192,8 @@ export function gorunumOzeti(liste: GorunumListesi, sorgu: string): string {
 /** Görünümün açtığı adres. Sorgu boşsa listenin kendisi. */
 export function gorunumYolu(liste: GorunumListesi, sorgu: string): string {
   const temiz = gorunumSorgusu(liste, sorgu);
-  return temiz ? `/${liste}?${temiz}` : `/${liste}`;
+  const yol = YOLLAR[liste];
+  return temiz ? `${yol}?${temiz}` : yol;
 }
 
 /*

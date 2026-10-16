@@ -10,10 +10,19 @@ export function ConfirmSubmit({
   className,
   children,
   disabled,
+  name,
+  value,
 }: {
   message: string;
   className?: string;
   children: React.ReactNode;
+  /*
+    Aynı formda iki karar varsa (onayla / reddet) hangisine basıldığı
+    DÜĞMENİN kendi adıyla gidiyor. Gizli alan çözüm değil: iki karar
+    aynı adı taşıyor ve düğmenin İÇİNE input yazmak geçersiz HTML.
+  */
+  name?: string;
+  value?: string;
   /*
     İşlem sürerken kilitlenebilsin. Yerinde çalışan eylemlerde sayfa
     yenilenmediği için düğme ekranda kalıyor ve ikinci kez basılabiliyor;
@@ -27,6 +36,8 @@ export function ConfirmSubmit({
       type="submit"
       className={className}
       disabled={disabled}
+      name={name}
+      value={value}
       onClick={(event) => {
         if (!window.confirm(message)) event.preventDefault();
       }}

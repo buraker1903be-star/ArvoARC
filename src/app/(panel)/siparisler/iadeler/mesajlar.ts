@@ -8,6 +8,10 @@ import { yetkiYok } from "@/lib/yetki-metni";
 */
 
 export const ERRORS: Record<string, string> = {
+  /* İkisi eskiden tanımsızdı ve genel "İşlem tamamlanamadı"ya düşüyordu:
+     bayat bir sekmeden karar veren kullanıcı sebebi öğrenemiyordu. */
+  invalid: "İstek anlaşılamadı. Sayfayı yenileyip tekrar deneyin.",
+  "not-found": "Talep bulunamadı. Silinmiş olabilir ya da başka bir mağazaya ait.",
   "refund-failed": "PayTR iadeyi reddetti. Sipariş numarası ve tutarı kontrol edin.",
   "already-resolved": "Bu talep zaten sonuçlandırılmış.",
   forbidden: yetkiYok("iade işlemi", "sahiplik"),

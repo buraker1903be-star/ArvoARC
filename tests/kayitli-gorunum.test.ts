@@ -102,3 +102,33 @@ test("sayfadaki durum listesi ile görünümün tanıdığı liste aynı", () =>
   }
   assert.ok(EN_FAZLA_GORUNUM > 0);
 });
+
+/*
+  İADE GÖRÜNÜMLERİ (16.10.2026). İade listesi sipariş listesinin
+  kalıbına geçtiğinde kaydedilmiş görünümler de ona açıldı.
+*/
+test("iade görünümünün yolu /siparisler/iadeler", () => {
+  /*
+    Yol adından TÜRETİLMİYOR: iadeler siparişlerin altında duruyor ve
+    "/iadeler" diye bir sayfa yok. Kaydedilmiş her iade görünümü o
+    adrese gitse 404 olurdu.
+  */
+  assert.equal(gorunumYolu("iadeler", "filter=onaylandi"), "/siparisler/iadeler?filter=onaylandi");
+  assert.equal(gorunumYolu("iadeler", ""), "/siparisler/iadeler");
+  assert.equal(gorunumYolu("urunler", "filter=draft"), "/urunler?filter=draft");
+});
+
+test("iade görünümünde varsayılan durum 'beklemede' yazılmıyor", () => {
+  /*
+    Liste bekleyenlerle açılıyor; "beklemede" varsayılan olduğu için
+    sorguya girmez, yoksa aynı süzgeç iki ayrı görünüm gibi görünürdü.
+  */
+  assert.equal(gorunumSorgusu("iadeler", "filter=beklemede"), "");
+  assert.equal(gorunumSorgusu("iadeler", "filter=tamamlandi"), "filter=tamamlandi");
+  assert.equal(gorunumSorgusu("iadeler", "filter=yok-boyle"), "", "tanınmayan durum düşer");
+  assert.equal(gorunumSorgusu("iadeler", "period=7&q=ARC26"), "q=ARC26&period=7", "anahtar sırası sabit");
+});
+
+test("iade görünümünün özeti okunur", () => {
+  assert.equal(gorunumOzeti("iadeler", "filter=onaylandi&period=7"), "Onaylandı · ürün bekleniyor · Son 7 gün");
+});
