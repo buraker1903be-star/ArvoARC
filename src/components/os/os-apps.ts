@@ -58,8 +58,8 @@ export function arcUygulamalari(rozet?: { operasyon?: number; iade?: number }): 
     /*
       ALT MENÜSÜZ (16.10.2026, kurum sahibi: "butona basınca siparişler
       açılsın yeter"). Operasyon merkezi ve Müşteriler Siparişler'in
-      bölümüydü; dock'tan kalktılar ama ulaşılamaz olmasınlar diye
-      başlatıcıda ve Ctrl+K'da (yalnizBaslatici) duruyorlar.
+      bölümüydü; Operasyon başlatıcıda kaldı (yalnizBaslatici),
+      Müşteriler ise Finans'ın bölümü oldu — aşağıdaki gerekçe.
     */
     {
       key: "siparisler", label: "Siparişler", href: "/siparisler", ikon: "satis",
@@ -72,11 +72,20 @@ export function arcUygulamalari(rozet?: { operasyon?: number; iade?: number }): 
       ...(iade ? { rozet: iade } : {}),
     },
     { key: "indirimler", label: "İndirimler", href: "/indirimler", ikon: "indirim", yollar: ["/indirimler"] },
+    /*
+      MÜŞTERİLER FİNANS'IN ALTINDA (16.10.2026, kurum sahibinin kararı).
+      Ekran para tarafını anlatıyor: ömür boyu net harcama, ortalama
+      sepet, tekrar eden oranı, cironun ilk beş müşteride toplanması.
+      Siparişler'in bölümüyken dock'tan kaldırılmış ve yalnızca
+      başlatıcıda kalmıştı; günlük işte aranan bir ekran için fazla
+      derindi.
+    */
     {
       key: "finans", label: "Finans", href: "/analitik", ikon: "finans",
-      yollar: ["/analitik"],
+      yollar: ["/analitik", "/musteriler"],
       bolumler: [
         { key: "analitik", href: "/analitik", label: "Satış analitiği" },
+        { key: "musteriler", href: "/musteriler", label: "Müşteriler" },
       ],
     },
     {
@@ -98,7 +107,6 @@ export function arcUygulamalari(rozet?: { operasyon?: number; iade?: number }): 
       ],
     },
     { key: "operasyon", label: "Operasyon merkezi", href: "/operasyon", ikon: "satis", yollar: ["/operasyon"], yalnizBaslatici: true },
-    { key: "musteriler", label: "Müşteriler", href: "/musteriler", ikon: "musteri", yollar: ["/musteriler"], yalnizBaslatici: true },
     {
       key: "settings", label: "Ayarlar", href: "/ayarlar", ikon: "settings",
       yollar: ["/ayarlar", "/tema"],

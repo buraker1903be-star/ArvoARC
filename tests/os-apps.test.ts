@@ -8,7 +8,10 @@ test("açık uygulama en uzun yol önekinden", () => {
   assert.equal(etkinUygulama(u, "/")?.key, "home");
   assert.equal(etkinUygulama(u, "/siparisler/abc")?.key, "siparisler");
   assert.equal(etkinUygulama(u, "/siparisler/iadeler")?.key, "iadeler");
-  assert.equal(etkinUygulama(u, "/musteriler/x")?.key, "musteriler");
+  /* Müşteriler 16.10.2026'da Finans'ın bölümü oldu: ekran para
+     tarafını anlatıyor (ömür boyu harcama, ortalama sepet, ciro
+     yoğunlaşması) ve başlatıcıda kalması günlük iş için fazla derindi. */
+  assert.equal(etkinUygulama(u, "/musteriler/x")?.key, "finans");
   assert.equal(etkinUygulama(u, "/operasyon")?.key, "operasyon");
   assert.equal(etkinUygulama(u, "/analitik")?.key, "finans");
   assert.equal(etkinUygulama(u, "/indirimler")?.key, "indirimler");
@@ -17,12 +20,17 @@ test("açık uygulama en uzun yol önekinden", () => {
   assert.equal(etkinUygulama(u, "/bilinmeyen"), null);
 });
 
-test("Siparişler alt menüsüz; Operasyon ve Müşteriler başlatıcıda ve Ctrl+K'da", () => {
+test("Siparişler alt menüsüz; Operasyon başlatıcıda, Müşteriler Finans'ın bölümü", () => {
   const siparis = u.find((x) => x.key === "siparisler")!;
   assert.equal(siparis.bolumler, undefined);
   const s = osSayfalari(u).map((x) => x.href);
-  assert.ok(s.includes("/operasyon"));
-  assert.ok(s.includes("/musteriler"));
+  assert.ok(s.includes("/operasyon"), "başlatıcı ve Ctrl+K");
+  assert.ok(s.includes("/musteriler"), "Finans'ın bölümü olarak Ctrl+K'da");
+  const finans = u.find((x) => x.key === "finans")!;
+  assert.deepEqual(finans.bolumler?.map((b) => b.href), ["/analitik", "/musteriler"]);
+  /* Müşteriler artık ayrı bir uygulama DEĞİL: iki yerde durursa
+     etkinUygulama hangisini seçeceğini yol uzunluğundan ayırt edemez. */
+  assert.equal(u.some((x) => x.key === "musteriler"), false);
 });
 
 test("dock dizilimi kurum sahibinin tarifiyle aynı", () => {

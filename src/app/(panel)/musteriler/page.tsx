@@ -87,7 +87,9 @@ export default async function Customers({ searchParams }: { searchParams: Promis
     <main className="talep liste-sayfa musteri-listesi">
       <header className="talep-bas">
         <div className="talep-bas-metin">
-          <small className="panel-kicker">Siparişler</small>
+          {/* Üst başlık uygulamayı söyler; ekran 16.10.2026'da Finans'ın
+              bölümü oldu (components/os/os-apps). */}
+          <small className="panel-kicker">Finans</small>
           <h1>Müşteriler</h1>
           {/* Sayılar sağdaki kartta; başlık yalnızca kaynağı söylüyor. */}
           <p className="talep-bas-alt">{customers.length.toLocaleString("tr-TR")} müşteri · {orderCount.toLocaleString("tr-TR")} siparişten türetildi</p>
