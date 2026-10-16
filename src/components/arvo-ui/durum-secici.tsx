@@ -57,6 +57,17 @@ export function DurumSecici({
 
   const mevcut = secenekler.find((s) => s.deger === secili) ?? secenekler[0];
 
+  /*
+    React 19 eylemden sonra formu sıfırlıyor ve gizli alan İLK çizimdeki
+    değere dönüyor (ArvoOS iş detayında görev seçimleri bu yüzden key
+    taşıyor). Her çizimde seçili değer gizli alana yeniden yazılıyor:
+    aynı formdaki başka bir alan (ör. "Ne bekleniyor?") gönderildiğinde
+    eski değer gitmesin.
+  */
+  useEffect(() => {
+    if (girdi.current) girdi.current.value = secili;
+  });
+
   useEffect(() => {
     if (!acik) return;
     const disari = (olay: PointerEvent) => {
