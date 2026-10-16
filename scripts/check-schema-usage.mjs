@@ -266,7 +266,7 @@ function walk(dir) {
 }
 
 // --- CLI. Argümanlar yalnızca denetimin kendi testi için; normalde yok. ---
-const [kaynakArg, katalogArg] = process.argv.slice(2);
+const [kaynakArg, katalogArg, migrationArg] = process.argv.slice(2);
 const catalogPath = katalogArg ? path.resolve(katalogArg) : path.join(root, "supabase", "schema", "katalog.json");
 const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
 const tables = new Map(Object.entries(catalog.tables).map(([t, cols]) => [t, new Set(cols)]));
@@ -298,10 +298,103 @@ for (const dir of SOURCE_DIRS) {
   }
 }
 
-if (problems.length) {
-  console.error(`✗ Şema sözleşmesi: ${problems.length} sorun\n${problems.map((p) => `  ${p}`).join("\n")}\n` +
-    "  Sütun gerçekten yeniyse önce migration'ı canlıya uygulayın, sonra anlık görüntüyü ve kataloğu yenileyin " +
-    "(ArvoARC/supabase/schema/README.md).");
+/*
+  KATALOG GECİKMESİ İLE YAZIM HATASINI AYIR (16.10.2026).
+
+  Denetim iki ayrı şeyi aynı sesle söylüyordu: gerçekten yanlış yazılmış
+  bir sütun adı, ve HENÜZ KATALOĞA GİRMEMİŞ yeni bir sütun. İkincisi
+  olağan iş akışı — migration SQL Editor'den canlıya uygulanıyor, döküm
+  ve katalog sonra yenileniyor — ama arada CI kırmızı kalıyor.
+
+  16.10.2026'da tam bu oldu: sipariş arşivi, kalem düzenleme ve
+  tedarikçi stok işleri canlıya uygulanıp yayına çıktı, katalog
+  yenilenmedi ve CI on dört satırla üç commit boyunca kırmızı kaldı.
+  O gürültünün bedeli, gerçek bir yazım hatasının gözden kaçması:
+  kırmızıya alışan göz on beşinciyi okumuyor.
+
+  Ayrım basit: adı YEREL BİR MIGRATION DOSYASI yaratıyor mu?
+  Yaratıyorsa kod kataloğun ilerisinde (uyarı, çıkış 0); yaratmıyorsa
+  hiçbir yerde olmayan bir ada bakılıyor (hata, çıkış 1).
+
+  Eşleşme adın GEÇTİĞİ yere değil onu YARATAN ifadeye bakıyor ve
+  sütunda tabloya bağlı: gevşek bir eşleşme yazım hatasını "gecikme"
+  diye örterse denetim, denetlediği hatadan farksız olur. Migration
+  yorumları da ayıklanıyor — bu deponun migration'ları uzun Türkçe
+  gerekçeler taşıyor ve gerekçede geçen bir ad tanım sayılamaz.
+*/
+const migrationDizini = migrationArg
+  ? path.resolve(migrationArg)
+  : path.join(root, "supabase", "migrations");
+const yorumsuz = (sql) => sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
+/* İfade ifade: bir sütunun hangi TABLOYA eklendiğini bilmek için
+   migration metni noktalı virgülden bölünüyor. */
+const migrationIfadeleri = fs.existsSync(migrationDizini)
+  ? fs.readdirSync(migrationDizini).filter((f) => f.endsWith(".sql"))
+      .flatMap((f) => yorumsuz(fs.readFileSync(path.join(migrationDizini, f), "utf8")).toLowerCase().split(";"))
+  : [];
+
+const kacis = (ad) => String(ad).toLowerCase().replace(/[^a-z0-9_]/g, "");
+
+/** Tabloyu/görünümü/fonksiyonu YARATAN bir ifade var mı? */
+function nesneYaratiliyorMu(ad) {
+  const a = kacis(ad);
+  if (!a) return false;
+  const kalip = new RegExp(`create\\s+(or\\s+replace\\s+)?(table|view|materialized\\s+view|function|procedure)\\s+(if\\s+not\\s+exists\\s+)?(public\\.|private\\.)?${a}\\b`);
+  return migrationIfadeleri.some((ifade) => kalip.test(ifade));
+}
+
+/**
+ * Sütun, O TABLOYA ait bir ifadede yaratılıyor mu? Yalnızca tablonun
+ * adını içeren ifadelere bakılıyor: "add column x" başka bir tabloya
+ * aitse sayılmaz.
+ */
+function sutunYaratiliyorMu(tablo, sutun) {
+  const t = kacis(tablo);
+  const c = kacis(sutun);
+  if (!t || !c) return false;
+  const tabloKalibi = new RegExp(`\\b(public\\.)?${t}\\b`);
+  const sutunKaliplari = [
+    new RegExp(`add\\s+column\\s+(if\\s+not\\s+exists\\s+)?${c}\\b`),
+    new RegExp(`\\bas\\s+${c}\\b`),
+    new RegExp(`(^|[(,\\s])${c}\\s+(text|uuid|boolean|integer|bigint|smallint|numeric|jsonb|json|timestamptz|timestamp|date|interval)\\b`, "m"),
+  ];
+  return migrationIfadeleri.some((ifade) => tabloKalibi.test(ifade) && sutunKaliplari.some((k) => k.test(ifade)));
+}
+
+/** "src/x.ts:12  tablo.sutun yok (select)" → { tablo, sutun } ya da { nesne }. */
+function sorunHedefi(sorun) {
+  const nesne = sorun.match(/(?:tablo yok: ([a-z0-9_]+))|(?:fonksiyon yok: ([a-z0-9_]+))/i);
+  if (nesne) return { nesne: nesne[1] ?? nesne[2] };
+  const sutun = sorun.match(/\s([a-z0-9_]+)\.([a-z0-9_]+) yok/i);
+  return sutun ? { tablo: sutun[1], sutun: sutun[2] } : {};
+}
+
+const bekleyenMi = (sorun) => {
+  const hedef = sorunHedefi(sorun);
+  if (hedef.nesne) return nesneYaratiliyorMu(hedef.nesne);
+  if (hedef.tablo && hedef.sutun) return sutunYaratiliyorMu(hedef.tablo, hedef.sutun);
+  return false;
+};
+const sorunAdi = (sorun) => {
+  const hedef = sorunHedefi(sorun);
+  return hedef.nesne ?? (hedef.sutun ? `${hedef.tablo}.${hedef.sutun}` : "");
+};
+
+const bekleyen = [];
+const hatalar = [];
+for (const sorun of problems) (bekleyenMi(sorun) ? bekleyen : hatalar).push(sorun);
+
+if (bekleyen.length) {
+  const adlar = [...new Set(bekleyen.map(sorunAdi).filter(Boolean))];
+  console.warn(`! Katalog ${adlar.length} yeni adın gerisinde: ${adlar.join(", ")}\n` +
+    `  ${bekleyen.length} kullanım, hepsini yerel bir migration yaratıyor — yazım hatası değil.\n` +
+    "  Migration canlıya uygulandıysa dökümü ve kataloğu yenileyin (supabase/schema/README.md).");
+}
+
+if (hatalar.length) {
+  console.error(`✗ Şema sözleşmesi: ${hatalar.length} sorun\n${hatalar.map((p) => `  ${p}`).join("\n")}\n` +
+    "  Bu adları hiçbir migration yaratmıyor: ya yazım hatası ya da migration yazılmamış.");
   process.exit(1);
 }
-console.log(`✓ Şema sözleşmesi: ${tables.size} tablo, ${functions.size} fonksiyon; kod ile uyumlu`);
+console.log(`✓ Şema sözleşmesi: ${tables.size} tablo, ${functions.size} fonksiyon; kod ile uyumlu`
+  + (bekleyen.length ? " (katalog birkaç yeni adın gerisinde)" : ""));

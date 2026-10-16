@@ -201,7 +201,18 @@ yapan fonksiyon herkese açık kalmıştı).
 
 **Şema sözleşmesi** (`npm run check:schema`): koddaki tablo, sütun ve RPC
 adları canlı şemanın kataloğuyla (`supabase/schema/katalog.json`)
-karşılaştırılır. Supabase istemcisi tipsiz olduğu için yanlış sütun adı
+karşılaştırılır. **Katalog gecikmesini hatadan ayırır** (16.10.2026): adı
+yerel bir migration yaratıyorsa uyarı yazılır ve çıkış kodu 0 kalır (kod
+kataloğun ilerisinde, olağan akış — migration SQL Editor'den uygulanıyor,
+döküm ve katalog sonra yenileniyor); hiçbir migration yaratmıyorsa hata
+verir. Bu ayrım olmadığı için CI üç commit boyunca on dört satırla
+kırmızı kaldı (sipariş arşivi, kalem düzenleme, tedarikçi stok işleri
+canlıya uygulanmış ama katalog yenilenmemişti) ve kırmızıya alışan göz
+on beşinci satırı okumaz. Eşleşme adın geçtiği yere değil onu YARATAN
+ifadeye bakar, sütunda tabloya bağlıdır ve migration yorumları
+ayıklanır: gevşek bir eşleşme yazım hatasını "gecikme" diye örterse
+denetim, denetlediği hatadan farksız olur
+(`tests/check-schema-usage.test.ts` iki dalı da sabitliyor). Supabase istemcisi tipsiz olduğu için yanlış sütun adı
 derlemede görünmez; üretimde sorgu hata verir ve çoğu yerde hata yakalanıp
 boş veri gösterilir (Platform → Ödemeler bu yüzden iki gün "sorun yok"
 gösterdi). Yeni sütun/fonksiyon kullanan kodu, migration canlıya uygulanıp

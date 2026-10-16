@@ -83,3 +83,56 @@ test("örnek ağaçta yalnızca beklenen altı sorun var", () => {
   // Sayı sabit: yeni bir yanlış alarm sınıfı eklenirse burada görünür.
   assert.match(sonuc.cikti, /✗ Şema sözleşmesi: 6 sorun/);
 });
+
+/*
+  KATALOG GECİKMESİ İLE YAZIM HATASI AYRI SESLE SÖYLENİYOR (16.10.2026).
+
+  Denetim ikisini aynı sesle söylüyordu ve CI üç commit boyunca on dört
+  satırla kırmızı kaldı: sipariş arşivi, kalem düzenleme ve tedarikçi
+  stok işleri canlıya uygulanıp yayına çıkmış, döküm ve katalog
+  yenilenmemişti. Kırmızıya alışan göz on beşinci satırı okumuyor —
+  gürültünün bedeli gerçek bir yazım hatasının kaçması.
+
+  Örnek migration ağacı (tests/fixtures/sema-migration) üç adı
+  yaratıyor; aynı dosya GEVŞEK EŞLEŞME tuzağını da kuruyor.
+*/
+function gecikmeliDenetim(): { cikis: number; cikti: string } {
+  const argumanlar = [
+    "scripts/check-schema-usage.mjs",
+    "tests/fixtures/sema",
+    "tests/fixtures/sema/katalog.json",
+    "tests/fixtures/sema-migration",
+  ];
+  try {
+    return { cikis: 0, cikti: execFileSync("node", argumanlar, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) };
+  } catch (sorun) {
+    const hata = sorun as { status?: number; stdout?: string; stderr?: string };
+    return { cikis: hata.status ?? 1, cikti: `${hata.stdout ?? ""}${hata.stderr ?? ""}` };
+  }
+}
+
+const gecikmeli = gecikmeliDenetim();
+
+test("migration'ın YARATTIĞI ad hata değil, uyarı", () => {
+  assert.match(gecikmeli.cikti, /! Katalog 3 yeni adın gerisinde/);
+  for (const ad of ["personel\\.unvan", "olmayan_tablo", "olmayan_fonksiyon"]) {
+    assert.match(gecikmeli.cikti, new RegExp(`Katalog[^\\n]*${ad}`), `${ad} gecikme sayılmalı`);
+  }
+});
+
+test("GEVŞEK EŞLEŞME yazım hatasını örtmüyor", () => {
+  /*
+    Örnek migration `yanlis_sutun`u BAŞKA bir tabloya ekliyor ve
+    `personel.yanlis_sutun`u yalnızca gerekçesinde anıyor. İkisi de
+    tanım değil: eşleşme tabloya bağlı ve yorumlar ayıklanıyor.
+  */
+  assert.match(gecikmeli.cikti, /✗ Şema sözleşmesi: 3 sorun/);
+  assert.match(gecikmeli.cikti, /klasik\.ts:5\s+personel\.yanlis_sutun yok \(insert\)/);
+  assert.equal(gecikmeli.cikis, 1, "gerçek hata varken çıkış 1 kalmalı");
+});
+
+test("migration dizini yoksa her şey hata sayılıyor", () => {
+  // Gecikme dalı yalnızca KANIT varken açılır; kanıt yoksa denetim eski gibi davranır.
+  assert.equal(sonuc.cikis, 1);
+  assert.match(sonuc.cikti, /✗ Şema sözleşmesi: 6 sorun/);
+});
