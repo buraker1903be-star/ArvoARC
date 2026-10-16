@@ -439,3 +439,7 @@ a.os-ws-item:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
 /* Ekran okuyucuya açık, gözden gizli metin (tablo başlıklarında boş sütunun adı).
    ArvoARC'ta tanımlı değildi; "Sonraki adım" başlığı tabloda görünüyordu. */
 .os-root .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+/* Radyo ve onay kutusu kendi boyunda. globals.css bütün input'lara
+   width:100% veriyor; eskiden bir kural bunları geri daraltıyordu, yeni
+   stil sırasıyla ezildi ve LR fiyat aktarımındaki radyo 720 piksele yayıldı. */
+.os-root input:is([type="radio"],[type="checkbox"]){width:auto;flex:none;margin-top:0}

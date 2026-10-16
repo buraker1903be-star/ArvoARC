@@ -1,0 +1,4 @@
+/* Veri aktarımı: ArvoOS kalıbı (16.10.2026). Kartların iç biçimi ../modules.css (import-*). */
+.os-root .veri-aktarimi{display:grid;gap:var(--sp-4)}
+.os-root .veri-aktarimi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .veri-aktarimi .import-card{padding:var(--sp-5)}

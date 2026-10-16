@@ -166,7 +166,7 @@ export function MaliyetAktarimi() {
     }));
 
   return (
-    <section className="ac ac-pad import-card">
+    <section className="panel-card import-card">
       <div className="ac-head">
         <div>
           <h3>LR fiyat aktarımı</h3>
@@ -217,7 +217,7 @@ export function MaliyetAktarimi() {
           fiyat yine siz onaylamadan yazılmaz.
         </p>
         <div className="maliyet-actions">
-          <button className="ac-btn ac-btn-primary" type="button" onClick={lrTara} disabled={calisiyor}>
+          <button className="panel-primary" type="button" onClick={lrTara} disabled={calisiyor}>
             {calisiyor ? "Taranıyor…" : "LR'dan fiyatları çek"}
           </button>
         </div>
@@ -239,10 +239,10 @@ export function MaliyetAktarimi() {
           bırakır. Şifreniz hiçbir yere yazılmaz — betik yalnızca sizin açtığınız sayfayı okur.
         </p>
         <div className="maliyet-actions">
-          <button className="ac-btn" type="button" onClick={toplananiGetir} disabled={calisiyor}>
+          <button className="panel-secondary" type="button" onClick={toplananiGetir} disabled={calisiyor}>
             Son toplanan listeyi getir
           </button>
-          <button className="ac-btn" type="button" onClick={yerImiAl} disabled={calisiyor}>
+          <button className="panel-secondary" type="button" onClick={yerImiAl} disabled={calisiyor}>
             {yerImi ? "Kodu yenile" : "Yer imi kodunu göster"}
           </button>
         </div>
@@ -290,7 +290,7 @@ export function MaliyetAktarimi() {
                 aria-label="Yer imi kodu"
               />
               <button
-                className="ac-btn"
+                className="panel-secondary"
                 type="button"
                 onClick={() => { void navigator.clipboard?.writeText(yerImi.kod); setSonuc({ metin: "Yer imi kodu kopyalandı." }); }}
               >
@@ -368,11 +368,11 @@ export function MaliyetAktarimi() {
       </p>
 
       <div className="maliyet-actions">
-        <button className="ac-btn ac-btn-primary" type="button" onClick={esleştir} disabled={calisiyor || !metin.trim()}>
+        <button className="panel-primary" type="button" onClick={esleştir} disabled={calisiyor || !metin.trim()}>
           {calisiyor ? "Okunuyor…" : "Eşleştir"}
         </button>
         {onizleme?.eslesen.length ? (
-          <button className="ac-btn" type="button" onClick={uygula} disabled={calisiyor}>
+          <button className="panel-secondary" type="button" onClick={uygula} disabled={calisiyor}>
             {onizleme.eslesen.filter((x) => !x.sorun).length} varyanta uygula
           </button>
         ) : null}

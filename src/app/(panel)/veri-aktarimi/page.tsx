@@ -1,8 +1,11 @@
 import { requireTenant } from "@/lib/tenant";
-import { PanelBildirimi } from "@/components/panel/bildirim";
+import { KKart, KListe, KOge } from "@/components/arvo-ui/k-ui";
+import { rozetTonu } from "@/lib/rozet-tonu";
 import { importActiveProducts, importHistoricalOrders, migrateShopifyImages } from "./actions";
 import { importKindLabel, importStatusLabel } from "@/lib/commerce-labels";
 import "../modules.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./veri-aktarimi.css";
 
 /*
   LR taraması bu sayfanın sunucu işleminden çalışıyor ve onlarca sayfa
@@ -27,19 +30,17 @@ export default async function ImportPage() {
   if (error) throw new Error(error.message);
   const canManage = ["owner", "admin", "manager"].includes(membership.role);
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <h1>Veri Aktarımı</h1>
-        <p>Shopify arşivinden ürün, sipariş ve görsel aktarımı.</p>
+  /* ArvoOS kalıbı (16.10.2026): başlık, panel kartları, geçmiş iOS listesinde. */
+  return <main className="talep veri-aktarimi">
+    <header className="talep-bas">
+      <div className="talep-bas-metin">
+        <small className="panel-kicker">Tedarik</small>
+        <h1>Veri aktarımı</h1>
+        <p className="talep-bas-alt">Alış fiyatı, Shopify arşivinden ürün, sipariş ve görsel aktarımı.</p>
       </div>
-    </section>
+    </header>
 
     <div className="ac-stack">
-      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
-          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
-          gösterebiliyordu (lib/panel-bildirim.ts). */}
-      <PanelBildirimi />
 
       {/*
         Alış fiyatı aktarımı en üstte: kâr hesabının dayandığı veri bu
@@ -50,55 +51,55 @@ export default async function ImportPage() {
       {canManage ? <MaliyetAktarimi /> : null}
 
       <div className="import-grid">
-        <section className="ac ac-pad import-card">
+        <section className="panel-card import-card">
           <div className="ac-head"><div><h3>Aktif ürünler</h3><p>Tek seferlik katalog aktarımı</p></div></div>
           <p>Yalnızca Shopify CSV’de <b>Status = active</b> olan ürünler alınır; taslak ve arşivlenmişler atlanır. Varyantlar, fiyatlar ve seçenekler korunur. Stok 0 başlar, stoksuz satış açık gelir.</p>
           {canManage ? (
             <form action={importActiveProducts} className="import-form">
               <label>Shopify Products CSV<input name="file" type="file" accept=".csv,text/csv" required /></label>
-              <button className="ac-btn ac-btn-primary" type="submit">Aktif ürünleri aktar</button>
+              <button className="panel-primary" type="submit">Aktif ürünleri aktar</button>
             </form>
           ) : null}
         </section>
 
-        <section className="ac ac-pad import-card">
+        <section className="panel-card import-card">
           <div className="ac-head"><div><h3>Geçmiş siparişler</h3><p>Stok miktarlarını etkilemez</p></div></div>
           <p>Shopify Orders CSV’deki eski siparişleri, müşteri bilgilerini ve kalemleri aktarır. Tarihsel kayıt olduğu için mevcut stoktan yeniden düşüm yapılmaz.</p>
           {canManage ? (
             <form action={importHistoricalOrders} className="import-form">
               <label>Shopify Orders CSV<input name="file" type="file" accept=".csv,text/csv" required /></label>
-              <button className="ac-btn ac-btn-primary" type="submit">Eski siparişleri aktar</button>
+              <button className="panel-primary" type="submit">Eski siparişleri aktar</button>
             </form>
           ) : null}
         </section>
 
-        <section className="ac ac-pad import-card">
+        <section className="panel-card import-card">
           <div className="ac-head"><div><h3>Görselleri taşı</h3><p>Shopify CDN bağını kaldırır</p></div></div>
           <p>Shopify ürün görsellerini ArvoARC depolamasına kopyalar. Zaman aşımını önlemek için her çalıştırmada 5 ürün taşınır; kalan sayısı işlem sonunda gösterilir.</p>
           {canManage ? (
             <form action={migrateShopifyImages} className="import-form">
-              <button className="ac-btn ac-btn-primary" type="submit">Sonraki görsel grubunu taşı</button>
+              <button className="panel-primary" type="submit">Sonraki görsel grubunu taşı</button>
             </form>
           ) : null}
         </section>
       </div>
 
-      <section className="ac table list-table import-list">
-        <div className="ac-head ac-pad-sm list-table-head"><div><h3>Aktarım geçmişi</h3><p>Son 20 işlem</p></div></div>
-        {batches?.length ? <>
-          <div className="list-row th"><span className="il-file">DOSYA</span><span className="il-kind">TÜR</span><span className="il-imported">AKTARILAN</span><span className="il-skipped">ATLANAN</span><span className="il-status">DURUM</span><span className="il-date">TARİH</span></div>
-          {batches.map((batch) => (
-            <div className="list-row" key={batch.id}>
-              <span className="il-file"><b>{batch.file_name ?? "Shopify CSV"}</b></span>
-              <span className="il-kind">{importKindLabel(batch.kind)}</span>
-              <span className="il-imported"><b>{(batch.imported_rows ?? 0).toLocaleString("tr-TR")}</b><small>/ {(batch.total_rows ?? 0).toLocaleString("tr-TR")} satır</small></span>
-              <span className="il-skipped">{((batch.skipped_rows ?? 0) + (batch.error_rows ?? 0)).toLocaleString("tr-TR")}</span>
-              <span className="il-status"><em className="ac-tag" data-tone={statusTone(batch.status)}>{importStatusLabel(batch.status)}</em></span>
-              <span className="il-date">{dateTime.format(new Date(batch.created_at))}</span>
-            </div>
-          ))}
-        </> : <div className="list-empty"><b>Henüz kayıtlı aktarım yok.</b><p>İlk aktif ürün kataloğu aktarımı burada görünecek.</p></div>}
-      </section>
+      <KKart baslik="Aktarım geçmişi" aciklama="Son 20 işlem">
+        {batches?.length ? (
+          <KListe>
+            {batches.map((batch) => (
+              <KOge
+                key={batch.id}
+                baslik={batch.file_name ?? "Shopify CSV"}
+                alt={`${importKindLabel(batch.kind)} · ${dateTime.format(new Date(batch.created_at))} · ${((batch.skipped_rows ?? 0) + (batch.error_rows ?? 0)).toLocaleString("tr-TR")} atlanan`}
+                durum={{ etiket: importStatusLabel(batch.status), ton: rozetTonu(statusTone(batch.status) ?? "good") }}
+                deger={(batch.imported_rows ?? 0).toLocaleString("tr-TR")}
+                degerAlt={`/ ${(batch.total_rows ?? 0).toLocaleString("tr-TR")} satır`}
+              />
+            ))}
+          </KListe>
+        ) : <div className="crm-empty-state talep-bos-kutu"><h2>Henüz kayıtlı aktarım yok</h2><p>İlk aktif ürün kataloğu aktarımı burada görünecek.</p></div>}
+      </KKart>
     </div>
-  </>;
+  </main>;
 }
