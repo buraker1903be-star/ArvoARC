@@ -125,3 +125,7 @@ html[data-theme="dark"] .panel-root .device-switch button[aria-pressed="true"]{b
   .panel-root .theme-bar-actions{width:100%}
   .panel-root .theme-bar-actions .ac-btn{flex:1;justify-content:center}
 }
+
+/* ArvoOS başlığı (16.10.2026) */
+.os-root .tema-sayfasi{display:grid;gap:var(--sp-4)}
+.os-root .tema-sayfasi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}

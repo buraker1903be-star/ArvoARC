@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Icon } from "@/components/panel/icons";
-import { Notice } from "@/components/panel/notice";
-import { PanelBildirimi } from "@/components/panel/bildirim";
+import { KNot } from "@/components/arvo-ui/k-ui";
+import "@/components/arvo-ui/kayit-detay.css";
 import { requireTenant } from "@/lib/tenant";
 import { ThemeEditor, type Theme } from "./theme-editor";
 import { temaVarsayilanlari } from "@/lib/tema-varsayilanlari";
@@ -66,18 +66,15 @@ export default async function Page() {
   const unpublished = Boolean(draft) && (!live?.published_at || new Date(draft?.updated_at ?? 0) > new Date(live.published_at));
 
   return (
-    <>
-      <section className="ac-bar">
-        <div>
-          <h1>Mağaza Tasarımı</h1>
-          <p>Ana sayfa bölümlerini ve tema ayarlarını canlı önizleme üzerinde düzenleyin.</p>
+    /* ArvoOS başlığı (16.10.2026); düzenleyici ve canlı önizleme aynen. */
+    <main className="talep tema-sayfasi">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker">Mağaza ayarları</small>
+          <h1>Vitrin teması</h1>
+          <p className="talep-bas-alt">Ana sayfa bölümlerini ve tema ayarlarını canlı önizleme üzerinde düzenleyin.</p>
         </div>
-      </section>
-
-      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
-          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
-          gösterebiliyordu (lib/panel-bildirim.ts). */}
-      <PanelBildirimi />
+      </header>
 
       <div className="theme-status">
         <span><Icon name="clock" size={14} />Taslak <b>{when(draft?.updated_at) ?? "henüz kaydedilmedi"}</b></span>
@@ -90,8 +87,8 @@ export default async function Page() {
       {canEdit ? (
         <ThemeEditor key={draft?.updated_at ?? "yeni"} initial={config} store={magazaAdresi(settings)} />
       ) : (
-        <Notice tone="info" title="Yalnızca görüntüleme">{yetkiYok("tema düzenleme")}</Notice>
+        <KNot ton="bilgi"><b>Yalnızca görüntüleme.</b> {yetkiYok("tema düzenleme")}</KNot>
       )}
-    </>
+    </main>
   );
 }
