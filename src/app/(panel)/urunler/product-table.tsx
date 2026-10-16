@@ -125,7 +125,7 @@ export function ProductTable({ rows, canManage, back, bos, children }: { rows: P
             <thead>
               <tr>
                 {canManage ? (
-                  <th className="liste-secim"><input type="checkbox" checked={allChecked} onChange={() => setSelected(allChecked ? new Set() : new Set(rows.map((row) => row.id)))} aria-label="Bu sayfadaki tüm ürünleri seç" /></th>
+                  <th className="liste-secim"><input type="checkbox" checked={allChecked} ref={(kutu) => { if (kutu) kutu.indeterminate = chosen.length > 0 && !allChecked; }} onChange={() => setSelected(allChecked ? new Set() : new Set(rows.map((row) => row.id)))} aria-label="Bu sayfadaki tüm ürünleri seç" /></th>
                 ) : null}
                 <th className="urun-gorsel-sutun"><span className="sr-only">Görsel</span></th>
                 <th>Ürün</th>

@@ -224,7 +224,7 @@ export function OrderTable({ rows, canManage, canDelete, back, bos, children }: 
             <thead>
               <tr>
                 {canManage ? (
-                  <th className="liste-secim"><input type="checkbox" checked={allChecked} onChange={toggleAll} aria-label="Bu sayfadaki tüm siparişleri seç" /></th>
+                  <th className="liste-secim"><input type="checkbox" checked={allChecked} ref={(kutu) => { if (kutu) kutu.indeterminate = chosen.length > 0 && !allChecked; }} onChange={toggleAll} aria-label="Bu sayfadaki tüm siparişleri seç" /></th>
                 ) : null}
                 <th>Sipariş</th>
                 <th>Müşteri</th>

@@ -4,7 +4,33 @@
   satırdaki yerinde işlem düğmesi. Siparişler ve Ürünler kullanıyor.
 */
 .os-root .crm-data-table .liste-secim{width:36px;text-align:center}
-.os-root .crm-data-table .liste-secim input{position:relative;z-index:2;width:16px;height:16px;margin:0;accent-color:var(--primary);cursor:pointer}
+/*
+  SEÇİM KUTUSU (16.10.2026): tarayıcının düz kutusu yerine durum
+  seçicisiyle (durum-secici.css) aynı dil — yumuşak köşe, ince çerçeve,
+  seçilince birincil renk ve beyaz tik. Başlıktaki "tümünü seç" kutusu
+  birkaç satır seçiliyken yarım (—) görünür (indeterminate, tablo
+  bileşeni ayarlıyor). Tik ve çizgi ::before ile çiziliyor: appearance:none
+  olan kutuda bütün tarayıcılar destekliyor.
+*/
+.os-root .crm-data-table .liste-secim input[type="checkbox"]{
+  position:relative;z-index:2;display:inline-grid;place-content:center;
+  width:18px;height:18px;margin:0;padding:0;
+  -webkit-appearance:none;appearance:none;
+  border:1.5px solid color-mix(in srgb,var(--ink) 22%,var(--line));border-radius:6px;
+  background:var(--surface);cursor:pointer;vertical-align:middle;
+  transition:background-color .14s ease,border-color .14s ease,box-shadow .14s ease;
+}
+.os-root .crm-data-table .liste-secim input[type="checkbox"]::before{
+  content:"";width:5px;height:9px;margin-top:-2px;
+  border:solid var(--surface);border-width:0 2px 2px 0;transform:rotate(45deg) scale(0);
+  transition:transform .14s ease;
+}
+.os-root .crm-data-table .liste-secim input[type="checkbox"]:hover{border-color:color-mix(in srgb,var(--primary) 55%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 10%,transparent)}
+.os-root .crm-data-table .liste-secim input[type="checkbox"]:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 25%,transparent)}
+.os-root .crm-data-table .liste-secim input[type="checkbox"]:is(:checked,:indeterminate){border-color:var(--primary);background:var(--primary)}
+.os-root .crm-data-table .liste-secim input[type="checkbox"]:checked::before{transform:rotate(45deg) scale(1)}
+.os-root .crm-data-table .liste-secim input[type="checkbox"]:indeterminate::before{width:8px;height:0;margin-top:0;border-width:0 0 2px 0;transform:none}
+@media (prefers-reduced-motion:reduce){.os-root .crm-data-table .liste-secim input[type="checkbox"],.os-root .crm-data-table .liste-secim input[type="checkbox"]::before{transition:none}}
 .os-root .crm-data-table tr.is-selected td{background:color-mix(in srgb,var(--primary) 6%,transparent)}
 .os-root .crm-data-table tr[data-islenen] td{opacity:.55}
 .os-root .crm-data-table .crm-cell-main{display:block;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:var(--fw-semibold)}
