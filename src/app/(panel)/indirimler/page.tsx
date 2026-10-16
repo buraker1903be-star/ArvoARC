@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
+import Image from "next/image";
 import { Pencere } from "@/components/os/pencere";
+import { createProductImageUrls } from "@/lib/product-images";
 import { createDiscount } from "./actions";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { indirimIstatistikleri, urunIndirimOzeti, type IstatistikIndirimi } from "@/lib/indirim-istatistik";
@@ -228,10 +230,33 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
     .sort((a, b) => b.oran - a.oran);
   const urunIdleri = [...new Set(indirimliVaryantlar.slice(0, 100).map((v) => v.product_id))];
   const { data: urunler, error: urunHatasi } = urunGorunumu && urunIdleri.length
-    ? await supabase.from("arc_products").select("id,name").in("id", urunIdleri).eq("organization_id", organization.id)
+    ? await supabase.from("arc_products").select("id,name,metadata").in("id", urunIdleri).eq("organization_id", organization.id)
     : { data: [], error: null };
   if (urunHatasi) throw new Error("İndirimli ürünler okunamadı: " + urunHatasi.message);
-  const urunAdi = new Map(((urunler ?? []) as { id: string; name: string }[]).map((u) => [u.id, u.name]));
+  type UrunSatiri = { id: string; name: string; metadata: unknown };
+  const urunKaydi = new Map(((urunler ?? []) as UrunSatiri[]).map((u) => [u.id, u]));
+  const urunAdi = new Map(((urunler ?? []) as UrunSatiri[]).map((u) => [u.id, u.name]));
+
+  /*
+    KÜÇÜK GÖRSEL. Liste adlarla doluydu ve benzer adlı ürünler
+    ("LR Microsilver Plus Yüz Kremi" / "… Temizleme Kremi") ancak
+    okunarak ayırt ediliyordu. Ürünler ekranındaki kalıbın aynısı:
+    kendi ürünlerimizde depodaki yol imzalanıyor, tedarikçi
+    ürünlerinde CDN adresi doğrudan kullanılıyor.
+  */
+  type UrunMeta = { images?: string[]; image_paths?: string[] };
+  const uzakMi = (yol: string) => yol.startsWith("http");
+  const depoYollari = urunIdleri.flatMap((id) => {
+    const yol = ((urunKaydi.get(id)?.metadata ?? {}) as UrunMeta).image_paths?.[0];
+    return yol && !uzakMi(yol) ? [yol] : [];
+  });
+  const imzaliAdresler = depoYollari.length ? await createProductImageUrls(supabase, depoYollari) : [];
+  const imzaliByYol = new Map(depoYollari.map((yol, sira) => [yol, imzaliAdresler[sira]]));
+  const urunGorseli = (id: string) => {
+    const meta = (urunKaydi.get(id)?.metadata ?? {}) as UrunMeta;
+    const yol = meta.image_paths?.[0];
+    return (yol ? (uzakMi(yol) ? yol : imzaliByYol.get(yol)) : undefined) ?? meta.images?.[0] ?? null;
+  };
 
   const urunOzeti = urunIndirimOzeti(urunSonucu.rows);
   /* Kartın listesi: en yüksek oranlı altı ÜRÜN (varyant değil; aynı
@@ -330,26 +355,53 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
           ) : null}
           {indirimliVaryantlar.length ? (
             <div className="talep-tablo">
-              <table className="crm-data-table" data-cols="urun-indirim">
+              <table className="crm-data-table indirim-urun-tablo" data-cols="urun-indirim">
                 <thead>
-                  <tr><th>Ürün</th><th>Varyant</th><th className="crm-col-amount">Fiyat</th><th className="crm-col-amount">Eski fiyat</th><th>İndirim</th><th></th></tr>
+                  <tr>
+                    <th className="indirim-gorsel-sutun"><span className="sr-only">Görsel</span></th>
+                    <th>Ürün</th>
+                    <th className="crm-col-amount">Fiyat</th>
+                    <th>İndirim</th>
+                    <th></th>
+                  </tr>
                 </thead>
                 <tbody>
-                  {indirimliVaryantlar.slice(0, 100).map((varyant) => (
-                    <tr key={varyant.id}>
-                      <td data-label="Ürün">
-                        <Link prefetch={false} className="crm-row-link" href={`/urunler/${varyant.product_id}`}>{urunAdi.get(varyant.product_id) ?? "Ürün"}</Link>
-                      </td>
-                      <td data-label="Varyant">
-                        <span className="crm-cell-main">{varyant.title || "Tek varyant"}</span>
-                        <small className="crm-cell-sub crm-table-mono">{varyant.sku}</small>
-                      </td>
-                      <td className="crm-col-amount" data-label="Fiyat"><b>{money.format(varyant.price / 100)}</b></td>
-                      <td className="crm-col-amount" data-label="Eski fiyat"><s>{money.format((varyant.compare_at_price ?? 0) / 100)}</s></td>
-                      <td data-label="İndirim"><span className="status-pill" data-tone="success">−%{varyant.oran}</span></td>
-                      <td className="crm-table-actions"><span className="crm-row-chevron" aria-hidden="true">›</span></td>
-                    </tr>
-                  ))}
+                  {indirimliVaryantlar.slice(0, 100).map((varyant) => {
+                    const ad = urunAdi.get(varyant.product_id) ?? "Ürün";
+                    const gorsel = urunGorseli(varyant.product_id);
+                    /*
+                      "Default Title" VARYANT ADI DEĞİL, tek varyantlı
+                      ürünün yer tutucusu: her satırda tekrarlayınca
+                      sütunu okunmaz bir duvara çeviriyordu. Gerçek bir
+                      varyant adı varsa yazılıyor, yoksa yalnızca SKU.
+                    */
+                    const varyantAdi = varyant.title && varyant.title.trim().toLocaleLowerCase("tr-TR") !== "default title" ? varyant.title.trim() : null;
+                    return (
+                      <tr key={varyant.id}>
+                        <td className="indirim-gorsel-sutun">
+                          <span className="indirim-gorsel">
+                            {gorsel ? <Image src={gorsel} alt="" width={80} height={80} sizes="40px" /> : <b>{ad.slice(0, 2).toLocaleUpperCase("tr-TR")}</b>}
+                          </span>
+                        </td>
+                        <td data-label="Ürün">
+                          <Link prefetch={false} className="crm-row-link crm-cell-main" href={`/urunler/${varyant.product_id}`} title={ad}>{ad}</Link>
+                          <small className="crm-cell-sub">
+                            {varyantAdi ? <span>{varyantAdi} · </span> : null}
+                            <span className="crm-table-mono">{varyant.sku}</span>
+                          </small>
+                        </td>
+                        {/* Eski fiyat FİYATIN ALTINDA: ayrı sütun olunca
+                            satır genişliyor, ad sütunu daralıyor ve isim
+                            üç satıra sarıyordu. */}
+                        <td className="crm-col-amount" data-label="Fiyat">
+                          <b>{money.format(varyant.price / 100)}</b>
+                          <small className="crm-cell-sub"><s>{money.format((varyant.compare_at_price ?? 0) / 100)}</s></small>
+                        </td>
+                        <td data-label="İndirim"><span className="status-pill" data-tone="success">−%{varyant.oran}</span></td>
+                        <td className="crm-table-actions"><span className="crm-row-chevron" aria-hidden="true">›</span></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {indirimliVaryantlar.length > 100 ? (

@@ -42,6 +42,24 @@
 .os-root .indirim-eylem :is(button,summary){min-height:30px;padding:4px 10px;font-size:var(--fs-sm)}
 .indirim-pencere-alt{margin:0;color:var(--muted);font-size:var(--fs-sm)}
 
+/*
+  ÜRÜN İNDİRİMİ SATIRLARI. Liste adlarla doluydu: benzer adlı ürünler
+  ("… Yüz Kremi" / "… Yüz Temizleme Kremi") ancak okunarak ayırt
+  ediliyordu ve ad sütunu dar kaldığı için isim üç satıra sarıyordu.
+  Küçük görsel ürünler ekranındaki kalıbın aynısı; ad sütunu geniş,
+  fiyat ve indirim daralmıyor.
+*/
+.os-root .indirim-urun-tablo .indirim-gorsel-sutun{width:52px}
+.os-root .indirim-urun-tablo .indirim-gorsel{
+  display:grid;place-items:center;width:40px;height:40px;overflow:hidden;
+  border-radius:var(--r-sm);background:var(--surface-2);color:var(--muted);font-size:var(--fs-micro)
+}
+.os-root .indirim-urun-tablo .indirim-gorsel img{width:100%;height:100%;object-fit:cover}
+/* Ad sütunu listenin omurgası: kalan genişliği o alsın. */
+.os-root .indirim-urun-tablo td:nth-child(2){width:100%}
+.os-root .indirim-urun-tablo .crm-col-amount{white-space:nowrap}
+@media (max-width:760px){.os-root .indirim-urun-tablo .indirim-gorsel-sutun{display:none}}
+
 /* ---------- Kampanya detayı ---------- */
 /* Kullanım sayısı kararın merkezinde: limit dolmuşsa kampanya fiilen bitmiştir. */
 .os-root .indirim-detay .indirim-kullanim{
