@@ -133,7 +133,16 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
   */
   const etiketler = customerTags(summary, now);
   return (
-    <main className="talep musteri-detay">
+    /*
+      TEK EKRAN, SAYFA KAYMAZ (16.10.2026). Sayfa 1147px boyundaydı ve
+      pencereyi aşıyordu; sipariş detayı ise ekran boyunda durup
+      sütunlarını kendi içinde kaydırıyor. Kural ortak
+      (components/arvo-ui/kayit-detay.css): `.talep-izgara` içindeki
+      `.talep-bilgi` / `.talep-musteri` kendi içinde kayıyor. Buradaki
+      ızgara kendi sınıfını taşıyordu, yani kurala hiç girmiyordu —
+      sihirli sayıyı kopyalamak yerine kancaları kullanıyoruz.
+    */
+    <main className="crm-page-stack talep musteri-detay">
       <header className="talep-bas">
         <div className="talep-bas-metin">
           <small className="panel-kicker"><Link prefetch={false} href="/musteriler">Müşteriler</Link></small>
@@ -156,8 +165,8 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
         </dl>
       </nav>
 
-      <div className="musteri-izgara">
-        <KKart baslik="Sipariş geçmişi" aciklama={`${orders.length} sipariş · en yeniden eskiye`}>
+      <div className="talep-izgara musteri-izgara">
+        <KKart sinif="talep-bilgi" baslik="Sipariş geçmişi" aciklama={`${orders.length} sipariş · en yeniden eskiye`}>
           <KListe>
             {orders.map((order) => {
               const badge = orderBadge(order.status, order.payment_status);
@@ -175,7 +184,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
           </KListe>
         </KKart>
 
-        <aside className="musteri-yan">
+        <aside className="musteri-yan talep-musteri">
           <KKart baslik="İletişim">
             <dl className="customer-dl">
               <div><dt>E-posta</dt><dd>{customerEmail ? <a href={`mailto:${customerEmail}`}>{customerEmail}</a> : "Bulunmuyor"}</dd></div>
