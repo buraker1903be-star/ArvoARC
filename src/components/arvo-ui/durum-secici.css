@@ -118,6 +118,9 @@
 /* Altta yer yoksa yukarı: pencerenin dibindeki seçicide liste ekranın
    altından taşıyordu (16.10.2026, canlıda ölçüldü). */
 .durum-secici[data-yon="ust"] :is(.durum-secici-kutu,.durum-secici-liste){top:auto;bottom:calc(100% + 6px)}
-/* Portaldaki kutu düğmenin yanında değil panelin kökünde: konumu
-   satır içi (sabit, açılırken ölçüldü), genişliği de düğmeninki. */
-.durum-secici-kutu[data-portal]{z-index:1600;width:auto}
+/* Portaldaki kutu düğmenin yanında değil panelin kökünde: konumu ve
+   genişliği satır içinde (açılırken düğmeden ölçülüyor). Kutunun kendi
+   yerleşim kuralları SIFIRLANIYOR: `top:calc(100% + 6px)` satır içi
+   `bottom` ile birlikte kalınca kutu eziliyor, `min-width:max(100%,…)`
+   de genişliği kök genişliğine (1420px) çekiyordu. */
+.durum-secici-kutu[data-portal]{z-index:1600;top:auto;right:auto;bottom:auto;left:auto;min-width:0}
