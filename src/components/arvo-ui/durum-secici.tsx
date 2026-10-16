@@ -30,6 +30,7 @@ export function DurumSecici({
   etiket,
   disabled = false,
   gonder = true,
+  bicim = "hap",
 }: {
   name: string;
   deger: string;
@@ -39,6 +40,15 @@ export function DurumSecici({
   disabled?: boolean;
   /** false: yalnızca değeri değiştirir, formu göndermez. */
   gonder?: boolean;
+  /*
+    BİÇİM. "hap" durum şeritleri için: etiket gibi, renk noktalı.
+    "alan" bir FORM alanı için: kutu biçimli, nokta yok, yanındaki
+    metin kutularıyla aynı boy ve köşe. İkisi de aynı listeyi, aynı
+    klavye davranışını ve aynı erişilebilirlik sözleşmesini kullanıyor;
+    tarayıcının <select>'i formlarda da panelin dilinin dışında
+    kalıyordu.
+  */
+  bicim?: "hap" | "alan";
 }) {
   const [secili, setSecili] = useState(deger);
   const [acik, setAcik] = useState(false);
@@ -92,7 +102,7 @@ export function DurumSecici({
   };
 
   return (
-    <div className="durum-secici" ref={kok} data-acik={acik ? "" : undefined}>
+    <div className="durum-secici" ref={kok} data-bicim={bicim} data-acik={acik ? "" : undefined}>
       <input ref={girdi} type="hidden" name={name} defaultValue={deger} />
       <button
         ref={dugme}

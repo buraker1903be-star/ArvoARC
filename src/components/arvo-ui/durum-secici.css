@@ -58,3 +58,28 @@
 .durum-secici-tik{flex:none;width:15px;height:15px;fill:none;stroke:var(--ton);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 @keyframes durum-secici-ac{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.durum-secici-liste{animation:none}.durum-secici-ok{transition:none}}
+
+/*
+  ALAN BİÇİMİ (16.10.2026). Form içindeki seçici hap gibi durmamalı:
+  yanındaki metin kutularıyla aynı boy, aynı köşe, aynı zemin. Renk
+  noktası da kalkıyor — orada bir DURUM değil, bir seçenek var
+  ("Sepette yüzde indirim").
+*/
+.durum-secici[data-bicim="alan"]{display:block;width:100%}
+.os-root .durum-secici[data-bicim="alan"] .durum-secici-dugme{
+  width:100%;justify-content:space-between;
+  height:var(--control-h,40px);padding:0 var(--sp-3);
+  border-radius:var(--r-sm);border-color:var(--line);
+  background:var(--surface-2);
+  font-weight:var(--fw-medium);font-size:var(--fs-base);
+}
+.os-root .durum-secici[data-bicim="alan"] .durum-secici-dugme:hover{
+  border-color:color-mix(in srgb,var(--primary) 30%,var(--line));background:var(--surface-2)
+}
+.durum-secici[data-bicim="alan"] .durum-secici-dugme>.durum-secici-nokta{display:none}
+.durum-secici[data-bicim="alan"][data-acik] .durum-secici-dugme{
+  border-color:var(--primary);background:var(--surface);box-shadow:var(--shadow-glow)
+}
+.durum-secici[data-bicim="alan"] .durum-secici-liste{width:100%;min-width:0}
+/* Listede de nokta yok; seçili olanı tik gösteriyor. */
+.durum-secici[data-bicim="alan"] .durum-secici-liste .durum-secici-nokta{display:none}

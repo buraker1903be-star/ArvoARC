@@ -81,16 +81,48 @@ html[data-theme="dark"] .os-root .panel-secondary{border-color:var(--line);color
    özgüllükte onu eziyordu ve sayfa içindeki formlarda (Ayarlar, Abonelik)
    açılır liste oku siliniyor, punto ve köşeler çekmecedekinden farklı
    çıkıyordu. Çekmeceler .panel-content dışında çizildiği için etkilenmiyordu. */
+/*
+  ALAN ZEMİNİ VE ÇERÇEVESİ TEMA DEĞİŞKENİNDEN (16.10.2026).
+
+  Kural `--n-300` kullanıyordu: o paletin sabit bir tonu, temaya göre
+  DEĞİŞMİYOR. Koyu temada düzeltmesi vardı ama ÖZGÜLLÜKTE
+  KAYBEDİYORDU — açık kuralda beş `:not([type=…])` var (0,8,1), koyu
+  kuralda iki (0,6,2) — yani koyu temada her form alanı neredeyse
+  siyah zeminde AÇIK GRİ çerçeveyle çiziliyordu. Ekran görüntüsünde
+  "tarayıcı varsayılanı" gibi duran şey buydu.
+
+  Tek kural, iki temada da doğru: çerçeve `--line`, zemin `--surface-2`
+  (karttan bir ton koyu/açık, yani alan "oyulmuş" görünüyor).
+*/
 .os-root .panel-content :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *){
-  border:1px solid var(--n-300);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font-size:var(--fs-base);
-  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
+  border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink);font-size:var(--fs-base);
+  padding:0 var(--sp-3);
+  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),background-color var(--dur) var(--ease);
+}
+/* Yazı alanı tek satır değil: dikey dolgu ve satır yüksekliği ister. */
+.os-root .panel-content textarea:not(.kayit-formu > label > *){padding:10px var(--sp-3);line-height:1.5}
+.os-root .panel-content :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *):hover:not(:focus){
+  border-color:color-mix(in srgb,var(--primary) 30%,var(--line))
 }
 .os-root .panel-content :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *):focus{
-  outline:none;border-color:var(--primary);box-shadow:var(--shadow-glow)
+  outline:none;border-color:var(--primary);background:var(--surface);box-shadow:var(--shadow-glow)
 }
+/*
+  SAYI OKLARI KALKIYOR. Tarayıcının çift oku her sayı alanında
+  beliriyor, kutunun sağını yiyor ve panelin dilinde karşılığı yok;
+  değer klavyeyle yazılıyor.
+*/
+.os-root .panel-content input[type="number"]{-moz-appearance:textfield;appearance:textfield}
+.os-root .panel-content input[type="number"]::-webkit-outer-spin-button,
+.os-root .panel-content input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+/* Tarih/saat alanının takvim simgesi koyu temada görünmüyordu. */
+.os-root .panel-content input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.os-root .panel-content input[type="date"]::-webkit-calendar-picker-indicator{opacity:.6;cursor:pointer;filter:invert(var(--takvim-ters,0))}
+html[data-theme="dark"] .os-root .panel-content{--takvim-ters:1}
+/* Onay kutusu: 13px'lik tarayıcı kutusu yerine markanın rengi ve okunur boy. */
+.os-root .panel-content input[type="checkbox"]{width:16px;height:16px;accent-color:var(--primary);cursor:pointer}
 .os-root .panel-content :is(input,textarea)::placeholder{color:var(--muted)}
 .os-root .panel-content label>:is(span,small):first-child{font-weight:var(--fw-medium)}
-html[data-theme="dark"] .os-root .panel-content :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea):not(.kayit-formu > label > *){border-color:var(--line);background:var(--surface-2)}
 
 /* ---------- Boş durumlar ----------
    ~18 ayrı tasarım vardı; ortak çerçeve: kesik çizgili, ortalanmış, sakin. */

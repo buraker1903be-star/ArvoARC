@@ -7,6 +7,7 @@ import { trIsoToLocal } from "@/lib/tr-time";
 import { rozetTonu } from "@/lib/rozet-tonu";
 import { KNot } from "@/components/arvo-ui/k-ui";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
+import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { deleteDiscount, toggleDiscount, updateDiscount } from "../actions";
 import { indirimDegeri, indirimDurumu, indirimTuruAdi } from "@/lib/indirim-bicim";
 import { BITIYOR_GUN } from "@/lib/indirim-istatistik";
@@ -198,12 +199,21 @@ export default async function KampanyaDetayi({ params }: { params: Promise<{ id:
               <input type="hidden" name="back" value={adres} />
               <div className="discount-form-grid">
                 <label className="wide">Kampanya adı<input name="name" required maxLength={160} defaultValue={kural.name} /></label>
+                {/* Tarayıcının <select>'i yerine panelin seçicisi: aynı
+                    liste, aynı klavye, kutu biçiminde (durum-secici). */}
                 <label>İndirim türü
-                  <select name="discount_type" defaultValue={kural.discount_type}>
-                    <option value="percentage">Sepette yüzde indirim</option>
-                    <option value="fixed_amount">Sepette sabit tutar indirimi</option>
-                    <option value="free_shipping">Ücretsiz kargo</option>
-                  </select>
+                  <DurumSecici
+                    name="discount_type"
+                    etiket="İndirim türü"
+                    bicim="alan"
+                    gonder={false}
+                    deger={kural.discount_type}
+                    secenekler={[
+                      { deger: "percentage", etiket: "Sepette yüzde indirim" },
+                      { deger: "fixed_amount", etiket: "Sepette sabit tutar indirimi" },
+                      { deger: "free_shipping", etiket: "Ücretsiz kargo" },
+                    ]}
+                  />
                 </label>
                 <label>İndirim değeri
                   <input name="value" type="text" inputMode="decimal" autoComplete="off" defaultValue={kural.discount_type === "fixed_amount" ? (kural.value / 100).toLocaleString("tr-TR", { minimumFractionDigits: 2 }) : String(kural.value)} />

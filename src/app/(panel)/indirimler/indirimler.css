@@ -67,6 +67,11 @@
 }
 .os-root .indirim-detay .indirim-kullanim b{font-size:var(--fs-lg);font-weight:700}
 .os-root .indirim-detay .indirim-kullanim span{color:var(--muted);font-size:var(--fs-sm)}
-/* Düzenleme formu kartın içinde: ızgara modules.css'ten, boşluk burada. */
-.os-root .indirim-detay .discount-form-grid{margin-top:var(--sp-3)}
+/*
+  Düzenleme formu kartın içinde ve İKİ SÜTUN. Ortak ızgara dört sütun;
+  detayın sağ sütununda her alan ~170px kalıyor ve tarih kutusunun
+  değeri ("16.10.2026 12:00") kırpılıyordu.
+*/
+.os-root .indirim-detay .discount-form-grid{margin-top:var(--sp-3);grid-template-columns:repeat(2,minmax(0,1fr))}
+.os-root .indirim-detay .discount-form-grid .wide{grid-column:span 2}
 .os-root .indirim-detay .talep-bas-eylem form{margin:0}
