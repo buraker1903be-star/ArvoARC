@@ -76,8 +76,8 @@ export default async function SuppliersPage() {
                   <form action={updateSupplier} className="supplier-form">
                     <input type="hidden" name="code" value={supplier.code} />
                     <label>Kâr oranı (%)<input name="margin_percent" type="number" min="0" max="500" step="1" defaultValue={margin} required className="ac-input" /></label>
-                    <label>Kargo payı (₺)<input name="shipping_markup" type="number" min="0" step="0.01" defaultValue={(shipping / 100).toFixed(2)} required className="ac-input" /></label>
-                    <label>Ek hizmet bedeli (₺)<input name="service_fee" type="number" min="0" step="0.01" defaultValue={(service / 100).toFixed(2)} className="ac-input" /></label>
+                    <label>Kargo payı (₺)<input name="shipping_markup" type="text" inputMode="decimal" autoComplete="off" defaultValue={(shipping / 100).toFixed(2)} required className="ac-input" /></label>
+                    <label>Ek hizmet bedeli (₺)<input name="service_fee" type="text" inputMode="decimal" autoComplete="off" defaultValue={(service / 100).toFixed(2)} className="ac-input" /></label>
                     <label>Stok tamponu (adet)<input name="stock_buffer" type="number" min="0" max="100" step="1" defaultValue={supplier.stock_buffer ?? 5} className="ac-input" /></label>
                     <label>Yuvarlama (kuruş)<input name="round_to_kurus" type="number" min="0" max="99" step="1" defaultValue={round} required className="ac-input" /></label>
                     <label className="check-inline is-wide"><input name="publish_directly" type="checkbox" defaultChecked={supplier.publish_directly ?? false} /> Yeni ürünler doğrudan yayınlansın (kapalıysa taslak gelir)</label>

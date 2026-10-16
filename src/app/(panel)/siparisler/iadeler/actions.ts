@@ -1,5 +1,6 @@
 "use server";
 
+import { formTutari } from "@/lib/money";
 import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
@@ -206,12 +207,13 @@ export async function resolveReturn(formData: FormData) {
     sanırken siparişin tamamı iade edilebiliyordu.
   */
   /* Yalnızca boş alan "hesaplanan tutar" demek; "0", eksi ya da sayı olmayan girdi reddedilir. */
+  /* Türkçe yazım (formTutari): "1.500" bin beş yüz liradır, 1,5 değil. Boş alan "tamamı". */
   const rawAmount = String(formData.get("amount") ?? "").trim();
-  const custom = Number(rawAmount.replace(",", "."));
-  if (rawAmount && (!Number.isFinite(custom) || custom <= 0)) {
+  const customKurus = formTutari(rawAmount);
+  if (rawAmount && (customKurus === null || customKurus <= 0)) {
     return await bildirimliDonus("/siparisler/iadeler",{hata:hataMetni("invalid-amount")});
   }
-  const amountKurus = rawAmount ? Math.round(custom * 100) : breakdown.amount;
+  const amountKurus = rawAmount ? customKurus! : breakdown.amount;
 
   /*
     Üst sınır artık siparişin tamamı değil, iade edilen kalemler

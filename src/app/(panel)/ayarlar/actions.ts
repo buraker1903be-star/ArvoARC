@@ -1,5 +1,6 @@
 "use server";
 
+import { formTutari } from "@/lib/money";
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
@@ -102,22 +103,23 @@ export async function updateSalesSettings(formData:FormData){
   if(!roles.has(membership.role))return await bildirimliDonus("/ayarlar",{hata:hataMetni("forbidden")});
 
   const prefix=String(formData.get("order_prefix")??"").trim().toUpperCase();
-  const shippingFee=Number(formData.get("shipping_fee")??0);
-  const freeThreshold=Number(formData.get("free_shipping_threshold")??0);
+  /* Tutarlar Türkçe yazımla (lib/money → formTutari): "1.500" bin beş yüz, 1,5 değil. */
+  const shippingFee=formTutari(formData.get("shipping_fee"));
+  const freeThreshold=formTutari(formData.get("free_shipping_threshold"));
   const transferDiscount=Number(formData.get("bank_transfer_discount_percent")??0);
 
   /* Veritabanı kısıtıyla aynı: yalnızca harf, 1-6 karakter. */
   if(!/^[A-Z]{1,6}$/.test(prefix))return await bildirimliDonus("/ayarlar",{hata:hataMetni("invalid-order-prefix")});
-  if(!Number.isFinite(shippingFee)||shippingFee<0||shippingFee>100000)return await bildirimliDonus("/ayarlar",{hata:hataMetni("invalid-shipping-fee")});
-  if(!Number.isFinite(freeThreshold)||freeThreshold<0||freeThreshold>1000000)return await bildirimliDonus("/ayarlar",{hata:hataMetni("invalid-free-threshold")});
+  if(shippingFee===null||shippingFee>100000_00)return await bildirimliDonus("/ayarlar",{hata:hataMetni("invalid-shipping-fee")});
+  if(freeThreshold===null||freeThreshold>1000000_00)return await bildirimliDonus("/ayarlar",{hata:hataMetni("invalid-free-threshold")});
   if(!Number.isFinite(transferDiscount)||transferDiscount<0||transferDiscount>100)return await bildirimliDonus("/ayarlar",{hata:hataMetni("invalid-transfer-discount")});
 
   const {error}=await supabase.from("arc_store_settings").upsert({
     organization_id:organization.id,
     ...(await magazaAdiTabani(supabase,organization.id,organization.name)),
     order_prefix:prefix,
-    shipping_fee:Math.round(shippingFee*100),
-    free_shipping_threshold:Math.round(freeThreshold*100),
+    shipping_fee:shippingFee,
+    free_shipping_threshold:freeThreshold,
     bank_transfer_discount_percent:transferDiscount,
     /* Tarifeyi kiracı SEÇTİ. Sütunlar NOT NULL ve varsayılanları
        ArvoCulture'ın tarifesi olduğu için "seçildi mi" başka türlü

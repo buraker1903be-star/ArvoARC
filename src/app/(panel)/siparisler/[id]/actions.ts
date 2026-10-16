@@ -1,6 +1,6 @@
 "use server";
 
-import { parseMoneyToCents } from "@/lib/money";
+import { formTutari } from "@/lib/money";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { bildirimBirak, bildirimliDonus } from "@/lib/panel-bildirim";
@@ -242,7 +242,7 @@ export async function refundOrder(formData: FormData) {
     ve ondalık virgülü tanıyor). Okunamayan ya da sıfır tutar reddedilir.
   */
   const rawAmount = String(formData.get("amount") ?? "").trim();
-  const requestedKurus = rawAmount ? parseMoneyToCents(rawAmount) : 0;
+  const requestedKurus = rawAmount ? (formTutari(rawAmount) ?? 0) : 0;
   if (rawAmount && requestedKurus <= 0) {
     return await siparise(orderId,{hata:"invalid-amount"});
   }

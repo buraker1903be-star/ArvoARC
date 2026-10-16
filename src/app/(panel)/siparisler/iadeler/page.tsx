@@ -278,10 +278,9 @@ export default async function ReturnsPage({
                       İade tutarı (₺)
                       <input
                         name="amount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        max={(refund.amount / 100).toFixed(2)}
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
                         placeholder={
                           refund.shippingRefund > 0
                             ? `Kalem + kargo: ${(refund.amount / 100).toFixed(2)}`
