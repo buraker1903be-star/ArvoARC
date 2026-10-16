@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BITIYOR_GUN, indirimIstatistikleri, urunIndirimOzeti, type IstatistikIndirimi } from "@/lib/indirim-istatistik";
+import { indirimKuralYazisi } from "@/lib/indirim-bicim";
 
 const AN = Date.parse("2026-10-16T12:00:00+03:00");
 const gunSonra = (gun: number) => new Date(AN + gun * 86_400_000).toISOString();
@@ -111,4 +112,17 @@ test("indirimsiz ve eksik karşılaştırma fiyatı sayılmıyor", () => {
   assert.equal(o.ortalamaOran, null, "indirimli varyant yokken ortalama yok");
   assert.equal(o.enYuksekOran, null);
   assert.equal(o.toplamFarkKurus, 0);
+});
+
+
+/*
+  Listede "Tür" ve "Değer" ayrı sütunlardı ve birbirini tekrarlıyordu
+  ("Yüzde indirim" + "%10"). Kuralın tek cümlesi ikisinin yerine geçti.
+*/
+test("kural tek cümlede: ne veriyor", () => {
+  assert.equal(indirimKuralYazisi("percentage", 10), "%10 indirim");
+  assert.equal(indirimKuralYazisi("fixed_amount", 5000), "₺50,00 indirim");
+  assert.equal(indirimKuralYazisi("free_shipping", 0), "Ücretsiz kargo");
+  /* Tanınmayan tür uydurulmuyor, ham adıyla geçiyor. */
+  assert.equal(indirimKuralYazisi("yok_boyle", 3), "yok_boyle");
 });

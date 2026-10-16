@@ -11,7 +11,7 @@ import { gorunumleriOku } from "../gorunumler/oku";
 import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
 import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
 import { IndirimTablosu, type IndirimSatiri } from "./indirim-tablosu";
-import { indirimDegeri, indirimDurumu, indirimTuruAdi } from "@/lib/indirim-bicim";
+import { indirimDurumu, indirimKuralYazisi } from "@/lib/indirim-bicim";
 // Liste kalıbı (talep-*, crm-data-table) ve form ızgarası: sayfa kendi CSS'ini import eder.
 import "@/components/arvo-ui/k-ui";
 import "@/components/arvo-ui/crm.css";
@@ -162,13 +162,15 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
   };
   const kurallar = (listeSonucu.data ?? []) as unknown as KuralSatiri[];
 
+  /* Süresiz kural null döndürüyor: hücre "süresiz" yazısını kendi
+     yazıyor ve sessiz tonda gösteriyor. */
   const tarihYazisi = (bas: string | null, son: string | null) => {
     const b = bas ? kisaTarih.format(new Date(bas)) : null;
     const s = son ? kisaTarih.format(new Date(son)) : null;
     if (b && s) return `${b} – ${s}`;
     if (s) return `${s} tarihine kadar`;
     if (b) return `${b} tarihinden beri`;
-    return "süresiz";
+    return null;
   };
 
   const GUN = 86_400_000;
@@ -177,14 +179,18 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
     const gecerliBitis = bitis !== null && !Number.isNaN(bitis) ? bitis : null;
     const limit = Number(kural.usage_limit ?? 0) || 0;
     const kullanim = Math.max(0, Number(kural.usage_count ?? 0) || 0);
+    /* Ad ile kod aynıysa alt satır YAZILMIYOR: "ARVO10 / ARVO10" diye
+       iki kez görünüyordu. */
+    const altSatir = kural.code
+      ? (kural.code.trim().toLocaleLowerCase("tr-TR") === kural.name.trim().toLocaleLowerCase("tr-TR") ? null : kural.code)
+      : "otomatik";
     return {
       id: kural.id,
       ad: kural.name,
-      kod: kural.code,
-      turEtiketi: indirimTuruAdi(kural.discount_type),
-      deger: indirimDegeri(kural.discount_type, kural.value),
-      kosul: kural.minimum_subtotal > 0 ? `${money.format(kural.minimum_subtotal / 100)} üzeri` : "alt limitsiz",
-      kullanim: limit > 0 ? `${kullanim}/${limit}` : `${kullanim} kullanım`,
+      altSatir,
+      kural: indirimKuralYazisi(kural.discount_type, kural.value),
+      kosul: kural.minimum_subtotal > 0 ? `${money.format(kural.minimum_subtotal / 100)} üzeri sepet` : null,
+      kullanim: limit > 0 ? `${kullanim}/${limit}` : kullanim > 0 ? `${kullanim} kullanım` : null,
       kullanimOrani: limit > 0 ? kullanim / limit : null,
       tarih: tarihYazisi(kural.starts_at, kural.ends_at),
       suresiGecti: gecerliBitis !== null && gecerliBitis < an,

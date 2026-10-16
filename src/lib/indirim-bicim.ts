@@ -25,6 +25,21 @@ export function indirimDegeri(tur: string, deger: number): string {
   return "Ücretsiz";
 }
 
+/*
+  KURALIN TEK CÜMLESİ: "ne veriyor".
+
+  Listede "Tür" ve "Değer" ayrı sütunlardı ve birbirini tekrarlıyordu:
+  "Yüzde indirim" + "%10". Satırı okuyan kişi iki hücreden tek bir şey
+  çıkarıyordu. Değer zaten türü söylüyor; cümle onu bir hücreye
+  topluyor.
+*/
+export function indirimKuralYazisi(tur: string, deger: number): string {
+  if (tur === "percentage") return `%${deger} indirim`;
+  if (tur === "fixed_amount") return `${money.format(deger / 100)} indirim`;
+  if (tur === "free_shipping") return "Ücretsiz kargo";
+  return indirimTuruAdi(tur);
+}
+
 export const INDIRIM_DURUM_ROZETI: Record<string, { label: string; tone?: string }> = {
   active: { label: "Aktif", tone: "success" },
   paused: { label: "Duraklatıldı", tone: "warning" },

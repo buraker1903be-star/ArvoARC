@@ -12,16 +12,22 @@ import "@/components/arvo-ui/liste-ek.css";
 export type IndirimSatiri = {
   id: string;
   ad: string;
-  /** Kupon kodu; yoksa kural sepette kendiliğinden uygulanıyor. */
-  kod: string | null;
-  turEtiketi: string;
-  deger: string;
-  /** Minimum sepet tutarı ya da "alt limitsiz". */
-  kosul: string;
-  kullanim: string;
+  /*
+    Ad satırının ALTINDAKİ metin: kupon kodu ya da "otomatik". Adın
+    kendisiyle aynıysa sayfa onu null veriyor — "ARVO10 / ARVO10" diye
+    iki kez yazılıyordu.
+  */
+  altSatir: string | null;
+  /** Kuralın tek cümlesi: "%10 indirim", "Ücretsiz kargo". */
+  kural: string;
+  /** Minimum sepet tutarı; koşulsuz kuralda null. */
+  kosul: string | null;
+  /** Kullanım: "12/100", "12" ya da hiç kullanılmadıysa null. */
+  kullanim: string | null;
   /** Limitin doluluk oranı (0–1). Limitsizde null. */
   kullanimOrani: number | null;
-  tarih: string;
+  /** Geçerlilik aralığı; süresizse null. */
+  tarih: string | null;
   suresiGecti: boolean;
   bitiyor: boolean;
   durum: { label: string; tone?: string };
@@ -145,11 +151,9 @@ export function IndirimTablosu({ satirlar, canManage, bos, children }: {
                   </th>
                 ) : null}
                 <th>Kampanya</th>
-                <th>Tür</th>
-                <th className="crm-col-amount">Değer</th>
-                <th>Koşul</th>
+                <th>Kural</th>
                 <th>Kullanım</th>
-                <th>Tarih</th>
+                <th>Geçerlilik</th>
                 <th>Durum</th>
                 {canManage ? <th className="indirim-eylem-sutun"><span className="sr-only">Durum değiştir</span></th> : null}
                 <th></th>
@@ -164,25 +168,26 @@ export function IndirimTablosu({ satirlar, canManage, bos, children }: {
                     </td>
                   ) : null}
                   <td data-label="Kampanya">
-                    <Link prefetch={false} className="crm-row-link" href={`/indirimler/${satir.id}`} title={satir.ad}>{satir.ad}</Link>
-                    <small className="crm-cell-sub crm-table-mono">{satir.kod ?? "otomatik"}</small>
+                    <Link prefetch={false} className="crm-row-link crm-cell-main" href={`/indirimler/${satir.id}`} title={satir.ad}>{satir.ad}</Link>
+                    {satir.altSatir ? <small className="crm-cell-sub crm-table-mono">{satir.altSatir}</small> : null}
                   </td>
-                  <td data-label="Tür">
-                    <span className="crm-cell-main">{satir.turEtiketi}</span>
-                    <small className="crm-cell-sub">{satir.kod ? "müşteri kod girer" : "koşul sağlanınca"}</small>
+                  {/* Kural ve koşulu TEK HÜCREDE: "Tür" ile "Değer" ayrı
+                      sütunken birbirini tekrarlıyordu ("Yüzde indirim" +
+                      "%10") ve koşul üçüncü bir sütun istiyordu. */}
+                  <td data-label="Kural">
+                    <b className="crm-cell-main">{satir.kural}</b>
+                    {satir.kosul ? <small className="crm-cell-sub">{satir.kosul}</small> : null}
                   </td>
-                  <td className="crm-col-amount" data-label="Değer"><b>{satir.deger}</b></td>
-                  <td data-label="Koşul"><span className="crm-cell-sub">{satir.kosul}</span></td>
                   <td data-label="Kullanım">
-                    <span className="crm-cell-main">{satir.kullanim}</span>
-                    {/* Limiti dolmak üzere olan kural sessizce bitiyor:
-                        müşteri kodu giriyor, "limit doldu" cevabını alıyor. */}
+                    {/* Hiç kullanılmamış kural "0 kullanım" diye yazı
+                        yazmıyor: üç sütun birden yokluk anlatıyordu. */}
+                    {satir.kullanim ? <span className="crm-cell-main">{satir.kullanim}</span> : <span className="crm-cell-sub" title="Henüz kullanılmadı">—</span>}
                     {satir.kullanimOrani !== null && satir.kullanimOrani >= 0.8 ? (
                       <small className="crm-cell-sub is-uyari">limit doluyor</small>
                     ) : null}
                   </td>
-                  <td data-label="Tarih">
-                    <span className="crm-cell-sub">{satir.tarih}</span>
+                  <td data-label="Geçerlilik">
+                    {satir.tarih ? <span className="crm-cell-sub">{satir.tarih}</span> : <span className="crm-cell-sub" title="Başlangıç ve bitiş tarihi yok">süresiz</span>}
                     {satir.suresiGecti ? (
                       <small className="crm-cell-sub"><span className="status-pill" data-tone="danger">süresi geçti</span></small>
                     ) : satir.bitiyor ? (
@@ -207,10 +212,10 @@ export function IndirimTablosu({ satirlar, canManage, bos, children }: {
                     href={`/indirimler/${satir.id}`}
                     baslik={satir.ad}
                     durum={{ etiket: satir.durum.label, ton: rozetTonu(satir.durum.tone) }}
-                    alt={[satir.kod ?? "otomatik", satir.turEtiketi]}
+                    alt={[satir.altSatir ?? "otomatik", satir.kosul ?? "koşulsuz"]}
                     isaretler={[
-                      { metin: satir.deger, ton: "guclu" },
-                      { metin: satir.kullanim, ton: "sessiz" },
+                      { metin: satir.kural, ton: "guclu" },
+                      satir.kullanim ? { metin: satir.kullanim, ton: "sessiz" } : null,
                       satir.suresiGecti ? { metin: "Süresi geçti", ton: "tehlike" } : satir.bitiyor ? { metin: "Bitmek üzere", ton: "uyari" } : null,
                     ]}
                   />
