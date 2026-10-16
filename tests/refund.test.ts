@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { calculateRefund, refundOutcome } from "@/lib/refund";
+import { calculateRefund, iadeDagilimi, refundOutcome } from "@/lib/refund";
 
 test("kısmi iadede sipariş olduğu adımda kalır, iptal edilmez", () => {
   for (const status of ["pending", "confirmed", "processing", "fulfilled"]) {
@@ -41,4 +41,15 @@ test("kalem toplamı yoksa siparişin tamamı esas alınır", () => {
 
 test("eksi ya da geçersiz tutarlar 0 sayılır", () => {
   assert.equal(calculateRefund({ itemsTotal: -500, orderTotal: -100 }).amount, 0);
+});
+
+/*
+  Düzenleme alacağı: ödenmiş siparişten kalem çıkarılınca toplam zaten
+  düştü. O farkın iadesi refunded_amount'a eklenirse ciro iki kez düşer.
+*/
+test("iade önce düzenleme alacağından düşülüyor", () => {
+  assert.deepEqual(iadeDagilimi({ tutar: 3000, alacak: 3000 }), { alacaktan: 3000, normal: 0 });
+  assert.deepEqual(iadeDagilimi({ tutar: 5000, alacak: 3000 }), { alacaktan: 3000, normal: 2000 });
+  assert.deepEqual(iadeDagilimi({ tutar: 1000, alacak: 3000 }), { alacaktan: 1000, normal: 0 });
+  assert.deepEqual(iadeDagilimi({ tutar: 1000, alacak: 0 }), { alacaktan: 0, normal: 1000 });
 });

@@ -116,3 +116,53 @@
   /* Havale uyarısı ve düğmesi tek satırda: iki satır, sütunlardan 60px yiyordu. */
   .os-root .siparis-detay .siparis-havale{grid-template-columns:minmax(0,1fr) auto;align-items:center}
 }
+
+/* ---------- Derli toplu sipariş kartı (16.10.2026) ---------- */
+/* Beş adım, küçük: eski çizgi 32px noktalı ve 120px boyundaydı. */
+.siparis-detay .siparis-adimlar{grid-template-columns:repeat(5,minmax(0,1fr))}
+.siparis-detay .siparis-adimlar li{gap:3px;padding:0 2px}
+.siparis-detay .siparis-adimlar li::before{top:10px}
+.siparis-detay .siparis-adimlar .order-step-dot{width:22px;height:22px;border-width:2px;font-size:11px}
+.siparis-detay .siparis-adimlar b{font-size:12px;font-weight:600;line-height:1.25}
+.siparis-detay .siparis-adimlar small{font-size:11px}
+
+/* Kalem satırı: ad · adet × birim · tutar · düzenle. */
+.siparis-detay .siparis-kalem-listesi{display:grid;margin:0;padding:0;list-style:none;border-top:1px solid var(--line-soft)}
+.siparis-detay .siparis-kalem-listesi>li{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:var(--sp-3);padding:10px 0;border-bottom:1px solid var(--line-soft)}
+.siparis-detay .siparis-kalem-listesi>li[data-tukendi]{background:color-mix(in srgb,var(--danger) 5%,transparent);margin:0 calc(-1 * var(--sp-2));padding-inline:var(--sp-2);border-radius:var(--r-xs)}
+.siparis-detay .siparis-kalem-ad{display:grid;gap:3px;min-width:0}
+.siparis-detay .siparis-kalem-ad>b{overflow:hidden;color:var(--ink);font-size:var(--fs-sm);font-weight:var(--fw-semibold);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.siparis-detay .siparis-kalem-ad>small{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;color:var(--muted);font-size:var(--fs-micro)}
+.siparis-detay .siparis-kalem-sku{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+.siparis-detay .siparis-kalem-ad .status-pill{font-size:11px}
+.siparis-detay .siparis-kalem-adet{color:var(--muted);font-size:var(--fs-sm);white-space:nowrap;font-variant-numeric:tabular-nums}
+.siparis-detay .siparis-kalem-tutar{min-width:84px;text-align:right;color:var(--ink);font-size:var(--fs-sm);font-variant-numeric:tabular-nums}
+.os-root .siparis-detay .siparis-kalem-duzenle{min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink-soft);font:inherit;font-size:12px;box-shadow:none;cursor:pointer}
+.os-root .siparis-detay .siparis-kalem-duzenle:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));color:var(--ink)}
+.siparis-kalem-kaldir{margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--line-soft)}
+
+/* Toplamlar: sağa yaslı kısa döküm. */
+.siparis-detay .siparis-toplamlar{display:grid;gap:4px;margin:0 0 0 auto;min-width:260px;font-size:var(--fs-sm)}
+.siparis-detay .siparis-toplamlar>div{display:flex;justify-content:space-between;gap:var(--sp-4)}
+.siparis-detay .siparis-toplamlar dt{color:var(--muted)}
+.siparis-detay .siparis-toplamlar dd{margin:0;color:var(--ink);font-variant-numeric:tabular-nums}
+.siparis-detay .siparis-toplamlar .is-toplam{margin-top:4px;padding-top:6px;border-top:1px solid var(--line-soft);font-weight:var(--fw-semibold)}
+.siparis-detay .siparis-toplamlar .is-toplam :is(dt,dd){color:var(--ink)}
+.siparis-detay .siparis-toplamlar .is-alacak :is(dt,dd){color:var(--warning);font-weight:var(--fw-semibold)}
+
+/* Katlanan fatura dökümü */
+.siparis-detay .siparis-fatura{border-top:1px solid var(--line-soft);padding-top:var(--sp-3)}
+.siparis-detay .siparis-fatura>summary{cursor:pointer;color:var(--muted);font-size:var(--fs-sm);list-style:none}
+.siparis-detay .siparis-fatura>summary::-webkit-details-marker{display:none}
+.os-root .siparis-detay .siparis-fatura>summary::after{content:" ▾"}
+.os-root .siparis-detay .siparis-fatura[open]>summary::after{content:" ▴"}
+.siparis-detay .siparis-fatura .siparis-kalemler{margin-top:var(--sp-3)}
+
+/* Kargo sekmesi: gönderiler sekmenin içinde, üst çizgi yok. */
+.siparis-detay .siparis-sekme .siparis-gonderiler{padding-top:0;border-top:0}
+
+@media (max-width:760px){
+  .siparis-detay .siparis-kalem-listesi>li{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}
+  .siparis-detay .siparis-kalem-adet{grid-column:1}
+  .siparis-detay .siparis-toplamlar{min-width:0;width:100%}
+}

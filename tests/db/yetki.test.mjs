@@ -83,6 +83,12 @@ const PANEL = [
     owner/admin). anon'a KAPALI olmalı — silme geri alınamaz.
   */
   "public.arc_delete_order",
+  /*
+    Sipariş kalemi düzenleme: oturumlu kullanıcıya açık, yetkiyi işlev
+    daraltıyor (owner/admin/manager). Stok ve tutar değiştirdiği için
+    anon'a KAPALI.
+  */
+  "public.arc_siparis_kalemi_duzenle",
   "public.arc_baslik",
   "public.arc_check_coupon",
   "public.arc_clean",

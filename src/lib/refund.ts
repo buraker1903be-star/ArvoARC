@@ -76,3 +76,19 @@ export function refundOutcome(input: {
     paymentStatus: full ? "refunded" : "partially_refunded",
   };
 }
+
+/**
+ * İade tutarının düzenleme alacağıyla bölüşümü (16.10.2026).
+ *
+ * Ödenmiş siparişten kalem çıkarılınca toplam düşüyor ve müşterinin fazla
+ * ödediği fark `duzenleme_alacagi` olarak bekliyor. Yapılan iade ÖNCE bu
+ * alacaktan düşülür: o kısım `refunded_amount`'a yazılmaz, çünkü toplam
+ * zaten inmişti ve ciro (total − refunded_amount) iki kez düşerdi.
+ * Kalan kısım olağan iade gibi işlenir.
+ */
+export function iadeDagilimi(input: { tutar: number; alacak: number }) {
+  const tutar = Math.max(0, Math.round(Number(input.tutar) || 0));
+  const alacak = Math.max(0, Math.round(Number(input.alacak) || 0));
+  const alacaktan = Math.min(tutar, alacak);
+  return { alacaktan, normal: tutar - alacaktan };
+}

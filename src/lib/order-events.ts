@@ -104,6 +104,23 @@ export function describeOrderEvent(
     };
   }
 
+  /* Sipariş düzenleme (arc_siparis_kalemi_duzenle): ne değişti ve toplam. */
+  if (eventType === "item_edited") {
+    const islem = text(data.islem);
+    const urun = text(data.urun) || text(data.eski_sku);
+    const neOldu =
+      islem === "kaldirildi" ? `${urun} (${text(data.eski_sku)}) siparişten çıkarıldı`
+      : islem === "degisti" ? `${text(data.eski_sku)} yerine ${text(data.yeni_sku)} · ${text(data.yeni_adet)} adet`
+      : `${urun}: ${text(data.eski_adet)} → ${text(data.yeni_adet)} adet`;
+    const alacak = Number(data.alacak ?? 0);
+    return {
+      kind: "status",
+      tone: islem === "kaldirildi" ? "danger" : "muted",
+      title: islem === "kaldirildi" ? "Kalem çıkarıldı" : islem === "degisti" ? "Kalem değiştirildi" : "Adet değiştirildi",
+      detail: `${neOldu} · toplam ${labels.money(Number(data.eski_toplam ?? 0))} → ${labels.money(Number(data.yeni_toplam ?? 0))}${alacak > 0 ? ` · iade edilecek ${labels.money(alacak)}` : ""}`,
+    };
+  }
+
   /* Kargo olayı TÜR ADINA göre değil İÇERİĞE göre tanınıyor: olayları yazan
      arc_log_order_event tetikleyicisi bu depoda tanımlı değil (canlıda
      yaşıyor), yani tür adını varsayamayız. Kargo alanlarını taşıyan olay

@@ -10,10 +10,11 @@ import { partialRefundEmail, shippingNoticeHtml, statusUpdateEmail } from "@/lib
 import { notifyTransferPaid } from "@/lib/email/transfer-paid";
 import { odemeyiIadeEt } from "@/lib/odeme/iade";
 import { isBankTransfer } from "@/lib/payment-method";
-import { refundOutcome } from "@/lib/refund";
+import { iadeDagilimi, refundOutcome } from "@/lib/refund";
 import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock";
 import { requireTenant } from "@/lib/tenant";
 import { getStoreBrand } from "@/lib/store-brand";
+import { tarzyeriSepetiniDogrula } from "@/lib/supplier/tarzyeri-dogrulama";
 
 /*
   İşlem sonucu ÇEREZE yazılıyor, adrese değil: `?error=` adres satırında
@@ -208,7 +209,13 @@ export async function refundOrder(formData: FormData) {
     hesaplanamaz; onlar ikinci kez iade edilmez.
   */
   const alreadyRefunded = Math.max(0, Number(meta.refunded_amount ?? 0) || 0);
-  const remaining = Math.max(0, (order.total ?? 0) - alreadyRefunded);
+  /*
+    DÜZENLEME ALACAĞI (16.10.2026): ödenmiş siparişten kalem çıkarılınca
+    toplam düşüyor, müşterinin fazla ödediği fark burada bekliyor. Bu fark
+    da iade edilebilir tutara girer (lib/refund → iadeDagilimi).
+  */
+  const alacak = Math.max(0, Number(meta.duzenleme_alacagi ?? 0) || 0);
+  const remaining = Math.max(0, (order.total ?? 0) - alreadyRefunded) + alacak;
   if (order.payment_status === "refunded" || remaining <= 0 || (meta.refunded_at && alreadyRefunded <= 0)) {
     return await siparise(orderId,{hata:"already-refunded"});
   }
@@ -283,18 +290,34 @@ export async function refundOrder(formData: FormData) {
     Ödeme durumu her iki hâlde de değişir: parası kısmen geri gitmiş
     sipariş "Ödendi" görünmez.
   */
-  const refundedTotal = alreadyRefunded + amountKurus;
+  /*
+    Düzenleme alacağından ödenen kısım refunded_amount'a YAZILMIYOR:
+    toplam o kalem çıkarılırken zaten düştü, ciro "total - refunded_amount"
+    olduğu için eklemek ciroyu ikinci kez düşürürdü. Yalnızca alacak
+    ödeniyorsa sipariş "Ödendi" kalır — müşteri kalan ürünlerin parasını
+    ödemiş durumda. refunded_at da yazılmıyor: o alan "iade yapıldı"
+    anlamında okunuyor (geçmiş, ikinci iade engeli).
+  */
+  const dagilim = iadeDagilimi({ tutar: amountKurus, alacak });
+  const refundedTotal = alreadyRefunded + dagilim.normal;
   const outcome = refundOutcome({ orderTotal: order.total ?? 0, refundedTotal, status: order.status });
+  const simdi = new Date().toISOString();
+  const temizMeta = withoutLock(lockedMeta, "refund_lock");
+  const alacakBilgisi = dagilim.alacaktan > 0 ? {
+    duzenleme_alacagi: alacak - dagilim.alacaktan,
+    duzenleme_iadesi: Math.max(0, Number(meta.duzenleme_iadesi ?? 0) || 0) + dagilim.alacaktan,
+    duzenleme_iade_at: simdi,
+  } : {};
 
   const { error } = await supabase
     .from("arc_orders")
     .update({
-      payment_status: outcome.paymentStatus,
-      status: outcome.status,
+      payment_status: dagilim.normal > 0 ? outcome.paymentStatus : order.payment_status,
+      status: dagilim.normal > 0 ? outcome.status : order.status,
       metadata: {
-        ...withoutLock(lockedMeta, "refund_lock"),
-        refunded_at: new Date().toISOString(),
-        refunded_amount: refundedTotal,
+        ...temizMeta,
+        ...alacakBilgisi,
+        ...(dagilim.normal > 0 ? { refunded_at: simdi, refunded_amount: refundedTotal } : {}),
         refund_count: priorRefunds + 1,
         refund_reference: result.reference ?? null,
       },
@@ -333,4 +356,89 @@ export async function refundOrder(formData: FormData) {
 
   revalidatePath(`/siparisler/${orderId}`);
   return await siparise(orderId,{basari:"refund"});
+}
+
+/*
+  SİPARİŞ KALEMİNİ DÜZENLE (16.10.2026): kaldır, adedini değiştir ya da
+  başka bir varyantla değiştir. İşin tamamı veritabanında, tek işlemde
+  (arc_siparis_kalemi_duzenle): stok, toplam, KDV ve olay kaydı birlikte.
+  Burada yalnızca giriş okunuyor ve Tarzyeri ürünü siparişe GİRİYORSA
+  stoğu canlı sayfasından doğrulanıyor — vitrin ödemesindeki kuralın
+  aynısı: veritabanındaki stok on dakikada bir yenileniyor, "stokta yok"
+  diye çıkarılan ürünün yerine konan da bitmiş olabilir.
+*/
+export async function kalemiDuzenle(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!roles.has(membership.role)) return await siparise(orderId, { hata: "forbidden" });
+  const itemId = String(formData.get("item_id") ?? "");
+  const adet = Number.parseInt(String(formData.get("adet") ?? ""), 10);
+  const varyant = String(formData.get("variant_id") ?? "").trim() || null;
+  if (!orderId || !itemId || !Number.isInteger(adet) || adet < 0 || adet > 999) {
+    return await siparise(orderId, { hata: "Geçersiz adet." });
+  }
+
+  if (adet > 0) {
+    const { data: kalem, error: kalemHatasi } = await supabase.from("arc_order_items")
+      .select("variant_id,quantity").eq("organization_id", organization.id).eq("id", itemId).maybeSingle();
+    if (kalemHatasi) return await siparise(orderId, { hata: "Kalem okunamadı: " + kalemHatasi.message });
+    const hedef = varyant ?? kalem?.variant_id ?? null;
+    /* Yalnızca adet AZALIYORSA doğrulamaya gerek yok: yeni stok istenmiyor. */
+    const yeniStokGerekir = Boolean(hedef) && (varyant !== null && varyant !== kalem?.variant_id || adet > (kalem?.quantity ?? 0));
+    if (hedef && yeniStokGerekir) {
+      const { data: v, error: vHatasi } = await supabase.from("arc_product_variants")
+        .select("sku").eq("organization_id", organization.id).eq("id", hedef).maybeSingle();
+      if (vHatasi || !v) return await siparise(orderId, { hata: "Varyant okunamadı." });
+      const dogrulama = await tarzyeriSepetiniDogrula(supabase, organization.id, [{ sku: v.sku, quantity: adet }]);
+      if (!dogrulama.ok) return await siparise(orderId, { hata: dogrulama.message });
+    }
+  }
+
+  const { data, error } = await supabase.rpc("arc_siparis_kalemi_duzenle", {
+    p_order_id: orderId, p_item_id: itemId, p_adet: adet, p_variant_id: varyant,
+  });
+  /* İşlevin hata metinleri Türkçe ve kullanıcıya yönelik ("önce gönderiyi iptal edin"). */
+  if (error) return await siparise(orderId, { hata: error.message });
+
+  const sonuc = (data ?? {}) as { islem?: string; alacak?: number };
+  revalidatePath(`/siparisler/${orderId}`);
+  revalidatePath("/siparisler");
+  const metin = sonuc.islem === "kaldirildi" ? "Kalem siparişten çıkarıldı; stok geri verildi ve toplam yeniden hesaplandı."
+    : sonuc.islem === "degisti" ? "Kalem değiştirildi; stok ve toplam güncellendi."
+    : "Adet güncellendi; stok ve toplam yeniden hesaplandı.";
+  return await siparise(orderId, { basari: sonuc.alacak ? `${metin} Müşteriye iade edilecek fark Ödeme bölümünde.` : metin });
+}
+
+/*
+  HAVALE SİPARİŞİNDE DÜZENLEME ALACAĞI KAPATMA. Havale PayTR'dan geçmediği
+  için fark panelden geri ödenemiyor; kurum bankadan gönderip burada
+  işaretliyor. Para işlemi olduğu için iadeyle aynı kapı: sahip ve
+  yönetici. Tutar refunded_amount'a YAZILMAZ (iadeDagilimi ile aynı
+  gerekçe): toplam kalem çıkarılırken zaten düştü.
+*/
+export async function alacakKapat(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  const orderId = String(formData.get("order_id") ?? "");
+  if (!["owner", "admin"].includes(membership.role)) return await siparise(orderId, { hata: "forbidden-para" });
+  const { data: order, error: okumaHatasi } = await supabase.from("arc_orders")
+    .select("id,metadata").eq("organization_id", organization.id).eq("id", orderId).maybeSingle();
+  if (okumaHatasi) return await siparise(orderId, { hata: "Sipariş okunamadı: " + okumaHatasi.message });
+  if (!order) return await siparise(orderId, { hata: "order-not-found" });
+  const meta = (order.metadata ?? {}) as Record<string, unknown>;
+  if (!isBankTransfer(meta)) return await siparise(orderId, { hata: "Bu sipariş havale değil; fark İade sekmesinden karta geri ödenir." });
+  const alacak = Math.max(0, Number(meta.duzenleme_alacagi ?? 0) || 0);
+  if (alacak <= 0) return await siparise(orderId, { hata: "Bu siparişte iade edilecek fark yok." });
+  const simdi = new Date().toISOString();
+  const { error } = await supabase.from("arc_orders").update({
+    metadata: {
+      ...meta,
+      duzenleme_alacagi: 0,
+      duzenleme_iadesi: Math.max(0, Number(meta.duzenleme_iadesi ?? 0) || 0) + alacak,
+      duzenleme_iade_at: simdi,
+    },
+    updated_at: simdi,
+  }).eq("organization_id", organization.id).eq("id", orderId);
+  if (error) return await siparise(orderId, { hata: "Kaydedilemedi: " + error.message });
+  revalidatePath(`/siparisler/${orderId}`);
+  return await siparise(orderId, { basari: "Fark bankadan iade edildi olarak işaretlendi." });
 }
