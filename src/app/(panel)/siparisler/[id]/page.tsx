@@ -10,6 +10,8 @@ import { alacakKapat, kalemiDuzenle, refundOrder, updateFulfillmentDetails, upda
 import { PanelDrawer } from "@/components/arvo-ui/panel-drawer";
 import { PanelModal } from "@/components/arvo-ui/panel-modal";
 import { FaturaYazdir } from "./fatura-yazdir";
+import { DurumSecici } from "@/components/arvo-ui/durum-secici";
+import { statusTone } from "@/lib/status-tone";
 import { cancelTransferOrder, confirmTransferPayment, quickStatus } from "../actions";
 import { isBankTransfer, TRANSFER_STALE_HOURS } from "@/lib/payment-method";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
@@ -24,7 +26,6 @@ import { PrintButton } from "@/components/panel/print-button";
 import { KNot } from "@/components/arvo-ui/k-ui";
 import { TalepAkis } from "@/components/arvo-ui/kayit-akis";
 import { AnindaForm, AnindaYedek } from "@/components/arvo-ui/aninda";
-import { rozetTonu } from "@/lib/rozet-tonu";
 // Kalem dökümü ve gönderi kartlarının kendi sınıfları (ac-lines, shipment-*) hâlâ orada.
 import "../orders.css";
 import "@/components/arvo-ui/kayit-detay.css";
@@ -360,9 +361,9 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   const kargoOzeti=acikGonderiler.length
     ?`${acikGonderiler.length} paket · ${!takipliGonderiSayisi?"takip no bekleniyor":kargoDurumuOzet==="teslim"?"teslim edildi":kargoDurumuOzet==="tamam"?"tamamı kargoda":kargoDurumuOzet==="kismi"?"bir kısmı kargoda":"kargoya verilmedi"}`
     :meta.tracking_number?`Takip: ${meta.tracking_number}`:"Henüz kargoya verilmedi";
-  /* Seçim kutusunun tonu rozetle aynı: şeride bakınca renk de bilgi veriyor. */
-  const durumTonu=rozetTonu(badge.tone);
-  const odemeTonu=order.payment_status==="paid"?"success":["pending","authorized"].includes(order.payment_status)?"warning":["failed","refunded","partially_refunded"].includes(order.payment_status)?"danger":"neutral";
+  /* Seçeneklerin tonu rozetlerle aynı kaynaktan (lib/status-tone): şeride bakınca renk de bilgi veriyor. */
+  const durumSecenekleri=orderStatusOptions.map(([deger,etiket])=>({deger,etiket,ton:statusTone(deger)}));
+  const odemeSecenekleri=paymentStatusOptions.map(([deger,etiket])=>({deger,etiket,ton:statusTone(deger)}));
 
   return (
     <main className="crm-page-stack talep opd opd-v3 siparis-detay">
@@ -455,18 +456,14 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         <AnindaForm action={updateOrderStatus} className="opd-ff">
           <input type="hidden" name="order_id" value={order.id}/>
           <input type="hidden" name="payment_status" value={order.payment_status}/>
-          <label className="opd-ff-etiket" htmlFor="siparis-durumu">Durum</label>
-          <select key={order.status} id="siparis-durumu" name="status" defaultValue={order.status} disabled={!canManage} data-tone={durumTonu}>
-            {orderStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}
-          </select>
+          <span className="opd-ff-etiket">Durum</span>
+          <DurumSecici name="status" etiket="Sipariş durumu" deger={order.status} secenekler={durumSecenekleri} disabled={!canManage}/>
         </AnindaForm>
         <AnindaForm action={updateOrderStatus} className="opd-ff">
           <input type="hidden" name="order_id" value={order.id}/>
           <input type="hidden" name="status" value={order.status}/>
-          <label className="opd-ff-etiket" htmlFor="odeme-durumu">Ödeme</label>
-          <select key={order.payment_status} id="odeme-durumu" name="payment_status" defaultValue={order.payment_status} disabled={!canManage} data-tone={odemeTonu}>
-            {paymentStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}
-          </select>
+          <span className="opd-ff-etiket">Ödeme</span>
+          <DurumSecici name="payment_status" etiket="Ödeme durumu" deger={order.payment_status} secenekler={odemeSecenekleri} disabled={!canManage}/>
           {/* Elle değiştirmenin bedeli başlıkta: eskiden durum penceresindeki notta. */}
           <span className="opd-ff-not" title="Ödeme durumu normalde PayTR bildirimiyle güncellenir; elle değiştirmek muhasebe kayıtlarıyla uyumsuzluk yaratabilir.">{meta.payment_method??"Kredi kartı"}</span>
         </AnindaForm>

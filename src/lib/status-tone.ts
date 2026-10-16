@@ -16,7 +16,7 @@ const tones: Record<string, StatusTone> = {
   // ödeme / prim / belge
   paid: "success", pending: "warning", overdue: "danger", accrued: "gold", approved: "info", revoked: "danger",
   // ArvoARC siparişleri ve ödemeleri
-  confirmed: "info", processing: "info", shipped: "info", delivered: "success", refunded: "neutral", partially_refunded: "warning",
+  confirmed: "info", processing: "info", fulfilled: "success", shipped: "info", delivered: "success", refunded: "neutral", partially_refunded: "warning",
   failed: "danger", authorized: "info", active: "success", out_of_stock: "warning",
 };
 

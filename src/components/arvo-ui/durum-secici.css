@@ -1,0 +1,55 @@
+/*
+  Durum seçici (durum-secici.tsx). ArvoOS'ta aynı dosya:
+  app/panel/components/durum-secici.css.
+
+  Ton tek değişkende (--ton): düğmenin noktası, ince zemin tonu ve
+  çerçevesi ondan türüyor. Yeni bir ton eklemek tek satır.
+*/
+.durum-secici{position:relative;display:inline-flex}
+.durum-secici [data-tone]{--ton:var(--muted)}
+.durum-secici [data-tone="info"]{--ton:var(--info)}
+.durum-secici [data-tone="success"]{--ton:var(--success)}
+.durum-secici [data-tone="warning"]{--ton:var(--warning)}
+.durum-secici [data-tone="danger"]{--ton:var(--danger)}
+.durum-secici [data-tone="gold"]{--ton:var(--gold, var(--warning))}
+
+/* Düğme: hap biçimi, ince ton zemini, sağda ok. Eski panel.css'in genel
+   düğme kuralı (gölge, kalın yazı, iç boşluk) .os-root ön ekiyle eziliyor. */
+.os-root .durum-secici-dugme,.durum-secici-dugme{
+  display:inline-flex;align-items:center;gap:8px;
+  height:var(--ff-boy,34px);min-height:0;margin:0;padding:0 10px 0 12px;
+  border:1px solid color-mix(in srgb,var(--ton) 28%,var(--line));
+  border-radius:var(--r-pill);
+  background:color-mix(in srgb,var(--ton) 7%,var(--surface));
+  color:var(--ink);font:inherit;font-size:13px;font-weight:var(--fw-semibold);letter-spacing:normal;
+  box-shadow:0 1px 0 color-mix(in srgb,var(--ink) 4%,transparent);
+  cursor:pointer;white-space:nowrap;
+  transition:border-color .16s ease,background-color .16s ease,box-shadow .16s ease;
+}
+.os-root .durum-secici-dugme:hover,.durum-secici-dugme:hover{border-color:color-mix(in srgb,var(--ton) 50%,var(--line));background:color-mix(in srgb,var(--ton) 11%,var(--surface))}
+.os-root .durum-secici-dugme:focus-visible,.durum-secici-dugme:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--ton) 22%,transparent)}
+.durum-secici[data-acik] .durum-secici-dugme{border-color:color-mix(in srgb,var(--ton) 55%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--ton) 16%,transparent)}
+.os-root .durum-secici-dugme:disabled,.durum-secici-dugme:disabled{cursor:default;opacity:.75}
+
+.durum-secici-nokta{flex:none;width:8px;height:8px;border-radius:50%;background:var(--ton);box-shadow:0 0 0 3px color-mix(in srgb,var(--ton) 18%,transparent)}
+.durum-secici-ok{flex:none;width:14px;height:14px;fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .16s ease}
+.durum-secici[data-acik] .durum-secici-ok{transform:rotate(180deg)}
+
+/* Liste: düğmenin altında açılan kart. */
+.durum-secici-liste{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:60;
+  min-width:max(100%,200px);margin:0;padding:6px;list-style:none;
+  border:1px solid var(--line);border-radius:var(--r-md);
+  background:var(--surface);box-shadow:var(--shadow-lg);
+  outline:none;animation:durum-secici-ac .14s ease-out;
+}
+.durum-secici-liste li{
+  display:flex;align-items:center;gap:10px;min-height:36px;padding:0 10px;
+  border-radius:var(--r-sm);color:var(--ink);font-size:13.5px;cursor:pointer;
+}
+.durum-secici-liste li[data-etkin]{background:var(--surface-2)}
+.durum-secici-liste li[aria-selected="true"]{font-weight:var(--fw-semibold)}
+.durum-secici-liste li>span{flex:1}
+.durum-secici-tik{flex:none;width:15px;height:15px;fill:none;stroke:var(--ton);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+@keyframes durum-secici-ac{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.durum-secici-liste{animation:none}.durum-secici-ok{transition:none}}
