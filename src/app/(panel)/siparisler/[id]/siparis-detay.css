@@ -166,3 +166,8 @@
   .siparis-detay .siparis-kalem-adet{grid-column:1}
   .siparis-detay .siparis-toplamlar{min-width:0;width:100%}
 }
+
+/* Siparişten çıkarılan kalem: silinmiyor, üstü çizili (16.10.2026). Toplama girmiyor. */
+.siparis-detay .siparis-kalem-listesi>li.is-cikan{grid-template-columns:minmax(0,1fr) auto auto;opacity:.7}
+.siparis-detay .is-cikan .siparis-kalem-ad>b,.siparis-detay .is-cikan .siparis-kalem-adet,.siparis-detay .is-cikan .siparis-kalem-tutar{text-decoration:line-through;text-decoration-thickness:1px;color:var(--muted)}
+.siparis-detay .is-cikan .status-pill{text-decoration:none}

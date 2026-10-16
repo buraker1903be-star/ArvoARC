@@ -11,6 +11,7 @@
 */
 import { before, describe, test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { islem, reddedilir, rol, veritabani } from "./ortam.mjs";
 
 const KURUM = "00000000-0000-4000-8000-0000000000d1";
@@ -82,6 +83,49 @@ describe("sipariş düzenleme · arc_siparis_kalemi_duzenle", () => {
       assert.equal(await stok(VAR_B), 6, "kaldırılan kalemin stoğu geri geldi");
       const olay = await db.query(`select event_type from public.arc_order_events where order_id = $1 and event_type = 'item_edited'`, [SIPARIS]);
       assert.equal(olay.rows.length, 1, "olay kaydı yazıldı");
+      /* Kalem silinmiyor, görünür kalıyor (kurum sahibi: "üstüne çizgi çeksin"). */
+      const cikan = s.metadata.cikan_kalemler;
+      assert.equal(cikan.length, 1, "çıkarılan kalem kayıtta");
+      assert.deepEqual([cikan[0].sku, cikan[0].adet, Number(cikan[0].tutar), cikan[0].islem], ["ES-B", 1, 3000, "kaldirildi"]);
+    }));
+
+  test("değiştirilen kalemin eskisi de çıkan kalemlerde, yerine geçenle", () =>
+    islem(db, async () => {
+      await tohum();
+      await rol(db, "authenticated", SAHIP);
+      await duzenle(KALEM_B, 1, VAR_C);
+      await rol(db, "postgres");
+      const cikan = (await siparis()).metadata.cikan_kalemler;
+      assert.deepEqual([cikan[0].sku, cikan[0].islem, cikan[0].yerine], ["ES-B", "degisti", "ES-C"]);
+    }));
+
+  test("GERİYE DÖNÜK DOLDURMA: ilk sürümde silinen kalem olay kaydından geri geliyor, iki kez eklenmiyor", () =>
+    islem(db, async () => {
+      await tohum();
+      await rol(db, "postgres");
+      /* İlk sürümün bıraktığı iz: kalem yok, yalnızca olay var. */
+      await db.query(`delete from public.arc_order_items where id = $1`, [KALEM_B]);
+      await db.query(
+        `insert into public.arc_order_events (organization_id, order_id, event_type, event_data)
+         values ($1, $2, 'item_edited', '{"islem":"kaldirildi","urun":"Eşofman","eski_sku":"ES-B","eski_adet":1}'::jsonb)`,
+        [KURUM, SIPARIS],
+      );
+      const dosya = fs.readFileSync(new URL("../../supabase/migrations/20261016121535_cikan_kalemler_gorunur.sql", import.meta.url), "utf8");
+      const doldurma = dosya.slice(dosya.indexOf("update public.arc_orders o"));
+      await db.exec(doldurma);
+      await db.exec(doldurma);
+      const cikan = (await siparis()).metadata.cikan_kalemler;
+      assert.equal(cikan.length, 1, "bir kez eklendi");
+      assert.deepEqual([cikan[0].sku, Number(cikan[0].birim), Number(cikan[0].tutar)], ["ES-B", 3000, 3000], "fiyat varyanttan");
+    }));
+
+  test("adet değişikliği çıkan kalem yazmıyor", () =>
+    islem(db, async () => {
+      await tohum();
+      await rol(db, "authenticated", SAHIP);
+      await duzenle(KALEM_A, 1);
+      await rol(db, "postgres");
+      assert.equal((await siparis()).metadata.cikan_kalemler, undefined);
     }));
 
   test("MEŞRU: adet değişiyor, satış fiyatı korunuyor", () =>

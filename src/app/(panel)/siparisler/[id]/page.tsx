@@ -267,6 +267,13 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   /* Düzenleme alacağı: ödenmiş siparişten çıkarılan kalemin parası (migration 20261016115843). */
   /* Havale indirimi ayrı alanda (api/storefront/odeme): gösterilmezse ara toplam − indirim + kargo, toplamı tutmuyordu. */
   const havaleIndirimi=Math.max(0,Number((meta as {transfer_discount?:number}).transfer_discount??0)||0);
+  /*
+    Siparişten çıkarılan kalemler (migration 20261016121535): satırları
+    gidiyor ama müşterinin ne istediği görünür kalsın diye üstü çizili
+    çiziliyor. Toplama girmez.
+  */
+  type CikanKalem={urun:string|null;sku:string|null;adet:number|null;tutar:number|null;islem:string|null;yerine:string|null;zaman:string|null};
+  const cikanKalemler=Array.isArray((meta as {cikan_kalemler?:unknown}).cikan_kalemler)?((meta as {cikan_kalemler:CikanKalem[]}).cikan_kalemler):[];
   const havaleYuzdesi=Number((meta as {transfer_discount_percent?:number}).transfer_discount_percent??0)||0;
   const alacak=Math.max(0,Number((meta as {duzenleme_alacagi?:number}).duzenleme_alacagi??0)||0);
   const refundable=Math.max(0,(order.total??0)-refundedSoFar)+alacak;
@@ -583,6 +590,19 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                 ):null}
               </li>;
             })}
+            {cikanKalemler.map((kalem,sira)=>(
+              <li key={`cikan-${sira}`} className="is-cikan">
+                <div className="siparis-kalem-ad">
+                  <b title={kalem.urun??""}>{kalem.urun||kalem.sku||"Ürün"}</b>
+                  <small>
+                    <span className="siparis-kalem-sku">{kalem.sku}</span>
+                    <span className="status-pill" data-tone="neutral">{kalem.islem==="degisti"?`Değiştirildi${kalem.yerine?` → ${kalem.yerine}`:""}`:"Siparişten çıkarıldı"}{kalem.zaman?` · ${shortDate.format(new Date(kalem.zaman))}`:""}</span>
+                  </small>
+                </div>
+                <span className="siparis-kalem-adet">{kalem.adet??"—"} adet</span>
+                <b className="siparis-kalem-tutar">{kalem.tutar!=null?money(Number(kalem.tutar),order.currency):"—"}</b>
+              </li>
+            ))}
           </ul>
 
           <dl className="siparis-toplamlar">
