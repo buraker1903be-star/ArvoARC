@@ -4,3 +4,5 @@
 .os-root .ayarlar-sayfasi .settings-section{padding:var(--sp-5)}
 /* Eski düzende iki sütunlu ızgaraydı; bölüm başına tek içerik kaldığı için tam genişlik. */
 .os-root .ayarlar-sayfasi .settings-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-4)}
+/* Telefonda bölümler üstteki şeritte (os-bolum-seridi); sayfadaki süzgeç aynı listenin tekrarı olurdu. */
+@media (max-width:760px){.os-root .ayarlar-bolumleri{display:none}}
