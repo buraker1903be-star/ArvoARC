@@ -5,12 +5,17 @@ import { createProduct, bulkUpdateStatus } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel } from "@/lib/commerce-labels";
 import { yayinOzeti } from "@/lib/yayin-plani";
-import { PanelBildirimi } from "@/components/panel/bildirim";
+import { Pencere } from "@/components/os/pencere";
 import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
 import { gorunumleriOku } from "../gorunumler/oku";
 import { gorunumSorgusu, URUN_DURUMLARI, URUN_KAYNAKLARI } from "@/lib/kayitli-gorunum";
 import { ProductTable, type ProductRow } from "./product-table";
+// Yeni ürün ve toplu durum formlarının biçimi (catalog-form) hâlâ orada.
 import "../catalog.css";
+import "@/components/arvo-ui/k-ui";
+import "@/components/arvo-ui/crm.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./urun-listesi.css";
 
 const PAGE_SIZE = 24;
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
@@ -40,7 +45,7 @@ function listHref(state: ListState, patch: Partial<ListState>) {
   return text ? `/urunler?${text}` : "/urunler";
 }
 
-type Params = { error?: string; created?: string; ok?: string; q?: string; filter?: string; source?: string; page?: string; updated?: string; skipped?: string; yeni?: string };
+type Params = { error?: string; created?: string; ok?: string; q?: string; filter?: string; source?: string; page?: string; updated?: string; skipped?: string; yeni?: string; pencere?: string };
 
 export default async function Products({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
@@ -221,79 +226,99 @@ export default async function Products({ searchParams }: { searchParams: Promise
     };
   });
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <h1>Ürünler</h1>
-        {/* İpucu buraya taşındı: liste üstünde ayrı bir bant olarak 56px tutuyordu. */}
-        <p>{counts.all.toLocaleString("tr-TR")} ürün · {(variantCountResult.count ?? 0).toLocaleString("tr-TR")} varyant{search ? ` · “${search}”` : ""} · satıra tıklayarak düzenleyin{canManage ? ", kutucuklarla toplu işlem yapın" : ""}</p>
-      </div>
-      {canManage ? <div className="ac-bar-actions"><Link prefetch={false} className="ac-btn ac-btn-primary" href="/urunler?yeni=1#yeni-urun">+ Yeni ürün</Link></div> : null}
-    </section>
+  /*
+    PENCERELER (16.10.2026): yeni ürün ve filtreye göre toplu durum
+    sayfanın dibindeki açılır kartlardı. Kurulum rehberinin "ürün ekle"
+    adımı ?yeni=1 ile geliyor; o da yeni ürün penceresini açıyor.
+  */
+  const pencere = canManage ? (params.pencere === "toplu" ? "toplu" : params.pencere === "yeni" || params.yeni === "1" ? "yeni" : null) : null;
+  const pencereAdresi = (kod: string) => { const h = listHref(state, {}); return `${h}${h.includes("?") ? "&" : "?"}pencere=${kod}`; };
+  const katalogBos = (katalogSayimi.count ?? 0) === 0;
+  const filtreli = Boolean(search) || statusFilter !== "all" || source !== "all";
 
-    <div className="ac-stack">
-      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
-          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
-          gösterebiliyordu (lib/panel-bildirim.ts). */}
-      <PanelBildirimi />
+  return (
+    <main className="talep liste-sayfa urun-listesi">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker">Katalog</small>
+          <h1>Ürünler</h1>
+          <p className="talep-bas-alt">{counts.all.toLocaleString("tr-TR")} ürün · {(variantCountResult.count ?? 0).toLocaleString("tr-TR")} varyant{search ? ` · “${search}”` : ""}</p>
+        </div>
+        {canManage ? (
+          <div className="talep-bas-eylem">
+            <Link prefetch={false} scroll={false} className="panel-secondary" href={pencereAdresi("toplu")}>Toplu durum</Link>
+            <Link prefetch={false} scroll={false} className="panel-primary" href={pencereAdresi("yeni")}>+ Yeni ürün</Link>
+          </div>
+        ) : null}
+      </header>
 
-      {/*
-        ÖZET ŞERİDİ KALDIRILDI: taşıdığı dört sayının dördü de ekranda
-        zaten vardı. Aktif/Taslak/Arşiv kutuları filtre çipleriyle aynı
-        bağlantıya ve aynı sayıya gidiyordu; varyant sayısı da sayfanın
-        alt başlığında yazıyor ("3.442 ürün · 15.740 varyant").
-
-        Bedeli 114px'di: 900px'lik ekranda ilk ürün satırı 595. pikselde
-        başlıyor ve 3.442 üründen 4'ü görünüyordu (canlıda ölçüldü,
-        27.09.2026).
-      */}
-
-      <section className="ac ac-pad-sm list-toolbar">
-        <form className="ac-filter catalog-search" role="search">
-          {statusFilter !== "all" ? <input type="hidden" name="filter" value={statusFilter} /> : null}
-          {source !== "all" ? <input type="hidden" name="source" value={source} /> : null}
-          <input name="q" defaultValue={search} placeholder="Ürün adı, SKU, marka, tür veya etiket" aria-label="Ürünlerde ara" />
-          <button className="ac-btn ac-btn-primary" type="submit">Ara</button>
-          {search ? <Link prefetch={false} className="ac-btn" href={listHref(state, { q: "", page: 1 })}>Temizle</Link> : null}
-        </form>
-        <nav className="ac-filter" aria-label="Ürün kaynağı">
-          {SOURCES.map(([key, label]) => (
-            <Link prefetch={false} key={key} className="ac-btn" href={listHref(state, { source: key, page: 1 })} aria-current={source === key ? "page" : undefined}>{label}</Link>
+      <nav className="kayit-serit talep-serit" aria-label="Duruma göre süz">
+        <dl>
+          {STATUS_TABS.map(([key, label]) => (
+            <div key={key} className={statusFilter === key ? "is-active" : undefined}>
+              <dt>{label}</dt>
+              <dd><Link prefetch={false} href={listHref(state, { filter: key, page: 1 })} aria-current={statusFilter === key ? "page" : undefined}>{counts[key].toLocaleString("tr-TR")}</Link></dd>
+            </div>
           ))}
-        </nav>
-        <GorunumKaydet liste="urunler" aktifSorgu={aktifSorgu} gorunumler={gorunumler} canManage={canManage} />
-      </section>
-
-      {/* Şerit yalnızca kayıtlı görünüm varken çiziliyor; boşken hiç yer kaplamıyor. */}
-      <KayitliGorunumler liste="urunler" gorunumler={gorunumler} aktifSorgu={aktifSorgu} canManage={canManage} />
-
-      <nav className="ac-filter" aria-label="Ürün durumu">
-        {STATUS_TABS.map(([key, label]) => (
-          <Link prefetch={false} key={key} className="ac-btn" href={listHref(state, { filter: key, page: 1 })} aria-current={statusFilter === key ? "page" : undefined}>
-            {label}
-            <span className="ac-count">{counts[key].toLocaleString("tr-TR")}</span>
-          </Link>
-        ))}
+        </dl>
       </nav>
 
-      <ProductTable key={JSON.stringify(params)} rows={rows} canManage={canManage} back={listHref(state, {})} katalogBos={(katalogSayimi.count ?? 0) === 0}>
-        {/* Kayıt yokken şerit gizli: boş ekran zaten "kayıt yok" diyor ve
-              altındaki ikinci "Kayıt yok" 45px yeri tekrara harcıyordu. */}
-        <div className="list-pagination" data-bos={total ? undefined : ""}>
-          <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + rows.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} ürün` : "Kayıt yok"}</span>
-          {pageCount > 1 ? (
-            <div>
-              {page > 1 ? <Link prefetch={false} className="ac-btn" href={listHref(state, { page: page - 1 })}>← Önceki</Link> : <span className="ac-btn" aria-disabled="true">← Önceki</span>}
-              <span className="order-page-number">{page} / {pageCount}</span>
-              {page < pageCount ? <Link prefetch={false} className="ac-btn" href={listHref(state, { page: page + 1 })}>Sonraki →</Link> : <span className="ac-btn" aria-disabled="true">Sonraki →</span>}
-            </div>
-          ) : null}
+      <section className="panel-card talep-bilgi" aria-label="Ürün listesi">
+        <div className="ekip-suzgec talep-suzgec">
+          {SOURCES.map(([key, label]) => (
+            <Link prefetch={false} key={key} href={listHref(state, { source: key, page: 1 })} className={source === key ? "is-active" : undefined} aria-current={source === key ? "page" : undefined}>{label}</Link>
+          ))}
+          <form className="talep-ara" role="search">
+            {statusFilter !== "all" ? <input type="hidden" name="filter" value={statusFilter} /> : null}
+            {source !== "all" ? <input type="hidden" name="source" value={source} /> : null}
+            <input name="q" defaultValue={search} placeholder="Ürün adı, SKU, marka, tür veya etiket" aria-label="Ürünlerde ara" />
+          </form>
+          <GorunumKaydet liste="urunler" aktifSorgu={aktifSorgu} gorunumler={gorunumler} canManage={canManage} />
         </div>
-      </ProductTable>
 
-      {canManage ? (
-        <details className="ac ac-pad catalog-details" id="yeni-urun" open={params.yeni === "1"}>
-          <summary><span><b>Yeni ürün oluştur</b><small>Tek varyantla başlar; görsel, açıklama ve SEO sonra düzenleyicide eklenir</small></span></summary>
+        <KayitliGorunumler liste="urunler" gorunumler={gorunumler} aktifSorgu={aktifSorgu} canManage={canManage} />
+
+        <ProductTable
+          key={JSON.stringify(params)}
+          rows={rows}
+          canManage={canManage}
+          back={listHref(state, {})}
+          bos={
+            /*
+              İKİ DURUM AYRI. Katalog gerçekten boşken "filtreleri
+              değiştirin" demek, ortada olmayan bir filtreyi aratmaktı.
+              Boş katalogda birincil eylem tek ürün eklemek: yeni bir
+              salonun ne Shopify geçmişi ne tedarikçi akışı var.
+            */
+            <div className="crm-empty-state talep-bos-kutu">
+              <h2>{katalogBos ? "Kataloğunuz henüz boş" : "Bu ölçütlere uygun ürün yok"}</h2>
+              <p>{katalogBos
+                ? "Tek bir ürünle başlayabilirsiniz. Başka bir platformdan taşınıyorsanız Shopify CSV'sini toplu aktarabilir ya da tedarikçi kataloğundan çekebilirsiniz."
+                : "Ürün adı, SKU, marka, tür ve etiketlerde arama yapılır. Aramayı veya süzgeci değiştirin."}</p>
+              <div className="crm-empty-actions">
+                {filtreli ? <Link prefetch={false} className="panel-secondary" href="/urunler">Süzgeci temizle</Link> : null}
+                {katalogBos && canManage ? <>
+                  <Link prefetch={false} className="panel-primary" href={pencereAdresi("yeni")}>Ürün ekle</Link>
+                  <Link prefetch={false} className="panel-secondary" href="/veri-aktarimi">Toplu aktar</Link>
+                  <Link prefetch={false} className="panel-secondary" href="/tedarikci">Tedarikçiden çek</Link>
+                </> : null}
+              </div>
+            </div>
+          }
+        >
+          {pageCount > 1 ? (
+            <nav className="liste-sayfalar" aria-label="Sayfalar">
+              {page > 1 ? <Link prefetch={false} href={listHref(state, { page: page - 1 })}>← Önceki</Link> : <span aria-disabled="true">← Önceki</span>}
+              <b>{page} / {pageCount} · {total.toLocaleString("tr-TR")} ürün</b>
+              {page < pageCount ? <Link prefetch={false} href={listHref(state, { page: page + 1 })}>Sonraki →</Link> : <span aria-disabled="true">Sonraki →</span>}
+            </nav>
+          ) : null}
+        </ProductTable>
+      </section>
+
+      {pencere === "yeni" ? (
+        <Pencere key="yeni" ust="Katalog" baslik="Yeni ürün" kapatAdresi={listHref(state, {})} genis={false}>
+          <p className="urun-pencere-alt">Tek varyantla başlar; görsel, açıklama ve SEO sonra düzenleyicide eklenir.</p>
           <form action={createProduct} className="catalog-form">
             <label>Ürün adı<input name="name" required maxLength={200} className="ac-input" /></label>
             <label>SKU<input name="sku" required maxLength={80} className="ac-input" /></label>
@@ -307,12 +332,12 @@ export default async function Products({ searchParams }: { searchParams: Promise
               <button className="ac-btn ac-btn-primary" type="submit">Ürün oluştur</button>
             </div>
           </form>
-        </details>
+        </Pencere>
       ) : null}
 
-      {canManage ? (
-        <details className="ac ac-pad catalog-details">
-          <summary><span><b>Filtreye göre toplu durum değişikliği</b><small>Bir tedarikçinin veya koleksiyonun tüm ürünlerini tek seferde açıp kapatın</small></span></summary>
+      {pencere === "toplu" ? (
+        <Pencere key="toplu" ust="Katalog" baslik="Filtreye göre toplu durum" kapatAdresi={listHref(state, {})} genis={false}>
+          <p className="urun-pencere-alt">Bir tedarikçinin veya koleksiyonun tüm ürünlerini tek seferde açıp kapatın.</p>
           <form action={bulkUpdateStatus} className="catalog-form is-narrow">
             <p className="list-hint">Listede seçerek toplu işlem yapabilirsiniz; bu form ise filtreye uyan <b>tüm</b> ürünleri değiştirir. En az bir tedarikçi veya koleksiyon seçilmesi zorunlu: filtresiz işlem tüm kataloğu değiştirir ve geri alması zordur.</p>
             <label>Tedarikçi<select name="supplier" className="ac-input"><option value="">Seçiniz</option><option value="tarzyeri">Tarzyeri</option></select></label>
@@ -321,8 +346,8 @@ export default async function Products({ searchParams }: { searchParams: Promise
             <label>Yeni durum<select name="status" required className="ac-input"><option value="active">Yayında</option><option value="draft">Taslak</option><option value="archived">Arşiv</option></select></label>
             <div className="catalog-form-actions"><button className="ac-btn ac-btn-primary" type="submit">Uygula</button></div>
           </form>
-        </details>
+        </Pencere>
       ) : null}
-    </div>
-  </>;
+    </main>
+  );
 }

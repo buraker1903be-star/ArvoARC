@@ -3,8 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
-import { Notice } from "@/components/panel/notice";
+import { KNot } from "@/components/arvo-ui/k-ui";
+import { MobilSatir } from "@/components/arvo-ui/mobil-satir";
+import { SatirTiklama } from "@/components/arvo-ui/satir-tiklama";
+import { rozetTonu } from "@/lib/rozet-tonu";
+import "@/components/arvo-ui/liste-ek.css";
 import { bulkSetStatus, topluDurumSonuc } from "./actions";
 
 export type ProductRow = {
@@ -42,7 +45,7 @@ const BULK = [
 */
 /* total kaldırıldı: yalnızca liste üstündeki ipucu bandında kullanılıyordu,
    o bant sayfa alt başlığına taşındı ve sayı zaten orada yazıyor. */
-export function ProductTable({ rows, canManage, back, katalogBos, children }: { rows: ProductRow[]; canManage: boolean; back: string; katalogBos: boolean; children?: React.ReactNode }) {
+export function ProductTable({ rows, canManage, back, bos, children }: { rows: ProductRow[]; canManage: boolean; back: string; bos: React.ReactNode; children?: React.ReactNode }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const chosen = rows.filter((row) => selected.has(row.id));
   const allChecked = rows.length > 0 && chosen.length === rows.length;
@@ -76,44 +79,25 @@ export function ProductTable({ rows, canManage, back, katalogBos, children }: { 
     });
   };
 
+  /* GÖRÜNÜM ArvoOS'un liste tablosu (16.10.2026); seçim ve toplu işlem mantığı aynen. */
   return (
-    <section className="ac table list-table product-list" data-manage={canManage ? "" : undefined}>
-      {/*
-        Liste üstünde ne başlık ne ipucu bandı var. Başlık zaten
-        kaldırılmıştı; ipucu bandının da 56px tuttuğunu
-        scripts/olc-yogunluk.mjs ölçtü — bir kez okunan bir cümle
-        için, her açılışta. Cümle sayfa alt başlığına taşındı.
-      */}
-
-      {/* Yerinde işlem sonucu: liste yönlendirmediği için çerezli şerit okunmuyor. */}
-      {sonuc ? (
-        <div className="list-sonuc">
-          <Notice tone={sonuc.tur === "hata" ? "error" : "success"} title={sonuc.tur === "hata" ? "İşlem tamamlanamadı" : "İşlem tamamlandı"}>
-            {sonuc.metin}
-          </Notice>
-        </div>
-      ) : null}
+    <>
+      {/* Yerinde işlem sonucu: liste yönlendirmediği için kabuktaki balon okunmuyor. */}
+      {sonuc ? <KNot ton={sonuc.tur === "hata" ? "tehlike" : "basari"}>{sonuc.metin}</KNot> : null}
 
       {canManage && chosen.length > 0 ? (
         /*
-          FORM DURUYOR, yalnızca gönderimi kesiliyor.
-
-          Eskiden toplu işlem tam bir gezinme başlatıyordu: kaydırma
-          yeri ve seçim gidiyor, liste baştan çiziliyordu. Artık eylem
-          sonucu döndürüyor (topluDurumSonuc) ve içindeki
-          revalidatePath veriyi yeniliyor; kullanıcı yerinde kalıyor.
-
-          Hangi düğmeye basıldığını submitter söylüyor: durum
-          düğmelerin value'sunda ve type="button" yapmak JavaScript
+          FORM DURUYOR, yalnızca gönderimi kesiliyor: hangi düğmeye
+          basıldığını submitter söylüyor; type="button" JavaScript
           kapalıyken toplu işlemi tamamen bozardı.
         */
         <form
           action={bulkSetStatus}
-          className="list-bulk-bar"
+          className="liste-toplu"
           onSubmit={(olay) => {
             const basilan = (olay.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
             const durum = basilan?.value;
-            if (!durum) return; /* durum okunamadıysa forma dokunma: normal gönderim çalışsın */
+            if (!durum) return;
             olay.preventDefault();
             uygula(chosen.map((row) => row.id), durum);
           }}
@@ -121,115 +105,84 @@ export function ProductTable({ rows, canManage, back, katalogBos, children }: { 
           <input type="hidden" name="back" value={back} />
           {chosen.map((row) => <input key={row.id} type="hidden" name="product_id" value={row.id} />)}
           <b>{chosen.length} ürün seçildi</b>
-          <span className="list-bulk-actions">
+          <span className="liste-toplu-eylem">
             {BULK.map((step) => {
               const eligible = chosen.filter((row) => row.status !== step.key).length;
               return (
-                <button key={step.key} className="ac-btn" type="submit" name="status" value={step.key} disabled={!eligible || calisiyor}>
-                  {step.label}
-                  <span className="ac-count">{eligible}</span>
+                <button key={step.key} className="panel-secondary" type="submit" name="status" value={step.key} disabled={!eligible || calisiyor}>
+                  {step.label} <small>{eligible}</small>
                 </button>
               );
             })}
-            <button className="ac-btn" type="button" onClick={() => setSelected(new Set())}>Seçimi temizle</button>
+            <button className="panel-secondary" type="button" onClick={() => setSelected(new Set())}>Seçimi temizle</button>
           </span>
         </form>
       ) : null}
 
       {rows.length ? (
-        <>
-          <div className="list-row th">
-            {canManage ? (
-              <label className="list-check"><input type="checkbox" checked={allChecked} onChange={() => setSelected(allChecked ? new Set() : new Set(rows.map((row) => row.id)))} aria-label="Bu sayfadaki tüm ürünleri seç" /></label>
-            ) : null}
-            <span className="pl-thumb" />
-            <span className="pl-name">ÜRÜN</span>
-            <span className="pl-price">FİYAT</span>
-            <span className="pl-margin">ALIŞ / KÂR</span>
-            <span className="pl-stock">STOK</span>
-            <span className="pl-status">DURUM</span>
-          </div>
-          {rows.map((row) => (
-            <div className={selected.has(row.id) ? "list-row is-selected" : "list-row"} key={row.id}>
-              {canManage ? (
-                <label className="list-check"><input type="checkbox" checked={selected.has(row.id)} onChange={() => toggle(row.id)} aria-label={`${row.name} ürününü seç`} /></label>
-              ) : null}
-              {/* Küçük görsel: benzer adlı ürünleri ayırt etmek için. */}
-              <span className="pl-thumb">
-                {row.image ? <Image src={row.image} alt="" width={88} height={88} sizes="44px" /> : <b>{row.initials}</b>}
-              </span>
-              {/*
-                title ŞART: satır metinleri üç nokta ile kırpılıyor
-                (panel.css, .list-row b/small) ve uzun ürün adı kaydı
-                açmadan okunamıyordu. Kırpılan her metnin tam hâli
-                imlecin altında duruyor.
-              */}
-              <span className="pl-name">
-                <Link prefetch={false} className="list-row-link" href={`/urunler/${row.id}`}><b title={row.name}>{row.name}</b></Link>
-                <small title={row.meta}>{row.meta}</small>
-              </span>
-              <span className="pl-price">
-                <b>{row.price}</b>
-                {row.compare ? <small><s>{row.compare}</s>{row.discount ? ` · −%${row.discount}` : ""}</small> : null}
-              </span>
-              {/* Alış ve kâr yalnızca tedarikçi ürünlerinde: kendi
-                  ürünlerimizde maliyet kayıtlı değil, uydurma kâr
-                  göstermek yanıltıcı olur. */}
-              <span className="pl-margin">
-                {row.cost ? <><small>Alış {row.cost}</small><b className="profit" data-loss={row.loss ? "" : undefined}>{row.profit}</b></> : <small>—</small>}
-              </span>
-              <span className="pl-stock"><em className="stock-pill" data-tone={row.stockTone}>{row.stock.toLocaleString("tr-TR")} adet</em></span>
-              <span className="pl-status">
-                {/* Zamanlama rozete İŞARET olarak iniyor: yeni bir sütun
-                    açmak listeden satır çalardı, saat imi 0px maliyetli. */}
-                <em className="ac-tag" data-tone={row.statusHint?"warn":row.statusTone} title={row.statusHint}>{row.statusLabel}{row.statusHint?" ⏱":""}</em>
-                {row.bestSeller ? <small>Çok satan</small> : null}
-              </span>
-            </div>
-          ))}
-        </>
-      ) : (
-        /*
-          İKİ DURUM AYRI. Katalog gerçekten boşken "filtreleri
-          değiştirin" demek, ortada olmayan bir filtreyi aratmaktı —
-          yeni mağazanın gördüğü ilk ekran buydu.
-        */
-        katalogBos ? (
-          /*
-            BİRİNCİL EYLEM "TEK ÜRÜN EKLE". Eskiden birincil düğme
-            Shopify CSV aktarımıydı ve "tek tek ekleyebilirsiniz"
-            metinde geçtiği hâlde düğmesi YOKTU. İkisi de ArvoCulture'ın
-            durumunu varsayıyordu: başka bir platformdan taşınan,
-            tedarikçi akışı olan bir mağaza. Yeni bir kuaför ya da
-            güzellik salonunun ne Shopify geçmişi ne tedarikçi akışı
-            var; ilk işi tek bir ürün girmek.
-
-            Kurulum rehberinin 1. adımı da tam buraya gidiyordu
-            (/urunler?yeni=1#yeni-urun); iki ekran ilk adım konusunda
-            birbiriyle çelişiyordu.
-          */
-          <ListeBos
-            baslik="Kataloğunuz henüz boş."
-            aciklama="Tek bir ürünle başlayabilirsiniz. Başka bir platformdan taşınıyorsanız Shopify CSV'sini toplu aktarabilir ya da tedarikçi kataloğundan çekebilirsiniz."
-          >
-            {canManage ? (
-              <>
-                <ListeBosEylem href="/urunler?yeni=1#yeni-urun" birincil>Ürün ekle</ListeBosEylem>
-                <ListeBosEylem href="/veri-aktarimi">Toplu aktar</ListeBosEylem>
-                <ListeBosEylem href="/tedarikci">Tedarikçiden çek</ListeBosEylem>
-              </>
-            ) : null}
-          </ListeBos>
-        ) : (
-          <ListeBos
-            baslik="Bu ölçütlere uygun ürün yok."
-            aciklama="Ürün adı, SKU, marka, tür ve etiketlerde arama yapılır. Aramayı veya filtreleri değiştirin."
-          >
-            <ListeBosEylem href={back}>Filtreleri temizle</ListeBosEylem>
-          </ListeBos>
-        )
-      )}
-      {children}
-    </section>
+        <div className="talep-tablo">
+          <table className="crm-data-table urun-tablo" data-cols="urunler">
+            <thead>
+              <tr>
+                {canManage ? (
+                  <th className="liste-secim"><input type="checkbox" checked={allChecked} onChange={() => setSelected(allChecked ? new Set() : new Set(rows.map((row) => row.id)))} aria-label="Bu sayfadaki tüm ürünleri seç" /></th>
+                ) : null}
+                <th className="urun-gorsel-sutun"><span className="sr-only">Görsel</span></th>
+                <th>Ürün</th>
+                <th className="crm-col-amount">Fiyat</th>
+                <th className="crm-col-amount">Alış / kâr</th>
+                <th className="crm-col-amount">Stok</th>
+                <th>Durum</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className={selected.has(row.id) ? "is-selected" : undefined}>
+                  {canManage ? (
+                    <td className="liste-secim"><input type="checkbox" checked={selected.has(row.id)} onChange={() => toggle(row.id)} aria-label={`${row.name} ürününü seç`} /></td>
+                  ) : null}
+                  {/* Küçük görsel: benzer adlı ürünleri ayırt etmek için. */}
+                  <td className="urun-gorsel-sutun">
+                    <span className="urun-gorsel">{row.image ? <Image src={row.image} alt="" width={80} height={80} sizes="40px" /> : <b>{row.initials}</b>}</span>
+                  </td>
+                  <td data-label="Ürün">
+                    <Link prefetch={false} className="crm-row-link crm-cell-main" href={`/urunler/${row.id}`} title={row.name}>{row.name}</Link>
+                    <small className="crm-cell-sub" title={row.meta}>{row.meta}{row.bestSeller ? <span className="status-pill" data-tone="gold">Çok satan</span> : null}</small>
+                  </td>
+                  <td className="crm-col-amount" data-label="Fiyat">
+                    <b>{row.price}</b>
+                    {row.compare ? <small className="crm-cell-sub"><s>{row.compare}</s>{row.discount ? ` · −%${row.discount}` : ""}</small> : null}
+                  </td>
+                  {/* Alış ve kâr yalnızca tedarikçi ürünlerinde: kendi ürünlerimizde maliyet kayıtlı değil. */}
+                  <td className="crm-col-amount" data-label="Alış / kâr">
+                    {row.cost ? <><b className={row.loss ? "is-eksi" : undefined}>{row.profit}</b><small className="crm-cell-sub">Alış {row.cost}</small></> : <span className="crm-cell-sub">—</span>}
+                  </td>
+                  <td className="crm-col-amount" data-label="Stok"><span className="status-pill" data-tone={rozetTonu(row.stockTone ?? "muted")}>{row.stock.toLocaleString("tr-TR")} adet</span></td>
+                  <td data-label="Durum">
+                    {/* Zamanlama rozete İŞARET olarak iniyor: yeni bir sütun listeden yer çalardı. */}
+                    <span className="status-pill" data-tone={rozetTonu(row.statusHint ? "warn" : row.statusTone)} title={row.statusHint}>{row.statusLabel}{row.statusHint ? " ⏱" : ""}</span>
+                  </td>
+                  <td className="crm-table-actions"><span className="crm-row-chevron" aria-hidden="true">›</span></td>
+                  <MobilSatir
+                    href={`/urunler/${row.id}`}
+                    baslik={row.name}
+                    durum={{ etiket: row.statusLabel, ton: rozetTonu(row.statusHint ? "warn" : row.statusTone) }}
+                    alt={[row.meta]}
+                    isaretler={[
+                      { metin: row.price, ton: "guclu" },
+                      { metin: `${row.stock.toLocaleString("tr-TR")} adet`, ton: row.stock <= 0 ? "uyari" : "sessiz" },
+                      row.bestSeller ? { metin: "Çok satan", ton: "bilgi" } : null,
+                    ]}
+                  />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <SatirTiklama />
+          {children}
+        </div>
+      ) : bos}
+    </>
   );
 }

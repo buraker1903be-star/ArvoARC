@@ -8,6 +8,7 @@ import { KNot } from "@/components/arvo-ui/k-ui";
 import { MobilSatir } from "@/components/arvo-ui/mobil-satir";
 import { SatirTiklama } from "@/components/arvo-ui/satir-tiklama";
 import { rozetTonu } from "@/lib/rozet-tonu";
+import "@/components/arvo-ui/liste-ek.css";
 
 export type OrderRow = {
   id: string;

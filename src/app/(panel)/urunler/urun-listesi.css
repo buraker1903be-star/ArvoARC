@@ -1,0 +1,8 @@
+/* Ürünler: ArvoOS liste kalıbına uyarlama (16.10.2026). Ortak liste parçaları components/arvo-ui/liste-ek.css. */
+.os-root .urun-listesi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .urun-listesi .talep-bilgi{display:grid;gap:var(--sp-3)}
+.os-root .urun-tablo .urun-gorsel-sutun{width:52px}
+.os-root .urun-tablo .urun-gorsel{display:grid;place-items:center;width:40px;height:40px;overflow:hidden;border-radius:var(--r-sm);background:var(--surface-2);color:var(--muted);font-size:11px}
+.os-root .urun-tablo .urun-gorsel img{width:100%;height:100%;object-fit:cover}
+.urun-pencere-alt{margin:0;color:var(--muted);font-size:var(--fs-sm)}
+@media (max-width:760px){.os-root .urun-tablo .urun-gorsel-sutun{display:none}}
