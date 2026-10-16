@@ -49,9 +49,6 @@
 .siparis-detay .siparis-not{margin:0;font-size:var(--fs-sm);color:var(--ink);line-height:1.5;white-space:pre-line}
 .siparis-detay .talep-liste code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em}
 
-/* Orta sütun: kalemler ve gönderiler kartın bölümleri, ayrı kart değil. */
-.siparis-detay .siparis-gonderiler{display:grid;gap:var(--sp-3);padding-top:var(--sp-4);border-top:1px solid var(--line-soft)}
-.siparis-detay .siparis-gonderiler .ac-head h3{margin:0;font-size:var(--fs-base);font-weight:var(--fw-semibold)}
 /*
   KALEM DÖKÜMÜ SÜTUNA GÖRE DARALIYOR. Dokuz sütunluk fatura dökümü tam
   genişlik için yazılmıştı; orta sütunda ~700px kalıyor ve indirim
@@ -150,8 +147,6 @@
 .siparis-detay .siparis-toplamlar .is-toplam :is(dt,dd){color:var(--ink)}
 .siparis-detay .siparis-toplamlar .is-alacak :is(dt,dd){color:var(--warning);font-weight:var(--fw-semibold)}
 
-/* Kargo sekmesi: gönderiler sekmenin içinde, üst çizgi yok. */
-.siparis-detay .siparis-sekme .siparis-gonderiler{padding-top:0;border-top:0}
 
 @media (max-width:760px){
   .siparis-detay .siparis-kalem-listesi>li{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}
@@ -193,3 +188,106 @@
   body.fatura-yazdir .fatura-belge,body.fatura-yazdir .fatura-belge *{visibility:visible}
   body.fatura-yazdir .fatura-belge{position:absolute;inset:0 0 auto 0;padding:0}
 }
+
+/* ---------- Kargo paneli (sağ sütun, ilk sekme; 16.10.2026) ---------- */
+.siparis-detay .kargo-paneli{display:grid;gap:var(--sp-4)}
+
+/* Özet: adet sayacı, renkli çubuk, lejant, teslimat adresi. */
+.siparis-detay .kargo-ozet{display:grid;gap:10px;padding:var(--sp-4);border:1px solid var(--line);border-radius:var(--r-md);background:linear-gradient(180deg,var(--surface),var(--surface-2))}
+.siparis-detay .kargo-ozet-bas{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3)}
+.siparis-detay .kargo-ozet-bas>div{display:flex;align-items:baseline;gap:8px}
+.siparis-detay .kargo-ozet-bas b{color:var(--ink);font-size:var(--fs-xl);font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums;line-height:1}
+.siparis-detay .kargo-ozet-bas b small{color:var(--muted);font-size:var(--fs-sm);font-weight:var(--fw-medium)}
+.siparis-detay .kargo-ozet-bas span{color:var(--muted);font-size:var(--fs-sm)}
+.siparis-detay .kargo-ozet-bas form{margin:0}
+.os-root .siparis-detay .kargo-yenile{min-height:30px;margin:0;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface);box-shadow:none;color:var(--ink-soft);font:inherit;font-size:12px;cursor:pointer}
+.os-root .siparis-detay .kargo-yenile:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));color:var(--ink)}
+.siparis-detay [data-tur="teslim"]{--tur:var(--success)}
+.siparis-detay [data-tur="yolda"]{--tur:var(--info)}
+.siparis-detay [data-tur="taslak"]{--tur:var(--warning)}
+.siparis-detay [data-tur="sorunlu"]{--tur:var(--danger)}
+.siparis-detay [data-tur="bekliyor"]{--tur:var(--line)}
+.siparis-detay .kargo-cubuk{display:flex;gap:3px;height:8px;overflow:hidden;border-radius:var(--r-pill);background:var(--surface-2)}
+.siparis-detay .kargo-cubuk i{flex-basis:0;min-width:6px;border-radius:var(--r-pill);background:var(--tur)}
+.siparis-detay .kargo-lejant{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;padding:0;list-style:none;color:var(--ink-soft);font-size:12px}
+.siparis-detay .kargo-lejant li{display:inline-flex;align-items:center;gap:6px}
+.siparis-detay .kargo-lejant li::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--tur)}
+.siparis-detay .kargo-lejant li[data-tur="bekliyor"]::before{background:var(--muted)}
+.siparis-detay .kargo-adres{display:flex;gap:8px;margin:0;padding-top:10px;border-top:1px solid var(--line-soft);color:var(--ink);font-size:12.5px}
+.siparis-detay .kargo-adres span{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+
+/* Bölüm başlığı */
+.siparis-detay .kargo-bolum{display:grid;gap:10px}
+.siparis-detay .kargo-bolum>h4{display:flex;align-items:baseline;gap:8px;margin:0;color:var(--ink);font-size:var(--fs-sm);font-weight:var(--fw-semibold)}
+.siparis-detay .kargo-bolum>h4 small{color:var(--muted);font-size:12px;font-weight:var(--fw-medium)}
+
+/* Kargoya verilecek: depo kartı */
+.siparis-detay .kargo-yeni{display:grid;gap:10px;margin:0;padding:var(--sp-3) var(--sp-4);border:1px dashed color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:var(--r-md);background:color-mix(in srgb,var(--accent) 3%,var(--surface))}
+.siparis-detay .kargo-yeni-bas{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.siparis-detay .kargo-yeni-bas b{color:var(--ink);font-size:13px}
+.siparis-detay .kargo-yeni-bas small{color:var(--muted);font-size:12px}
+.siparis-detay .kargo-yeni-kalemler{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.siparis-detay .kargo-yeni-kalemler li{display:flex;align-items:center;gap:10px;font-size:12.5px}
+.siparis-detay .kargo-yeni-kalemler span{flex:1;min-width:0;overflow:hidden;color:var(--ink);text-overflow:ellipsis;white-space:nowrap}
+.siparis-detay .kargo-yeni-kalemler label{display:inline-flex;align-items:center;gap:5px;margin:0}
+.os-root .siparis-detay .kargo-yeni-kalemler input{width:54px;height:30px;min-height:0;padding:0 6px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);font:inherit;font-size:13px;text-align:center}
+.siparis-detay .kargo-yeni-kalemler em{color:var(--muted);font-size:11.5px;font-style:normal}
+.siparis-detay .kargo-ipucu{margin:0;color:var(--muted);font-size:11.5px}
+.siparis-detay .kargo-yeni-eylem{display:grid;gap:8px}
+.siparis-detay .kargo-yeni-eylem>.panel-primary{width:100%;justify-content:center}
+.siparis-detay .kargo-takip-gir>summary{display:flex;justify-content:center;list-style:none;cursor:pointer}
+.siparis-detay .kargo-takip-gir>summary::-webkit-details-marker{display:none}
+.os-root .siparis-detay .kargo-takip-gir>summary::after{content:none}
+.siparis-detay .kargo-takip-alanlar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.siparis-detay .kargo-takip-alanlar .wide{grid-column:1/-1}
+.siparis-detay .kargo-takip-alanlar label{display:grid;gap:4px;margin:0;color:var(--muted);font-size:11.5px}
+.os-root .siparis-detay .kargo-takip-alanlar :is(input,select){height:34px;min-height:0;padding:0 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:13px}
+.siparis-detay .kargo-tamam{margin:0;color:var(--success);font-size:12.5px;font-weight:var(--fw-medium)}
+.siparis-detay .kargo-bos{margin:0;color:var(--muted);font-size:12.5px}
+
+/* Paket kartı */
+.siparis-detay .kargo-paketler{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.siparis-detay .kargo-paket{display:grid;gap:8px;padding:var(--sp-3) var(--sp-4);border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);box-shadow:var(--shadow-sm)}
+.siparis-detay .kargo-paket[data-durum="delivered"]{border-color:color-mix(in srgb,var(--success) 40%,var(--line))}
+.siparis-detay .kargo-paket[data-durum="failed"]{border-color:color-mix(in srgb,var(--danger) 45%,var(--line))}
+.siparis-detay .kargo-paket-bas{display:flex;align-items:center;gap:8px}
+.siparis-detay .kargo-paket-bas b{color:var(--ink);font-size:13px}
+.siparis-detay .kargo-paket-bas small{color:var(--muted);font-size:12px}
+.siparis-detay .kargo-paket-bas .status-pill{margin-left:auto}
+.siparis-detay .kargo-paket-takip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0;color:var(--ink-soft);font-size:12.5px}
+.siparis-detay .kargo-paket-takip code{padding:2px 8px;border-radius:var(--r-xs);background:var(--surface-2);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;letter-spacing:.03em;user-select:all}
+.siparis-detay .kargo-paket-icerik{display:grid;gap:3px;margin:0;padding:8px 10px;list-style:none;border-radius:var(--r-sm);background:var(--surface-2)}
+.siparis-detay .kargo-paket-icerik li{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+.siparis-detay .kargo-paket-icerik span{min-width:0;overflow:hidden;color:var(--ink-soft);text-overflow:ellipsis;white-space:nowrap}
+.siparis-detay .kargo-paket-icerik b{flex:none;color:var(--ink);font-variant-numeric:tabular-nums}
+.siparis-detay .kargo-hata{margin:0;color:var(--danger);font-size:12px}
+.siparis-detay .kargo-paket-eylem{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.siparis-detay .kargo-paket-eylem form{margin:0}
+.os-root .siparis-detay .kargo-paket-eylem :is(.panel-primary,.panel-secondary){min-height:30px;padding:0 12px;font-size:12px}
+.siparis-detay .kargo-paket-eylem .kargo-iptal{margin-left:auto}
+.os-root .siparis-detay .kargo-iptal-dugme{min-height:30px;margin:0;padding:0 10px;border:0;background:transparent;box-shadow:none;color:var(--danger);font:inherit;font-size:12px;cursor:pointer}
+.os-root .siparis-detay .kargo-iptal-dugme:hover{text-decoration:underline}
+
+/* Taslak paket: ölçü ve kargo seçenekleri (fiyat kartları) */
+.siparis-detay .kargo-taslak{display:grid;gap:8px;padding-top:8px;border-top:1px solid var(--line-soft)}
+.siparis-detay .kargo-olcu{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:end;gap:6px;margin:0}
+.siparis-detay .kargo-olcu label{display:grid;gap:3px;margin:0;color:var(--muted);font-size:11px}
+.os-root .siparis-detay .kargo-olcu input{width:100%;height:30px;min-height:0;padding:0 6px;border:1px solid var(--line);border-radius:var(--r-sm);font:inherit;font-size:12.5px}
+.os-root .siparis-detay .kargo-olcu .panel-secondary{min-height:30px;padding:0 10px;font-size:12px}
+.siparis-detay .kargo-olcu-not{color:var(--muted);font-size:11px}
+.siparis-detay .kargo-secenek{display:grid;gap:8px;margin:0}
+.siparis-detay .kargo-secenekler{display:grid;gap:6px}
+.siparis-detay .kargo-secenekler label{display:flex;align-items:center;gap:10px;margin:0;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);cursor:pointer}
+.siparis-detay .kargo-secenekler label:has(input:checked){border-color:color-mix(in srgb,var(--accent) 60%,var(--line));background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+.siparis-detay .kargo-secenekler span{display:grid;flex:1;min-width:0}
+.siparis-detay .kargo-secenekler span b{color:var(--ink);font-size:12.5px}
+.siparis-detay .kargo-secenekler span small{overflow:hidden;color:var(--muted);font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.siparis-detay .kargo-secenekler strong{color:var(--ink);font-size:13px;font-variant-numeric:tabular-nums}
+.siparis-detay .kargo-secenek>.panel-primary{justify-content:center}
+
+/* İptal edilenler */
+.siparis-detay .kargo-iptaller>summary{color:var(--muted);font-size:12px;cursor:pointer}
+.siparis-detay .kargo-iptaller ul{display:grid;gap:6px;margin:8px 0 0;padding:0;list-style:none}
+.siparis-detay .kargo-iptaller li{display:flex;flex-wrap:wrap;gap:4px 10px;padding:6px 10px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--muted);font-size:12px}
+.siparis-detay .kargo-iptaller code{font-size:11.5px}
+.siparis-detay .kargo-iptaller small{flex-basis:100%}
