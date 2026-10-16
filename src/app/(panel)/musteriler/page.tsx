@@ -4,6 +4,12 @@ import { KNot } from "@/components/arvo-ui/k-ui";
 import { MobilSatir } from "@/components/arvo-ui/mobil-satir";
 import { SatirTiklama } from "@/components/arvo-ui/satir-tiklama";
 import { rozetTonu } from "@/lib/rozet-tonu";
+import { IstatistikKarti, degisimYazisi, kisaPara, tamPara } from "@/components/arvo-ui/istatistik-karti";
+import { musteriIstatistikleri } from "@/lib/musteri-istatistik";
+import { gorunumSorgusu, MUSTERI_SEGMENTLERI, MUSTERI_SIRALAMALARI } from "@/lib/kayitli-gorunum";
+import { gorunumleriOku } from "../gorunumler/oku";
+import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
+import "@/components/arvo-ui/crm.css";
 import "@/components/arvo-ui/kayit-detay.css";
 import { customerTags, currentTime, DAY, daysAgo, loadCustomers, NEW_DAYS, RISK_DAYS, type Customer } from "./customer-data";
 import "./musteri-listesi.css";
@@ -12,18 +18,14 @@ const PAGE_SIZE = 50;
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 const dateFormat = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Istanbul" });
 
-const SEGMENTS = [
-  ["all", "Tümü"],
-  ["repeat", "Tekrarlayan"],
-  ["new", "Yeni"],
-  ["risk", "Uzun süredir yok"],
-  ["single", "Tek sipariş"],
-] as const;
-const SORTS = [
-  ["spent", "Harcama"],
-  ["orders", "Sipariş"],
-  ["recent", "Son sipariş"],
-] as const;
+/*
+  Segment ve sıralama listeleri lib/kayitli-gorunum.ts'de: kaydedilmiş
+  görünüm, sakladığı sorgunun geçerli olduğunu doğrulamak zorunda ve
+  ikinci bir kopya olsaydı buraya eklenen yeni bir segmenti görünüm
+  tanımaz, sessizce düşürürdü.
+*/
+const SEGMENTS = MUSTERI_SEGMENTLERI;
+const SORTS = MUSTERI_SIRALAMALARI;
 
 type SegmentKey = (typeof SEGMENTS)[number][0];
 type SortKey = (typeof SORTS)[number][0];
@@ -62,7 +64,11 @@ export default async function Customers({ searchParams }: { searchParams: Promis
   const page = Math.min(10_000, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));
   const state: ListState = { q: search, segment, sort, page };
 
-  const { customers, orderCount, truncated } = await loadCustomers(supabase, organization.id);
+  const aktifSorgu = gorunumSorgusu("musteriler", params as Record<string, string | undefined>);
+  const [{ customers, orderCount, truncated }, gorunumler] = await Promise.all([
+    loadCustomers(supabase, organization.id),
+    gorunumleriOku(supabase, organization.id, "musteriler"),
+  ]);
 
   const searched = needle ? customers.filter((customer) => customer.name.toLocaleLowerCase("tr-TR").includes(needle) || customer.email.includes(needle)) : customers;
   const counts = Object.fromEntries(SEGMENTS.map(([key]) => [key, searched.filter((customer) => inSegment(customer, key, now)).length])) as Record<SegmentKey, number>;
@@ -73,8 +79,7 @@ export default async function Customers({ searchParams }: { searchParams: Promis
   const from = (Math.min(page, pageCount) - 1) * PAGE_SIZE;
   const visible = sorted.slice(from, from + PAGE_SIZE);
 
-  const totalSpent = customers.reduce((sum, customer) => sum + customer.spent, 0);
-
+  const istatistik = musteriIstatistikleri(customers, now);
   const filtreli = Boolean(search) || segment !== "all";
 
   /* ArvoOS'un liste kalıbı (16.10.2026): başlık, segment şeridi, süzgeç ve tablo tek kartta. */
@@ -84,7 +89,8 @@ export default async function Customers({ searchParams }: { searchParams: Promis
         <div className="talep-bas-metin">
           <small className="panel-kicker">Siparişler</small>
           <h1>Müşteriler</h1>
-          <p className="talep-bas-alt">{customers.length.toLocaleString("tr-TR")} müşteri · müşteri başına {money.format(customers.length ? totalSpent / customers.length / 100 : 0)} · {orderCount.toLocaleString("tr-TR")} siparişten</p>
+          {/* Sayılar sağdaki kartta; başlık yalnızca kaynağı söylüyor. */}
+          <p className="talep-bas-alt">{customers.length.toLocaleString("tr-TR")} müşteri · {orderCount.toLocaleString("tr-TR")} siparişten türetildi</p>
         </div>
         <div className="talep-bas-eylem">
           {canManage ? <a className="panel-secondary" href="/api/disari-aktar/musteriler">CSV indir</a> : null}
@@ -104,6 +110,8 @@ export default async function Customers({ searchParams }: { searchParams: Promis
         </dl>
       </nav>
 
+      {/* Solda liste, sağda istatistikler: sipariş listesiyle aynı ızgara. */}
+      <div className="talep-izgara personel-iki ekip-izgara">
       <section className="panel-card talep-bilgi" aria-label="Müşteri listesi">
         <div className="ekip-suzgec talep-suzgec">
           {SORTS.map(([key, label]) => (
@@ -114,7 +122,10 @@ export default async function Customers({ searchParams }: { searchParams: Promis
             {sort !== "spent" ? <input type="hidden" name="sort" value={sort} /> : null}
             <input name="q" defaultValue={search} placeholder="Ad veya e-posta ile ara" aria-label="Müşterilerde ara" />
           </form>
+          <GorunumKaydet liste="musteriler" aktifSorgu={aktifSorgu} gorunumler={gorunumler} canManage={canManage} />
         </div>
+
+        <KayitliGorunumler liste="musteriler" gorunumler={gorunumler} aktifSorgu={aktifSorgu} canManage={canManage} />
 
         {visible.length ? (
           <div className="talep-tablo">
@@ -194,6 +205,37 @@ export default async function Customers({ searchParams }: { searchParams: Promis
           </div>
         )}
       </section>
+
+      <IstatistikKarti
+        kapsam={truncated ? "en yeni 20.000 siparişten" : "bütün siparişlerden · süzgeçten bağımsız"}
+        kutular={[
+          {
+            ad: "Tekrar eden",
+            deger: istatistik.tekrarOrani === null ? "—" : `%${istatistik.tekrarOrani}`,
+            alt: `${istatistik.tekrarEden.toLocaleString("tr-TR")} müşteri · ${istatistik.tekSiparis.toLocaleString("tr-TR")} tek sipariş`,
+          },
+          {
+            ad: `Yeni · ${NEW_DAYS} gün`,
+            deger: istatistik.yeni.toLocaleString("tr-TR"),
+            alt: degisimYazisi(istatistik.yeniDegisim, `önceki ${NEW_DAYS} güne göre`) ?? "ilk siparişini verdi",
+            ton: istatistik.yeniDegisim !== null && istatistik.yeniDegisim < 0 ? "uyari" : istatistik.yeniDegisim !== null ? "arti" : undefined,
+          },
+          { ad: "Müşteri başına", deger: tamPara(istatistik.musteriBasina), alt: `toplam ${kisaPara(istatistik.toplamHarcama)} net` },
+          {
+            ad: "Uzun süredir yok",
+            deger: istatistik.riskli.toLocaleString("tr-TR"),
+            alt: `son siparişi ${RISK_DAYS} günden eski`,
+            ton: istatistik.riskli ? "uyari" : undefined,
+          },
+        ]}
+        gruplar={[
+          {
+            baslik: istatistik.ilkBesPayi === null ? "En çok harcayan" : `En çok harcayan · cironun %${istatistik.ilkBesPayi}'i ilk beşte`,
+            satirlar: istatistik.enCokHarcayan.map((m) => ({ ad: m.ad, adet: m.harcama, etiket: kisaPara(m.harcama) })),
+          },
+        ]}
+      />
+      </div>
     </main>
   );
 }

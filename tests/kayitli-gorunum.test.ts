@@ -87,7 +87,11 @@ test("ad tek satıra iniyor ve 40 karakterde kesiliyor", () => {
 test("liste adı denetleniyor", () => {
   assert.ok(gorunumListesiMi("siparisler"));
   assert.ok(gorunumListesiMi("urunler"));
-  assert.equal(gorunumListesiMi("musteriler"), false);
+  /* "musteriler" 16.10.2026'da görünümlere açıldı; tanınmayan ad
+     örneği olarak kullanılıyordu, gerçekten olmayan bir adla
+     değiştirildi. */
+  assert.ok(gorunumListesiMi("musteriler"));
+  assert.equal(gorunumListesiMi("yok-boyle-liste"), false);
   assert.equal(gorunumListesiMi(undefined), false);
 });
 
