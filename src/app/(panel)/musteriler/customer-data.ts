@@ -84,3 +84,31 @@ export function daysAgo(at: number, now: number) {
 export function currentTime() {
   return Date.now();
 }
+
+
+/*
+  ANAHTARIN SÜZGECE GİRİŞİ.
+
+  Müşteri anahtarı e-posta (ya da "name:<ad>") ve detay sayfası onu
+  `ilike` ile arıyor — joker karakter yazılmadığı için bu büyük/küçük
+  harf duyarsız EŞİTLİK demek. Sorun şuydu: değerden `%` ve `_`
+  SİLİNİYORDU. İkisi de e-postada geçerli karakter ve `_` çok yaygın;
+  "ali_veli@example.com" süzgece "aliveli@example.com" olarak giriyor,
+  hiçbir satıra uymuyor ve müşteri KENDİ LİSTE SATIRINDAN 404 alıyordu.
+
+  Doğrusu silmek değil KAÇIRMAK: Postgres LIKE'ın varsayılan kaçış
+  karakteri ters eğik çizgi. Jokeri olmayan bir değerde desen hiç
+  değişmiyor, yani olağan e-postalarda davranış aynı kalıyor.
+
+  Saf fonksiyon; testi tests/musteri-anahtari.test.ts.
+*/
+export function likeDeseni(deger: string) {
+  return deger.replace(/[\\%_]/g, (karakter) => `\\${karakter}`);
+}
+
+/** Anahtar hangi sütunda aranacak ve hangi desenle. */
+export function anahtarSuzgeci(key: string): { alan: "customer_name" | "customer_email"; desen: string } {
+  return key.startsWith("name:")
+    ? { alan: "customer_name", desen: likeDeseni(key.slice(5)) }
+    : { alan: "customer_email", desen: likeDeseni(key) };
+}

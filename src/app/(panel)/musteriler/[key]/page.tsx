@@ -4,8 +4,8 @@ import { orderBadge, sourceLabel } from "@/lib/commerce-labels";
 import { countsAsRevenue, revenueAmount } from "@/lib/order-flow";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { requireTenant } from "@/lib/tenant";
-import { currentTime, customerTags, DAY, daysAgo, type Customer } from "../customer-data";
-import { KKart, KListe, KOge } from "@/components/arvo-ui/k-ui";
+import { anahtarSuzgeci, currentTime, customerTags, DAY, daysAgo, type Customer } from "../customer-data";
+import { KKart, KListe, KNot, KOge } from "@/components/arvo-ui/k-ui";
 import { rozetTonu } from "@/lib/rozet-tonu";
 // Yan kartların tanım listesi ve favori ürünler (customer-dl, customer-fav) hâlâ orada.
 import "../customers.css";
@@ -38,22 +38,29 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
   const { supabase, organization } = await requireTenant();
   const now = currentTime();
 
-  let ordersQuery = supabase
-    .from("arc_orders")
-    .select("id,order_number,source,status,payment_status,customer_name,customer_email,total,currency,metadata,created_at")
-    .eq("organization_id", organization.id)
-    .order("created_at", { ascending: false })
-    .limit(1000);
-
-  if (key.startsWith("name:")) {
-    ordersQuery = ordersQuery.ilike("customer_name", key.slice(5).replace(/[%_,]/g, ""));
-  } else {
-    ordersQuery = ordersQuery.ilike("customer_email", key.replace(/[%_,]/g, ""));
-  }
-
-  const { data: orders, error } = await ordersQuery;
-  if (error) throw new Error(error.message);
-  if (!orders?.length) notFound();
+  /*
+    SİPARİŞLER SAYFALI OKUNUYOR. Önce `limit(1000)` vardı: binden çok
+    siparişi olan müşteride liste sessizce kesiliyor ve şeritteki net
+    harcama, ortalama sepet, ilk sipariş tarihi EKSİK çıkıyordu —
+    yanlış olduğu hiçbir yerde yazmadan. Tavana çarpılırsa ekranda
+    yazıyor (lib/fetch-all).
+  */
+  const { alan, desen } = anahtarSuzgeci(key);
+  type OrderRow = {
+    id: string; order_number: string; source: string | null; status: string; payment_status: string;
+    customer_name: string | null; customer_email: string | null; total: number; currency: string | null;
+    metadata: unknown; created_at: string;
+  };
+  const { rows: orders, truncated } = await fetchAllRows<OrderRow>((from, to) =>
+    supabase
+      .from("arc_orders")
+      .select("id,order_number,source,status,payment_status,customer_name,customer_email,total,currency,metadata,created_at")
+      .eq("organization_id", organization.id)
+      .ilike(alan, desen)
+      .order("created_at", { ascending: false })
+      .range(from, to) as unknown as PromiseLike<{ data: OrderRow[] | null; error: { message: string } | null }>,
+  );
+  if (!orders.length) notFound();
 
   const latestOrder = orders[0];
   const firstOrder = orders[orders.length - 1];
@@ -114,6 +121,8 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
           {customerEmail ? <a className="panel-secondary" href={`mailto:${customerEmail}`}>E-posta gönder</a> : null}
         </div>
       </header>
+
+      {truncated ? <KNot ton="uyari">Bu müşterinin en yeni 20.000 siparişi okundu; daha eskiler toplamlara dâhil değil.</KNot> : null}
 
       <nav className="kayit-serit talep-serit" aria-label="Müşteri özeti">
         <dl>
