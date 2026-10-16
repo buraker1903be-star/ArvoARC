@@ -21,3 +21,30 @@ export function sellableStock(supplierQuantity: number, stockBuffer: number | nu
   const buffer = Number.isFinite(Number(stockBuffer)) ? Math.max(0, Math.trunc(Number(stockBuffer))) : 0;
   return quantity < buffer ? 0 : quantity;
 }
+
+/*
+  AKIŞTAN DÜŞEN ÜRÜN SATIŞA KAPANIR — AMA YALNIZCA AKIŞ TAMSA.
+
+  Tarzyeri satışa kapattığı ürünü XML'de miktarı 0'a çekmiyor, ürünü
+  akıştan TAMAMEN ÇIKARIYOR. Stok turu yalnızca akışta gelen varyantları
+  yazdığı için çıkarılan ürün bizde son görülen miktarla açık kalıyordu:
+  16.10.2026'da iki sipariş tedarikçide çoktan kapanmış ürünlere düştü
+  (bizde 92 ve 1000 adet görünüyordu, son değişiklik 9 Eylül). O gün
+  akışta 14.902 varyant vardı, katalogda tedarikçi varyantı 15.365.
+
+  Akışta olmayanı kapatmak tehlikeli bir kural: akış yarım ya da hatalı
+  gelirse (tedarikçide kesinti, kesik yanıt) bütün mağaza satışa kapanır.
+  Bu yüzden kapatma ancak akış, bir önceki tam turdaki ürün sayısının
+  büyük kısmını taşıyorsa yapılır. Tedarikçi bir seferde çok sayıda ürünü
+  gerçekten kaldırdıysa bu tur kapatma atlanır ve sayı yeni değerine
+  oturur; sonraki tur (on dakika sonra) kapatır.
+*/
+export const AKIS_TAMLIK_ESIGI = 0.9;
+
+export function akisTamMi(akistakiUrun: number, oncekiToplam: number | null | undefined) {
+  if (!Number.isFinite(akistakiUrun) || akistakiUrun <= 0) return false;
+  const onceki = Number(oncekiToplam);
+  // İlk tur: kıyaslanacak bir şey yok, akışın boş olmaması yeterli.
+  if (!Number.isFinite(onceki) || onceki <= 0) return true;
+  return akistakiUrun >= onceki * AKIS_TAMLIK_ESIGI;
+}

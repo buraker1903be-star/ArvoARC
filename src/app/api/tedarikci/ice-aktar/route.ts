@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { fetchTarzyeri, parseDetail, slugify } from "@/lib/supplier/tarzyeri";
-import { sellableStock } from "@/lib/supplier-stock";
+import { akisTamMi, sellableStock } from "@/lib/supplier-stock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +11,11 @@ export const dynamic = "force-dynamic";
 // parçalara bölünüyor.
 export const maxDuration = 60;
 
-/** Tek çağrıda işlenecek ürün sayısı. */
+/** Tek çağrıda işlenecek ürün sayısı (tam aktarım). */
 const BATCH = 40;
+
+/** Stok turunda tek RPC'ye giden varyant sayısı. */
+const STOK_PARCASI = 3000;
 
 /**
  * Satış fiyatı — ArvoARC'taki `arc_sale_price` fonksiyonunun aynısı.
@@ -216,8 +219,19 @@ async function runSync(mode: "tam" | "stok") {
     bir tetiklemeyle katalog yaklaşık 70 dakikada tam turluyor.
     Öncesinde bu süre 5 saatti.
   */
-  const size = mode === "tam" ? BATCH : 500;
-  const start = rule.sync_cursor ?? 0;
+  /*
+    STOK TURU ARTIK PARÇALI DEĞİL (16.10.2026). XML her turda zaten
+    BAŞTAN SONA indiriliyordu ama yalnızca 500 ürünü işleniyordu: 3.161
+    ürünlük katalog yedi turda, yani ancak 70 dakikada bir tazeleniyordu
+    ve arada tükenen ürün satılıyordu. Yazma toplu RPC'yle yapıldığı için
+    kataloğun tamamı tek turda sığıyor. Akışta OLMAYAN varyantları
+    kapatmak da (aşağıda) bütün listeyi görmeyi gerektiriyor — parçalı
+    turda "bu parçada yok" ile "akışta yok" ayırt edilemezdi.
+
+    İmleç yalnızca elle başlatılan tam aktarımın.
+  */
+  const size = mode === "tam" ? BATCH : products.length;
+  const start = mode === "tam" ? (rule.sync_cursor ?? 0) : 0;
   const slice = products.slice(start, start + size);
 
   /* Stok modunda biriken güncellemeler; parça sonunda tek
@@ -319,8 +333,12 @@ async function runSync(mode: "tam" | "stok") {
           seenSkus.add(variant.sku);
           stockUpdates.push({
             sku: variant.sku,
-            // Tedarikçi stoğu tamponun altındaysa ürün satışa kapatılır.
-            stock: sellableStock(variant.quantity, rule.stock_buffer),
+            /*
+              Tedarikçi stoğu tamponun altındaysa ürün satışa kapatılır.
+              Akışta pasif (active=0) gelen ürünün miktarı yok sayılır:
+              stok turu bu alana hiç bakmıyordu.
+            */
+            stock: product.active ? sellableStock(variant.quantity, rule.stock_buffer) : 0,
             cost: product.costPrice,
             price: stockPrice,
           });
@@ -494,18 +512,6 @@ async function runSync(mode: "tam" | "stok") {
         }
       }
 
-      /*
-        Tam modda varyantlar zaten yeniden yazıldığı için ek
-        temizliğe gerek yok. Bu blok yalnızca stok modunda
-        anlamlı olurdu; şimdilik devre dışı.
-      */
-      if (false && seen.size > 0) {
-        await supabase
-          .from("arc_product_variants")
-          .update({ stock: 0, updated_at: now })
-          .eq("product_id", productId)
-          .not("sku", "in", `(${[...seen].map((s) => `"${s}"`).join(",")})`);
-      }
     } catch (error) {
       stats.hata.push(`${product.productCode}: ${(error as Error).message}`);
       if (stats.hata.length > 20) break;
@@ -523,30 +529,67 @@ async function runSync(mode: "tam" | "stok") {
     Fonksiyon mükerrer bağlantı oluşturmuyor, her turda güvenle
     çağrılabilir.
   */
-  /* Biriken stok güncellemeleri tek sorguda uygulanır. */
+  /*
+    Biriken stok güncellemeleri toplu sorgularla uygulanır. Kataloğun
+    tamamı (~15 bin varyant) tek istekte gitmesin diye parçalanıyor:
+    tek bir dev UPDATE, veritabanının sorgu süre sınırına takılabilir.
+  */
+  let kapatilan = 0;
+  let kapatmaNotu = "";
   if (mode !== "tam" && stockUpdates.length > 0) {
-    const { data: updated, error: bulkError } = await supabase.rpc(
-      "arc_bulk_update_supplier_stock",
-      /*
-        Kurum artık parametre. Fonksiyonun eski sürümü kurumu
-        "where slug = 'arvoculture'" ile kendisi buluyordu: hangi mağaza
-        çağırırsa çağırsın stok ve FİYAT ArvoCulture'ın varyantlarına
-        yazılıyordu (20260917180000).
-      */
-      { p_organization_id: orgId, p_supplier: "tarzyeri", p_rows: stockUpdates },
-    );
-
-    if (bulkError) {
-      return NextResponse.json(
-        { error: "stok_guncellenemedi", detail: bulkError.message },
-        { status: 500 },
+    for (let i = 0; i < stockUpdates.length; i += STOK_PARCASI) {
+      const { data: updated, error: bulkError } = await supabase.rpc(
+        "arc_bulk_update_supplier_stock",
+        /*
+          Kurum artık parametre. Fonksiyonun eski sürümü kurumu
+          "where slug = 'arvoculture'" ile kendisi buluyordu: hangi mağaza
+          çağırırsa çağırsın stok ve FİYAT ArvoCulture'ın varyantlarına
+          yazılıyordu (20260917180000).
+        */
+        { p_organization_id: orgId, p_supplier: "tarzyeri", p_rows: stockUpdates.slice(i, i + STOK_PARCASI) },
       );
+
+      if (bulkError) {
+        return NextResponse.json(
+          { error: "stok_guncellenemedi", detail: bulkError.message },
+          { status: 500 },
+        );
+      }
+
+      stats.guncellenenVaryant += Number(updated ?? 0);
     }
 
-    stats.guncellenenVaryant = Number(updated ?? 0);
+    /*
+      AKIŞTAN DÜŞEN ÜRÜN SATIŞA KAPANIR. Tarzyeri kapattığı ürünü XML'den
+      çıkarıyor; yukarıdaki güncelleme yalnızca akışta gelen SKU'lara
+      dokunduğu için çıkarılan ürün bizde açık kalıyordu (16.10.2026: iki
+      sipariş tedarikçide kapanmış ürünlere düştü). Kural ve güvenlik
+      eşiği: lib/supplier-stock.ts → akisTamMi.
+    */
+    if (akisTamMi(products.length, rule.sync_total)) {
+      const { data: kapanan, error: kapatmaHatasi } = await supabase.rpc(
+        "arc_close_missing_supplier_variants",
+        {
+          p_organization_id: orgId,
+          p_supplier: "tarzyeri",
+          p_skus: [...new Set(stockUpdates.map((row) => row.sku))],
+        },
+      );
+      if (kapatmaHatasi) {
+        return NextResponse.json(
+          { error: "akistan_dusenler_kapatilamadi", detail: kapatmaHatasi.message },
+          { status: 500 },
+        );
+      }
+      kapatilan = Number(kapanan ?? 0);
+      if (kapatilan > 0) kapatmaNotu = ` · akıştan düşen ${kapatilan} varyant kapatıldı`;
+    } else {
+      kapatmaNotu = ` · akış eksik göründü (önceki tur ${rule.sync_total}), kapatma atlandı`;
+    }
   }
 
-  if (bitti) {
+  // Yeni ürün yalnızca tam aktarımda gelir; stok turunda (artık her on dakikada bir) kategorilemek boşa iş.
+  if (bitti && mode === "tam") {
     const { error: catError } = await supabase.rpc(
       "arc_categorize_supplier_products",
       { p_supplier: rule.code, p_organization_id: orgId },
@@ -559,9 +602,10 @@ async function runSync(mode: "tam" | "stok") {
     .update({
       last_synced_at: new Date().toISOString(),
       last_sync_note: bitti
-        ? `${mode} tamamlandı · ${products.length} ürün`
+        ? `${mode} tamamlandı · ${products.length} ürün${kapatmaNotu}`
         : `${mode} sürüyor · ${next} / ${products.length}`,
-      sync_cursor: bitti ? 0 : next,
+      // Stok turu imlece dokunmaz: elle başlatılmış bir tam aktarım yarıdaysa sürsün.
+      ...(mode === "tam" ? { sync_cursor: bitti ? 0 : next } : {}),
       sync_total: products.length,
       updated_at: new Date().toISOString(),
     })
@@ -570,6 +614,7 @@ async function runSync(mode: "tam" | "stok") {
   return NextResponse.json({
     mode,
     ...stats,
+    kapatilan,
     kalan: bitti ? 0 : products.length - next,
     bitti,
     // Bitmediyse aynı komutu tekrar çalıştırın.
