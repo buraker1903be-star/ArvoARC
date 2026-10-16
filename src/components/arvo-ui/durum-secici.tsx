@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent as KlavyeOlayi } from "react";
+import { createPortal } from "react-dom";
 import { aramaSadesi } from "@/lib/arama-metni";
 import "./durum-secici.css";
 
@@ -76,7 +77,14 @@ export function DurumSecici({
   */
   const [yon, setYon] = useState<"alt" | "ust">("alt");
   const [bosluk, setBosluk] = useState(320);
+  /* Aranabilir liste PANELİN KÖKÜNE çiziliyor (PanelDrawer'ın
+     yaptığının aynısı): çekmece gövdesi kendi içinde kaydığı için
+     içeride kalan liste gövdenin kenarında KIRPILIYORDU ve 243
+     seçeneğe dört satır yer kalıyordu. Konum açılırken ölçülüp
+     sabitleniyor. */
+  const [konum, setKonum] = useState<{ sol: number; genislik: number; ust?: number; alt?: number } | null>(null);
   const kok = useRef<HTMLDivElement>(null);
+  const kutuRef = useRef<HTMLDivElement>(null);
   const dugme = useRef<HTMLButtonElement>(null);
   const girdi = useRef<HTMLInputElement>(null);
   const liste = useId();
@@ -118,32 +126,61 @@ export function DurumSecici({
   useEffect(() => {
     if (!acik) return;
     const disari = (olay: PointerEvent) => {
-      if (!kok.current?.contains(olay.target as Node)) setAcik(false);
+      const hedef = olay.target as Node;
+      /* Kutu portalda: kökün içinde DEĞİL, ama dışarısı da sayılmaz —
+         yoksa listedeki tıklama seçmeden önce pencereyi kapatırdı. */
+      if (!kok.current?.contains(hedef) && !kutuRef.current?.contains(hedef)) setAcik(false);
     };
     document.addEventListener("pointerdown", disari);
     return () => document.removeEventListener("pointerdown", disari);
   }, [acik]);
+
+  /* Konum açılırken sabitlendi: sayfa kayarsa liste düğmesinden
+     ayrı düşerdi. Listenin KENDİ kaydırması bunun dışında. */
+  useEffect(() => {
+    if (!acik || !aranabilir) return;
+    const kapat = (olay: Event) => {
+      if (kutuRef.current?.contains(olay.target as Node)) return;
+      setAcik(false);
+    };
+    window.addEventListener("scroll", kapat, true);
+    window.addEventListener("resize", kapat);
+    return () => {
+      window.removeEventListener("scroll", kapat, true);
+      window.removeEventListener("resize", kapat);
+    };
+  }, [acik, aranabilir]);
 
   const ac = () => {
     if (disabled) return;
     setSorgu("");
     const kutu = dugme.current?.getBoundingClientRect();
     if (kutu) {
+      /* Aranabilir liste kökte çizildiği için sınır PENCERE; öbürü
+         yerinde duruyor ve onu KIRPAN kutu sınırlıyor. */
       let sinirUst = 0;
       let sinirAlt = window.innerHeight;
-      for (let ust = kok.current?.parentElement; ust; ust = ust.parentElement) {
-        if (/(auto|scroll)/.test(getComputedStyle(ust).overflowY)) {
-          const r = ust.getBoundingClientRect();
-          sinirUst = Math.max(sinirUst, r.top);
-          sinirAlt = Math.min(sinirAlt, r.bottom);
-          break;
+      if (!aranabilir) {
+        for (let ust = kok.current?.parentElement; ust; ust = ust.parentElement) {
+          if (/(auto|scroll)/.test(getComputedStyle(ust).overflowY)) {
+            const r = ust.getBoundingClientRect();
+            sinirUst = Math.max(sinirUst, r.top);
+            sinirAlt = Math.min(sinirAlt, r.bottom);
+            break;
+          }
         }
       }
-      const altBosluk = sinirAlt - kutu.bottom;
-      const ustBosluk = kutu.top - sinirUst;
-      setYon(altBosluk >= 360 || altBosluk >= ustBosluk ? "alt" : "ust");
+      const altBosluk = sinirAlt - kutu.bottom - 12;
+      const ustBosluk = kutu.top - sinirUst - 12;
+      const asagi = altBosluk >= 360 || altBosluk >= ustBosluk;
+      setYon(asagi ? "alt" : "ust");
       /* 72px: arama kutusu, kutu dolgusu ve 6px'lik aralık. */
-      setBosluk(Math.max(140, Math.round(Math.max(altBosluk, ustBosluk) - 72)));
+      setBosluk(Math.max(140, Math.round((asagi ? altBosluk : ustBosluk) - 72)));
+      setKonum({
+        sol: Math.round(kutu.left),
+        genislik: Math.round(kutu.width),
+        ...(asagi ? { ust: Math.round(kutu.bottom + 6) } : { alt: Math.round(window.innerHeight - kutu.top + 6) }),
+      });
     }
     setEtkin(Math.max(0, secenekler.findIndex((s) => s.deger === secili)));
     setAcik(true);
@@ -177,6 +214,74 @@ export function DurumSecici({
     if (gonder) girdi.current?.form?.requestSubmit();
   };
 
+  /* Kutu bir DEĞİŞKEN: aranabilir olanı panelin köküne portal ile
+     gider (çekmece gövdesi kırpıyordu), öbürü yerinde kalır. */
+  const kutuIcerik = acik ? (
+      <div
+        className="durum-secici-kutu"
+        ref={kutuRef}
+        data-yon={yon}
+        data-portal={aranabilir ? "" : undefined}
+        style={
+          aranabilir && konum
+            ? ({ position: "fixed", left: konum.sol, width: konum.genislik, top: konum.ust, bottom: konum.alt, "--secici-bosluk": `${bosluk}px` } as CSSProperties)
+            : ({ "--secici-bosluk": `${bosluk}px` } as CSSProperties)
+        }
+      >
+        {/* Arama kutusu listenin İÇİNDE: alanın kendisi seçili değeri
+            gösteriyor, arama geçici. Enter formu göndermesin diye
+            klavye burada da ele alınıyor. */}
+        {aranabilir ? (
+          <input
+            className="durum-secici-arama"
+            type="text"
+            value={sorgu}
+            autoFocus
+            placeholder="Ara…"
+            aria-label={`${etiket} ara`}
+            aria-controls={liste}
+            onChange={(olay) => {
+              setSorgu(olay.target.value);
+              setEtkin(0);
+            }}
+            onKeyDown={klavye}
+          />
+        ) : null}
+        <ul
+          id={liste}
+          role="listbox"
+          aria-label={etiket}
+          tabIndex={-1}
+          className="durum-secici-liste"
+          ref={(ul) => {
+            if (!aranabilir) ul?.focus();
+          }}
+          aria-activedescendant={`${liste}-${etkin}`}
+          onKeyDown={klavye}
+        >
+          {gorunen.map((secenek, sira) => (
+            <li
+              key={secenek.deger}
+              id={`${liste}-${sira}`}
+              role="option"
+              aria-selected={secenek.deger === secili}
+              data-tone={secenek.ton ?? "neutral"}
+              data-etkin={sira === etkin ? "" : undefined}
+              onPointerEnter={() => setEtkin(sira)}
+              onClick={() => sec(secenek.deger)}
+            >
+              <i className="durum-secici-nokta" aria-hidden="true" />
+              <span>{secenek.etiket}</span>
+              {secenek.deger === secili ? (
+                <svg className="durum-secici-tik" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" /></svg>
+              ) : null}
+            </li>
+          ))}
+          {gorunen.length === 0 ? <li className="durum-secici-bos" role="presentation">Eşleşen seçenek yok</li> : null}
+        </ul>
+      </div>
+  ) : null;
+
   return (
     <div
       className="durum-secici"
@@ -209,61 +314,7 @@ export function DurumSecici({
         <span>{mevcut?.etiket}</span>
         <svg className="durum-secici-ok" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
       </button>
-      {acik ? (
-        <div className="durum-secici-kutu">
-          {/* Arama kutusu listenin İÇİNDE: alanın kendisi seçili değeri
-              gösteriyor, arama geçici. Enter formu göndermesin diye
-              klavye burada da ele alınıyor. */}
-          {aranabilir ? (
-            <input
-              className="durum-secici-arama"
-              type="text"
-              value={sorgu}
-              autoFocus
-              placeholder="Ara…"
-              aria-label={`${etiket} ara`}
-              aria-controls={liste}
-              onChange={(olay) => {
-                setSorgu(olay.target.value);
-                setEtkin(0);
-              }}
-              onKeyDown={klavye}
-            />
-          ) : null}
-          <ul
-            id={liste}
-            role="listbox"
-            aria-label={etiket}
-            tabIndex={-1}
-            className="durum-secici-liste"
-            ref={(ul) => {
-              if (!aranabilir) ul?.focus();
-            }}
-            aria-activedescendant={`${liste}-${etkin}`}
-            onKeyDown={klavye}
-          >
-            {gorunen.map((secenek, sira) => (
-              <li
-                key={secenek.deger}
-                id={`${liste}-${sira}`}
-                role="option"
-                aria-selected={secenek.deger === secili}
-                data-tone={secenek.ton ?? "neutral"}
-                data-etkin={sira === etkin ? "" : undefined}
-                onPointerEnter={() => setEtkin(sira)}
-                onClick={() => sec(secenek.deger)}
-              >
-                <i className="durum-secici-nokta" aria-hidden="true" />
-                <span>{secenek.etiket}</span>
-                {secenek.deger === secili ? (
-                  <svg className="durum-secici-tik" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" /></svg>
-                ) : null}
-              </li>
-            ))}
-            {gorunen.length === 0 ? <li className="durum-secici-bos" role="presentation">Eşleşen seçenek yok</li> : null}
-          </ul>
-        </div>
-      ) : null}
+      {acik ? (aranabilir ? createPortal(kutuIcerik, document.querySelector(".panel-root") ?? document.body) : kutuIcerik) : null}
     </div>
   );
 }
