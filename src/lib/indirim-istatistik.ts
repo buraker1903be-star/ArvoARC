@@ -86,3 +86,43 @@ export function indirimIstatistikleri(kurallar: IstatistikIndirimi[], an: number
     enCokKullanilan: kullanilanlar.sort((a, b) => b.adet - a.adet).slice(0, 6),
   };
 }
+
+
+/*
+  ÜRÜN İNDİRİMİ ÖZETİ (sekmenin sağındaki kart).
+
+  Kampanya sayıları burada işe yaramıyor: sekme kuralları değil
+  VARYANTIN karşılaştırma fiyatını listeliyor. Kartın kampanya
+  sayılarını göstermeye devam etmesi, listelenen şeyle ilgisi olmayan
+  bir özet olurdu.
+
+  Oran kuruş üzerinden: fiyatlar tamsayı ve TL'ye çevirip bölmek
+  yuvarlama hatası ekler.
+*/
+export type IndirimliVaryant = { product_id: string; price: number; compare_at_price: number | null };
+
+export function urunIndirimOzeti(varyantlar: IndirimliVaryant[]) {
+  let toplamOran = 0;
+  let enYuksek = 0;
+  let kazanc = 0;
+  const urunler = new Set<string>();
+  for (const varyant of varyantlar) {
+    const eski = varyant.compare_at_price ?? 0;
+    if (eski <= varyant.price) continue;
+    const oran = Math.round((1 - varyant.price / eski) * 100);
+    toplamOran += oran;
+    if (oran > enYuksek) enYuksek = oran;
+    kazanc += eski - varyant.price;
+    urunler.add(varyant.product_id);
+  }
+  const adet = varyantlar.filter((v) => (v.compare_at_price ?? 0) > v.price).length;
+  return {
+    varyant: adet,
+    urun: urunler.size,
+    /** Ortalama indirim oranı; indirimli varyant yoksa null. */
+    ortalamaOran: adet ? Math.round(toplamOran / adet) : null,
+    enYuksekOran: adet ? enYuksek : null,
+    /** Vitrinde "şu kadar tasarruf" diye görünen toplam fark (kuruş). */
+    toplamFarkKurus: kazanc,
+  };
+}

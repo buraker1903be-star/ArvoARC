@@ -13,6 +13,15 @@
 /* Süresi geçmiş sütunu: aktif görünen ama tarihi geçmiş kurallar. */
 .os-root .indirim-sayfasi .kayit-serit .is-tehlike dd a{color:var(--danger)}
 
+/*
+  SEKME ŞERİDİ. Ortak biçim kayıt akışından geliyor
+  (.talep-akis-sekmeler) ama orası KART İÇİ: yanlarda boşluğu var.
+  Burada şerit sayfanın kendi genişliğinde duruyor ve altındaki durum
+  şeridiyle hizalanıyor.
+*/
+.os-root .indirim-sekmeler{padding:0;border-bottom:1px solid var(--line)}
+.os-root .indirim-sekmeler a{text-decoration:none}
+
 /* Eylem sütunu sağda ve daralmıyor: "Etkinleştir" satırdan satıra kaymasın. */
 .os-root .indirim-tablo .indirim-eylem-sutun{width:1%;white-space:nowrap;text-align:right}
 .os-root .indirim-tablo .indirim-ilerlet{white-space:nowrap}

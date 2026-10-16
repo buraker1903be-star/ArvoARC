@@ -3,7 +3,7 @@ import { requireTenant } from "@/lib/tenant";
 import { Pencere } from "@/components/os/pencere";
 import { createDiscount } from "./actions";
 import { fetchAllRows } from "@/lib/fetch-all";
-import { indirimIstatistikleri, type IstatistikIndirimi } from "@/lib/indirim-istatistik";
+import { indirimIstatistikleri, urunIndirimOzeti, type IstatistikIndirimi } from "@/lib/indirim-istatistik";
 import { gorunumSorgusu, INDIRIM_DURUMLARI, INDIRIM_TURLERI } from "@/lib/kayitli-gorunum";
 import { gorunumleriOku } from "../gorunumler/oku";
 import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
@@ -228,6 +228,21 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
   if (urunHatasi) throw new Error("İndirimli ürünler okunamadı: " + urunHatasi.message);
   const urunAdi = new Map(((urunler ?? []) as { id: string; name: string }[]).map((u) => [u.id, u.name]));
 
+  const urunOzeti = urunIndirimOzeti(urunSonucu.rows);
+  /* Kartın listesi: en yüksek oranlı altı ÜRÜN (varyant değil; aynı
+     ürünün iki varyantı listeyi doldurmasın). */
+  const enCokIndirimli = (() => {
+    const enIyi = new Map<string, number>();
+    for (const varyant of indirimliVaryantlar) {
+      const once = enIyi.get(varyant.product_id) ?? 0;
+      if (varyant.oran > once) enIyi.set(varyant.product_id, varyant.oran);
+    }
+    return [...enIyi.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([id, oran]) => ({ ad: urunAdi.get(id) ?? "Ürün", oran }));
+  })();
+
   const istatistik = indirimIstatistikleri(istatistikSonucu.rows, an);
   const filtreli = Boolean(search) || tur !== "all" || biten;
   const hicKuralYok = (kuralSayimi.count ?? 0) === 0;
@@ -248,16 +263,29 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
           </p>
         </div>
         <div className="talep-bas-eylem">
-          {urunGorunumu
-            ? <Link prefetch={false} className="panel-secondary" href="/indirimler">← Kampanyalar</Link>
-            : <Link prefetch={false} className="panel-secondary" href="/indirimler?gorunum=urun">Ürün indirimleri</Link>}
           {canManage && !urunGorunumu ? (
             <Link prefetch={false} scroll={false} className="panel-primary" href="/indirimler?pencere=yeni">+ Yeni kampanya</Link>
           ) : null}
         </div>
       </header>
 
+      {/*
+        İKİ SEKME, AYRI SAYFA DEĞİL. Ürün indirimleri önce başlıktaki bir
+        düğmeyle açılıyordu ve kendi başlığı olan ayrı bir ekran gibi
+        davranıyordu: kullanıcı "nereye gittim" diye geri düğmesini
+        arıyordu. İkisi de aynı listenin iki görünümü — biri kuralları,
+        öteki varyantın karşılaştırma fiyatını listeliyor.
+
+        Sekme ADRESTE taşınıyor (bağlantı, düğme değil): yenilenince
+        aynı sekme açılıyor ve paylaşılan bağlantı doğru yere gidiyor.
+      */}
+      <nav className="talep-akis-sekmeler indirim-sekmeler" role="tablist" aria-label="İndirim görünümü">
+        <Link prefetch={false} role="tab" aria-selected={!urunGorunumu} className={!urunGorunumu ? "is-active" : undefined} href={listHref(durum, {})}>Kampanyalar</Link>
+        <Link prefetch={false} role="tab" aria-selected={urunGorunumu} className={urunGorunumu ? "is-active" : undefined} href="/indirimler?gorunum=urun">Ürün indirimleri</Link>
+      </nav>
+
       {urunGorunumu ? (
+        <div className="talep-izgara personel-iki ekip-izgara">
         <section className="panel-card talep-bilgi" aria-label="Ürün indirimleri">
           {urunSonucu.truncated ? (
             <p className="list-hint">Liste ilk 20.000 varyantla sınırlı; daha fazlası varsa burada görünmez.</p>
@@ -298,6 +326,22 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
             </div>
           )}
         </section>
+
+        {/* Sağdaki kart LİSTELENEN ŞEYİ özetliyor: burada kampanya
+            sayıları yanlış özet olurdu (lib/indirim-istatistik). */}
+        <IstatistikKarti
+          kapsam={urunSonucu.truncated ? "ilk 20.000 varyant" : "karşılaştırma fiyatı girilmiş varyantlar"}
+          kutular={[
+            { ad: "İndirimli varyant", deger: urunOzeti.varyant.toLocaleString("tr-TR"), alt: `${urunOzeti.urun.toLocaleString("tr-TR")} üründe` },
+            { ad: "Ortalama indirim", deger: urunOzeti.ortalamaOran === null ? "—" : `%${urunOzeti.ortalamaOran}`, alt: urunOzeti.enYuksekOran === null ? "indirimli varyant yok" : `en yüksek %${urunOzeti.enYuksekOran}` },
+            { ad: "Toplam fark", deger: money.format(urunOzeti.toplamFarkKurus / 100), alt: "liste fiyatına göre" },
+            { ad: "Kampanya", deger: istatistik.aktif.toLocaleString("tr-TR"), alt: "aktif sepet kuralı" },
+          ]}
+          gruplar={[
+            { baslik: "En çok indirimli ürün", satirlar: enCokIndirimli.map((u) => ({ ad: u.ad, adet: u.oran, etiket: `%${u.oran}` })) },
+          ]}
+        />
+        </div>
       ) : (
         <>
           <nav className="kayit-serit talep-serit" aria-label="Duruma göre süz">

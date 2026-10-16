@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BITIYOR_GUN, indirimIstatistikleri, type IstatistikIndirimi } from "@/lib/indirim-istatistik";
+import { BITIYOR_GUN, indirimIstatistikleri, urunIndirimOzeti, type IstatistikIndirimi } from "@/lib/indirim-istatistik";
 
 const AN = Date.parse("2026-10-16T12:00:00+03:00");
 const gunSonra = (gun: number) => new Date(AN + gun * 86_400_000).toISOString();
@@ -80,4 +80,35 @@ test("tür dağılımı okunur adlarla", () => {
     kural({ discount_type: "percentage" }),
   ], AN);
   assert.deepEqual(s.turler, [{ tur: "Yüzde indirim", adet: 2 }, { tur: "Ücretsiz kargo", adet: 1 }]);
+});
+
+
+/*
+  Ürün indirimi sekmesinin özeti. Sekme kuralları değil varyantın
+  karşılaştırma fiyatını listeliyor; kampanya sayıları orada yanlış
+  özet olurdu.
+*/
+test("ürün indirimi özeti: varyant, ürün, ortalama ve en yüksek oran", () => {
+  const o = urunIndirimOzeti([
+    { product_id: "u1", price: 7500, compare_at_price: 10000 },
+    { product_id: "u1", price: 9000, compare_at_price: 10000 },
+    { product_id: "u2", price: 5000, compare_at_price: 10000 },
+  ]);
+  assert.equal(o.varyant, 3);
+  assert.equal(o.urun, 2, "aynı ürünün iki varyantı tek ürün");
+  assert.equal(o.ortalamaOran, 28, "(25+10+50)/3");
+  assert.equal(o.enYuksekOran, 50);
+  assert.equal(o.toplamFarkKurus, 2500 + 1000 + 5000);
+});
+
+test("indirimsiz ve eksik karşılaştırma fiyatı sayılmıyor", () => {
+  const o = urunIndirimOzeti([
+    { product_id: "u1", price: 10000, compare_at_price: 10000 },
+    { product_id: "u2", price: 10000, compare_at_price: null },
+    { product_id: "u3", price: 12000, compare_at_price: 10000 },
+  ]);
+  assert.equal(o.varyant, 0);
+  assert.equal(o.ortalamaOran, null, "indirimli varyant yokken ortalama yok");
+  assert.equal(o.enYuksekOran, null);
+  assert.equal(o.toplamFarkKurus, 0);
 });
