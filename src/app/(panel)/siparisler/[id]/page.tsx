@@ -415,7 +415,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           <details className="os-menu talep-menu">
             <summary className="panel-secondary" aria-label="Diğer işlemler">⋯</summary>
             <div className="os-menu-list" role="menu">
-              <PrintButton className="os-menu-item" />
+              <PrintButton className="os-menu-item" simge={false} />
               {order.customer_email?<a className="os-menu-item" href={`mailto:${order.customer_email}`}>Müşteriye e-posta</a>:null}
               {/* Arşiv (20261016124844): yalnızca kapanmış sipariş; kural veritabanında da var. */}
               {canManage&&(order.archived_at||arsivlenebilirMi(order.status))?(

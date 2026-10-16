@@ -33,20 +33,29 @@
 }
 
 /* ---------- Ortak iskelet ----------
+   ÖZGÜLLÜK BİLEREK DÜŞÜK: sınıfsız düğme seçicisi (:not ×2) aynı :is()
+   listesindeyken bütün listenin özgüllüğünü yükseltiyordu ve küçük boy
+   (.dugme-kucuk) ile renk kuralları iskelete yeniliyordu — "Fatura
+   dökümü" 32 yerine 38px, ikincilin çerçevesi saydam çıktı. Sınıflı ve
+   sınıfsız düğme artık aynı kuralda AYRI seçici.
    Sınıfsız düğme (eski formların "Kaydet"i) birincil düğme olur; rolü olan
    sınıfsız düğme (sekme: role="tab") bu kuralın DIŞINDA — pasif sekme
    sınıfsız çizildiği için ilk sürümde birincil düğme gibi boyanıyordu. */
-.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button,.panel-content button:not([class]):not([role])){
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button),.os-root.os-root .panel-content button:not([class]):not([role]){
   display:inline-flex;align-items:center;justify-content:center;gap:8px;
   height:var(--dugme-h);min-height:var(--dugme-h);margin:0;padding:0 18px;
-  border:1px solid transparent;border-radius:var(--r-pill);
+  /* Yalnızca kalınlık ve çizgi: RENGİ her tür kendisi veriyor. Burada
+     transparent yazılıydı ve bu kuralın :is() listesi daha özgül olduğu
+     için ikincil ve tehlike düğmelerinin çerçevesini siliyordu (⋯ ve
+     "Fatura dökümü" çerçevesiz görünüyordu). */
+  border-width:1px;border-style:solid;border-radius:var(--r-pill);
   font:inherit;font-size:13.5px;font-weight:var(--fw-semibold);line-height:1;letter-spacing:.005em;text-transform:none;
   text-decoration:none;white-space:nowrap;cursor:pointer;filter:none;transform:none;
   transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,color .16s ease,transform .08s ease;
 }
-.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button,.panel-content button:not([class]):not([role])):active{transform:translateY(.5px)}
-.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button,.panel-content button:not([class]):not([role])):focus-visible{outline:none;box-shadow:var(--dugme-halka)}
-.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button,.panel-content button:not([class]):not([role])):disabled{opacity:.5;cursor:not-allowed;transform:none}
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button):active,.os-root.os-root .panel-content button:not([class]):not([role]):active{transform:translateY(.5px)}
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button):focus-visible,.os-root.os-root .panel-content button:not([class]):not([role]):focus-visible{outline:none;box-shadow:var(--dugme-halka)}
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button):disabled,.os-root.os-root .panel-content button:not([class]):not([role]):disabled{opacity:.5;cursor:not-allowed;transform:none}
 
 /* ---------- Birincil: koyu, ışığı yukarıdan alan, iç parıltılı ---------- */
 .os-root.os-root :is(.panel-primary,.ac-btn.ac-btn-primary,.panel-content button:not([class]):not([role])){
@@ -87,6 +96,14 @@
 
 /* ---------- Küçük boy ---------- */
 .os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn).dugme-kucuk{height:var(--dugme-h-kucuk);min-height:var(--dugme-h-kucuk);padding:0 14px;font-size:12.5px;gap:6px}
+
+/* "⋯" menüsünün öğeleri: hepsi aynı satır. "Yazdır" bir <button> ve
+   globals.css'in vitrin düğmesinden gölge alıyordu; bağlantı olan
+   öğelerden farklı, çerçeveli bir kutu gibi duruyordu. */
+.os-root.os-root .os-menu-list .os-menu-item{gap:10px;min-height:38px;margin:0;padding:0 12px;border:0;border-radius:var(--r-sm);background:transparent;box-shadow:none;filter:none;transform:none;color:var(--ink);font-size:13.5px;font-weight:var(--fw-medium);letter-spacing:normal}
+.os-root.os-root .os-menu-list .os-menu-item:hover{background:var(--surface-2)}
+.os-root.os-root .os-menu-list .os-menu-item.is-danger{color:var(--danger)}
+.os-root.os-root .os-menu-list .os-menu-item.is-danger:hover{background:var(--danger-soft)}
 
 /* "⋯" menü düğmesi: yuvarlak, düğmenin boyunda. */
 .os-root.os-root .os-menu>summary.panel-secondary{width:var(--dugme-h);padding:0;font-size:18px;letter-spacing:.06em}

@@ -3,10 +3,11 @@
 import { Icon } from "./icons";
 
 /* Yazdırma: panel çerçevesi ve işlem formları print CSS'te gizlenir. */
-export function PrintButton({ label = "Yazdır", className = "ac-btn" }: { label?: string; className?: string }) {
+/* simge: menü öğesinde kapalı — öteki öğelerde simge yok, yalnızca biri simgeli olunca hizası bozuluyordu. */
+export function PrintButton({ label = "Yazdır", className = "ac-btn", simge = true }: { label?: string; className?: string; simge?: boolean }) {
   return (
     <button type="button" className={className} onClick={() => window.print()}>
-      <Icon name="printer" size={16} />
+      {simge ? <Icon name="printer" size={16} /> : null}
       {label}
     </button>
   );
