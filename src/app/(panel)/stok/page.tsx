@@ -2,12 +2,14 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { adjustInventory } from "./actions";
 import { inventoryKindLabel } from "@/lib/commerce-labels";
-import { Icon } from "@/components/panel/icons";
-import { Notice } from "@/components/panel/notice";
-import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
+import { KKart, KNot } from "@/components/arvo-ui/k-ui";
+import { Pencere } from "@/components/os/pencere";
 import { StokTablosu } from "./stok-tablosu";
+// Detaylı hareket formu ve hareket geçmişinin iç biçimi (stock-*) hâlâ orada.
 import "../catalog.css";
-import { PanelBildirimi } from "@/components/panel/bildirim";
+import "@/components/arvo-ui/crm.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./stok.css";
 
 const PAGE_SIZE = 50;
 const dateTime = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
@@ -26,7 +28,7 @@ function listHref(state: ListState, patch: Partial<ListState>) {
   return text ? `/stok?${text}` : "/stok";
 }
 
-export default async function Stock({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string; page?: string }> }) {
+export default async function Stock({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string; page?: string; pencere?: string }> }) {
   const params = await searchParams;
   const { supabase, organization, membership } = await requireTenant();
   const canManage = ["owner", "admin", "manager"].includes(membership.role);
@@ -133,142 +135,93 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
   const productName = new Map((products ?? []).map((product) => [product.id, product.name]));
   const back = listHref(state, {});
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <h1>Stok Yönetimi</h1>
-        {/* İpucu buraya taşındı: liste üstünde ayrı bir bant olarak 56px tutuyordu. */}
-        <p>{stockSum.toLocaleString("tr-TR")} adet · {counts.all.toLocaleString("tr-TR")} varyant · en düşük stoktan başlar{canManage ? ", miktarı yazıp satırdan giriş veya çıkış yapın" : ""} · her değişiklik hareket olarak kaydedilir.</p>
-      </div>
-      <div className="ac-bar-actions">
-        {canManage ? <a className="ac-btn" href="/api/disari-aktar/stok"><Icon name="download" size={16} />CSV indir</a> : null}
-      </div>
-    </section>
+  const pencereAcik = canManage && params.pencere === "hareket";
+  const hareketAdresi = `${back}${back.includes("?") ? "&" : "?"}pencere=hareket`;
 
-    <div className="ac-stack">
-      {/*
-        Stok hareketinin sonucu BURADA görünüyor.
-
-        Bir dönem burada "buraya hata yazan bir işlem YOK" yazıyordu ve
-        kusuru tam o varsayım korudu: adjustInventory sonucu adres
-        satırına yazıyordu (?updated= / ?error=), bu şerit ise çerezi
-        okuyor. Yani giriş de çıkış da, başarı da hata da hiç
-        görünmüyordu — kullanıcı adedin değişip değişmediğini listeyi
-        gözleyerek anlamak zorundaydı. Eylem çereze taşındı.
-      */}
-      <PanelBildirimi />
-
-      {/*
-        ÖZET ŞERİDİ KALDIRILDI. Negatif / Stok sıfır / Düşük stok
-        kutuları filtre çipleriyle AYNI bağlantıya ve aynı sayıya
-        gidiyordu; toplam stok ve varyant sayısı da sayfanın alt
-        başlığına taşındı.
-
-        Bedeli 114px'di ve bu ekranda en pahalıya mal oluyordu: ilk
-        varyant satırı 685. pikselde başlıyor, 900px'lik ekranda
-        15.740 varyanttan YALNIZCA 3'ü görünüyordu (canlıda ölçüldü,
-        27.09.2026).
-
-        Aksiyon gerektiren durum zaten altındaki uyarı şeridinde
-        duruyor ("… varyantta stok aksiyonu gerekiyor"); kutular o
-        uyarıyı da üçüncü kez tekrarlıyordu.
-      */}
+  /* ArvoOS'un liste kalıbı (16.10.2026): başlık, durum şeridi, süzgeç ve tablo tek kartta; detaylı hareket pencerede. */
+  return (
+    <main className="talep liste-sayfa stok-listesi">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker">Katalog</small>
+          <h1>Stok</h1>
+          <p className="talep-bas-alt">{stockSum.toLocaleString("tr-TR")} adet · {counts.all.toLocaleString("tr-TR")} varyant · en düşük stoktan başlar · her değişiklik hareket olarak kaydedilir</p>
+        </div>
+        {canManage ? (
+          <div className="talep-bas-eylem">
+            <a className="panel-secondary" href="/api/disari-aktar/stok">CSV indir</a>
+            <Link prefetch={false} scroll={false} className="panel-primary" href={hareketAdresi}>Detaylı stok hareketi</Link>
+          </div>
+        ) : null}
+      </header>
 
       {counts.negative + unavailable > 0 ? (
-        <Notice tone="warn" title={`${(counts.negative + unavailable).toLocaleString("tr-TR")} varyantta stok aksiyonu gerekiyor`}>
+        <KNot ton="uyari">
+          <b>{(counts.negative + unavailable).toLocaleString("tr-TR")} varyantta stok aksiyonu gerekiyor.</b>{" "}
           {counts.negative.toLocaleString("tr-TR")} varyant negatif stokta; {unavailable.toLocaleString("tr-TR")} varyantta stok yok ve stoksuz satış kapalı (mağazada satın alınamıyor).
-        </Notice>
+        </KNot>
       ) : null}
 
-      <section className="ac ac-pad-sm list-toolbar">
-        <form className="ac-filter catalog-search" role="search">
-          {stockFilter !== "all" ? <input type="hidden" name="filter" value={stockFilter} /> : null}
-          <input name="q" defaultValue={search} placeholder="SKU veya ürün adı" aria-label="Stokta ara" />
-          <button className="ac-btn ac-btn-primary" type="submit">Ara</button>
-          {search ? <Link prefetch={false} className="ac-btn" href={listHref(state, { q: "", page: 1 })}>Temizle</Link> : null}
-        </form>
-      </section>
-
-      <nav className="ac-filter" aria-label="Stok durumu">
-        {FILTERS.map(([key, label]) => (
-          <Link prefetch={false} key={key} className="ac-btn" href={listHref(state, { filter: key, page: 1 })} aria-current={stockFilter === key ? "page" : undefined}>
-            {label}
-            <span className="ac-count" data-tone={key === "negative" && counts[key] ? "warn" : undefined}>{counts[key].toLocaleString("tr-TR")}</span>
-          </Link>
-        ))}
+      <nav className="kayit-serit talep-serit" aria-label="Stok durumuna göre süz">
+        <dl>
+          {FILTERS.map(([key, label]) => (
+            <div key={key} className={[stockFilter === key ? "is-active" : "", key === "negative" && counts[key] ? "is-tehlike" : ""].filter(Boolean).join(" ") || undefined}>
+              <dt>{label}</dt>
+              <dd><Link prefetch={false} href={listHref(state, { filter: key, page: 1 })} aria-current={stockFilter === key ? "page" : undefined}>{counts[key].toLocaleString("tr-TR")}</Link></dd>
+            </div>
+          ))}
+        </dl>
       </nav>
 
-      {/*
-        Liste İSTEMCİ BİLEŞENİNDE: satır içi giriş/çıkış her tıklamada
-        tam bir gezinme başlatıyordu ve stok düzeltmesi seri yapılan bir
-        iş — sayımdan sonra on varyantı girmek on kez başa dönmek
-        demekti. Veri ve yetki kararı burada, çizim ve etkileşim orada.
-
-        İpucu bandı da kalktı (56px, ölçüldü); cümlesi sayfa alt
-        başlığına taşındı.
-      */}
-      <StokTablosu
-        satirlar={variants.map((variant) => ({
-          id: variant.id,
-          urunId: variant.product_id,
-          urunAdi: productName.get(variant.product_id) ?? "Ürün",
-          varyantAdi: variant.title && variant.title !== "Default" ? variant.title : "Tek varyant",
-          sku: variant.sku,
-          stok: variant.stock,
-          stoksuzSatis: variant.allow_backorder,
-        }))}
-        canManage={canManage}
-        back={back}
-        dusukStokEsigi={lowStockThreshold}
-      >
-        {(varyantSayimi.count ?? 0) === 0 ? (
-          <ListeBos
-            baslik="Stok takip edilecek varyant yok."
-            aciklama="Stok, ürün varyantlarında tutuluyor. Önce kataloğa ürün ekleyin; her varyant burada kendi adediyle görünür."
-          >
-            <ListeBosEylem href="/urunler" birincil>Ürünlere git</ListeBosEylem>
-          </ListeBos>
-        ) : (
-          <ListeBos
-            baslik="Bu ölçütlere uygun varyant yok."
-            aciklama="SKU ve varyant adında arama yapılır. Aramayı veya filtreyi değiştirin."
-          >
-            <ListeBosEylem href={back}>Filtreleri temizle</ListeBosEylem>
-          </ListeBos>
-        )}
-      </StokTablosu>
-
-      <div className="ac table list-table">
-        {/* Kayıt yokken şerit gizli: boş ekran zaten "kayıt yok" diyor ve
-              altındaki ikinci "Kayıt yok" 45px yeri tekrara harcıyordu. */}
-        <div className="list-pagination" data-bos={total ? undefined : ""}>
-          <span>{total ? `${(from + 1).toLocaleString("tr-TR")}–${(from + variants.length).toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")} varyant` : "Kayıt yok"}</span>
-          {pageCount > 1 ? (
-            <div>
-              {page > 1 ? <Link prefetch={false} className="ac-btn" href={listHref(state, { page: page - 1 })}>← Önceki</Link> : <span className="ac-btn" aria-disabled="true">← Önceki</span>}
-              <span className="order-page-number">{page} / {pageCount}</span>
-              {page < pageCount ? <Link prefetch={false} className="ac-btn" href={listHref(state, { page: page + 1 })}>Sonraki →</Link> : <span className="ac-btn" aria-disabled="true">Sonraki →</span>}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {canManage ? (
-        <details className="ac ac-pad catalog-details">
-          <summary><span><b>Detaylı stok hareketi</b><small>SKU ile giriş, çıkış veya düzeltme; not ile birlikte kaydedilir</small></span></summary>
-          <form action={adjustInventory} className="stock-detailed-form">
-            <input type="hidden" name="back" value={back} />
-            <label>SKU<input name="sku" required maxLength={80} className="ac-input" placeholder="Örn. AC-TS-MNT" autoComplete="off" /></label>
-            <label>İşlem<select name="direction" defaultValue="in" className="ac-input"><option value="in">Stok girişi</option><option value="out">Stok çıkışı</option><option value="adjustment">Pozitif düzeltme</option></select></label>
-            <label>Miktar<input name="quantity" type="number" min="1" step="1" required className="ac-input" /></label>
-            <label>Not<input name="note" maxLength={300} className="ac-input" placeholder="Örn. Tedarikçi teslimatı #123" /></label>
-            <button className="ac-btn ac-btn-primary" type="submit">Hareketi kaydet</button>
+      <section className="panel-card talep-bilgi" aria-label="Stok listesi">
+        <div className="ekip-suzgec talep-suzgec">
+          <form className="talep-ara" role="search">
+            {stockFilter !== "all" ? <input type="hidden" name="filter" value={stockFilter} /> : null}
+            <input name="q" defaultValue={search} placeholder="SKU veya ürün adı" aria-label="Stokta ara" />
           </form>
-        </details>
-      ) : null}
+        </div>
 
-      <section className="ac ac-pad">
-        <div className="ac-head"><div><h3>Hareket geçmişi</h3><p>Son 20 işlem.</p></div></div>
+        {/*
+          Liste İSTEMCİ BİLEŞENİNDE: satır içi giriş/çıkış her tıklamada
+          tam bir gezinme başlatıyordu; stok düzeltmesi seri yapılan bir iş.
+        */}
+        <StokTablosu
+          satirlar={variants.map((variant) => ({
+            id: variant.id,
+            urunId: variant.product_id,
+            urunAdi: productName.get(variant.product_id) ?? "Ürün",
+            varyantAdi: variant.title && variant.title !== "Default" ? variant.title : "Tek varyant",
+            sku: variant.sku,
+            stok: variant.stock,
+            stoksuzSatis: variant.allow_backorder,
+          }))}
+          canManage={canManage}
+          back={back}
+          dusukStokEsigi={lowStockThreshold}
+        >
+          <div className="crm-empty-state talep-bos-kutu">
+            <h2>{(varyantSayimi.count ?? 0) === 0 ? "Stok takip edilecek varyant yok" : "Bu ölçütlere uygun varyant yok"}</h2>
+            <p>{(varyantSayimi.count ?? 0) === 0
+              ? "Stok, ürün varyantlarında tutuluyor. Önce kataloğa ürün ekleyin; her varyant burada kendi adediyle görünür."
+              : "SKU ve ürün adında arama yapılır. Aramayı veya süzgeci değiştirin."}</p>
+            <div className="crm-empty-actions">
+              {(varyantSayimi.count ?? 0) === 0
+                ? <Link prefetch={false} className="panel-primary" href="/urunler">Ürünlere git</Link>
+                : <Link prefetch={false} className="panel-secondary" href="/stok">Süzgeci temizle</Link>}
+            </div>
+          </div>
+        </StokTablosu>
+
+        {pageCount > 1 ? (
+          <nav className="liste-sayfalar" aria-label="Sayfalar">
+            {page > 1 ? <Link prefetch={false} href={listHref(state, { page: page - 1 })}>← Önceki</Link> : <span aria-disabled="true">← Önceki</span>}
+            <b>{page} / {pageCount} · {total.toLocaleString("tr-TR")} varyant</b>
+            {page < pageCount ? <Link prefetch={false} href={listHref(state, { page: page + 1 })}>Sonraki →</Link> : <span aria-disabled="true">Sonraki →</span>}
+          </nav>
+        ) : null}
+      </section>
+
+      <KKart baslik="Hareket geçmişi" aciklama="Son 20 işlem">
         {movements.length ? (
           <ul className="stock-moves">
             {movements.map((movement) => {
@@ -287,7 +240,21 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
             })}
           </ul>
         ) : <p className="list-hint">Henüz stok hareketi yok.</p>}
-      </section>
-    </div>
-  </>;
+      </KKart>
+
+      {pencereAcik ? (
+        <Pencere key="hareket" ust="Stok" baslik="Detaylı stok hareketi" kapatAdresi={back} genis={false}>
+          <p className="stok-pencere-alt">SKU ile giriş, çıkış veya düzeltme; not ile birlikte kaydedilir.</p>
+          <form action={adjustInventory} className="stock-detailed-form">
+            <input type="hidden" name="back" value={back} />
+            <label>SKU<input name="sku" required maxLength={80} className="ac-input" placeholder="Örn. AC-TS-MNT" autoComplete="off" /></label>
+            <label>İşlem<select name="direction" defaultValue="in" className="ac-input"><option value="in">Stok girişi</option><option value="out">Stok çıkışı</option><option value="adjustment">Pozitif düzeltme</option></select></label>
+            <label>Miktar<input name="quantity" type="number" min="1" step="1" required className="ac-input" /></label>
+            <label>Not<input name="note" maxLength={300} className="ac-input" placeholder="Örn. Tedarikçi teslimatı #123" /></label>
+            <button className="ac-btn ac-btn-primary" type="submit">Hareketi kaydet</button>
+          </form>
+        </Pencere>
+      ) : null}
+    </main>
+  );
 }
