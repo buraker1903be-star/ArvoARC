@@ -2,9 +2,10 @@
   Durum seçici (durum-secici.tsx). ArvoOS'ta aynı dosya:
   app/panel/components/durum-secici.css.
 
-  Biçim panelin düğmeleriyle aynı (16.10.2026: köşe --r-md, boy
-  --durum-secici-h; verilmezse şeridin --ff-boy'u). Hap biçimi düğmelerin
-  yanında ayrı bir dil gibi duruyordu.
+  HAP BİÇİMİ BİLEREK (16.10.2026). Bir ara düğmelerle aynı köşeye ve
+  boya çekildi; kurum sahibi geri istedi: seçici bir düğme değil, durumu
+  gösteren bir etiket — düğme disiplininin (arvo-ui/dugmeler.css)
+  dışında tutuluyor.
 
   Ton tek değişkende (--ton): düğmenin noktası, ince zemin tonu ve
   çerçevesi ondan türüyor. Yeni bir ton eklemek tek satır.
@@ -21,11 +22,11 @@
    düğme kuralı (gölge, kalın yazı, iç boşluk) .os-root ön ekiyle eziliyor. */
 .os-root .durum-secici-dugme,.durum-secici-dugme{
   display:inline-flex;align-items:center;gap:8px;
-  height:var(--durum-secici-h,var(--ff-boy,34px));min-height:0;margin:0;padding:0 10px 0 12px;
+  height:var(--ff-boy,34px);min-height:0;margin:0;padding:0 10px 0 12px;
   border:1px solid color-mix(in srgb,var(--ton) 28%,var(--line));
-  border-radius:var(--r-md);
+  border-radius:var(--r-pill);
   background:color-mix(in srgb,var(--ton) 7%,var(--surface));
-  color:var(--ink);font:inherit;font-size:var(--fs-base,13.5px);font-weight:var(--fw-semibold);letter-spacing:normal;
+  color:var(--ink);font:inherit;font-size:13px;font-weight:var(--fw-semibold);letter-spacing:normal;
   box-shadow:0 1px 0 color-mix(in srgb,var(--ink) 4%,transparent);
   cursor:pointer;white-space:nowrap;
   transition:border-color .16s ease,background-color .16s ease,box-shadow .16s ease;

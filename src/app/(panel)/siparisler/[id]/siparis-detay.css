@@ -16,7 +16,7 @@
 /* ---------- Durum şeridi (ArvoOS: .opd-serit / .opd-ff) ----------
    Ölçüler değişkende: bağlam (telefon) kural değil değişken değiştirir;
    ArvoOS'ta özgüllük yarışı iki kez yanlış boyut üretmişti. */
-.siparis-detay{--durum-secici-h:var(--dugme-h);--ff-boy:32px;--ff-yazi:12.5px;--ff-dolgu:9px;--ff-yazi:12.5px;--ff-aralik:7px}
+.siparis-detay{--ff-boy:32px;--ff-yazi:12.5px;--ff-dolgu:9px;--ff-yazi:12.5px;--ff-aralik:7px}
 .siparis-detay .opd-serit{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;margin:0;padding:11px 16px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);box-shadow:var(--shadow-sm)}
 .siparis-detay .opd-ff{display:inline-flex;align-items:center;gap:var(--ff-aralik);margin:0}
 .siparis-detay .opd-ff select{height:var(--ff-boy);max-width:100%;padding:0 var(--ff-dolgu);border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:var(--ff-yazi);transition:border-color .18s ease,box-shadow .18s ease}
