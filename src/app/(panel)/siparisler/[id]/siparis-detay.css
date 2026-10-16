@@ -1,34 +1,91 @@
 /*
-  Sipariş detayının ArvoOS kalıbına uyarlaması (16.10.2026). Kalem dökümü
-  ve gönderi kartlarının iç biçimi hâlâ ../orders.css'te; burası yalnızca
-  yeni düzen: kartlar, taraflar ızgarası, pencere içi bölümler.
+  Sipariş detayı: ArvoOS'un iş detayı (operations/[id]/detail.css) iskeleti,
+  16.10.2026. Üç sütun ve sütunların içi (talep-musteri, talep-bilgi,
+  talep-akis) components/arvo-ui/kayit-detay.css'ten; burası şerit, sütun
+  oranları ve siparişe özgü parçalar. Kalem dökümü ve gönderi kartlarının
+  iç biçimi hâlâ ../orders.css ve design.css'te.
 */
 .os-root .siparis-detay{display:grid;gap:var(--sp-4)}
-.os-root .siparis-detay .talep-bas h1{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
-.os-root .siparis-detay .talep-bas h1 .status-pill{font-size:var(--fs-sm)}
-.os-root .siparis-detay .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
 .os-root .siparis-detay .talep-bas-eylem{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
 .os-root .siparis-detay .talep-bas-eylem form{margin:0}
-.os-root .siparis-detay .kayit-serit small{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro)}
-.os-root .siparis-detay .kayit-serit .is-uyari dd{color:var(--warning)}
-.os-root .siparis-detay .kayit-serit .is-tehlike dd{color:var(--danger)}
-
-.os-root .siparis-kart,.os-root .siparis-akis{padding:var(--sp-5)}
-.os-root .siparis-taraflar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-3)}
-.os-root .siparis-taraflar .order-party{padding:var(--sp-4)}
 .os-root .siparis-not-eylem{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-top:var(--sp-2)}
 .os-root .siparis-not-eylem form{margin:0}
-
-/* Pencere içi bölümler: durum formu ve not alt alta, ince çizgiyle ayrık. */
-.siparis-pencere-bolum{display:grid;gap:var(--sp-3)}
-.siparis-pencere-bolum+.siparis-pencere-bolum{padding-top:var(--sp-4);border-top:1px solid var(--line-soft)}
-.siparis-pencere-bolum h3{margin:0;font-size:var(--fs-base);font-weight:var(--fw-semibold)}
-.siparis-pencere-alt{margin:0;color:var(--muted);font-size:var(--fs-sm)}
-
-@media (max-width:900px){.os-root .siparis-taraflar{grid-template-columns:1fr}}
-/* Yazdırırken kabuk ve pencereler görünmesin: belge yalnızca sipariş. */
-@media print{
-  .os-bar,.os-dock,.os-bolum-seridi,.order-noprint{display:none!important}
-}
 .os-root .siparis-havale{display:grid;gap:var(--sp-2)}
 .os-root .siparis-havale .siparis-not-eylem{margin-top:0}
+
+/* ---------- Durum şeridi (ArvoOS: .opd-serit / .opd-ff) ----------
+   Ölçüler değişkende: bağlam (telefon) kural değil değişken değiştirir;
+   ArvoOS'ta özgüllük yarışı iki kez yanlış boyut üretmişti. */
+.siparis-detay{--ff-boy:32px;--ff-dolgu:9px;--ff-yazi:12.5px;--ff-aralik:7px}
+.siparis-detay .opd-serit{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;margin:0;padding:11px 16px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);box-shadow:var(--shadow-sm)}
+.siparis-detay .opd-ff{display:inline-flex;align-items:center;gap:var(--ff-aralik);margin:0}
+.siparis-detay .opd-ff select{height:var(--ff-boy);max-width:100%;padding:0 var(--ff-dolgu);border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:var(--ff-yazi);transition:border-color .18s ease,box-shadow .18s ease}
+.siparis-detay .opd-ff select:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.siparis-detay .opd-ff select:focus-visible,.siparis-detay .opd-ff select:focus{outline:none;border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
+.siparis-detay .opd-ff select:disabled{background:var(--surface-2);color:var(--muted)}
+.siparis-detay .opd-ff select[data-tone="info"]{border-color:color-mix(in srgb,var(--info) 45%,var(--line));color:var(--info)}
+.siparis-detay .opd-ff select[data-tone="warning"]{border-color:color-mix(in srgb,var(--warning) 45%,var(--line));color:var(--warning)}
+.siparis-detay .opd-ff select[data-tone="success"]{border-color:color-mix(in srgb,var(--success) 45%,var(--line));color:var(--success)}
+.siparis-detay .opd-ff select[data-tone="danger"]{border-color:color-mix(in srgb,var(--danger) 45%,var(--line));color:var(--danger)}
+.siparis-detay .opd-ff-etiket{color:var(--muted);font-size:11.5px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+.siparis-detay .opd-ff-not{color:var(--muted);font-size:12px;white-space:nowrap}
+.siparis-detay .opd-ff-not[data-tone="warning"]{color:var(--warning);font-weight:650}
+.siparis-detay .opd-ff-not[data-tone="success"]{color:var(--success)}
+/* Anında kaydediliyor; düğme yalnızca JS kapalıyken çıkıyor (aninda.tsx). */
+.siparis-detay .aninda-kaydet{display:none;height:var(--ff-boy);padding:0 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:var(--ff-yazi);cursor:pointer}
+
+/* ---------- Üç sütun ---------- */
+.siparis-detay .talep-izgara.opd-izgara{grid-template-columns:minmax(260px,1fr) minmax(0,2fr) minmax(320px,1.25fr)}
+.os-root .siparis-detay .talep-izgara>:is(.talep-bilgi,.talep-musteri){max-height:calc(100dvh - 330px)}
+.siparis-detay .talep-akis-panel{max-height:calc(100dvh - 380px)}
+.siparis-detay .opd-gorevler{display:flex;flex-direction:column;gap:var(--sp-4)}
+.siparis-detay .opd-gorev-bas{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--sp-3)}
+.siparis-detay .opd-gorev-bas small{color:var(--muted);font-size:var(--fs-sm)}
+.siparis-detay .opd-gorev-bas strong{font-size:var(--fs-xl);font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums;color:var(--ink)}
+.siparis-detay .opd-zaman{margin:var(--sp-3) 0 0;color:var(--muted);font-size:var(--fs-micro)}
+
+/* Sol sütun: adres ve notlar talep-gecmis bölümü olarak. */
+.siparis-detay .siparis-adres{display:grid;gap:2px;font-style:normal;font-size:var(--fs-sm);color:var(--ink);line-height:1.5}
+.siparis-detay .siparis-not{margin:0;font-size:var(--fs-sm);color:var(--ink);line-height:1.5;white-space:pre-line}
+.siparis-detay .talep-liste code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em}
+
+/* Orta sütun: kalemler ve gönderiler kartın bölümleri, ayrı kart değil. */
+.siparis-detay .siparis-gonderiler{display:grid;gap:var(--sp-3);padding-top:var(--sp-4);border-top:1px solid var(--line-soft)}
+.siparis-detay .siparis-gonderiler .ac-head h3{margin:0;font-size:var(--fs-base);font-weight:var(--fw-semibold)}
+/*
+  KALEM DÖKÜMÜ SÜTUNA GÖRE DARALIYOR. Dokuz sütunluk fatura dökümü tam
+  genişlik için yazılmıştı; orta sütunda ~700px kalıyor ve indirim
+  sütunları rakamları sıkıştırıyordu. Kapsayıcı sorgusu ekrana değil
+  SÜTUNA bakıyor: dar sütunda ürün · adet · birim · KDV % · toplam kalıyor.
+  Tam döküm yazdırmada (aşağıda sütunlar tek sıraya iniyor).
+*/
+.siparis-detay .siparis-kalemler{container-type:inline-size}
+@container (max-width:760px){
+  .siparis-detay .ac-line{grid-template-columns:minmax(0,1fr) 40px minmax(0,auto) 44px minmax(0,auto)}
+  .siparis-detay .ac-line>:is(:nth-child(4),:nth-child(5),:nth-child(6),:nth-child(8)){display:none}
+}
+
+/* Sağ sütun sekmeleri */
+.siparis-detay .siparis-sekme{display:grid;gap:var(--sp-3);padding:var(--sp-4)}
+.siparis-pencere-alt{margin:0;color:var(--muted);font-size:var(--fs-sm)}
+
+@media (max-width:1200px){
+  .siparis-detay .talep-izgara.opd-izgara{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)}
+  .os-root .siparis-detay .talep-izgara>:is(.talep-bilgi,.talep-musteri),.siparis-detay .talep-akis-panel{max-height:none}
+}
+@media (max-width:760px){
+  .siparis-detay{--ff-boy:38px;--ff-yazi:13.5px}
+  .siparis-detay .talep-izgara.opd-izgara{grid-template-columns:minmax(0,1fr)}
+}
+
+/* Yazdırırken kabuk, şerit ve akış görünmesin: belge yalnızca sipariş. */
+@media print{
+  .os-bar,.os-dock,.os-bolum-seridi,.order-noprint,.talep-akis{display:none!important}
+  .siparis-detay .talep-izgara.opd-izgara{display:block}
+  .os-root .siparis-detay .talep-izgara>:is(.talep-bilgi,.talep-musteri){max-height:none;overflow:visible}
+}
+
+/* ArvoARC'ın eski panel.css'i her <summary>'ye "+" ekliyor; "⋯" menüsünde
+   "⋯ +" görünüyordu. Etiketin genel label boşluğu da şeritte kaydırıyordu. */
+.os-root .siparis-detay .talep-menu>summary::after{content:none}
+.os-root .siparis-detay .opd-ff-etiket{margin:0;line-height:1}

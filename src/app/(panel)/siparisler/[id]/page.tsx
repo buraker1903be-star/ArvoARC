@@ -18,8 +18,9 @@ import { nextOrderStep, orderFlow } from "@/lib/order-flow";
 import { describeOrderEvent } from "@/lib/order-events";
 import { Icon } from "@/components/panel/icons";
 import { PrintButton } from "@/components/panel/print-button";
-import { KKart, KNot } from "@/components/arvo-ui/k-ui";
-import { Pencere } from "@/components/os/pencere";
+import { KNot } from "@/components/arvo-ui/k-ui";
+import { TalepAkis } from "@/components/arvo-ui/kayit-akis";
+import { AnindaForm, AnindaYedek } from "@/components/arvo-ui/aninda";
 import { rozetTonu } from "@/lib/rozet-tonu";
 // Kalem dökümü ve gönderi kartlarının kendi sınıfları (ac-lines, shipment-*) hâlâ orada.
 import "../orders.css";
@@ -37,9 +38,10 @@ type Address={name?:string;address1?:string;address2?:string;city?:string;provin
 type OrderMeta={discount?:number;coupon_code?:string;refunded_at?:string;refunded_amount?:number;refund_reference?:string;billing?:Address;shipping_address?:Address;payment_method?:string;payment_reference?:string;notes?:string;tags?:string;historical_import?:boolean;shipping_carrier?:string;tracking_number?:string;tracking_url?:string;internal_note?:string};
 
 
-function AddressCard({title,address}:{title:string;address?:Address}){
-  const lines=[address?.name,address?.address1,address?.address2,[address?.zip,address?.city].filter(Boolean).join(" "),address?.province,address?.country,address?.phone].filter(Boolean);
-  return <article className="panel-card order-party"><small>{title}</small>{lines.length?lines.map((line,index)=><p key={index}>{line}</p>):<p className="is-empty">Bilgi bulunmuyor.</p>}</article>;
+/* Sol sütundaki adres bölümü (ArvoOS'un talep-gecmis bölümü); eskiden üç ayrı kart. */
+function AdresBolumu({baslik,adres}:{baslik:string;adres?:Address}){
+  const satirlar=[formatPersonName(adres?.name),adres?.address1,adres?.address2,[adres?.zip,adres?.city].filter(Boolean).join(" "),adres?.province,adres?.country,adres?.phone].filter(Boolean);
+  return <div className="talep-gecmis"><h3>{baslik}</h3>{satirlar.length?<address className="siparis-adres">{satirlar.map((satir,sira)=><span key={sira}>{satir}</span>)}</address>:<p className="talep-bos">Bilgi bulunmuyor.</p>}</div>;
 }
 
 export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{agirlik?:string;en?:string;boy?:string;yuk?:string;pencere?:string}>}){
@@ -275,35 +277,41 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   const transferStale=transferPending&&waitedHours>=TRANSFER_STALE_HOURS;
 
   /*
-    PENCERELER (16.10.2026, ArvoOS'un kayıt detayı gibi). Durum, not,
-    iade ve geçmiş sayfanın dibine alt alta diziliyordu — sayfa 4.600
-    piksel, beş ekran boyuydu ve en sık kullanılan iş (gönderi) ortada
-    kalıyordu. Şimdi başlıktaki düğmeler aynı sayfada bir pencere açıyor.
-    Pencere ADRESTE (?pencere=durum): kaydettikten sonra sayfa yeniden
-    çizildiğinde açık kalıyor; geri tuşu kapatıyor.
+    ÜÇ SÜTUN (16.10.2026, ArvoOS'un iş detayı): solda müşteri ve adresler,
+    ortada asıl iş (akış, kalemler, gönderiler), sağda sekmeli akış
+    (geçmiş, operasyon notu, iade). Durum ve ödeme üstteki şeritte,
+    değişince anında kaydediliyor.
+
+    Eskiden üstte dört özet kutusu, altında üç adres kartı, kalemler ve
+    gönderiler alt alta diziliyordu; durum, not, iade ve geçmiş başlıktaki
+    düğmelerle açılan pencerelerdeydi. Gönderiyi hazırlarken geçmişe ya da
+    nota bakmak bir pencere açıp kapatmak demekti.
+
+    Eski ?pencere= bağlantıları ilgili sekmeyi seçiyor.
   */
   const adres=`/siparisler/${order.id}`;
   const iadeAcik=["paid","partially_refunded"].includes(order.payment_status)&&refundable>0&&!(meta.refunded_at&&refundedSoFar<=0)&&!isBankTransfer(meta)&&["owner","admin"].includes(membership.role);
-  const PENCERELER=[
-    {kod:"durum",ad:"Durum ve operasyon notu",gorunur:true},
-    {kod:"iade",ad:"İade",gorunur:iadeAcik},
-    {kod:"gecmis",ad:`İşlem geçmişi (${timeline.length})`,gorunur:true},
-  ] as const;
-  const pencere=PENCERELER.find((p)=>p.kod===query.pencere&&p.gorunur)?.kod??null;
+  const sekmeler=[`Geçmiş (${timeline.length})`,"Operasyon notu",...(iadeAcik?["İade"]:[])];
+  const ilkSekme=query.pencere==="durum"?1:query.pencere==="iade"&&iadeAcik?2:0;
+  const musteriAdi:string=formatPersonName(order.customer_name)||order.customer_email||"Misafir müşteri";
+  const telefon:string|null=meta.shipping_address?.phone??meta.billing?.phone??null;
+  const basHarfler=musteriAdi.split(/\s+/).filter(Boolean).slice(0,2).map((p)=>p.charAt(0).toLocaleUpperCase("tr-TR")).join("")||"?";
+  const kargoOzeti=acikGonderiler.length
+    ?`${acikGonderiler.length} paket · ${!takipliGonderiSayisi?"takip no bekleniyor":kargoDurumuOzet==="teslim"?"teslim edildi":kargoDurumuOzet==="tamam"?"tamamı kargoda":kargoDurumuOzet==="kismi"?"bir kısmı kargoda":"kargoya verilmedi"}`
+    :meta.tracking_number?`Takip: ${meta.tracking_number}`:"Henüz kargoya verilmedi";
+  /* Seçim kutusunun tonu rozetle aynı: şeride bakınca renk de bilgi veriyor. */
+  const durumTonu=rozetTonu(badge.tone);
+  const odemeTonu=order.payment_status==="paid"?"success":["pending","authorized"].includes(order.payment_status)?"warning":["failed","refunded","partially_refunded"].includes(order.payment_status)?"danger":"neutral";
 
   return (
-    <main className="talep siparis-detay">
+    <main className="crm-page-stack talep opd opd-v3 siparis-detay">
+      <AnindaYedek />
       <header className="talep-bas">
         <div className="talep-bas-metin">
-          <small className="panel-kicker"><Link prefetch={false} href="/siparisler" className="order-noprint">Siparişler</Link></small>
-          <h1>{order.order_number} <span className="status-pill" data-tone={rozetTonu(badge.tone)}>{badge.label}</span></h1>
-          <p className="talep-bas-alt">{when(order.created_at)} · {formatPersonName(order.customer_name)||order.customer_email||"Misafir müşteri"} · {sourceLabel(order.source)}</p>
+          <small className="panel-kicker">SİPARİŞ · {when(order.created_at)}</small>
+          <h1>{order.order_number}</h1>
         </div>
         <div className="talep-bas-eylem order-noprint">
-          {PENCERELER.filter((p)=>p.gorunur).map((p)=>(
-            <Link key={p.kod} prefetch={false} scroll={false} className="panel-secondary" href={`${adres}?pencere=${p.kod}`} aria-current={pencere===p.kod?"page":undefined}>{p.ad}</Link>
-          ))}
-          <PrintButton />
           {canManage&&next?(
             <form action={quickStatus}>
               <input type="hidden" name="order_id" value={order.id}/>
@@ -312,6 +320,14 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
               <button className="panel-primary" type="submit">{next.label} →</button>
             </form>
           ):null}
+          <details className="os-menu talep-menu">
+            <summary className="panel-secondary" aria-label="Diğer işlemler">⋯</summary>
+            <div className="os-menu-list" role="menu">
+              <PrintButton className="os-menu-item" />
+              {order.customer_email?<a className="os-menu-item" href={`mailto:${order.customer_email}`}>Müşteriye e-posta</a>:null}
+              <Link prefetch={false} className="os-menu-item" href="/siparisler">Siparişlere dön</Link>
+            </div>
+          </details>
         </div>
       </header>
 
@@ -348,414 +364,423 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         </KNot>
       ):null}
 
-      <section className="panel-card siparis-akis order-noprint" aria-label="Sipariş akışı">
-        <ol className="order-steps" data-closed={closed?"":undefined}>
-          {orderFlow.map((step,index)=>{
-            const done=index<reachedIndex||(index===reachedIndex&&(closed||index===lastIndex));
-            const current=index===reachedIndex&&!done;
-            const at=reachedAt.get(step.key);
-            return <li key={step.key} className={done?"is-done":current?"is-current":undefined} aria-current={current?"step":undefined}>
-              <span className="order-step-dot">{done?<Icon name="check" size={16}/>:index+1}</span>
-              <b>{step.label}</b>
-              <small>{at&&index<=reachedIndex?shortDate.format(new Date(at)):current?"Şu an":"—"}</small>
-            </li>;
-          })}
-        </ol>
-      </section>
 
-      {/* Özet: ArvoOS'un kayıt şeridi (eskiden dört büyük kutu). Kargo
-          gönderilerden okunuyor, eski tek numaralı alandan değil. */}
-      <nav className="kayit-serit talep-serit" aria-label="Sipariş özeti">
-        <dl>
-          <div><dt>Toplam</dt><dd>{money(order.total,order.currency)}</dd><small>{discount>0?`${money(discount,order.currency)} indirim`:"KDV dâhil"}</small></div>
-          <div className={order.payment_status==="paid"?undefined:["pending","authorized"].includes(order.payment_status)?"is-uyari":["failed","refunded","partially_refunded"].includes(order.payment_status)?"is-tehlike":undefined}>
-            <dt>Ödeme</dt><dd>{paymentStatusLabel(order.payment_status)}</dd><small>{meta.payment_method??"Kredi kartı"}</small>
-          </div>
-          <div className={kargoDurumuOzet==="kismi"?"is-uyari":undefined}>
-            <dt>Kargo</dt>
-            <dd>{acikGonderiler.length?(acikGonderiler.length>1?`${acikGonderiler.length} paket`:acikGonderiler[0].carrier_name||"1 paket"):meta.shipping_carrier||"—"}</dd>
-            <small>{
-              acikGonderiler.length
-                ? (takipliGonderiSayisi
-                    ? `${takipliGonderiSayisi} takip no · ${
-                        kargoDurumuOzet==="teslim"?"teslim edildi"
-                        :kargoDurumuOzet==="tamam"?"tamamı kargoda"
-                        :"bir kısmı kargoda"}`
-                    : "takip no bekleniyor")
-                : meta.tracking_number?`Takip: ${meta.tracking_number}`:"henüz kargoya verilmedi"
-            }</small>
-          </div>
-          <div><dt>Kalemler</dt><dd>{itemCount} adet</dd><small>{items?.length??0} kalem</small></div>
-        </dl>
-      </nav>
+      {/*
+        DURUM ŞERİDİ (ArvoOS'un iş detayındaki gibi): durum ve ödeme
+        seçilince anında kaydediliyor (AnindaForm). İki form birbirinin
+        alanını gizli taşıyor: işlem ikisini birlikte istiyor ve biri
+        boş giderse "geçersiz durum" dönerdi.
+      */}
+      <div className="opd-serit order-noprint">
+        <AnindaForm action={updateOrderStatus} className="opd-ff">
+          <input type="hidden" name="order_id" value={order.id}/>
+          <input type="hidden" name="payment_status" value={order.payment_status}/>
+          <label className="opd-ff-etiket" htmlFor="siparis-durumu">Durum</label>
+          <select key={order.status} id="siparis-durumu" name="status" defaultValue={order.status} disabled={!canManage} data-tone={durumTonu}>
+            {orderStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}
+          </select>
+        </AnindaForm>
+        <AnindaForm action={updateOrderStatus} className="opd-ff">
+          <input type="hidden" name="order_id" value={order.id}/>
+          <input type="hidden" name="status" value={order.status}/>
+          <label className="opd-ff-etiket" htmlFor="odeme-durumu">Ödeme</label>
+          <select key={order.payment_status} id="odeme-durumu" name="payment_status" defaultValue={order.payment_status} disabled={!canManage} data-tone={odemeTonu}>
+            {paymentStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}
+          </select>
+          {/* Elle değiştirmenin bedeli başlıkta: eskiden durum penceresindeki notta. */}
+          <span className="opd-ff-not" title="Ödeme durumu normalde PayTR bildirimiyle güncellenir; elle değiştirmek muhasebe kayıtlarıyla uyumsuzluk yaratabilir.">{meta.payment_method??"Kredi kartı"}</span>
+        </AnindaForm>
+        <div className="opd-ff">
+          <span className="opd-ff-etiket">Kargo</span>
+          <span className="opd-ff-not" data-tone={kargoDurumuOzet==="teslim"?"success":kargoDurumuOzet==="kismi"?"warning":undefined}>{kargoOzeti}</span>
+        </div>
+      </div>
 
-      {/* Müşteri, fatura ve teslimat en başta: siparişi hazırlarken ilk bakılan yer. */}
-      <section className="siparis-taraflar">
-        <article className="panel-card order-party">
-          <small>MÜŞTERİ</small>
-          <p><b>{formatPersonName(order.customer_name)||"İsimsiz müşteri"}</b></p>
-          {order.customer_email?<p><a href={`mailto:${order.customer_email}`}>{order.customer_email}</a></p>:<p className="is-empty">E-posta yok</p>}
-          {meta.notes?<p className="order-party-note"><b>Müşteri notu:</b> {meta.notes}</p>:null}
-        </article>
-        <AddressCard title="FATURA ADRESİ" address={meta.billing}/>
-        <AddressCard title="TESLİMAT ADRESİ" address={meta.shipping_address}/>
-      </section>
-
-      <KKart id="kalemler" baslik="Sipariş kalemleri" aciklama={`${items?.length??0} kalem · birim fiyatlar KDV hariç`} sinif="siparis-kart">
-        {/*
-          Fatura düzeni. Her satırda birim fiyat, indirim, KDV
-          oranı ve tutarı ayrı ayrı; fatura keserken doğrudan
-          kullanılabilir.
-        */}
-        <div className="ac-lines">
-          <div className="ac-line ac-line-head">
-            <span>ÜRÜN / SKU</span>
-            <span>ADET</span>
-            <span>BİRİM (HARİÇ)</span>
-            <span>İND. %</span>
-            <span>İNDİRİM</span>
-            <span>İND. BİRİM (HARİÇ)</span>
-            <span>KDV %</span>
-            <span>KDV</span>
-            <span>TOPLAM (DÂHİL)</span>
-          </div>
-
-          {lines.map((line,index)=>(
-            <div className="ac-line" key={`${line.sku}-${index}`}>
-              <span>
-                <b>{line.name}</b>
-                <span className="ac-dim">{line.sku}</span>
-              </span>
-              <span>{line.quantity}</span>
-              <span>{money(line.unit,order.currency)}</span>
-              <span>{discountRate>0?`%${(discountRate*100).toFixed(1)}`:"—"}</span>
-              <span>{line.discountAmount>0?`−${money(line.discountAmount,order.currency)}`:"—"}</span>
-              <span>{money(line.netUnit,order.currency)}</span>
-              <span>%{line.rate}</span>
-              <span>{money(line.vat,order.currency)}</span>
-              <span><b>{money(line.total,order.currency)}</b></span>
+      <div className="talep-izgara opd-izgara">
+        <section className="panel-card talep-musteri" aria-label="Müşteri ve teslimat">
+          <div className="talep-musteri-kimlik">
+            <span className="talep-avatar" aria-hidden="true">{basHarfler}</span>
+            <div>
+              <h2>{musteriAdi}</h2>
+              <small>Müşteri · {sourceLabel(order.source)}</small>
             </div>
-          ))}
-        </div>
+          </div>
+          {telefon||order.customer_email?(
+            <div className="talep-iletisim order-noprint">
+              {telefon?<a className="panel-secondary" href={`tel:${telefon.replace(/[^\d+]/g,"")}`}>Ara</a>:null}
+              {order.customer_email?<a className="panel-secondary" href={`mailto:${order.customer_email}`}>E-posta</a>:null}
+            </div>
+          ):null}
+          <dl className="talep-liste">
+            <div><dt>Telefon</dt><dd>{telefon||<em>Yok</em>}</dd></div>
+            <div><dt>E-posta</dt><dd>{order.customer_email||<em>Yok</em>}</dd></div>
+            <div><dt>Tarih</dt><dd>{when(order.created_at)}</dd></div>
+            <div><dt>Ödeme türü</dt><dd>{meta.payment_method??"Kredi kartı"}</dd></div>
+            {meta.coupon_code?<div><dt>İndirim kodu</dt><dd><code>{meta.coupon_code}</code></dd></div>:null}
+            {discount>0?<div><dt>İndirim</dt><dd>{money(discount,order.currency)}</dd></div>:null}
+          </dl>
+          <AdresBolumu baslik="Teslimat adresi" adres={meta.shipping_address}/>
+          <AdresBolumu baslik="Fatura adresi" adres={meta.billing}/>
+          {meta.notes?(
+            <div className="talep-gecmis">
+              <h3>Müşteri notu</h3>
+              <p className="siparis-not">{meta.notes}</p>
+            </div>
+          ):null}
+          {meta.internal_note?(
+            <div className="talep-gecmis">
+              <h3>Operasyon notu</h3>
+              <p className="siparis-not">{meta.internal_note}</p>
+            </div>
+          ):null}
+          <p className="opd-zaman">Oluşturuldu {when(order.created_at)} · güncellendi {when(order.updated_at)}</p>
+        </section>
 
-        <div className="ac-totals">
-          {bracketList.map(([rate,v])=>(
-            <span key={rate}>%{rate} matrah <b>{money(v.matrah,order.currency)}</b></span>
-          ))}
-          {bracketList.map(([rate,v])=>(
-            <span key={`k${rate}`}>KDV %{rate} <b>{money(v.kdv,order.currency)}</b></span>
-          ))}
-          <strong>Toplam tutar <b>{money(order.total,order.currency)}</b></strong>
-          <span>Ödeme türü <b>{meta.payment_method??"Kredi kartı"}</b></span>
-          {meta.coupon_code?<span>İndirim kodu <b>{meta.coupon_code}</b></span>:null}
-        </div>
-      </KKart>
+        <section className="panel-card talep-bilgi opd-gorevler" aria-label="Sipariş">
+          <header className="opd-gorev-bas">
+            <div>
+              <h2>Sipariş</h2>
+              <small>{items?.length??0} kalem · {itemCount} adet · birim fiyatlar KDV hariç</small>
+            </div>
+            <strong>{money(order.total,order.currency)}</strong>
+          </header>
 
-      <section id="gonderiler" className="panel-card siparis-kart order-noprint">
-        <div className="ac-head">
-          <div><h3>Gönderiler</h3><p>{acikGonderiler.length?`${acikGonderiler.length} gönderi · ${
-            kargoDurumuOzet==="teslim"?"tamamı teslim edildi"
-            :kargoDurumuOzet==="tamam"?"tüm ürünler kargoda"
-            :kargoDurumuOzet==="kismi"?"bir kısmı kargoda"
-            :"henüz kargoya verilmedi"}`:"Bu siparişte henüz gönderi yok."}</p></div>
-          {/*
-            Durum OTO'dan ÇEKİLİYOR, webhook'la gelmiyor: OTO'nun webhook
-            yükünün şekli belgelenmemiş ve tahmine dayalı bir uç nokta,
-            yanlış eşleşen bir bildirimin gönderiyi "teslim edildi"
-            yapması demekti. Siparişteki bütün açık gönderiler tek
-            düğmeyle güncelleniyor.
-          */}
-          {canManage&&gonderiler.some(g=>g.source==="oto"&&!["draft","cancelled","delivered"].includes(g.status))
-            ?<form action={kargoDurumlariniGuncelle}><input type="hidden" name="order_id" value={order.id}/><button type="submit" className="shipment-refresh">Kargo durumlarını güncelle</button></form>
-            :null}
-        </div>
+          <ol className="order-steps order-noprint" data-closed={closed?"":undefined}>
+            {orderFlow.map((step,index)=>{
+              const done=index<reachedIndex||(index===reachedIndex&&(closed||index===lastIndex));
+              const current=index===reachedIndex&&!done;
+              const at=reachedAt.get(step.key);
+              return <li key={step.key} className={done?"is-done":current?"is-current":undefined} aria-current={current?"step":undefined}>
+                <span className="order-step-dot">{done?<Icon name="check" size={16}/>:index+1}</span>
+                <b>{step.label}</b>
+                <small>{at&&index<=reachedIndex?shortDate.format(new Date(at)):current?"Şu an":"—"}</small>
+              </li>;
+            })}
+          </ol>
 
-        {acikGonderiler.length?<ul className="shipment-list">
-          {acikGonderiler.map(gonderi=>
-            <li key={gonderi.id} data-durum={gonderi.status}>
-              <div className="shipment-head">
-                <b>{gonderi.sequence}. paket{gonderi.supplier?` · ${gonderi.supplier}`:""}</b>
-                <span data-durum={gonderi.status}>{gonderiDurumEtiketi(gonderi.status,gonderi.source)}</span>
+          <div id="kalemler" className="siparis-kalemler">
+          <div className="ac-lines">
+            <div className="ac-line ac-line-head">
+              <span>ÜRÜN / SKU</span>
+              <span>ADET</span>
+              <span>BİRİM (HARİÇ)</span>
+              <span>İND. %</span>
+              <span>İNDİRİM</span>
+              <span>İND. BİRİM (HARİÇ)</span>
+              <span>KDV %</span>
+              <span>KDV</span>
+              <span>TOPLAM (DÂHİL)</span>
+            </div>
+
+            {lines.map((line,index)=>(
+              <div className="ac-line" key={`${line.sku}-${index}`}>
+                <span>
+                  <b>{line.name}</b>
+                  <span className="ac-dim">{line.sku}</span>
+                </span>
+                <span>{line.quantity}</span>
+                <span>{money(line.unit,order.currency)}</span>
+                <span>{discountRate>0?`%${(discountRate*100).toFixed(1)}`:"—"}</span>
+                <span>{line.discountAmount>0?`−${money(line.discountAmount,order.currency)}`:"—"}</span>
+                <span>{money(line.netUnit,order.currency)}</span>
+                <span>%{line.rate}</span>
+                <span>{money(line.vat,order.currency)}</span>
+                <span><b>{money(line.total,order.currency)}</b></span>
               </div>
-              <p>{gonderi.carrier_name??"Firma belirtilmedi"}{gonderi.tracking_number?` · ${gonderi.tracking_number}`:""}</p>
-              <p className="shipment-items">{gonderi.items.map(kalem=>`${kalemAdi.get(kalem.order_item_id)??"Ürün"} ×${kalem.quantity}`).join(" · ")||"Kalem yok"}</p>
-              {gonderi.failure_reason?<p className="shipment-error">{gonderi.failure_reason}</p>:null}
+            ))}
+          </div>
 
+          <div className="ac-totals">
+            {bracketList.map(([rate,v])=>(
+              <span key={rate}>%{rate} matrah <b>{money(v.matrah,order.currency)}</b></span>
+            ))}
+            {bracketList.map(([rate,v])=>(
+              <span key={`k${rate}`}>KDV %{rate} <b>{money(v.kdv,order.currency)}</b></span>
+            ))}
+            <strong>Toplam tutar <b>{money(order.total,order.currency)}</b></strong>
+            <span>Ödeme türü <b>{meta.payment_method??"Kredi kartı"}</b></span>
+            {meta.coupon_code?<span>İndirim kodu <b>{meta.coupon_code}</b></span>:null}
+          </div>
+          </div>
+
+          <section id="gonderiler" className="siparis-gonderiler order-noprint">
+            <div className="ac-head">
+              <div><h3>Gönderiler</h3><p>{acikGonderiler.length?`${acikGonderiler.length} gönderi · ${
+                kargoDurumuOzet==="teslim"?"tamamı teslim edildi"
+                :kargoDurumuOzet==="tamam"?"tüm ürünler kargoda"
+                :kargoDurumuOzet==="kismi"?"bir kısmı kargoda"
+                :"henüz kargoya verilmedi"}`:"Bu siparişte henüz gönderi yok."}</p></div>
               {/*
-                TASLAK gönderi: kalemler ayrıldı, OTO'ya henüz dokunulmadı
-                (bakiye harcanmadı). Firma fiyatıyla birlikte seçiliyor;
-                tek adımda yapılsaydı kullanıcı fiyatı görmeden seçerdi.
+                Durum OTO'dan ÇEKİLİYOR, webhook'la gelmiyor: OTO'nun webhook
+                yükünün şekli belgelenmemiş ve tahmine dayalı bir uç nokta,
+                yanlış eşleşen bir bildirimin gönderiyi "teslim edildi"
+                yapması demekti. Siparişteki bütün açık gönderiler tek
+                düğmeyle güncelleniyor.
               */}
-              {/*
-                FİYAT SORGUSU NEYE GÖRE YAPILDI — açıkça yazılı. OTO
-                panelindeki fiyatla buradaki farklı çıkabiliyor: orada
-                paket ölçüleri ve teslim biçimi (şubeye teslim / adresten
-                alım) tek tek seçiliyor, burada yalnızca şehir ve ağırlık
-                gönderiliyor. Sayıyı sebebini söylemeden göstermek, farkı
-                hata sanmaya yol açıyordu.
-              */}
-              {canManage&&gonderi.source==="oto"&&gonderi.status==="draft"?<>
-                <form method="get" className="shipment-weight">
-                  <label>Ağırlık (kg)<input name="agirlik" type="number" step="0.1" min="0.1" max="100" defaultValue={sorgulananAgirlik}/></label>
-                  <label>En (cm)<input name="en" type="number" min="1" max="200" defaultValue={olcu.enCm}/></label>
-                  <label>Boy (cm)<input name="boy" type="number" min="1" max="200" defaultValue={olcu.boyCm}/></label>
-                  <label>Yükseklik (cm)<input name="yuk" type="number" min="1" max="200" defaultValue={olcu.yukseklikCm}/></label>
-                  <button type="submit">Fiyatları yenile</button>
-                  {/* Hacimsel ağırlık gösteriliyor: fiyat gerçek ağırlıkla
-                      bunun BÜYÜĞÜNDEN hesaplanıyor ve kullanıcı neden o
-                      fiyatı gördüğünü ancak böyle anlıyor. */}
-                  <small>{(kargoAyarSatiri as {address_city?:string|null}|null)?.address_city||"?"} → {teslimatAdresi.city||"?"} · {sorgulananAgirlik} kg · hacimsel {hacimsel} kg{hacimsel>sorgulananAgirlik?" (fiyat buna göre)":""} · {kargoSecenekleri.length} seçenek</small>
-                </form>
-                <form action={otoEtiketUret} className="shipment-oto">
+              {canManage&&gonderiler.some(g=>g.source==="oto"&&!["draft","cancelled","delivered"].includes(g.status))
+                ?<form action={kargoDurumlariniGuncelle}><input type="hidden" name="order_id" value={order.id}/><button type="submit" className="shipment-refresh">Kargo durumlarını güncelle</button></form>
+                :null}
+            </div>
+
+            {acikGonderiler.length?<ul className="shipment-list">
+              {acikGonderiler.map(gonderi=>
+                <li key={gonderi.id} data-durum={gonderi.status}>
+                  <div className="shipment-head">
+                    <b>{gonderi.sequence}. paket{gonderi.supplier?` · ${gonderi.supplier}`:""}</b>
+                    <span data-durum={gonderi.status}>{gonderiDurumEtiketi(gonderi.status,gonderi.source)}</span>
+                  </div>
+                  <p>{gonderi.carrier_name??"Firma belirtilmedi"}{gonderi.tracking_number?` · ${gonderi.tracking_number}`:""}</p>
+                  <p className="shipment-items">{gonderi.items.map(kalem=>`${kalemAdi.get(kalem.order_item_id)??"Ürün"} ×${kalem.quantity}`).join(" · ")||"Kalem yok"}</p>
+                  {gonderi.failure_reason?<p className="shipment-error">{gonderi.failure_reason}</p>:null}
+
+                  {/*
+                    TASLAK gönderi: kalemler ayrıldı, OTO'ya henüz dokunulmadı
+                    (bakiye harcanmadı). Firma fiyatıyla birlikte seçiliyor;
+                    tek adımda yapılsaydı kullanıcı fiyatı görmeden seçerdi.
+                  */}
+                  {/*
+                    FİYAT SORGUSU NEYE GÖRE YAPILDI — açıkça yazılı. OTO
+                    panelindeki fiyatla buradaki farklı çıkabiliyor: orada
+                    paket ölçüleri ve teslim biçimi (şubeye teslim / adresten
+                    alım) tek tek seçiliyor, burada yalnızca şehir ve ağırlık
+                    gönderiliyor. Sayıyı sebebini söylemeden göstermek, farkı
+                    hata sanmaya yol açıyordu.
+                  */}
+                  {canManage&&gonderi.source==="oto"&&gonderi.status==="draft"?<>
+                    <form method="get" className="shipment-weight">
+                      <label>Ağırlık (kg)<input name="agirlik" type="number" step="0.1" min="0.1" max="100" defaultValue={sorgulananAgirlik}/></label>
+                      <label>En (cm)<input name="en" type="number" min="1" max="200" defaultValue={olcu.enCm}/></label>
+                      <label>Boy (cm)<input name="boy" type="number" min="1" max="200" defaultValue={olcu.boyCm}/></label>
+                      <label>Yükseklik (cm)<input name="yuk" type="number" min="1" max="200" defaultValue={olcu.yukseklikCm}/></label>
+                      <button type="submit">Fiyatları yenile</button>
+                      {/* Hacimsel ağırlık gösteriliyor: fiyat gerçek ağırlıkla
+                          bunun BÜYÜĞÜNDEN hesaplanıyor ve kullanıcı neden o
+                          fiyatı gördüğünü ancak böyle anlıyor. */}
+                      <small>{(kargoAyarSatiri as {address_city?:string|null}|null)?.address_city||"?"} → {teslimatAdresi.city||"?"} · {sorgulananAgirlik} kg · hacimsel {hacimsel} kg{hacimsel>sorgulananAgirlik?" (fiyat buna göre)":""} · {kargoSecenekleri.length} seçenek</small>
+                    </form>
+                    <form action={otoEtiketUret} className="shipment-oto">
+                      <input type="hidden" name="order_id" value={order.id}/>
+                      <input type="hidden" name="shipment_id" value={gonderi.id}/>
+                      {kargoSecenekleri.length?<>
+                        <label>Kargo seçeneği<select name="delivery_option_id" defaultValue={kargoSecenekleri[0]?.id}>
+                          {kargoSecenekleri.map(secenek=>
+                            /* Değer "id|ad": firma adı createOrder yanıtından
+                               okunamıyor (alan adları sürümden sürüme değişiyor
+                               ve canlıda boş geldi — kart "Etiket üretildi ·
+                               firma belirtilmedi" diyordu). Kullanıcının
+                               EKRANDA GÖRDÜĞÜ ad kayda da o şekilde giriyor. */
+                            <option key={secenek.id} value={`${secenek.id}|${secenek.firmaAdi}`}>
+                              {secenek.firmaAdi}{secenek.teslimTuru?` · ${secenek.teslimTuru}`:""}{secenek.hizmet?` · ${secenek.hizmet}`:""}{secenek.ucretKurus!==null?` · ${money(secenek.ucretKurus,order.currency)}`:" · fiyat yok"}{secenek.tahminiTeslim?` · ${secenek.tahminiTeslim}`:""}
+                            </option>)}
+                        </select></label>
+                        {/* Ağırlık gizli: fiyat zaten bu ağırlıkla soruldu ve
+                            etiket de onunla üretilmeli, yoksa seçilen fiyatla
+                            gerçekleşen fiyat tutmaz. */}
+                        <input type="hidden" name="weight" value={sorgulananAgirlik}/>
+                        <input type="hidden" name="en" value={olcu.enCm}/>
+                        <input type="hidden" name="boy" value={olcu.boyCm}/>
+                        <input type="hidden" name="yuk" value={olcu.yukseklikCm}/>
+                        <button type="submit">Etiket üret</button>
+                      </>:<p className="shipment-error">{kargoFiyatHatasi??"Bu adres için kargo seçeneği dönmedi. Teslimat şehrini ve mağaza ayarlarındaki çıkış şehrini kontrol edin."}</p>}
+                    </form></>:null}
+                  <div className="shipment-actions">
+                    {/* Etiket Tarzyeri'ne gönderilecek olan; kargoya vermenin ön şartı. */}
+                    {gonderi.awb_url?<a href={gonderi.awb_url} target="_blank" rel="noreferrer" className="shipment-awb">Etiketi yazdır ↗</a>:null}
+                    {gonderi.tracking_url?<a href={gonderi.tracking_url} target="_blank" rel="noreferrer">Kargo takip ↗</a>:null}
+                    {/* Kargo firması AWB'yi bazen gecikmeyle üretiyor; ilk
+                        çağrıda adres boş dönerse buradan yeniden sorulabiliyor. */}
+                    {canManage&&gonderi.source==="oto"&&gonderi.status!=="draft"&&gonderi.status!=="cancelled"&&!gonderi.awb_url
+                      ?<form action={etiketiAl}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit">Etiketi al</button></form>
+                      :null}
+                    {/*
+                      ONAY İSTENİYOR: OTO gönderisinde iptal artık OTO'da da
+                      yapılıyor ve etiket geçersizleşiyor. Teslim edilmiş
+                      gönderide düğme hiç görünmüyor — iptal edilecek bir şey
+                      yok, kalemleri yeniden bölünebilir saymak ikinci kez
+                      göndermeye açık bırakırdı.
+                    */}
+                    {/*
+                      TESLİM EDİLDİ. Cron yalnızca tryOTO gönderilerini
+                      izliyor; tedarikçinin kendi gönderdiği paketten OTO
+                      haberdar değil ve o kayıtlar sonsuza kadar "Kargoda"
+                      kalıyordu. Kargo firmalarının takip sayfasını kazımak
+                      denenmedi: bugün Sürat'ın formunun yalnızca POST
+                      kabul ettiğini, MNG'nin alan adının öldüğünü ölçtük;
+                      tahmine dayalı izleme yanlış "teslim edildi" üretir.
+
+                      OTO gönderilerinde de duruyor — cron gecikirse ya da
+                      OTO durumu geç yazarsa elle kapatmak gerekebiliyor.
+                    */}
+                    {canManage&&!["cancelled","delivered"].includes(gonderi.status)&&gonderi.tracking_number?(
+                      <form action={gonderiTeslimEdildi}>
+                        <input type="hidden" name="order_id" value={order.id}/>
+                        <input type="hidden" name="shipment_id" value={gonderi.id}/>
+                        <button type="submit" className="shipment-delivered">Teslim edildi</button>
+                      </form>
+                    ):null}
+
+                    {canManage&&gonderi.status!=="cancelled"&&gonderi.status!=="delivered"?(
+                      <form action={gonderiIptal}>
+                        <input type="hidden" name="order_id" value={order.id}/>
+                        <input type="hidden" name="shipment_id" value={gonderi.id}/>
+                        <ConfirmSubmit message={
+                          gonderi.source==="oto"&&!["draft","failed"].includes(gonderi.status)
+                            ? `${gonderi.sequence}. paket OTO'da da iptal edilecek ve üretilen etiket geçersiz olacak. Kurye alıma geldiyse önce kargo firmasıyla görüşün. Devam edilsin mi?`
+                            : `${gonderi.sequence}. paket iptal edilsin mi? Kalemleri yeniden bölünebilir olur.`
+                        }>İptal et</ConfirmSubmit>
+                      </form>
+                    ):null}
+
+                    {/*
+                      YİNE DE KAPAT. OTO iptali reddettiyse kayıt kilitli
+                      kalıyordu: kalemler "kargoda" sayıldığı için müşteriye
+                      yeniden gönderilemiyordu. Düğme yalnızca o hata
+                      yazılıysa çıkıyor ve sebebi kayda not düşüyor —
+                      sessizce ayrışmak yerine açık bir karar.
+                    */}
+                    {canManage&&gonderi.status!=="cancelled"&&gonderi.failure_reason?.startsWith("OTO iptal etmedi")?(
+                      <form action={gonderiIptal}>
+                        <input type="hidden" name="order_id" value={order.id}/>
+                        <input type="hidden" name="shipment_id" value={gonderi.id}/>
+                        <input type="hidden" name="zorla" value="on"/>
+                        <ConfirmSubmit message={`${gonderi.sequence}. paket OTO'da iptal EDİLMEDİ. Kargo firmasıyla görüşüp paketin durdurulduğundan emin olduysanız bu kaydı kapatabilirsiniz; kalemleri yeniden bölünebilir olur. Devam edilsin mi?`}>Yine de kapat</ConfirmSubmit>
+                      </form>
+                    ):null}
+                  </div>
+                </li>)}
+            </ul>:null}
+
+            {/*
+              İPTAL EDİLENLER KATLANIYOR ve TEK SATIRA İNİYOR.
+
+              İptal edilmiş gönderide taslak formu, fiyat alanı ve etiket
+              düğmesi anlamsız; yine de tam kart çiziliyordu. Bu siparişte on
+              iptal kaydı 1.218px yer kaplıyordu — sayfanın dörtte biri
+              (canlıda ölçüldü, 27.09.2026). Kayıtlar SİLİNMİYOR: hangi
+              denemenin neden düştüğü sorusunun cevabı onlarda.
+            */}
+            {iptalGonderiler.length?(
+              <details className="shipment-cancelled">
+                <summary>{iptalGonderiler.length} iptal edilen gönderi</summary>
+                <ul>
+                  {iptalGonderiler.map(gonderi=>
+                    <li key={gonderi.id}>
+                      <b>{gonderi.sequence}. paket{gonderi.supplier?` · ${gonderi.supplier}`:""}</b>
+                      {gonderi.tracking_number?<span>{gonderi.tracking_number}</span>:null}
+                      {gonderi.failure_reason?<small>{gonderi.failure_reason}</small>:null}
+                    </li>
+                  )}
+                </ul>
+              </details>
+            ):null}
+
+            {/*
+              Yeni gönderi TEDARİKÇİYE GÖRE öneriliyor: aynı depodan çıkanlar
+              bir pakette. Tamamı kargoya verilmiş tedarikçi burada hiç
+              görünmüyor.
+            */}
+            {canManage&&gruplar.length?<div className="shipment-new">
+              {gruplar.map(grup=>
+                <form key={grup.tedarikci??"belirsiz"} action={elleGonderiEkle} className="shipment-form">
                   <input type="hidden" name="order_id" value={order.id}/>
-                  <input type="hidden" name="shipment_id" value={gonderi.id}/>
-                  {kargoSecenekleri.length?<>
-                    <label>Kargo seçeneği<select name="delivery_option_id" defaultValue={kargoSecenekleri[0]?.id}>
-                      {kargoSecenekleri.map(secenek=>
-                        /* Değer "id|ad": firma adı createOrder yanıtından
-                           okunamıyor (alan adları sürümden sürüme değişiyor
-                           ve canlıda boş geldi — kart "Etiket üretildi ·
-                           firma belirtilmedi" diyordu). Kullanıcının
-                           EKRANDA GÖRDÜĞÜ ad kayda da o şekilde giriyor. */
-                        <option key={secenek.id} value={`${secenek.id}|${secenek.firmaAdi}`}>
-                          {secenek.firmaAdi}{secenek.teslimTuru?` · ${secenek.teslimTuru}`:""}{secenek.hizmet?` · ${secenek.hizmet}`:""}{secenek.ucretKurus!==null?` · ${money(secenek.ucretKurus,order.currency)}`:" · fiyat yok"}{secenek.tahminiTeslim?` · ${secenek.tahminiTeslim}`:""}
-                        </option>)}
+                  <input type="hidden" name="supplier" value={grup.tedarikci??""}/>
+                  <h4>{grup.tedarikci??"Tedarikçisi belirsiz"}<small>{grup.toplamAdet} ürün kargoya verilmedi</small></h4>
+                  <div className="shipment-item-picks">
+                    {grup.kalemler.map(kalem=>
+                      <label key={kalem.id}>
+                        <span>{kalem.ad}</span>
+                        <input type="number" name={`kalem_${kalem.id}`} min={0} max={kalem.kalan} defaultValue={kalem.kalan}/>
+                        <em>/ {kalem.kalan}</em>
+                      </label>)}
+                  </div>
+                  <div className="shipment-form-fields">
+                    <label>Kargo firması<select name="carrier_code" defaultValue="">
+                      <option value="" disabled>Seçin</option>
+                      {KARGO_FIRMALARI.map(firma=><option key={firma.kod} value={firma.kod}>{firma.ad}</option>)}
                     </select></label>
-                    {/* Ağırlık gizli: fiyat zaten bu ağırlıkla soruldu ve
-                        etiket de onunla üretilmeli, yoksa seçilen fiyatla
-                        gerçekleşen fiyat tutmaz. */}
-                    <input type="hidden" name="weight" value={sorgulananAgirlik}/>
-                    <input type="hidden" name="en" value={olcu.enCm}/>
-                    <input type="hidden" name="boy" value={olcu.boyCm}/>
-                    <input type="hidden" name="yuk" value={olcu.yukseklikCm}/>
-                    <button type="submit">Etiket üret</button>
-                  </>:<p className="shipment-error">{kargoFiyatHatasi??"Bu adres için kargo seçeneği dönmedi. Teslimat şehrini ve mağaza ayarlarındaki çıkış şehrini kontrol edin."}</p>}
-                </form></>:null}
-              <div className="shipment-actions">
-                {/* Etiket Tarzyeri'ne gönderilecek olan; kargoya vermenin ön şartı. */}
-                {gonderi.awb_url?<a href={gonderi.awb_url} target="_blank" rel="noreferrer" className="shipment-awb">Etiketi yazdır ↗</a>:null}
-                {gonderi.tracking_url?<a href={gonderi.tracking_url} target="_blank" rel="noreferrer">Kargo takip ↗</a>:null}
-                {/* Kargo firması AWB'yi bazen gecikmeyle üretiyor; ilk
-                    çağrıda adres boş dönerse buradan yeniden sorulabiliyor. */}
-                {canManage&&gonderi.source==="oto"&&gonderi.status!=="draft"&&gonderi.status!=="cancelled"&&!gonderi.awb_url
-                  ?<form action={etiketiAl}><input type="hidden" name="order_id" value={order.id}/><input type="hidden" name="shipment_id" value={gonderi.id}/><button type="submit">Etiketi al</button></form>
-                  :null}
-                {/*
-                  ONAY İSTENİYOR: OTO gönderisinde iptal artık OTO'da da
-                  yapılıyor ve etiket geçersizleşiyor. Teslim edilmiş
-                  gönderide düğme hiç görünmüyor — iptal edilecek bir şey
-                  yok, kalemleri yeniden bölünebilir saymak ikinci kez
-                  göndermeye açık bırakırdı.
-                */}
-                {/*
-                  TESLİM EDİLDİ. Cron yalnızca tryOTO gönderilerini
-                  izliyor; tedarikçinin kendi gönderdiği paketten OTO
-                  haberdar değil ve o kayıtlar sonsuza kadar "Kargoda"
-                  kalıyordu. Kargo firmalarının takip sayfasını kazımak
-                  denenmedi: bugün Sürat'ın formunun yalnızca POST
-                  kabul ettiğini, MNG'nin alan adının öldüğünü ölçtük;
-                  tahmine dayalı izleme yanlış "teslim edildi" üretir.
+                    <label>Takip numarası<input name="tracking_number" placeholder="Tedarikçiden gelen numara" autoComplete="off"/></label>
+                    <label className="wide">Takip adresi (isteğe bağlı)<input name="tracking_url" placeholder="Boş bırakılırsa firmanın sorgu sayfası kullanılır" autoComplete="off"/></label>
+                  </div>
+                  {/*
+                    İki çalışma biçimi aynı formda, iki ayrı düğmeyle:
+                    tedarikçi kendi gönderdiyse takip numarası giriliyor,
+                    etiketi biz üretiyorsak yukarıdaki alanlar boş bırakılıp
+                    tryOTO'ya gidiliyor. Ayrı formlar aynı kalem seçimini iki
+                    kez yaptırırdı.
+                  */}
+                  <div className="shipment-submit">
+                    <button type="submit">Takip numarasıyla kaydet</button>
+                    <button type="submit" formAction={otoTaslakOlustur} className="ghost">tryOTO ile etiket üret →</button>
+                  </div>
+                </form>)}
+            </div>:canManage?<p className="list-hint">Siparişteki bütün ürünler kargoya verilmiş.</p>:null}
+          </section>
+        </section>
 
-                  OTO gönderilerinde de duruyor — cron gecikirse ya da
-                  OTO durumu geç yazarsa elle kapatmak gerekebiliyor.
-                */}
-                {canManage&&!["cancelled","delivered"].includes(gonderi.status)&&gonderi.tracking_number?(
-                  <form action={gonderiTeslimEdildi}>
-                    <input type="hidden" name="order_id" value={order.id}/>
-                    <input type="hidden" name="shipment_id" value={gonderi.id}/>
-                    <button type="submit" className="shipment-delivered">Teslim edildi</button>
-                  </form>
-                ):null}
-
-                {canManage&&gonderi.status!=="cancelled"&&gonderi.status!=="delivered"?(
-                  <form action={gonderiIptal}>
-                    <input type="hidden" name="order_id" value={order.id}/>
-                    <input type="hidden" name="shipment_id" value={gonderi.id}/>
-                    <ConfirmSubmit message={
-                      gonderi.source==="oto"&&!["draft","failed"].includes(gonderi.status)
-                        ? `${gonderi.sequence}. paket OTO'da da iptal edilecek ve üretilen etiket geçersiz olacak. Kurye alıma geldiyse önce kargo firmasıyla görüşün. Devam edilsin mi?`
-                        : `${gonderi.sequence}. paket iptal edilsin mi? Kalemleri yeniden bölünebilir olur.`
-                    }>İptal et</ConfirmSubmit>
-                  </form>
-                ):null}
-
-                {/*
-                  YİNE DE KAPAT. OTO iptali reddettiyse kayıt kilitli
-                  kalıyordu: kalemler "kargoda" sayıldığı için müşteriye
-                  yeniden gönderilemiyordu. Düğme yalnızca o hata
-                  yazılıysa çıkıyor ve sebebi kayda not düşüyor —
-                  sessizce ayrışmak yerine açık bir karar.
-                */}
-                {canManage&&gonderi.status!=="cancelled"&&gonderi.failure_reason?.startsWith("OTO iptal etmedi")?(
-                  <form action={gonderiIptal}>
-                    <input type="hidden" name="order_id" value={order.id}/>
-                    <input type="hidden" name="shipment_id" value={gonderi.id}/>
-                    <input type="hidden" name="zorla" value="on"/>
-                    <ConfirmSubmit message={`${gonderi.sequence}. paket OTO'da iptal EDİLMEDİ. Kargo firmasıyla görüşüp paketin durdurulduğundan emin olduysanız bu kaydı kapatabilirsiniz; kalemleri yeniden bölünebilir olur. Devam edilsin mi?`}>Yine de kapat</ConfirmSubmit>
-                  </form>
-                ):null}
-              </div>
-            </li>)}
-        </ul>:null}
-
-        {/*
-          İPTAL EDİLENLER KATLANIYOR ve TEK SATIRA İNİYOR.
-
-          İptal edilmiş gönderide taslak formu, fiyat alanı ve etiket
-          düğmesi anlamsız; yine de tam kart çiziliyordu. Bu siparişte on
-          iptal kaydı 1.218px yer kaplıyordu — sayfanın dörtte biri
-          (canlıda ölçüldü, 27.09.2026). Kayıtlar SİLİNMİYOR: hangi
-          denemenin neden düştüğü sorusunun cevabı onlarda.
-        */}
-        {iptalGonderiler.length?(
-          <details className="shipment-cancelled">
-            <summary>{iptalGonderiler.length} iptal edilen gönderi</summary>
-            <ul>
-              {iptalGonderiler.map(gonderi=>
-                <li key={gonderi.id}>
-                  <b>{gonderi.sequence}. paket{gonderi.supplier?` · ${gonderi.supplier}`:""}</b>
-                  {gonderi.tracking_number?<span>{gonderi.tracking_number}</span>:null}
-                  {gonderi.failure_reason?<small>{gonderi.failure_reason}</small>:null}
+        {/* Sağ sütun: ArvoOS'taki sekmeli akış (TalepAkis). */}
+        <TalepAkis sekmeler={sekmeler} baslangic={ilkSekme}>
+          <div className="siparis-sekme">
+            <ol className="order-timeline">
+              {timeline.map(item=>(
+                <li key={item.id}>
+                  <span className="order-timeline-dot" data-kind={item.kind}/>
+                  <div><b>{item.title}</b><small>{item.detail}{item.by?` · ${item.by}`:""}</small></div>
+                  <time dateTime={item.at}>{shortDate.format(new Date(item.at))}</time>
                 </li>
-              )}
-            </ul>
-          </details>
-        ):null}
-
-        {/*
-          Yeni gönderi TEDARİKÇİYE GÖRE öneriliyor: aynı depodan çıkanlar
-          bir pakette. Tamamı kargoya verilmiş tedarikçi burada hiç
-          görünmüyor.
-        */}
-        {canManage&&gruplar.length?<div className="shipment-new">
-          {gruplar.map(grup=>
-            <form key={grup.tedarikci??"belirsiz"} action={elleGonderiEkle} className="shipment-form">
-              <input type="hidden" name="order_id" value={order.id}/>
-              <input type="hidden" name="supplier" value={grup.tedarikci??""}/>
-              <h4>{grup.tedarikci??"Tedarikçisi belirsiz"}<small>{grup.toplamAdet} ürün kargoya verilmedi</small></h4>
-              <div className="shipment-item-picks">
-                {grup.kalemler.map(kalem=>
-                  <label key={kalem.id}>
-                    <span>{kalem.ad}</span>
-                    <input type="number" name={`kalem_${kalem.id}`} min={0} max={kalem.kalan} defaultValue={kalem.kalan}/>
-                    <em>/ {kalem.kalan}</em>
-                  </label>)}
-              </div>
-              <div className="shipment-form-fields">
-                <label>Kargo firması<select name="carrier_code" defaultValue="">
-                  <option value="" disabled>Seçin</option>
-                  {KARGO_FIRMALARI.map(firma=><option key={firma.kod} value={firma.kod}>{firma.ad}</option>)}
-                </select></label>
-                <label>Takip numarası<input name="tracking_number" placeholder="Tedarikçiden gelen numara" autoComplete="off"/></label>
-                <label className="wide">Takip adresi (isteğe bağlı)<input name="tracking_url" placeholder="Boş bırakılırsa firmanın sorgu sayfası kullanılır" autoComplete="off"/></label>
-              </div>
-              {/*
-                İki çalışma biçimi aynı formda, iki ayrı düğmeyle:
-                tedarikçi kendi gönderdiyse takip numarası giriliyor,
-                etiketi biz üretiyorsak yukarıdaki alanlar boş bırakılıp
-                tryOTO'ya gidiliyor. Ayrı formlar aynı kalem seçimini iki
-                kez yaptırırdı.
-              */}
-              <div className="shipment-submit">
-                <button type="submit">Takip numarasıyla kaydet</button>
-                <button type="submit" formAction={otoTaslakOlustur} className="ghost">tryOTO ile etiket üret →</button>
-              </div>
-            </form>)}
-        </div>:canManage?<p className="list-hint">Siparişteki bütün ürünler kargoya verilmiş.</p>:null}
-      </section>
-
-      {pencere==="durum"?(
-        <Pencere key="durum" ust={order.order_number} baslik="Durum ve operasyon notu" kapatAdresi={adres} genis={false}>
-          <section className="siparis-pencere-bolum">
-            <h3>Sipariş durumu</h3>
-          {canManage?(
-            <form action={updateOrderStatus} className="order-form-grid">
-              <input type="hidden" name="order_id" value={order.id}/>
-              <label>Sipariş durumu<select name="status" defaultValue={order.status} className="ac-input">{orderStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-              <label>Ödeme durumu<select name="payment_status" defaultValue={order.payment_status} className="ac-input">{paymentStatusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-              <p className="list-hint">Ödeme durumu normalde PayTR bildirimiyle güncellenir; elle değiştirmek muhasebe kayıtlarıyla uyumsuzluk yaratabilir.</p>
-              <button className="ac-btn ac-btn-primary" type="submit">Durumu kaydet</button>
-            </form>
-          ):<p className="list-hint">{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</p>}
-          </section>
-          <section className="siparis-pencere-bolum">
-        {/*
-          ESKİ TEK NUMARALI KARGO ALANI.
-
-          Gönderi kaydı varken bu alanlar YANILTICI: takip numarası artık
-          paket başına tutuluyor (Gönderiler bölümü) ve buraya yazılan
-          tek numara siparişin tamamını temsil etmiyor. İki ayrı yerde
-          takip numarası tutmak, hangisinin müşteriye gittiğini de
-          belirsiz yapıyordu.
-
-          Bu yüzden gönderi varken yalnızca DAHİLİ NOT kalıyor; takip
-          alanları gönderisi olmayan siparişler için duruyor.
-        */}
-          <div className="ac-head"><div><h3>{gonderiler.length?"Operasyon notu":"Kargo ve operasyon"}</h3><p>{gonderiler.length?"Takip numaraları Gönderiler bölümünde, paket başına tutuluyor.":"Takip numarası girildiğinde müşteriye e-posta gider."}</p></div></div>
-          {canManage?(
-            <form action={updateFulfillmentDetails} className="order-form-grid">
-              <input type="hidden" name="order_id" value={order.id}/>
-              {gonderiler.length?(
-                <>
-                  {/* Var olan değerler korunuyor: alan gizlendiği için
-                      boş gönderilirse kayıtlı numara silinirdi. */}
-                  <input type="hidden" name="shipping_carrier" value={meta.shipping_carrier??""}/>
-                  <input type="hidden" name="tracking_number" value={meta.tracking_number??""}/>
-                  <input type="hidden" name="tracking_url" value={meta.tracking_url??""}/>
-                </>
-              ):(
-                <>
-                  <label>Kargo firması<input name="shipping_carrier" defaultValue={meta.shipping_carrier??""} maxLength={100} className="ac-input"/></label>
-                  <label>Takip numarası<input name="tracking_number" defaultValue={meta.tracking_number??""} maxLength={160} className="ac-input"/></label>
-                  <label>Takip bağlantısı<input name="tracking_url" type="url" defaultValue={meta.tracking_url??""} placeholder="https://..." className="ac-input"/></label>
-                </>
-              )}
-              <label>İç operasyon notu<textarea name="internal_note" defaultValue={meta.internal_note??""} maxLength={1000} rows={3} className="ac-input"/></label>
-              <button className="ac-btn ac-btn-primary" type="submit">{gonderiler.length?"Notu kaydet":"Kargo bilgilerini kaydet"}</button>
-            </form>
-          ):<p className="list-hint">{meta.shipping_carrier||"Kargo firması yok"} · {meta.tracking_number||"Takip numarası yok"}</p>}
-          {meta.tracking_url&&!gonderiler.length?<p className="order-track"><a className="ac-btn" href={meta.tracking_url} target="_blank" rel="noreferrer"><Icon name="external" size={16}/>Kargo takibini aç</a></p>:null}
-          </section>
-        </Pencere>
-      ):null}
-
-      {pencere==="iade"?(
-        <Pencere key="iade" ust={order.order_number} baslik="İade" kapatAdresi={adres} genis={false}>
-          <p className="siparis-pencere-alt">
-            Tutar PayTR üzerinden müşterinin kartına iade edilir.
-            {refundedSoFar>0?<> Daha önce <strong>{money(refundedSoFar,order.currency)}</strong> iade edildi.</>:null}
-          </p>
-          <form action={refundOrder} className="order-form-grid is-narrow">
-            <input type="hidden" name="order_id" value={order.id}/>
-            <label>
-              İade tutarı (₺)
-              <input name="amount" type="text" inputMode="decimal" autoComplete="off" placeholder={`${refundedSoFar>0?"Kalanın tamamı":"Tamamı"}: ${money(refundable,order.currency)}`} className="ac-input"/>
-            </label>
-            <p className="list-hint">
-              Boş bırakırsanız {refundedSoFar>0?"kalan tutarın":"siparişin"} tamamı iade edilir ve sipariş kapanır. Bu işlem geri
-              alınamaz.
-              {/* Kısmi iadede sipariş kapanmaz: kalan ürünler gönderilebilir. */}
-              {order.status!=="fulfilled"?" Kısmi iadede sipariş açık kalır; kalan ürünler hazırlanıp kargoya verilebilir.":""}
-              {" "}Müşteriye iade tutarını bildiren e-posta gider.
+              ))}
+            </ol>
+          </div>
+          <div className="siparis-sekme">
+            <p className="siparis-pencere-alt">{gonderiler.length?"Takip numaraları Gönderiler bölümünde, paket başına tutuluyor.":"Takip numarası girildiğinde müşteriye e-posta gider."}</p>
+            {canManage?(
+              <form action={updateFulfillmentDetails} className="order-form-grid">
+                <input type="hidden" name="order_id" value={order.id}/>
+                {gonderiler.length?(
+                  <>
+                    {/* Var olan değerler korunuyor: alan gizlendiği için
+                        boş gönderilirse kayıtlı numara silinirdi. */}
+                    <input type="hidden" name="shipping_carrier" value={meta.shipping_carrier??""}/>
+                    <input type="hidden" name="tracking_number" value={meta.tracking_number??""}/>
+                    <input type="hidden" name="tracking_url" value={meta.tracking_url??""}/>
+                  </>
+                ):(
+                  <>
+                    <label>Kargo firması<input name="shipping_carrier" defaultValue={meta.shipping_carrier??""} maxLength={100} className="ac-input"/></label>
+                    <label>Takip numarası<input name="tracking_number" defaultValue={meta.tracking_number??""} maxLength={160} className="ac-input"/></label>
+                    <label>Takip bağlantısı<input name="tracking_url" type="url" defaultValue={meta.tracking_url??""} placeholder="https://..." className="ac-input"/></label>
+                  </>
+                )}
+                <label>İç operasyon notu<textarea name="internal_note" defaultValue={meta.internal_note??""} maxLength={1000} rows={3} className="ac-input"/></label>
+                <button className="ac-btn ac-btn-primary" type="submit">{gonderiler.length?"Notu kaydet":"Kargo bilgilerini kaydet"}</button>
+              </form>
+            ):<p className="list-hint">{meta.shipping_carrier||"Kargo firması yok"} · {meta.tracking_number||"Takip numarası yok"}</p>}
+            {meta.tracking_url&&!gonderiler.length?<p className="order-track"><a className="ac-btn" href={meta.tracking_url} target="_blank" rel="noreferrer"><Icon name="external" size={16}/>Kargo takibini aç</a></p>:null}
+          </div>
+          {iadeAcik?(
+            <div className="siparis-sekme">
+            <p className="siparis-pencere-alt">
+              Tutar PayTR üzerinden müşterinin kartına iade edilir.
+              {refundedSoFar>0?<> Daha önce <strong>{money(refundedSoFar,order.currency)}</strong> iade edildi.</>:null}
             </p>
-            <button className="ac-btn ac-btn-danger" type="submit">İadeyi başlat</button>
-          </form>
-        </Pencere>
-      ):null}
-
-      {pencere==="gecmis"?(
-        <Pencere key="gecmis" ust={order.order_number} baslik="İşlem geçmişi" kapatAdresi={adres} genis={false}>
-        <ol className="order-timeline">
-          {timeline.map(item=>(
-            <li key={item.id}>
-              <span className="order-timeline-dot" data-kind={item.kind}/>
-              <div><b>{item.title}</b><small>{item.detail}{item.by?` · ${item.by}`:""}</small></div>
-              <time dateTime={item.at}>{shortDate.format(new Date(item.at))}</time>
-            </li>
-          ))}
-        </ol>
-        </Pencere>
-      ):null}
+            <form action={refundOrder} className="order-form-grid is-narrow">
+              <input type="hidden" name="order_id" value={order.id}/>
+              <label>
+                İade tutarı (₺)
+                <input name="amount" type="text" inputMode="decimal" autoComplete="off" placeholder={`${refundedSoFar>0?"Kalanın tamamı":"Tamamı"}: ${money(refundable,order.currency)}`} className="ac-input"/>
+              </label>
+              <p className="list-hint">
+                Boş bırakırsanız {refundedSoFar>0?"kalan tutarın":"siparişin"} tamamı iade edilir ve sipariş kapanır. Bu işlem geri
+                alınamaz.
+                {/* Kısmi iadede sipariş kapanmaz: kalan ürünler gönderilebilir. */}
+                {order.status!=="fulfilled"?" Kısmi iadede sipariş açık kalır; kalan ürünler hazırlanıp kargoya verilebilir.":""}
+                {" "}Müşteriye iade tutarını bildiren e-posta gider.
+              </p>
+              <button className="ac-btn ac-btn-danger" type="submit">İadeyi başlat</button>
+            </form>
+            </div>
+          ):null}
+        </TalepAkis>
+      </div>
     </main>
   );
 }
