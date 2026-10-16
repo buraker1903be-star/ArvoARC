@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { kimlikMi } from "@/lib/kimlik";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
@@ -32,6 +33,10 @@ type Meta={
 
 export default async function ProductDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{medya?:string;pencere?:string}>}){
   const {id}=await params; const sp=await searchParams; const {medya}=sp; const {supabase,organization,membership}=await requireTenant();
+  /* Bozuk/kırpılmış kimlik "kayıt yok"tur: Postgres uuid olmayan değeri
+     22P02 ile reddediyor ve sayfa okuma hatasını fırlattığı için çökme
+     ekranı çıkıyordu (lib/kimlik). */
+  if (!kimlikMi(id)) notFound();
   const [{data:product,error},{data:variants,error:variantError},{data:settings}]=await Promise.all([
     supabase.from("arc_products").select("id,name,slug,description,status,source,metadata,created_at,publish_at,unpublish_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
     supabase.from("arc_product_variants").select("id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price,image_path").eq("organization_id",organization.id).eq("product_id",id).order("title"),

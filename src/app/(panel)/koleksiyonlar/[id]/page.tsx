@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { kimlikMi } from "@/lib/kimlik";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
@@ -25,6 +26,10 @@ function PickerRow({product,checked}:{product:ProductRow;checked:boolean}){
 
 export default async function CollectionDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{q?:string}>}){
   const {id}=await params;const query=await searchParams;
+  /* Bozuk/kırpılmış kimlik "kayıt yok"tur: Postgres uuid olmayan değeri
+     22P02 ile reddediyor ve sayfa okuma hatasını fırlattığı için çökme
+     ekranı çıkıyordu (lib/kimlik). */
+  if (!kimlikMi(id)) notFound();
   const {supabase,organization,membership}=await requireTenant();
   const search=(query.q??"").replace(/[,()*\\"%_]/g," ").trim().slice(0,80);
 

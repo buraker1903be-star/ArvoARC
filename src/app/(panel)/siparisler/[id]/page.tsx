@@ -1,4 +1,5 @@
 import { gonderiDurumEtiketi, kargoGorunumu, tedarikciGruplari } from "@/lib/kargo-bolme";
+import { kimlikMi } from "@/lib/kimlik";
 import { KARGO_FIRMALARI } from "@/lib/kargo-firmalari";
 import { elleGonderiEkle, etiketiAl, gonderiIptal, gonderiTeslimEdildi, kargoDurumlariniGuncelle, otoEtiketUret, otoTaslakOlustur } from "./gonderi-actions";
 import { teslimatSecenekleri } from "@/lib/tryoto/ayar";
@@ -54,6 +55,10 @@ function AdresBolumu({baslik,adres}:{baslik:string;adres?:Address}){
 
 export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{agirlik?:string;en?:string;boy?:string;yuk?:string;pencere?:string}>}){
   const {id}=await params;const query=await searchParams;
+  /* Bozuk/kırpılmış kimlik "kayıt yok"tur: Postgres uuid olmayan değeri
+     22P02 ile reddediyor ve sayfa okuma hatasını fırlattığı için çökme
+     ekranı çıkıyordu (lib/kimlik). */
+  if (!kimlikMi(id)) notFound();
   const {supabase,organization,membership}=await requireTenant();
   const [{data:order,error},{data:items,error:itemsError},{data:events,error:eventsError},{data:shipments}]=await Promise.all([
     supabase.from("arc_orders").select("id,order_number,source,status,payment_status,customer_name,customer_email,currency,subtotal,tax,shipping,total,metadata,created_at,updated_at,archived_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
