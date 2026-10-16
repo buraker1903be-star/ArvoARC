@@ -205,6 +205,12 @@ describe("sipariş düzenleme · arc_siparis_kalemi_duzenle", () => {
       /* Mal 2000 → indirim 60, toplam 2000 − 60 + 500. */
       assert.equal(Number(s.metadata.transfer_discount), 60);
       assert.equal(Number(s.total), 2440);
+      /*
+        KDV havale indirimini de düşüyor (20261016122046). Kalem 2000 (%20
+        varsayılan → 333), kargo 500 (→ 83) = 416; indirim 60 / brüt 2500
+        → 416 × 0,976 = 406. Eskiden indirim düşülmüyordu: 416.
+      */
+      assert.equal(Number(s.tax), 406);
     }));
 
   test("son kalem kaldırılamıyor, gönderideki kalem düzenlenemiyor, stok yetmezse reddediliyor", () =>

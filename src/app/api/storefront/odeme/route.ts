@@ -446,7 +446,9 @@ export async function POST(request: Request) {
         transfer_discount_percent: discountPercent,
         ...(note ? { notes: note } : {}),
       },
-      { total: transferTotal, payment_status: "pending", status: "pending" },
+      /* tax: 0 → KDV tetikleyicisi (arc_fill_order_tax) indirimli tutardan yeniden hesaplıyor.
+         Yazılmasa KDV indirimsiz tutarın vergisi olarak kalıyordu (20261016122046). */
+      { total: transferTotal, tax: 0, payment_status: "pending", status: "pending" },
     );
 
     /* Güncelleme olmadıysa indirim uygulanmadı; vitrine gerçek tutar döner. */
