@@ -36,6 +36,16 @@ const KAYNAK = path.join(kok, "src");
 const PALET = "src/app/(panel)/panel-tokens.css";
 /** Vitrin ve giriş ekranı panel jetonlarını kullanmıyor. */
 const PANEL_DISI = ["src/app/globals.css", "src/app/login/login.css"];
+/*
+  ArvoOS'TAN KOPYA KABUK (16.10.2026). Bu dizinlerdeki dosyalar
+  ArvoOS/app/panel'in birebir kopyası (her dosyanın başında kaynak
+  yazılı) ve kendi paletleri os-tokens.css. Sabit renk ve yarıçap
+  kuralları burada UYGULANMIYOR: ArvoOS kendi deposunda denetliyor,
+  burada tek tek düzeltmek iki kopyayı ayrıştırır ve sonraki
+  güncellemeyi bir birleştirme işine çevirir. Parantez dengesi (asıl
+  sessiz kayıp) her dosyada denetlenmeye devam ediyor.
+*/
+const ARVOOS_KOPYASI = ["src/components/os/", "src/components/arvo-ui/"];
 
 function cssDosyalari(dizin) {
   const cikti = [];
@@ -58,7 +68,8 @@ function yorumsuz(metin) {
 const sorunlar = [];
 
 for (const tam of cssDosyalari(KAYNAK)) {
-  const göreli = path.relative(kok, tam);
+  /* Windows'ta yol ters bölüyle geliyor; muaf listeleri düz bölüyle yazılı ve hiç eşleşmiyordu. */
+  const göreli = path.relative(kok, tam).replaceAll("\\", "/");
   const ham = fs.readFileSync(tam, "utf8");
   const gövde = yorumsuz(ham);
 
@@ -98,7 +109,8 @@ for (const tam of cssDosyalari(KAYNAK)) {
     Alfası olan beyaz (#fff9 gibi) muaf değil: rgb(255 255 255/.6)
     yazmak hem okunur hem denetimden geçer.
   */
-  if (göreli !== PALET && !PANEL_DISI.includes(göreli)) {
+  const kopya = ARVOOS_KOPYASI.some((onek) => göreli.startsWith(onek));
+  if (göreli !== PALET && !PANEL_DISI.includes(göreli) && !kopya) {
     const hexler = [...gövde.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].filter(
       (m) => !/^#(fff|ffffff)$/i.test(m[0]),
     );

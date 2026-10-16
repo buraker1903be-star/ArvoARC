@@ -6,7 +6,7 @@
   Sözleşme ArvoOS/app/panel/os/os-apps.ts'in kopyası: dock, ikinci dock
   (bölümler), başlatıcı, durum çubuğundaki uygulama adı, Ctrl+K ve
   telefondaki bölüm şeridi aynı listeden besleniyor. Eskiden ArvoARC'ın
-  sol menüsü (components/panel/nav-config.ts) ayrı, komut paleti ayrı,
+  sol menüsü (eski components/panel/nav-config.ts) ayrı, komut paleti ayrı,
   mobil menü ayrı bir listeydi; biri güncellenince öteki unutuluyordu.
 
   Fark: ArvoARC'ın kökü "/" (ArvoOS'unki "/panel").
