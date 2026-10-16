@@ -25,7 +25,8 @@ function dosyalar(dizin: string, uzanti: string[]): string[] {
   return sonuc;
 }
 
-const kisa = (yol: string) => path.relative(process.cwd(), yol);
+/* Windows'ta yol ters bölüyle geliyor; MUAF listesi düz bölüyle yazılı ve hiç eşleşmiyordu (test bu yüzden yalnızca Windows'ta kırıktı). */
+const kisa = (yol: string) => path.relative(process.cwd(), yol).replaceAll("\\", "/");
 
 test("hiçbir sayfa adresten işlem sonucu okumuyor", () => {
   /*

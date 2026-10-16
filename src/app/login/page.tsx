@@ -16,13 +16,14 @@ const messages: Record<string, string> = {
   "organization-inactive": "Organizasyon aktif değil.",
   "commerce-disabled": "ArvoARC erişimi bu organizasyon için aktif değil.",
   "license-inactive": "ArvoARC aboneliğiniz sona ermiş ya da askıya alınmış. Verileriniz duruyor; abonelik yenilenince kaldığınız yerden devam edersiniz.",
-  "server-error": "Giriş servisine ulaşılamadı. Sistem yöneticisi yapılandırmayı kontrol etmelidir.",
+  "server-error": "Giriş servisine şu an ulaşılamıyor. Şifreniz doğru olabilir; birkaç dakika sonra tekrar deneyin.",
+  "too-many": "Çok fazla deneme yapıldı. Birkaç dakika bekleyip tekrar deneyin.",
 };
 
 /*
-  Giriş ekranı ArvoOS ile aynı dilde: solda gece mavisi marka
-  paneli, sağda altın vurgulu form kartı. Panel ve giriş aynı
-  ürünün parçası gibi görünsün.
+  Giriş ekranı ArvoOS'unkiyle aynı (16.10.2026): tek sayfa, ortada kart,
+  üstte logo, yasal unvan altta bir kez (login.css). Marka bölümündeki
+  slogan stilde gizli; yapı ArvoOS sayfasıyla aynı kalsın diye duruyor.
 */
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
@@ -42,13 +43,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <section className="login-form-wrap">
         <form action={login} className="login-card">
           <span>GÜVENLİ PANEL GİRİŞİ</span>
-          <h2>Operasyon merkezine hoş geldiniz</h2>
+          <h2>Mağaza paneline hoş geldiniz</h2>
           <p>ArvoOS hesabınızla güvenli biçimde devam edin.</p>
           {error ? <div className="login-error" role="alert">{messages[error] ?? "Oturum açılamadı."}</div> : null}
           <label>E-posta adresi<input name="email" type="email" autoComplete="email" required placeholder="adiniz@kurum.com" /></label>
           <label>Parola<input name="password" type="password" autoComplete="current-password" required placeholder="••••••••" /></label>
-          <button type="submit">Giriş yap <b>→</b></button>
-          <small><Link href="/sifre">Şifremi unuttum / ilk şifremi belirleyeceğim</Link></small>
+          <button type="submit">Giriş Yap <b>→</b></button>
+          <Link href="/sifre">Şifremi unuttum / ilk şifremi belirleyeceğim</Link>
+          <a href="mailto:info@arvo-os.com?subject=ArvoARC%20erişim%20desteği">Erişim desteği alın</a>
           <small>Hesaplar ArvoOS kurum yöneticisi tarafından oluşturulur. Açık üyelik bulunmaz.</small>
         </form>
       </section>

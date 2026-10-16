@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { girisHataKodu } from "@/lib/giris-hatasi";
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -15,7 +16,8 @@ export async function login(formData: FormData) {
 
     if (error || !data.user || !data.session) {
       console.error("ARC_LOGIN_AUTH_ERROR", error?.message ?? "No session returned");
-      redirect("/login?error=invalid-credentials");
+      /* Ağ hatası ve hız sınırı "şifre hatalı" değil (lib/giris-hatasi). */
+      redirect(`/login?error=${girisHataKodu(error)}`);
     }
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
