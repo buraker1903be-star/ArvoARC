@@ -14,6 +14,7 @@ import { OsAramaDugmesi, OsKomutPaleti } from "@/components/os/os-command-palett
 import { OsKullaniciMenusu } from "@/components/os/os-user-menu";
 import { OsMenuKapat } from "@/components/os/os-menu-kapat";
 import { GlobalActionFeedback } from "@/components/os/global-action-feedback";
+import { FlashToast } from "@/components/os/flash-toast";
 import { activityUnread } from "./activity-actions";
 import "./panel-tokens.css";
 import "@/components/os/os-tokens.css";
@@ -21,6 +22,7 @@ import "./design.css";
 import "./panel.css";
 import "./dashboard.css";
 import "./activity.css";
+import "@/components/os/os-motion.css";
 import "@/components/os/os-shell.css";
 // Telefonda uygulama gibi: yalnızca ≤760px kuralları (masaüstüne dokunmaz).
 import "@/components/os/mobil-uygulama.css";
@@ -80,6 +82,7 @@ export default async function PanelLayout({ children }: Readonly<{ children: Rea
         <SkipLink />
         <NavProgress />
         <GlobalActionFeedback />
+        <FlashToast />
         <header className="os-bar">
           {/* Telefonda alt sayfalarda geri (ana ekrana eklenen uygulamada tarayıcının geri tuşu yok). */}
           <OsGeri uygulamalar={uygulamalar} />
