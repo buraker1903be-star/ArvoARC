@@ -1,9 +1,29 @@
 import { requireTenant } from "@/lib/tenant";
 import { ALT_ALAN_SONEKI, altAlanAdresi, magazaAdresi } from "@/lib/magaza-adresi";
-import { PanelBildirimi } from "@/components/panel/bildirim";
 import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
 import { baglantiyiSina } from "@/lib/tryoto/ayar";
+import Link from "next/link";
+// Ayar formlarının iç biçimi (settings-*, payment-*, domain-*) hâlâ eski dosyalarda.
 import "../catalog.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./ayarlar.css";
+
+/*
+  BÖLÜMLER (16.10.2026, ArvoOS'taki gibi). Ayarlar tek uzun sayfaydı:
+  marka, satış, iki alan adı, kargo entegrasyonu ve ödeme yöntemleri alt
+  alta, beş ekran boyu. Her bölüm artık ?bolum= ile ayrı açılıyor
+  (ikinci dock, Ctrl+K ve sayfanın başındaki süzgeç). Bir getirisi daha:
+  tryOTO bağlantı sınaması her açılışta dış istek atıyordu; artık yalnızca
+  Kargo bölümünde.
+*/
+export const AYAR_BOLUMLERI = [
+  ["marka", "Marka kimliği"],
+  ["satis", "Satış"],
+  ["alan-adi", "Alan adları"],
+  ["kargo", "Kargo"],
+  ["odeme", "Ödeme"],
+] as const;
+type AyarBolumu = (typeof AYAR_BOLUMLERI)[number][0];
 import { yetkiYok } from "@/lib/yetki-metni";
 
 const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending_dns:"DNS bekleniyor",verifying:"Doğrulanıyor",active:"Aktif",failed:"Bağlantı hatası"};
@@ -11,7 +31,9 @@ const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending
 /* DNS kaydı henüz yayılmadıysa hata değil, bekleme durumu. */
 
 
-export default async function Settings(){
+export default async function Settings({searchParams}:{searchParams:Promise<{bolum?:string}>}){
+  const {bolum:bolumParametresi}=await searchParams;
+  const bolum:AyarBolumu=AYAR_BOLUMLERI.some(([k])=>k===bolumParametresi)?(bolumParametresi as AyarBolumu):"marka";
   const {supabase,organization,membership}=await requireTenant();
   const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,garanti_enabled,garanti_test_mode,garanti_isyeri_no,garanti_terminal_no,garanti_api_surumu,garanti_guvenlik_duzeyi,garanti_yari_guvenli_kabul,garanti_provizyon_sifresi_enc,garanti_magaza_anahtari_enc,garanti_iade_sifresi_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
@@ -23,7 +45,7 @@ export default async function Settings(){
   const garantiKeysStored=Boolean(settings?.garanti_provizyon_sifresi_enc&&settings?.garanti_magaza_anahtari_enc);
   /* Bağlantı yalnızca yetkiliye sınanıyor: OTO'ya gereksiz istek atmamak
      ve firma listesini görmeye yetkisi olmayana göstermemek için. */
-  const kargoBaglantisi=canManagePayments
+  const kargoBaglantisi=canManagePayments&&bolum==="kargo"
     ?await baglantiyiSina(organization.id,settings)
     :{durum:"kapali" as const};
   const logoUrl=settings?.logo_path?supabase.storage.from("organization-assets").getPublicUrl(settings.logo_path).data.publicUrl:"";
@@ -45,27 +67,37 @@ export default async function Settings(){
   */
   const vitrinAdresi=magazaAdresi(settings)?.replace(/^https:\/\//,"")??null;
   const callbackHost=panelDomainStatus==="verified"&&settings?.panel_custom_domain?settings.panel_custom_domain:"arc.arvo-os.com";
-  return <>
-    <section className="ac-bar"><div><h1>Mağaza Ayarları</h1><p>Marka kimliği, alan adları ve ödeme yöntemleri.</p></div></section>
+  const bolumAdi=AYAR_BOLUMLERI.find(([k])=>k===bolum)![1];
+  return <main className="talep ayarlar-sayfasi">
+    <header className="talep-bas">
+      <div className="talep-bas-metin">
+        <small className="panel-kicker">Mağaza ayarları</small>
+        <h1>{bolumAdi}</h1>
+      </div>
+    </header>
+    <nav className="ekip-suzgec talep-suzgec ayarlar-bolumleri" aria-label="Ayar bölümleri">
+      {AYAR_BOLUMLERI.map(([k,ad])=>(
+        <Link key={k} prefetch={false} href={k==="marka"?"/ayarlar":`/ayarlar?bolum=${k}`} className={bolum===k?"is-active":undefined} aria-current={bolum===k?"page":undefined}>{ad}</Link>
+      ))}
+      <Link prefetch={false} href="/tema">Vitrin teması</Link>
+    </nav>
 
     <div className="ac-stack">
-    {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık okunmuyor:
-        dışarıdan gönderilen bağlantı uydurma mesaj gösterebiliyordu. */}
-    <PanelBildirimi basarililBaslik="Mağaza ayarları kaydedildi" />
 
     <div className="settings-layout">
-      <section className="card settings-section" id="marka-kimligi">
+    {bolum==="marka"?<>
+      <section className="panel-card settings-section" id="marka-kimligi">
         <div className="head"><div><small>MARKA KİMLİĞİ</small><h3>Logo ve görünüm</h3></div><span>{organization.plan_code}</span></div>
         <div className="brand-assets-grid">
           <article className="brand-asset">
             <div className="brand-preview logo-preview" role="img" aria-label="Mağaza logosu" style={logoUrl?{backgroundImage:`url("${logoUrl}")`}:undefined}>{!logoUrl&&<b>LOGO</b>}</div>
             <div><strong>Mağaza logosu</strong><small>PNG, JPG veya WEBP · en fazla 4 MB</small></div>
-            {canManage&&<><form action={uploadBrandAsset}><input type="hidden" name="kind" value="logo"/><input name="file" type="file" accept="image/png,image/jpeg,image/webp" required/><button type="submit">Logo yükle</button></form>{logoUrl&&<form action={removeBrandAsset}><input type="hidden" name="kind" value="logo"/><button className="danger-button" type="submit">Logoyu kaldır</button></form>}</>}
+            {canManage&&<><form action={uploadBrandAsset}><input type="hidden" name="kind" value="logo"/><input name="file" type="file" accept="image/png,image/jpeg,image/webp" required/><button className="panel-secondary" type="submit">Logo yükle</button></form>{logoUrl&&<form action={removeBrandAsset}><input type="hidden" name="kind" value="logo"/><button className="danger-button" type="submit">Logoyu kaldır</button></form>}</>}
           </article>
           <article className="brand-asset">
             <div className="brand-preview favicon-preview" role="img" aria-label="Mağaza faviconu" style={faviconUrl?{backgroundImage:`url("${faviconUrl}")`}:undefined}>{!faviconUrl&&<b>F</b>}</div>
             <div><strong>Favicon</strong><small>PNG, WEBP veya ICO · en fazla 1 MB</small></div>
-            {canManage&&<><form action={uploadBrandAsset}><input type="hidden" name="kind" value="favicon"/><input name="file" type="file" accept="image/png,image/webp,image/x-icon,image/vnd.microsoft.icon" required/><button type="submit">Favicon yükle</button></form>{faviconUrl&&<form action={removeBrandAsset}><input type="hidden" name="kind" value="favicon"/><button className="danger-button" type="submit">Faviconu kaldır</button></form>}</>}
+            {canManage&&<><form action={uploadBrandAsset}><input type="hidden" name="kind" value="favicon"/><input name="file" type="file" accept="image/png,image/webp,image/x-icon,image/vnd.microsoft.icon" required/><button className="panel-secondary" type="submit">Favicon yükle</button></form>{faviconUrl&&<form action={removeBrandAsset}><input type="hidden" name="kind" value="favicon"/><button className="danger-button" type="submit">Faviconu kaldır</button></form>}</>}
           </article>
         </div>
 
@@ -86,13 +118,15 @@ export default async function Settings(){
           <label>Para birimi<select name="currency" defaultValue={settings?.currency??"TRY"}><option value="TRY">TRY · Türk Lirası</option><option value="USD">USD · ABD Doları</option><option value="EUR">EUR · Euro</option></select></label>
           <label>Dil / bölge<select name="locale" defaultValue={settings?.locale??"tr-TR"}><option value="tr-TR">Türkçe · Türkiye</option><option value="en-US">English · United States</option></select></label>
           <label>Düşük stok eşiği<input name="low_stock_threshold" type="number" min="0" max="10000" step="1" defaultValue={settings?.low_stock_threshold??5} required/></label>
-          <button type="submit">Marka ayarlarını kaydet</button>
+          <button className="panel-secondary" type="submit">Marka ayarlarını kaydet</button>
         </form>:<p className="list-hint">{yetkiYok("mağaza ayarları")}</p>}
       </section>
 
       {/* Satış ayarları: sütunlar vardı ama hiçbir form onları yazmıyordu,
           yani her mağaza ArvoCulture tarifesiyle satıyordu. */}
-      <section className="card settings-section" id="satis-ayarlari">
+    </>:null}
+    {bolum==="satis"?<>
+      <section className="panel-card settings-section" id="satis-ayarlari">
         <header><h2>Satış ayarları</h2><p>Kargo, ücretsiz kargo eşiği, havale indirimi ve sipariş numarası öneki.</p></header>
         {canManage?<form action={updateSalesSettings} className="settings-form">
           <label>Kargo ücreti (₺)<input name="shipping_fee" type="text" inputMode="decimal" autoComplete="off" defaultValue={((settings?.shipping_fee??12000)/100).toFixed(2)} required/></label>
@@ -100,29 +134,31 @@ export default async function Settings(){
           <label>Havale indirimi (%)<input name="bank_transfer_discount_percent" type="number" min="0" max="100" step="0.1" defaultValue={settings?.bank_transfer_discount_percent??3} required/></label>
           <label>Sipariş numarası öneki<input name="order_prefix" maxLength={6} pattern="[A-Za-z]{1,6}" defaultValue={settings?.order_prefix??"AC"} required/></label>
           <p className="list-hint">Sepet tutarı eşiği geçerse kargo alınmaz. Eşik, indirim uygulanmadan önceki ara toplamla karşılaştırılır. Önek her mağazada farklı olmalı: sipariş numaraları çakışırsa ödeme bildirimleri yanlış siparişe düşebilir.</p>
-          <button type="submit">Satış ayarlarını kaydet</button>
+          <button className="panel-secondary" type="submit">Satış ayarlarını kaydet</button>
         </form>:<p className="list-hint">{yetkiYok("mağaza ayarları")}</p>}
       </section>
 
+    </>:null}
+    {bolum==="alan-adi"?<>
       <section className="domain-stack">
-        <section className="card settings-section domain-section">
+        <section className="panel-card settings-section domain-section">
           <div className="head"><div><small>YÖNETİM PANELİ</small><h3>Panel alan adı</h3></div><em className={panelDomainStatus}>{statusLabel[panelDomainStatus]??panelDomainStatus}</em></div>
           <p className="domain-explainer"><b>ArvoARC paneli</b> · Sipariş, ürün, stok ve mağaza yönetimi için kullanılır. Müşteriler bu adresi görmez.</p>
           <div className="domain-current"><small>MARKALI PANEL ADRESİ</small><strong>{settings?.panel_custom_domain??"Henüz tanımlanmadı"}</strong><span>{settings?.panel_domain_verified_at?"SSL ve alan adı doğrulandı":"DNS bağlantısı bekleniyor"}</span></div>
           <div className="domain-platform"><small>ArvoARC ana paneli</small><strong>arc.arvo-os.com</strong></div>
           {canManage&&<form action={updatePanelDomainSettings} className="domain-form">
             <label>Müşteriye özel panel alan adı<input name="panel_custom_domain" defaultValue={settings?.panel_custom_domain??""} placeholder="app.markaniz.com" required/></label>
-            <button type="submit">Panel alan adını kaydet</button>
+            <button className="panel-secondary" type="submit">Panel alan adını kaydet</button>
           </form>}
           {settings?.panel_custom_domain&&panelDomainStatus!=="active"&&<div className="dns-guide">
             <div><span>1</span><p><b>CNAME kaydı</b><code>{settings.panel_custom_domain} → 78128f864bd971a1.vercel-dns-017.com</code></p></div>
             <div><span>2</span><p><b>Vercel doğrulaması</b><small>Alan adı ArvoARC projesine eklenir ve DNS kaydı kontrol edilir.</small></p></div>
             <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli panel bağlantısı etkinleşir.</small></p></div>
-            {canManage&&<form action={verifyPanelDomain}><button type="submit">DNS bağlantısını doğrula</button></form>}
+            {canManage&&<form action={verifyPanelDomain}><button className="panel-secondary" type="submit">DNS bağlantısını doğrula</button></form>}
           </div>}
         </section>
 
-        <section className="card settings-section domain-section" id="magaza-alan-adi">
+        <section className="panel-card settings-section domain-section" id="magaza-alan-adi">
           <div className="head"><div><small>E-TİCARET MAĞAZASI</small><h3>Mağaza alan adı</h3></div><em className={domainStatus}>{statusLabel[domainStatus]??domainStatus}</em></div>
           <p className="domain-explainer"><b>Herkese açık mağaza</b> · Ürünlerin, koleksiyonların ve ödeme akışının yayınlandığı müşteri adresidir.</p>
           <div className="domain-current storefront"><small>MAĞAZA ADRESİ</small><strong>{settings?.custom_domain??(settings?.platform_subdomain?altAlanAdresi(settings.platform_subdomain):"Henüz tanımlanmadı")}</strong><span>{settings?.domain_verified_at?"SSL ve alan adı doğrulandı":"DNS bağlantısı bekleniyor"}</span></div>
@@ -130,18 +166,20 @@ export default async function Settings(){
             <label>ARVO mağaza alt alan adı<div className="domain-input"><input name="storefront_subdomain" defaultValue={settings?.platform_subdomain??""} placeholder="magazaadi" pattern="[a-z0-9-]+"/><span>.{ALT_ALAN_SONEKI}</span></div></label>
             <div className="domain-divider"><span>veya özel alan adı</span></div>
             <label>Mağaza alan adı<input name="storefront_custom_domain" defaultValue={settings?.custom_domain??""} placeholder="markaniz.com"/></label>
-            <button type="submit">Mağaza alan adını kaydet</button>
+            <button className="panel-secondary" type="submit">Mağaza alan adını kaydet</button>
           </form>}
           {settings?.custom_domain&&domainStatus!=="active"&&<div className="dns-guide">
             <div><span>1</span><p><b>Vercel DNS kaydı</b><small>Vercel’in mağaza projesinde göstereceği CNAME veya A kaydını DNS sağlayıcınıza ekleyin.</small></p></div>
             <div><span>2</span><p><b>Mağaza yayını</b><code>https://{settings.custom_domain}</code></p></div>
             <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli mağaza bağlantısı etkinleşir.</small></p></div>
-            {canManage&&<form action={verifyStorefrontDomain}><button type="submit">DNS bağlantısını doğrula</button></form>}
+            {canManage&&<form action={verifyStorefrontDomain}><button className="panel-secondary" type="submit">DNS bağlantısını doğrula</button></form>}
           </div>}
           <div className="domain-note"><b>Doğru ayrım</b><p><strong>{callbackHost}</strong> yönetim panelidir; {vitrinAdresi?<><strong>{vitrinAdresi}</strong> ise müşterilerin alışveriş yaptığı mağazadır.</>:"mağaza adresi ise müşterilerin alışveriş yaptığı yerdir ve yukarıdan bağlanır."}</p></div>
         </section>
       </section>
+    </>:null}
     </div>
+    {bolum==="kargo"?<>
     {/*
       KARGO ENTEGRASYONU. Bağlantı sayfa açılırken sınanıyor: hesapta
       hangi kargo firmalarının açık olduğunu panelden görmenin başka yolu
@@ -149,7 +187,7 @@ export default async function Settings(){
       sayfayı düşürmüyor (baglantiyiSina yakalıyor), yoksa yanlış yazılmış
       bir anahtar bütün ayar ekranını erişilemez yapardı.
     */}
-    <section className="card settings-section payment-section">
+    <section className="panel-card settings-section payment-section">
       <div className="head"><div><small>KARGO ALTYAPISI</small><h3>tryOTO entegrasyonu</h3><p>Bir siparişin kalemleri farklı kargo firmalarına bölünerek gönderilebilir; her parçanın kendi takip numarası olur.</p></div><span>MAĞAZAYA ÖZEL</span></div>
       {canManagePayments?<>
         <form action={updateShippingIntegration} className="payment-form">
@@ -195,7 +233,7 @@ export default async function Settings(){
             </div>
             <div className="security-note"><b>{settings?.tryoto_refresh_token_enc?"Anahtarınız kayıtlı.":"Anahtar henüz girilmedi."}</b><p>Anahtar şifrelenerek saklanır ve hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazın; boş bırakırsanız kayıtlı olan korunur.</p><p>Gönderici konumu <b>seçilmeli</b>: OTO gönderiyi kayıtlı bir konum olmadan oluşturmuyor — sipariş açılıyor, gönderi ve etiket üretilmiyor (27.09.2026). Aşağıdaki çıkış adresi yalnızca konum seçilmediğinde gönderilen yedek bilgidir.</p></div>
           </article>
-          <button className="payment-save" type="submit">Kargo ayarlarını kaydet</button>
+          <button className="panel-primary payment-save" type="submit">Kargo ayarlarını kaydet</button>
         </form>
         <article className="payment-method">
           <div className="payment-title"><div><small>BAĞLANTI DURUMU</small><h4>OTO&apos;nun desteklediği kargo firmaları</h4></div></div>
@@ -234,7 +272,9 @@ export default async function Settings(){
       </>:<p className="list-hint">{yetkiYok("kargo entegrasyonu", "sahiplik")}</p>}
     </section>
 
-    <section className="card settings-section payment-section" id="odeme-yontemleri">
+    </>:null}
+    {bolum==="odeme"?<>
+    <section className="panel-card settings-section payment-section" id="odeme-yontemleri">
       <div className="head"><div><small>ÖDEME ALTYAPISI</small><h3>Ödeme yöntemleri</h3><p>Her mağaza kendi havale hesabını ve PayTR mağaza numarasını yönetir.</p></div><span>GÜVENLİ YAPILANDIRMA</span></div>
       {canManagePayments?<form action={updatePaymentSettings} className="payment-form">
         <article className="payment-method">
@@ -330,9 +370,10 @@ export default async function Settings(){
           </div>
           <div className="security-note"><b>Önce alan adınızı doğrulatın.</b><p>E-posta sağlayıcısı, sahipliğini kanıtlamadığınız bir alan adından gönderim yapmaz. Doğrulama tamamlanmadan bu alanı doldurursanız e-postalar gönderilemez ve müşterileriniz sipariş onayı alamaz. Alan adı doğrulaması için bizimle iletişime geçin.</p></div>
         </article>
-        <button className="payment-save" type="submit">Ödeme ayarlarını kaydet</button>
+        <button className="panel-primary payment-save" type="submit">Ödeme ayarlarını kaydet</button>
       </form>:<p className="list-hint">{yetkiYok("ödeme hesapları (IBAN, PayTR)", "sahiplik")}</p>}
     </section>
+    </>:null}
     </div>
-  </>;
+  </main>;
 }

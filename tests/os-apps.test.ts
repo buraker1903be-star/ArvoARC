@@ -38,3 +38,10 @@ test("rozet yalnızca sıfırdan büyükse", () => {
   assert.equal(arcUygulamalari({ operasyon: 0 }).find((x) => x.key === "satis")!.rozet, undefined);
   assert.equal(arcUygulamalari({ operasyon: 3 }).find((x) => x.key === "satis")!.rozet, 3);
 });
+
+test("Ayarlar bölümleri sorgu değişkeniyle ayrışıyor", () => {
+  const ayar = u.find((x) => x.key === "settings")!;
+  assert.equal(etkinBolum(ayar.bolumler!, "/ayarlar", "")?.key, "marka");
+  assert.equal(etkinBolum(ayar.bolumler!, "/ayarlar", "bolum=kargo")?.key, "kargo");
+  assert.equal(etkinBolum(ayar.bolumler!, "/tema", "")?.key, "tema");
+});

@@ -1,0 +1,6 @@
+/* Mağaza ayarları: ArvoOS bölüm düzeni (16.10.2026). Formların iç biçimi globals.css ve ../catalog.css. */
+.os-root .ayarlar-sayfasi{display:grid;gap:var(--sp-4)}
+.os-root .ayarlar-bolumleri{flex-wrap:wrap}
+.os-root .ayarlar-sayfasi .settings-section{padding:var(--sp-5)}
+/* Eski düzende iki sütunlu ızgaraydı; bölüm başına tek içerik kaldığı için tam genişlik. */
+.os-root .ayarlar-sayfasi .settings-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-4)}

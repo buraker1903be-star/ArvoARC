@@ -87,7 +87,12 @@ export function arcUygulamalari(rozet?: { operasyon?: number; iade?: number }): 
       key: "settings", label: "Ayarlar", href: "/ayarlar", ikon: "settings",
       yollar: ["/ayarlar", "/tema"],
       bolumler: [
-        { key: "magaza", href: "/ayarlar", label: "Mağaza ayarları" },
+        /* Ayarlar sayfasının bölümleri (app/(panel)/ayarlar → AYAR_BOLUMLERI). */
+        { key: "marka", href: "/ayarlar", label: "Marka kimliği" },
+        { key: "satis-ayar", href: "/ayarlar?bolum=satis", label: "Satış" },
+        { key: "alan-adi", href: "/ayarlar?bolum=alan-adi", label: "Alan adları" },
+        { key: "kargo", href: "/ayarlar?bolum=kargo", label: "Kargo" },
+        { key: "odeme", href: "/ayarlar?bolum=odeme", label: "Ödeme" },
         { key: "tema", href: "/tema", label: "Vitrin teması" },
       ],
     },
