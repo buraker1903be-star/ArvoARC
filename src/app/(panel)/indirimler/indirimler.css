@@ -85,7 +85,7 @@
   solda gerekçe, sağda birincil düğme. Sütun kendi içinde kaydığı için
   düğme her zaman görünür kalıyor.
 */
-.os-root .indirim-detay .indirim-kaydet{
+.os-root .indirim-kaydet{
   position:sticky;bottom:calc(var(--sp-4) * -1);z-index:2;
   display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);
   margin:var(--sp-4) calc(var(--sp-4) * -1) calc(var(--sp-4) * -1);
@@ -94,10 +94,10 @@
   background:color-mix(in srgb,var(--surface) 92%,transparent);
   backdrop-filter:blur(10px);
 }
-.os-root .indirim-detay .indirim-kaydet span{color:var(--muted);font-size:var(--fs-sm);line-height:1.4}
-.os-root .indirim-detay .indirim-kaydet button{flex:none}
+.os-root .indirim-kaydet span{color:var(--muted);font-size:var(--fs-sm);line-height:1.4}
+.os-root .indirim-kaydet button{flex:none}
 @media (max-width:620px){
-  .os-root .indirim-detay .indirim-kaydet{flex-direction:column;align-items:stretch}
+  .os-root .indirim-kaydet{flex-direction:column;align-items:stretch}
 }
 
 /* Limit çubuğu: sayının yanında doluluk görünür olsun. */
@@ -124,3 +124,30 @@
 .os-root .indirim-detay .discount-form-grid{margin-top:var(--sp-3);grid-template-columns:repeat(2,minmax(0,1fr))}
 .os-root .indirim-detay .discount-form-grid .wide{grid-column:span 2}
 .os-root .indirim-detay .talep-bas-eylem form{margin:0}
+
+/*
+  KAMPANYA FORMU (kampanya-alanlari.tsx). On bir kutu tek yığın
+  hâlinde bir duvardı; üç soruya bölündü: ne veriyor, hangi koşulla,
+  ne zaman. Başlıklar şeridin kicker'ıyla aynı dilde, çizgi yok —
+  gruplar boşlukla ayrılıyor.
+*/
+.os-root .kampanya-alanlar{display:grid;gap:var(--sp-5)}
+.os-root .kampanya-alanlar h4{
+  margin:0 0 var(--sp-3);color:var(--muted);
+  font-size:var(--fs-micro);font-weight:var(--fw-semibold);letter-spacing:.08em;text-transform:uppercase
+}
+/* Onay kutuları kendi satırında: ızgarada tarih kutularının yanına
+   sıkışıyor ve uzun etiket iki satıra kırılıyordu. */
+.os-root .kampanya-onaylar{
+  grid-column:1/-1;display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center;
+  padding-top:var(--sp-2)
+}
+.os-root .kampanya-onaylar .check-inline{display:flex;align-items:center;gap:9px;margin:0;font-size:var(--fs-sm)}
+.os-root .kampanya-onaylar .check-inline input{margin:0}
+/* Pencerede alanlar daha geniş: üç sütun yerine iki, kutular nefes alsın. */
+.os-root .plt-pencere .discount-form-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.os-root .plt-pencere .discount-form-grid .wide{grid-column:span 3}
+@media (max-width:900px){
+  .os-root .plt-pencere .discount-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .os-root .plt-pencere .discount-form-grid .wide{grid-column:span 2}
+}

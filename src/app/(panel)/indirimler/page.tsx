@@ -11,7 +11,7 @@ import { gorunumleriOku } from "../gorunumler/oku";
 import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
 import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
 import { IndirimTablosu, type IndirimSatiri } from "./indirim-tablosu";
-import { DurumSecici } from "@/components/arvo-ui/durum-secici";
+import { KampanyaAlanlari } from "./kampanya-alanlari";
 import { indirimDurumu, indirimKuralYazisi } from "@/lib/indirim-bicim";
 // Liste kalıbı (talep-*, crm-data-table) ve form ızgarası: sayfa kendi CSS'ini import eder.
 import "@/components/arvo-ui/k-ui";
@@ -521,33 +521,11 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
           <p className="indirim-pencere-alt">Kupon kodunu boş bırakırsanız kural sepette otomatik uygulanır.</p>
           <form action={createDiscount}>
             <input type="hidden" name="back" value={listHref(durum, {})} />
-            <div className="discount-form-grid">
-              <label className="wide">Kampanya adı<input name="name" required maxLength={160} placeholder="Örn. 2.000 TL Üzeri Ücretsiz Kargo" /></label>
-              <label>İndirim türü
-                <DurumSecici
-                  name="discount_type"
-                  etiket="İndirim türü"
-                  bicim="alan"
-                  gonder={false}
-                  deger="percentage"
-                  secenekler={[
-                    { deger: "percentage", etiket: "Sepette yüzde indirim" },
-                      { deger: "fixed_amount", etiket: "Sepette sabit tutar indirimi" },
-                      { deger: "free_shipping", etiket: "Ücretsiz kargo" },
-                  ]}
-                />
-              </label>
-              <label>İndirim değeri<input name="value" type="text" inputMode="decimal" autoComplete="off" defaultValue="10" /><small>Yüzde için 10, sabit indirim için TL tutarı. Ücretsiz kargoda 0.</small></label>
-              <label>Minimum sepet tutarı (₺)<input name="minimum_subtotal" type="text" inputMode="decimal" autoComplete="off" defaultValue="0" /></label>
-              <label>Kupon kodu<input name="code" maxLength={40} placeholder="Örn. ARVO10" /></label>
-              <label>Toplam kullanım limiti<input name="usage_limit" type="number" min="1" step="1" placeholder="Limitsiz" /></label>
-              <label>Kişi başı kullanım<input name="per_customer_limit" type="number" min="1" step="1" placeholder="Limitsiz" /></label>
-              <label>Başlangıç (Türkiye saati)<input name="starts_at" type="datetime-local" /></label>
-              <label>Bitiş (Türkiye saati)<input name="ends_at" type="datetime-local" /></label>
-              <label className="check-inline"><input name="active" type="checkbox" defaultChecked /> Hemen aktif et</label>
-              <label className="check-inline"><input name="combinable" type="checkbox" /> Diğer indirimlerle birleştirilebilir</label>
+            <KampanyaAlanlari yeniMi />
+            <div className="indirim-kaydet">
+              <span>Kural sepet hesaplama motorunda saklanır; vitrin ve ödeme aynı kuralı uygular.</span>
+              <button className="panel-primary" type="submit">Kampanyayı oluştur</button>
             </div>
-            <div className="product-editor-actions"><span>Kural sepet hesaplama motorunda saklanır; vitrin ve ödeme aynı kuralı uygular.</span><button className="ac-btn ac-btn-primary" type="submit">Kampanyayı oluştur</button></div>
           </form>
         </Pencere>
       ) : null}

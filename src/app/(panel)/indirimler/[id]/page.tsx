@@ -5,11 +5,10 @@ import { yetkiYok } from "@/lib/yetki-metni";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { countsAsRevenue, revenueAmount } from "@/lib/order-flow";
-import { trIsoToLocal } from "@/lib/tr-time";
 import { rozetTonu } from "@/lib/rozet-tonu";
 import { KNot } from "@/components/arvo-ui/k-ui";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
-import { DurumSecici } from "@/components/arvo-ui/durum-secici";
+import { KampanyaAlanlari } from "../kampanya-alanlari";
 import { deleteDiscount, toggleDiscount, updateDiscount } from "../actions";
 import { indirimDegeri, indirimDurumu, indirimTuruAdi } from "@/lib/indirim-bicim";
 import { BITIYOR_GUN } from "@/lib/indirim-istatistik";
@@ -203,38 +202,21 @@ export default async function KampanyaDetayi({ params }: { params: Promise<{ id:
             <form action={updateDiscount}>
               <input type="hidden" name="id" value={kural.id} />
               <input type="hidden" name="back" value={adres} />
-              <div className="discount-form-grid">
-                <label className="wide">Kampanya adı<input name="name" required maxLength={160} defaultValue={kural.name} /></label>
-                {/* Tarayıcının <select>'i yerine panelin seçicisi: aynı
-                    liste, aynı klavye, kutu biçiminde (durum-secici). */}
-                <label>İndirim türü
-                  <DurumSecici
-                    name="discount_type"
-                    etiket="İndirim türü"
-                    bicim="alan"
-                    gonder={false}
-                    deger={kural.discount_type}
-                    secenekler={[
-                      { deger: "percentage", etiket: "Sepette yüzde indirim" },
-                      { deger: "fixed_amount", etiket: "Sepette sabit tutar indirimi" },
-                      { deger: "free_shipping", etiket: "Ücretsiz kargo" },
-                    ]}
-                  />
-                </label>
-                <label>İndirim değeri
-                  <input name="value" type="text" inputMode="decimal" autoComplete="off" defaultValue={kural.discount_type === "fixed_amount" ? (kural.value / 100).toLocaleString("tr-TR", { minimumFractionDigits: 2 }) : String(kural.value)} />
-                  <small>Yüzde için 10, sabit indirim için TL tutarı. Ücretsiz kargoda 0.</small>
-                </label>
-                <label>Minimum sepet tutarı (₺)
-                  <input name="minimum_subtotal" type="text" inputMode="decimal" autoComplete="off" defaultValue={(kural.minimum_subtotal / 100).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} />
-                </label>
-                <label>Kupon kodu<input name="code" maxLength={40} defaultValue={kural.code ?? ""} placeholder="Boş: otomatik uygulanır" /></label>
-                <label>Toplam kullanım limiti<input name="usage_limit" type="number" min="1" step="1" defaultValue={kural.usage_limit ?? ""} placeholder="Limitsiz" /></label>
-                <label>Kişi başı kullanım<input name="per_customer_limit" type="number" min="1" step="1" defaultValue={kural.per_customer_limit ?? ""} placeholder="Limitsiz" /></label>
-                <label>Başlangıç (Türkiye saati)<input name="starts_at" type="datetime-local" defaultValue={trIsoToLocal(kural.starts_at)} /></label>
-                <label>Bitiş (Türkiye saati)<input name="ends_at" type="datetime-local" defaultValue={trIsoToLocal(kural.ends_at)} /></label>
-                <label className="check-inline"><input name="combinable" type="checkbox" defaultChecked={kural.combinable} /> Diğer indirimlerle birleştirilebilir</label>
-              </div>
+              <KampanyaAlanlari
+                yeniMi={false}
+                deger={{
+                  name: kural.name,
+                  code: kural.code,
+                  discount_type: kural.discount_type,
+                  value: kural.value,
+                  minimum_subtotal: kural.minimum_subtotal,
+                  usage_limit: kural.usage_limit,
+                  per_customer_limit: kural.per_customer_limit,
+                  starts_at: kural.starts_at,
+                  ends_at: kural.ends_at,
+                  combinable: kural.combinable,
+                }}
+              />
               {/* Durum bu formda DEĞİL: başlıktaki düğmeden değişiyor ve
                   kaydetmeyi beklemeden geçerli olması gerekiyor. */}
               {/*
