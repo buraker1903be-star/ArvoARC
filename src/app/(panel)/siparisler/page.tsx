@@ -218,9 +218,23 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     : { data: [], error: null };
   if (productsError) throw new Error(productsError.message);
   const productById = new Map((products ?? []).map((product) => [product.id, product]));
+  /*
+    Fiyat ve stok ARTIK ETİKETİN İÇİNDE DEĞİL, ayrı alanlarda: pencere
+    satır ve sipariş toplamını kendisi hesaplıyor (order-form.tsx) ve
+    stok uyarısını gönderimden önce veriyor. Etikette eskiden
+    "stok 0 · stoksuz satış açık" yazıyordu; LR ürünlerinde stok hep 0
+    ve stoksuz satış açık, yani 243 satırın hepsinde aynı cümle
+    tekrarlıyor ve ürün adını kısaltıyordu.
+  */
   const variantOptions = variants.map((variant) => {
     const product = productById.get(variant.product_id);
-    return { id: variant.id, label: `${product?.name ?? "Ürün"} · ${variant.sku} · stok ${variant.stock}${variant.allow_backorder ? " · stoksuz satış açık" : ""}` };
+    return {
+      id: variant.id,
+      label: `${product?.name ?? "Ürün"} · ${variant.sku}`,
+      price: variant.price ?? 0,
+      stock: variant.stock ?? 0,
+      backorder: Boolean(variant.allow_backorder),
+    };
   });
 
   /*

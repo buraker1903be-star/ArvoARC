@@ -125,17 +125,9 @@
 .os-root .indirim-detay .discount-form-grid .wide{grid-column:span 2}
 .os-root .indirim-detay .talep-bas-eylem form{margin:0}
 
-/*
-  KAMPANYA FORMU (kampanya-alanlari.tsx). On bir kutu tek yığın
-  hâlinde bir duvardı; üç soruya bölündü: ne veriyor, hangi koşulla,
-  ne zaman. Başlıklar şeridin kicker'ıyla aynı dilde, çizgi yok —
-  gruplar boşlukla ayrılıyor.
-*/
-.os-root .kampanya-alanlar{display:grid;gap:var(--sp-5)}
-.os-root .kampanya-alanlar h4{
-  margin:0 0 var(--sp-3);color:var(--muted);
-  font-size:var(--fs-micro);font-weight:var(--fw-semibold);letter-spacing:.08em;text-transform:uppercase
-}
+/* Kampanya formunun grup başlıkları ortak dilden geliyor
+   (.form-gruplari, components/os/panel-ui.css): aynı başlık manuel
+   sipariş penceresinde de kullanılıyor. */
 /* Onay kutuları kendi satırında: ızgarada tarih kutularının yanına
    sıkışıyor ve uzun etiket iki satıra kırılıyordu. */
 .os-root .kampanya-onaylar{

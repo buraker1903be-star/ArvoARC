@@ -83,3 +83,35 @@
 .durum-secici[data-bicim="alan"] .durum-secici-liste{width:100%;min-width:0}
 /* Listede de nokta yok; seçili olanı tik gösteriyor. */
 .durum-secici[data-bicim="alan"] .durum-secici-liste .durum-secici-nokta{display:none}
+
+/*
+  ARANABİLİR LİSTE (16.10.2026). Manuel sipariş penceresinde seçenek
+  sayısı 243: aramasız bir liste ekranı boydan boya kaplıyor, aradığın
+  ürünü bulmak için kaydırmak gerekiyordu. Kutu listeyi sarıyor, arama
+  üstte sabit kalıyor, liste kendi içinde kayıyor.
+*/
+.durum-secici-kutu{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:60;
+  display:flex;flex-direction:column;min-width:max(100%,200px);
+  padding:6px;border:1px solid var(--line);border-radius:var(--r-md);
+  background:var(--surface);box-shadow:var(--shadow-lg);
+  animation:durum-secici-ac .14s ease-out;
+}
+.durum-secici[data-bicim="alan"] .durum-secici-kutu{width:100%;min-width:0}
+/* Kutu zaten kart: içindeki liste kendi çerçevesini ve gölgesini bırakır. */
+.durum-secici-kutu>.durum-secici-liste{
+  position:static;z-index:auto;padding:0;border:0;border-radius:0;
+  background:none;box-shadow:none;animation:none;
+  max-height:min(320px,46vh);overflow-y:auto;overscroll-behavior:contain
+}
+.os-root .durum-secici-arama{
+  flex:none;width:100%;margin:0 0 6px;
+  font-size:var(--fs-sm)
+}
+.durum-secici-bos{color:var(--muted);font-size:var(--fs-sm);cursor:default!important}
+/* Uzun seçenek adı ("LR ALOE VIA Baby Pişik Önleyici Krem · '20319 · 249,00 ₺")
+   alan biçiminde kutudan taşıyordu: nokta nokta kesiliyor, tamamı başlıkta. */
+.durum-secici[data-bicim="alan"] .durum-secici-dugme>span{
+  flex:1;min-width:0;overflow:hidden;text-align:left;text-overflow:ellipsis;white-space:nowrap
+}
+@media (prefers-reduced-motion:reduce){.durum-secici-kutu{animation:none}}

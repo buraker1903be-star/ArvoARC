@@ -80,7 +80,16 @@ html[data-theme="dark"] .os-root .panel-secondary{border-color:var(--line);color
 /* Ortak kayıt formunun alanları (components/kayit-formu.css) hariç: bu kural
    özgüllükte onu eziyordu ve sayfa içindeki formlarda (Ayarlar, Abonelik)
    açılır liste oku siliniyor, punto ve köşeler çekmecedekinden farklı
-   çıkıyordu. Çekmeceler .panel-content dışında çizildiği için etkilenmiyordu. */
+   çıkıyordu. */
+/*
+  ÇEKMECE DE KAPSAMA GİRDİ (16.10.2026). PanelDrawer penceresini
+  .panel-content'in DIŞINA, panelin köküne çiziyor (düğmenin üstündeki
+  bir transform position:fixed'i hapsediyordu). Sonuç: pencerede sayı
+  alanlarının çift oku duruyor, onay kutusu tarayıcının 13px'liği
+  kalıyor ve odak halkası sayfadakinden başka çıkıyordu — manuel
+  sipariş penceresinde görülen "tarayıcı varsayılanı" buydu. Kapsam
+  :is(...) ile genişletildi, özgüllük aynı kaldı: .kayit-formu ayrığı
+  ve koyu tema düzeltmeleri olduğu gibi çalışıyor. */
 /*
   ALAN ZEMİNİ VE ÇERÇEVESİ TEMA DEĞİŞKENİNDEN (16.10.2026).
 
@@ -94,17 +103,17 @@ html[data-theme="dark"] .os-root .panel-secondary{border-color:var(--line);color
   Tek kural, iki temada da doğru: çerçeve `--line`, zemin `--surface-2`
   (karttan bir ton koyu/açık, yani alan "oyulmuş" görünüyor).
 */
-.os-root .panel-content :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *){
+.os-root :is(.panel-content,.panel-drawer-body) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *){
   border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink);font-size:var(--fs-base);
   padding:0 var(--sp-3);
   transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),background-color var(--dur) var(--ease);
 }
 /* Yazı alanı tek satır değil: dikey dolgu ve satır yüksekliği ister. */
-.os-root .panel-content textarea:not(.kayit-formu > label > *){padding:10px var(--sp-3);line-height:1.5}
-.os-root .panel-content :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *):hover:not(:focus){
+.os-root :is(.panel-content,.panel-drawer-body) textarea:not(.kayit-formu > label > *){padding:10px var(--sp-3);line-height:1.5}
+.os-root :is(.panel-content,.panel-drawer-body) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *):hover:not(:focus){
   border-color:color-mix(in srgb,var(--primary) 30%,var(--line))
 }
-.os-root .panel-content :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *):focus{
+.os-root :is(.panel-content,.panel-drawer-body) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *):focus{
   outline:none;border-color:var(--primary);background:var(--surface);box-shadow:var(--shadow-glow)
 }
 /*
@@ -112,17 +121,32 @@ html[data-theme="dark"] .os-root .panel-secondary{border-color:var(--line);color
   beliriyor, kutunun sağını yiyor ve panelin dilinde karşılığı yok;
   değer klavyeyle yazılıyor.
 */
-.os-root .panel-content input[type="number"]{-moz-appearance:textfield;appearance:textfield}
-.os-root .panel-content input[type="number"]::-webkit-outer-spin-button,
-.os-root .panel-content input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.os-root :is(.panel-content,.panel-drawer-body) input[type="number"]{-moz-appearance:textfield;appearance:textfield}
+.os-root :is(.panel-content,.panel-drawer-body) input[type="number"]::-webkit-outer-spin-button,
+.os-root :is(.panel-content,.panel-drawer-body) input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 /* Tarih/saat alanının takvim simgesi koyu temada görünmüyordu. */
-.os-root .panel-content input[type="datetime-local"]::-webkit-calendar-picker-indicator,
-.os-root .panel-content input[type="date"]::-webkit-calendar-picker-indicator{opacity:.6;cursor:pointer;filter:invert(var(--takvim-ters,0))}
-html[data-theme="dark"] .os-root .panel-content{--takvim-ters:1}
+.os-root :is(.panel-content,.panel-drawer-body) input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.os-root :is(.panel-content,.panel-drawer-body) input[type="date"]::-webkit-calendar-picker-indicator{opacity:.6;cursor:pointer;filter:invert(var(--takvim-ters,0))}
+html[data-theme="dark"] .os-root :is(.panel-content,.panel-drawer-body){--takvim-ters:1}
 /* Onay kutusu: 13px'lik tarayıcı kutusu yerine markanın rengi ve okunur boy. */
-.os-root .panel-content input[type="checkbox"]{width:16px;height:16px;accent-color:var(--primary);cursor:pointer}
-.os-root .panel-content :is(input,textarea)::placeholder{color:var(--muted)}
-.os-root .panel-content label>:is(span,small):first-child{font-weight:var(--fw-medium)}
+.os-root :is(.panel-content,.panel-drawer-body) input[type="checkbox"]{width:16px;height:16px;accent-color:var(--primary);cursor:pointer}
+.os-root :is(.panel-content,.panel-drawer-body) :is(input,textarea)::placeholder{color:var(--muted)}
+.os-root :is(.panel-content,.panel-drawer-body) label>:is(span,small):first-child{font-weight:var(--fw-medium)}
+
+/*
+  FORM GRUPLARI (16.10.2026). Uzun bir form tek yığın hâlinde duvar
+  oluyor; alanlar başlıklı bölümlere ayrılıyor ("Ne veriyor", "Hangi
+  koşulla"). Önce yalnızca kampanya formunda vardı (.kampanya-alanlar),
+  manuel sipariş penceresi aynı dili isteyince kural buraya taşındı:
+  iki ekranda iki türlü başlık, aynı panelde iki ayrı form dili demek.
+  Başlıklar şeridin kicker'ıyla aynı tonda, çizgi yok — gruplar
+  boşlukla ayrılıyor.
+*/
+.os-root .form-gruplari{display:grid;gap:var(--sp-5)}
+.os-root .form-gruplari h4{
+  margin:0 0 var(--sp-3);color:var(--muted);
+  font-size:var(--fs-micro);font-weight:var(--fw-semibold);letter-spacing:.08em;text-transform:uppercase
+}
 
 /* ---------- Boş durumlar ----------
    ~18 ayrı tasarım vardı; ortak çerçeve: kesik çizgili, ortalanmış, sakin. */

@@ -39,7 +39,7 @@ const liraYazisi = (kurus: number) => (kurus / 100).toLocaleString("tr-TR", { mi
 export function KampanyaAlanlari({ deger, yeniMi }: { deger?: KampanyaDegerleri; yeniMi: boolean }) {
   const tur = deger?.discount_type ?? "percentage";
   return (
-    <div className="kampanya-alanlar">
+    <div className="form-gruplari">
       <section>
         <h4>Ne veriyor</h4>
         <div className="discount-form-grid">

@@ -1,4 +1,5 @@
 import { yetkiYok } from "@/lib/yetki-metni";
+import { siparisRpcHatasi } from "@/lib/siparis-hatasi";
 
 /*
   Siparişler ekranının işlem sonucu metinleri. Metinler eskiden sayfada duruyordu
@@ -22,6 +23,9 @@ export const BASARILAR: Record<string, string> = {
 };
 
 export const hataMetni = (kod: string): string =>
-  ERRORS[kod] ?? (kod.includes(" ") ? kod : "İşlem tamamlanamadı. Lütfen tekrar deneyin.");
+  /* Sıra önemli: önce kendi kodlarımız, sonra veritabanı
+     fonksiyonunun İngilizce hatası (lib/siparis-hatasi), en sonda
+     olduğu gibi basma. */
+  ERRORS[kod] ?? siparisRpcHatasi(kod) ?? (kod.includes(" ") ? kod : "İşlem tamamlanamadı. Lütfen tekrar deneyin.");
 
 export const basariMetni = (kod: string): string => BASARILAR[kod] ?? kod;
