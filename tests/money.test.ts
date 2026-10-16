@@ -29,3 +29,20 @@ test("boş, geçersiz ya da eksi değer 0 olur", () => {
     assert.equal(parseMoneyToCents(value), 0, String(value));
   }
 });
+
+test("form tutarı Türkçe yazımla okunur; okunamayan girdi null", async () => {
+  const { formTutari } = await import("@/lib/money");
+  // 16.10.2026: "1.500" bin beş yüz liraydı, 1,50 ₺ kaydediliyordu.
+  assert.equal(formTutari("1.500"), 150000);
+  assert.equal(formTutari("1.234,56"), 123456);
+  assert.equal(formTutari("12,50"), 1250);
+  assert.equal(formTutari("12.5"), 1250);
+  assert.equal(formTutari("30000.00"), 3000000);
+  assert.equal(formTutari("₺ 1.500"), 150000);
+  // Boş alan 0; harf, eksi ya da yalnızca ayırıcı reddedilir (sessizce 0 ₺ demek yerine).
+  assert.equal(formTutari(""), 0);
+  assert.equal(formTutari(null), 0);
+  assert.equal(formTutari("abc"), null);
+  assert.equal(formTutari("-5"), null);
+  assert.equal(formTutari(","), null);
+});

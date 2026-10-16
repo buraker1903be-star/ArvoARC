@@ -1,5 +1,6 @@
 "use server";
 
+import { formTutari } from "@/lib/money";
 import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
@@ -21,16 +22,17 @@ export async function createProduct(formData: FormData) {
   const sku = String(formData.get("sku") ?? "").trim().toUpperCase();
   const description = String(formData.get("description") ?? "").trim();
   const status = String(formData.get("status") ?? "draft");
-  const priceInput = Number(formData.get("price") ?? 0);
-  const compareAtPriceInput = Number(formData.get("compare_at_price") ?? 0);
+  /* Türkçe yazım (formTutari): "1.500" bin beş yüz liradır, 1,5 değil. */
+  const priceKurus = formTutari(formData.get("price"));
+  const compareKurus = formTutari(formData.get("compare_at_price"));
   const stock = Number(formData.get("stock") ?? 0);
   const allowBackorder = formData.get("allow_backorder") === "on";
 
-  if (!name || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isFinite(compareAtPriceInput) || compareAtPriceInput < 0 || !Number.isInteger(stock)) return await bildirimliDonus("/urunler?yeni=1#yeni-urun",{hata:hataMetni("invalid-product")});
+  if (!name || !sku || priceKurus === null || compareKurus === null || !Number.isInteger(stock)) return await bildirimliDonus("/urunler?yeni=1#yeni-urun",{hata:hataMetni("invalid-product")});
 
   const slug = `${slugla(name, 140)}-${Date.now().toString(36)}`;
-  const price = Math.round(priceInput * 100);
-  const compareAtPrice = compareAtPriceInput > priceInput ? Math.round(compareAtPriceInput * 100) : null;
+  const price = priceKurus;
+  const compareAtPrice = compareKurus > priceKurus ? compareKurus : null;
   const { data: product, error: productError } = await supabase.from("arc_products").insert({ organization_id: organization.id, name, slug, description, status: status === "active" ? "active" : "draft", source: "native", created_by: user.id }).select("id").single();
   if (productError) return await bildirimliDonus("/urunler?yeni=1#yeni-urun",{hata:hataMetni(productError.code ?? "product-create")});
 

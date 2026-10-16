@@ -72,8 +72,8 @@ export default async function DiscountsPage(){
             <div className="discount-form-grid">
               <label className="wide">Kampanya adı<input name="name" required maxLength={160} placeholder="Örn. 2.000 TL Üzeri Ücretsiz Kargo"/></label>
               <label>İndirim türü<select name="discount_type" defaultValue="percentage"><option value="percentage">Sepette yüzde indirim</option><option value="fixed_amount">Sepette sabit tutar indirimi</option><option value="free_shipping">Ücretsiz kargo</option></select></label>
-              <label>İndirim değeri<input name="value" type="number" min="0" step="0.01" defaultValue="10"/><small>Yüzde için 10, sabit indirim için TL tutarı. Ücretsiz kargoda 0.</small></label>
-              <label>Minimum sepet tutarı (₺)<input name="minimum_subtotal" type="number" min="0" step="0.01" defaultValue="0"/></label>
+              <label>İndirim değeri<input name="value" type="text" inputMode="decimal" autoComplete="off" defaultValue="10"/><small>Yüzde için 10, sabit indirim için TL tutarı. Ücretsiz kargoda 0.</small></label>
+              <label>Minimum sepet tutarı (₺)<input name="minimum_subtotal" type="text" inputMode="decimal" autoComplete="off" defaultValue="0"/></label>
               <label>Kupon kodu<input name="code" maxLength={40} placeholder="Örn. ARVO10"/></label>
               <label>Toplam kullanım limiti<input name="usage_limit" type="number" min="1" step="1" placeholder="Limitsiz"/></label>
               <label>Kişi başı kullanım<input name="per_customer_limit" type="number" min="1" step="1" placeholder="Limitsiz"/></label>

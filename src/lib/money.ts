@@ -28,3 +28,23 @@ export function parseMoneyToCents(value: string | undefined | null) {
   const amount = Number(normalized);
   return Number.isFinite(amount) ? Math.max(0, Math.round(amount * 100)) : 0;
 }
+
+/*
+  FORM ALANINDAKİ TUTAR (16.10.2026).
+
+  Panelin para alanları `Number(formData.get(...))` ile okunuyordu:
+  Türkçe'de doğal olan "1.500" (bin beş yüz) 1,5 oluyor ve fiyat, kargo
+  ücreti, iade tutarı BİNDE BİRİNE iniyordu; "1.234,56" NaN olup
+  reddediliyordu. `type="number"` kutusu bunu engellemiyor: Chrome
+  tr-TR'de "1.500" yazılınca değer yine "1.500" gidiyor.
+
+  parseMoneyToCents okunamayanı 0 sayıyor; form için bu yetmez — "abc"
+  yazan kişiye sessizce "0 ₺ kaydedildi" denirdi. Burada boş alan 0,
+  okunamayan ya da eksi girdi null: çağıran reddeder.
+*/
+export function formTutari(value: FormDataEntryValue | string | null | undefined): number | null {
+  const ham = String(value ?? "").replace(/\s/g, "").replace(/₺|TL$/i, "");
+  if (!ham) return 0;
+  if (!/^[0-9.,]+$/.test(ham) || !/[0-9]/.test(ham)) return null;
+  return parseMoneyToCents(ham);
+}

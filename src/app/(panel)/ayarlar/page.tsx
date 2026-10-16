@@ -95,8 +95,8 @@ export default async function Settings(){
       <section className="card settings-section" id="satis-ayarlari">
         <header><h2>Satış ayarları</h2><p>Kargo, ücretsiz kargo eşiği, havale indirimi ve sipariş numarası öneki.</p></header>
         {canManage?<form action={updateSalesSettings} className="settings-form">
-          <label>Kargo ücreti (₺)<input name="shipping_fee" type="number" min="0" max="100000" step="0.01" defaultValue={((settings?.shipping_fee??12000)/100).toFixed(2)} required/></label>
-          <label>Ücretsiz kargo eşiği (₺)<input name="free_shipping_threshold" type="number" min="0" max="1000000" step="0.01" defaultValue={((settings?.free_shipping_threshold??200000)/100).toFixed(2)} required/></label>
+          <label>Kargo ücreti (₺)<input name="shipping_fee" type="text" inputMode="decimal" autoComplete="off" defaultValue={((settings?.shipping_fee??12000)/100).toFixed(2)} required/></label>
+          <label>Ücretsiz kargo eşiği (₺)<input name="free_shipping_threshold" type="text" inputMode="decimal" autoComplete="off" defaultValue={((settings?.free_shipping_threshold??200000)/100).toFixed(2)} required/></label>
           <label>Havale indirimi (%)<input name="bank_transfer_discount_percent" type="number" min="0" max="100" step="0.1" defaultValue={settings?.bank_transfer_discount_percent??3} required/></label>
           <label>Sipariş numarası öneki<input name="order_prefix" maxLength={6} pattern="[A-Za-z]{1,6}" defaultValue={settings?.order_prefix??"AC"} required/></label>
           <p className="list-hint">Sepet tutarı eşiği geçerse kargo alınmaz. Eşik, indirim uygulanmadan önceki ara toplamla karşılaştırılır. Önek her mağazada farklı olmalı: sipariş numaraları çakışırsa ödeme bildirimleri yanlış siparişe düşebilir.</p>

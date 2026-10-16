@@ -1,5 +1,6 @@
 "use server";
 
+import { formTutari } from "@/lib/money";
 import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
@@ -8,8 +9,9 @@ import { trLocalToIso } from "@/lib/tr-time";
 
 const allowedRoles=new Set(["owner","admin","manager"]);
 const clean=(formData:FormData,name:string,max:number)=>String(formData.get(name)??"").trim().slice(0,max);
-/* Sayı olmayan girdi 0 sayılır; öncesinde NaN veritabanına gidiyordu. */
-const cents=(value:FormDataEntryValue|null)=>{const amount=Number(value??0);return Number.isFinite(amount)?Math.max(0,Math.round(amount*100)):0;};
+/* Sayı olmayan girdi 0 sayılır; öncesinde NaN veritabanına gidiyordu.
+   Türkçe yazım (formTutari): "1.500" bin beş yüz liradır, 1,5 değil. */
+const cents=(value:FormDataEntryValue|null)=>formTutari(value)??0;
 
 export async function createDiscount(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
@@ -18,7 +20,8 @@ export async function createDiscount(formData:FormData){
   const name=clean(formData,"name",160);
   const code=clean(formData,"code",40).toUpperCase().replace(/[^A-Z0-9_-]/g,"");
   const type=clean(formData,"discount_type",30);
-  const rawValue=Number(formData.get("value")??0);
+  /* Yüzde "12,5" de yazılabilir: virgül ondalık. */
+  const rawValue=Number(String(formData.get("value")??0).trim().replace(",","."));
   const value=type==="percentage"?Math.round(rawValue):type==="fixed_amount"?cents(formData.get("value")):0;
   const minimumSubtotal=cents(formData.get("minimum_subtotal"));
   const status=formData.get("active")==="on"?"active":"draft";

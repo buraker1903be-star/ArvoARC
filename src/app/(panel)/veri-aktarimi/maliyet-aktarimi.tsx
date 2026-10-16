@@ -1,5 +1,6 @@
 "use client";
 
+import { parseMoneyToCents } from "@/lib/money";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   maliyetOnizle,
@@ -70,7 +71,8 @@ export function MaliyetAktarimi() {
     if (yerImiBagi.current && yerImi) yerImiBagi.current.href = yerImi.kod;
   }, [yerImi]);
 
-  const indirimKurus = () => Math.round(Number(indirim.replace(",", ".")) * 100) || 0;
+  /* Türkçe yazım: "1.500" bin beş yüz liradır, 1,5 değil. */
+  const indirimKurus = () => parseMoneyToCents(indirim);
 
   /*
     Sunucu eylemi hata FIRLATIRSA ekranda hiçbir şey olmuyordu: düğmeye

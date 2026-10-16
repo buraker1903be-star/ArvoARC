@@ -753,7 +753,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             <input type="hidden" name="order_id" value={order.id}/>
             <label>
               İade tutarı (₺)
-              <input name="amount" type="number" min="0" step="0.01" max={(refundable/100).toFixed(2)} placeholder={`${refundedSoFar>0?"Kalanın tamamı":"Tamamı"}: ${(refundable/100).toFixed(2)}`} className="ac-input"/>
+              <input name="amount" type="text" inputMode="decimal" autoComplete="off" placeholder={`${refundedSoFar>0?"Kalanın tamamı":"Tamamı"}: ${(refundable/100).toFixed(2)}`} className="ac-input"/>
             </label>
             <p className="list-hint">
               Boş bırakırsanız {refundedSoFar>0?"kalan tutarın":"siparişin"} tamamı iade edilir ve sipariş kapanır. Bu işlem geri

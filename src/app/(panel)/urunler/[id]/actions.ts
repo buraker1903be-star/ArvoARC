@@ -1,5 +1,6 @@
 "use server";
 
+import { formTutari } from "@/lib/money";
 import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
@@ -125,15 +126,16 @@ export async function createVariant(formData:FormData){
     veride okunabiliyordu (28.09.2026'da canlıda tam bu oldu).
   */
   const title=String(formData.get("title")??"").trim()||sku;
-  const priceInput=Number(formData.get("price")??0);
-  const compareAtPriceInput=Number(formData.get("compare_at_price")??0);
+  /* Türkçe yazım (formTutari): "1.500" bin beş yüz liradır, 1,5 değil. */
+  const priceKurus=formTutari(formData.get("price"));
+  const compareKurus=formTutari(formData.get("compare_at_price"));
   const stock=Number(formData.get("stock")??0);
   const allowBackorder=formData.get("allow_backorder")==="on";
-  if(!productId||!sku||!Number.isFinite(priceInput)||priceInput<0||!Number.isFinite(compareAtPriceInput)||compareAtPriceInput<0||!Number.isInteger(stock)||stock<0)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("invalid-variant")});
+  if(!productId||!sku||priceKurus===null||compareKurus===null||!Number.isInteger(stock)||stock<0)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("invalid-variant")});
 
   const {data:product}=await supabase.from("arc_products").select("id").eq("organization_id",organization.id).eq("id",productId).maybeSingle();
   if(!product)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("product-not-found")});
-  const {error}=await supabase.from("arc_product_variants").insert({organization_id:organization.id,product_id:productId,title,sku,price:Math.round(priceInput*100),compare_at_price:compareAtPriceInput>priceInput?Math.round(compareAtPriceInput*100):null,currency:"TRY",stock,allow_backorder:allowBackorder,attributes:{},external_id:null});
+  const {error}=await supabase.from("arc_product_variants").insert({organization_id:organization.id,product_id:productId,title,sku,price:priceKurus,compare_at_price:compareKurus>priceKurus?compareKurus:null,currency:"TRY",stock,allow_backorder:allowBackorder,attributes:{},external_id:null});
   if(error)return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni(error.code??error.message)});
   revalidatePath("/");revalidatePath("/urunler");revalidatePath(`/urunler/${productId}`);revalidatePath("/stok");
   return await bildirimliDonus(`/urunler/${productId}`,{basari:basariMetni("variant-created")});
@@ -146,10 +148,10 @@ export async function updateVariant(formData: FormData) {
   if (!allowedRoles.has(membership.role)) return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("forbidden")});
 
   const sku = String(formData.get("sku") ?? "").trim().toUpperCase();
-  const priceInput = Number(formData.get("price") ?? 0);
-  const compareAtPriceInput = Number(formData.get("compare_at_price") ?? 0);
+  const priceKurus = formTutari(formData.get("price"));
+  const compareKurus = formTutari(formData.get("compare_at_price"));
   const allowBackorder = formData.get("allow_backorder") === "on";
-  if (!productId || !variantId || !sku || !Number.isFinite(priceInput) || priceInput < 0 || !Number.isFinite(compareAtPriceInput) || compareAtPriceInput < 0) return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("invalid-variant")});
+  if (!productId || !variantId || !sku || priceKurus === null || compareKurus === null) return await bildirimliDonus(`/urunler/${productId}`,{hata:hataMetni("invalid-variant")});
 
   /*
     VARYANT GÖRSELİ ÜRÜNÜN GALERİSİNDEN SEÇİLİYOR. Serbest metin kabul
@@ -170,7 +172,7 @@ export async function updateVariant(formData: FormData) {
 
   const { error } = await supabase
     .from("arc_product_variants")
-    .update({ sku, price: Math.round(priceInput * 100), compare_at_price: compareAtPriceInput > priceInput ? Math.round(compareAtPriceInput * 100) : null, allow_backorder: allowBackorder, image_path: imagePath, updated_at: new Date().toISOString() })
+    .update({ sku, price: priceKurus, compare_at_price: compareKurus > priceKurus ? compareKurus : null, allow_backorder: allowBackorder, image_path: imagePath, updated_at: new Date().toISOString() })
     .eq("id", variantId)
     .eq("product_id", productId)
     .eq("organization_id", organization.id);
@@ -276,11 +278,11 @@ export async function varyantMatrisi(formData: FormData) {
   const donus = `/urunler/${productId}`;
   if (!allowedRoles.has(membership.role)) return await bildirimliDonus(donus, { hata: hataMetni("forbidden") });
 
-  const priceInput = Number(formData.get("price") ?? 0);
-  const compareInput = Number(formData.get("compare_at_price") ?? 0);
+  const priceKurus = formTutari(formData.get("price"));
+  const compareKurus = formTutari(formData.get("compare_at_price"));
   const stock = Number(formData.get("stock") ?? 0);
   const allowBackorder = formData.get("allow_backorder") === "on";
-  if (!productId || !Number.isFinite(priceInput) || priceInput <= 0 || !Number.isFinite(compareInput) || compareInput < 0 || !Number.isInteger(stock) || stock < 0) {
+  if (!productId || priceKurus === null || priceKurus <= 0 || compareKurus === null || !Number.isInteger(stock) || stock < 0) {
     return await bildirimliDonus(donus, { hata: hataMetni("invalid-variant") });
   }
 
@@ -312,14 +314,14 @@ export async function varyantMatrisi(formData: FormData) {
   });
   if (hata) return await bildirimliDonus(donus, { hata });
 
-  const compareAt = compareInput > priceInput ? Math.round(compareInput * 100) : null;
+  const compareAt = compareKurus > priceKurus ? compareKurus : null;
   const { error } = await supabase.from("arc_product_variants").insert(
     satirlar.map((satir) => ({
       organization_id: organization.id,
       product_id: productId,
       title: satir.baslik,
       sku: satir.sku,
-      price: Math.round(priceInput * 100),
+      price: priceKurus,
       compare_at_price: compareAt,
       currency: "TRY",
       stock,

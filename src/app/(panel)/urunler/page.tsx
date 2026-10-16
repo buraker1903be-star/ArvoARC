@@ -297,8 +297,8 @@ export default async function Products({ searchParams }: { searchParams: Promise
           <form action={createProduct} className="catalog-form">
             <label>Ürün adı<input name="name" required maxLength={200} className="ac-input" /></label>
             <label>SKU<input name="sku" required maxLength={80} className="ac-input" /></label>
-            <label>Satış fiyatı (₺)<input name="price" type="number" min="0" step="0.01" required className="ac-input" /></label>
-            <label>Karşılaştırma fiyatı (₺)<input name="compare_at_price" type="number" min="0" step="0.01" placeholder="İndirim yoksa boş" className="ac-input" /></label>
+            <label>Satış fiyatı (₺)<input name="price" type="text" inputMode="decimal" autoComplete="off" required className="ac-input" /></label>
+            <label>Karşılaştırma fiyatı (₺)<input name="compare_at_price" type="text" inputMode="decimal" autoComplete="off" placeholder="İndirim yoksa boş" className="ac-input" /></label>
             <label>Başlangıç stoku<input name="stock" type="number" step="1" required defaultValue="0" className="ac-input" /></label>
             <label>Durum<select name="status" defaultValue="draft" className="ac-input"><option value="draft">Taslak</option><option value="active">Aktif</option></select></label>
             <label className="is-wide">Açıklama<textarea name="description" rows={4} className="ac-input" /></label>

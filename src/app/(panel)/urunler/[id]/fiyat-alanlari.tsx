@@ -91,7 +91,7 @@ export function VaryantFiyatlari(baslangic: Baslangic) {
       <label className="vl-price">
         <span className="vl-label">Fiyat ₺</span>
         <input
-          name="price" type="number" min="0" step="0.01" required
+          name="price" type="text" inputMode="decimal" autoComplete="off" required
           value={f.satis} onChange={(e) => f.satisDegisti(e.target.value)}
           aria-label="Satış fiyatı"
         />
@@ -99,7 +99,7 @@ export function VaryantFiyatlari(baslangic: Baslangic) {
       <label className="vl-compare">
         <span className="vl-label">Karşılaştırma ₺</span>
         <input
-          name="compare_at_price" type="number" min="0" step="0.01"
+          name="compare_at_price" type="text" inputMode="decimal" autoComplete="off"
           value={f.liste} onChange={(e) => f.listeDegisti(e.target.value)}
           placeholder="İndirim yok" aria-label="Karşılaştırma fiyatı"
         />
@@ -127,14 +127,14 @@ export function YeniVaryantFiyatlari(baslangic: Baslangic) {
       <label>
         Satış fiyatı ₺
         <input
-          name="price" type="number" min="0" step="0.01" required className="ac-input"
+          name="price" type="text" inputMode="decimal" autoComplete="off" required className="ac-input"
           value={f.satis} onChange={(e) => f.satisDegisti(e.target.value)}
         />
       </label>
       <label>
         Karşılaştırma fiyatı ₺
         <input
-          name="compare_at_price" type="number" min="0" step="0.01" className="ac-input"
+          name="compare_at_price" type="text" inputMode="decimal" autoComplete="off" className="ac-input"
           value={f.liste} onChange={(e) => f.listeDegisti(e.target.value)}
           placeholder="İndirim yoksa boş"
         />

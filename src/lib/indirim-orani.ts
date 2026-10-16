@@ -1,3 +1,4 @@
+import { formTutari } from "./money";
 /**
  * İndirim oranı ile fiyat ikilisi arasındaki çevrim.
  *
@@ -39,7 +40,10 @@ export function indirimliFiyat(liste: number, oran: number): number | null {
 export function tutar(metin: string): number {
   const sade = metin.trim();
   if (!sade) return Number.NaN;
-  return Number(sade.replace(",", "."));
+  /* Türkçe yazım (16.10.2026): "1.500" bin beş yüz; eskiden
+     Number("1.500") 1,5 veriyordu ve indirim oranı yanlış hesaplanıyordu. */
+  const kurus = formTutari(sade);
+  return kurus === null ? Number.NaN : kurus / 100;
 }
 
 /** Alana yazılacak biçim. Geçersiz sayı alanı boşaltır. */

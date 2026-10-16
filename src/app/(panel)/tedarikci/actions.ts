@@ -1,5 +1,6 @@
 "use server";
 
+import { formTutari } from "@/lib/money";
 import { revalidatePath } from "next/cache";
 import { bildirimliDonus } from "@/lib/panel-bildirim";
 import { basariMetni, hataMetni } from "./mesajlar";
@@ -20,11 +21,12 @@ export async function updateSupplier(formData: FormData) {
 
   const code = String(formData.get("code") ?? "").trim();
   const margin = Number(formData.get("margin_percent") ?? 0);
-  const shipping = Number(formData.get("shipping_markup") ?? 0);
+  /* Türkçe yazım (formTutari): "1.500" bin beş yüz liradır, 1,5 değil. */
+  const shipping = formTutari(formData.get("shipping_markup"));
   const round = Number(formData.get("round_to_kurus") ?? 0);
   /* Ek hizmet bedeli: paketleme, kalite kontrol, etiket gibi
      tedarikçi hizmetlerinin ürün başına maliyeti. */
-  const service = Number(formData.get("service_fee") ?? 0);
+  const service = formTutari(formData.get("service_fee"));
   /* Stok tamponu: tedarikçi stoğu bu değerin altına düşerse
      ürün satışa kapanır. */
   const buffer = Number(formData.get("stock_buffer") ?? 5);
@@ -40,13 +42,13 @@ export async function updateSupplier(formData: FormData) {
   if (!Number.isFinite(margin) || margin < 0 || margin > 500) {
     return await bildirimliDonus("/tedarikci",{hata:hataMetni("invalid-margin")});
   }
-  if (!Number.isFinite(shipping) || shipping < 0 || shipping > 100000) {
+  if (shipping === null || shipping > 100000_00) {
     return await bildirimliDonus("/tedarikci",{hata:hataMetni("invalid-shipping")});
   }
   if (!Number.isFinite(round) || round < 0 || round > 99) {
     return await bildirimliDonus("/tedarikci",{hata:hataMetni("invalid-round")});
   }
-  if (!Number.isFinite(service) || service < 0 || service > 10000) {
+  if (service === null || service > 10000_00) {
     return await bildirimliDonus("/tedarikci",{hata:hataMetni("invalid-service")});
   }
   if (!Number.isInteger(buffer) || buffer < 0 || buffer > 100) {
@@ -58,7 +60,7 @@ export async function updateSupplier(formData: FormData) {
     .update({
       margin_percent: Math.round(margin),
       // Kargo payı, ek hizmet bedeli ve yuvarlama kuruş cinsinden saklanıyor.
-      shipping_markup: Math.round(shipping * 100),
+      shipping_markup: shipping,
       round_to_kurus: Math.round(round),
       /*
         service_fee ve stock_buffer okunuyor ve doğrulanıyordu ama update
@@ -71,7 +73,7 @@ export async function updateSupplier(formData: FormData) {
         "tedarikçi stoğu bu değerin altına düşerse ürün satışa kapanır"
         kuralı kodda uygulanmıyor.
       */
-      service_fee: Math.round(service * 100),
+      service_fee: service,
       stock_buffer: Math.round(buffer),
       publish_directly: publishDirectly,
       updated_at: new Date().toISOString(),
