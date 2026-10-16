@@ -27,7 +27,7 @@ before(async () => {
   db = await veritabani();
 });
 
-async function tohum() {
+async function tohum(gunOnce = 0) {
   await rol(db, "postgres");
   /* Fonksiyon kurumu slug'dan buluyor: 'arvoculture'. */
   await db.exec(`
@@ -40,7 +40,7 @@ async function tohum() {
       (id, organization_id, user_id, order_number, source, status, payment_status, currency,
        subtotal, tax, shipping, total, metadata, created_at, updated_at)
       values ('${SIPARIS}', '${KURUM}', '${MUSTERI}', 'AC-1', 'native', 'fulfilled', 'paid', 'TRY',
-              6000, 0, 0, 6000, '{}'::jsonb, now(), now());
+              6000, 0, 0, 6000, '{}'::jsonb, now() - interval '${gunOnce} days', now());
     insert into public.arc_order_items
       (organization_id, order_id, product_name, sku, quantity, unit_price, total) values
       ('${KURUM}', '${SIPARIS}', 'Kupa', 'KUPA-1', 3, 2000, 6000);
@@ -151,5 +151,52 @@ describe("iade talebi · kalem doğrulaması", () => {
         ["AC-1", JSON.stringify([{ sku: "KUPA-1", quantity: 1 }]), "Beden uymadı"],
         /zaten açık bir iade talebiniz var/i,
       );
+    }));
+});
+
+/*
+  CAYMA SÜRESİ (16.10.2026). Fonksiyon 30 güne kadar talep kabul
+  ediyordu, oysa vitrin ürün sayfasında "14 gün içinde iade" yazıyor.
+  Fark sessizdi: on beşinci günde gelen talep sisteme giriyor, panelde
+  "karar bekliyor" olarak duruyor ve reddetmenin bedelini mağaza
+  ödüyordu ("ama sizin siteniz kabul etti").
+
+  Sınır GÜN SAYISIYLA ölçülüyor (extract(day from now() - created_at)),
+  yani on dördüncü gün hâlâ içeride: "14 gün içinde" sözü böyle okunur.
+*/
+describe("iade talebi · cayma süresi", () => {
+  test("on üçüncü günde talep açılıyor", () =>
+    islem(db, async () => {
+      await tohum(13);
+      await rol(db, "authenticated", MUSTERI);
+      await istek([{ sku: "KUPA-1", quantity: 1 }]);
+
+      await rol(db, "postgres");
+      assert.equal((await talepKalemleri())?.length, 1);
+    }));
+
+  test("SINIR: tam on dördüncü gün hâlâ içeride", () =>
+    islem(db, async () => {
+      await tohum(14);
+      await rol(db, "authenticated", MUSTERI);
+      await istek([{ sku: "KUPA-1", quantity: 1 }]);
+
+      await rol(db, "postgres");
+      assert.equal((await talepKalemleri())?.length, 1, "on dördüncü gün reddedilmemeli");
+    }));
+
+  test("on beşinci günde süre dolmuş", () =>
+    islem(db, async () => {
+      await tohum(15);
+      await rol(db, "authenticated", MUSTERI);
+      await reddedilir(
+        db,
+        `select public.create_arvoculture_return_request($1, $2::jsonb, $3, null)`,
+        ["AC-1", JSON.stringify([{ sku: "KUPA-1", quantity: 1 }]), "Beden uymadı"],
+        /İade süresi dolmuş/,
+      );
+
+      await rol(db, "postgres");
+      assert.equal(await talepKalemleri(), null, "talep hiç açılmamalı");
     }));
 });
