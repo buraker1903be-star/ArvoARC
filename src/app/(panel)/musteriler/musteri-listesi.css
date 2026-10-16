@@ -1,0 +1,7 @@
+/* Müşteriler: ArvoOS liste kalıbına uyarlama (16.10.2026). Düzen components/arvo-ui (talep-*, crm-data-table). */
+.os-root .musteri-listesi{display:grid;gap:var(--sp-4)}
+.os-root .musteri-listesi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .musteri-listesi .talep-bilgi{display:grid;gap:var(--sp-3)}
+.os-root .musteri-listesi .crm-cell-sub{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro);font-weight:var(--fw-regular)}
+.os-root .musteri-listesi .musteri-etiketler{display:flex;flex-wrap:wrap;gap:4px}
+.os-root .musteri-listesi .kayit-serit .is-uyari dd a{color:var(--warning)}

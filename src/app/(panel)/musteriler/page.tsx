@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
-import { Icon } from "@/components/panel/icons";
-import { Notice } from "@/components/panel/notice";
-import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
+import { KNot } from "@/components/arvo-ui/k-ui";
+import { MobilSatir } from "@/components/arvo-ui/mobil-satir";
+import { SatirTiklama } from "@/components/arvo-ui/satir-tiklama";
+import { rozetTonu } from "@/lib/rozet-tonu";
+import "@/components/arvo-ui/kayit-detay.css";
 import { customerTags, currentTime, DAY, daysAgo, loadCustomers, NEW_DAYS, RISK_DAYS, type Customer } from "./customer-data";
-import "./customers.css";
+import "./musteri-listesi.css";
 
 const PAGE_SIZE = 50;
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
@@ -46,7 +48,6 @@ function inSegment(customer: Customer, segment: SegmentKey, now: number) {
   return true;
 }
 
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toLocaleUpperCase("tr-TR") || "M";
 
 export default async function Customers({ searchParams }: { searchParams: Promise<{ q?: string; segment?: string; sort?: string; page?: string }> }) {
   const params = await searchParams;
@@ -74,123 +75,125 @@ export default async function Customers({ searchParams }: { searchParams: Promis
 
   const totalSpent = customers.reduce((sum, customer) => sum + customer.spent, 0);
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <h1>Müşteriler</h1>
-        <p>{customers.length.toLocaleString("tr-TR")} müşteri · müşteri başına {money.format(customers.length ? totalSpent / customers.length / 100 : 0)} · {orderCount.toLocaleString("tr-TR")} siparişten oluşturuldu</p>
-      </div>
-      <div className="ac-bar-actions">
-        {canManage ? <a className="ac-btn" href="/api/disari-aktar/musteriler"><Icon name="download" size={16} />CSV indir</a> : null}
-      </div>
-    </section>
+  const filtreli = Boolean(search) || segment !== "all";
 
-    <div className="ac-stack">
-      {truncated ? <Notice tone="warn" title="Sipariş sayısı çok yüksek">Müşteri görünümü en yeni 20.000 siparişten hesaplandı; daha eski siparişler toplamlara dâhil değil.</Notice> : null}
+  /* ArvoOS'un liste kalıbı (16.10.2026): başlık, segment şeridi, süzgeç ve tablo tek kartta. */
+  return (
+    <main className="talep liste-sayfa musteri-listesi">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker">Satış</small>
+          <h1>Müşteriler</h1>
+          <p className="talep-bas-alt">{customers.length.toLocaleString("tr-TR")} müşteri · müşteri başına {money.format(customers.length ? totalSpent / customers.length / 100 : 0)} · {orderCount.toLocaleString("tr-TR")} siparişten</p>
+        </div>
+        <div className="talep-bas-eylem">
+          {canManage ? <a className="panel-secondary" href="/api/disari-aktar/musteriler">CSV indir</a> : null}
+        </div>
+      </header>
 
-      {/*
-        ÖZET ŞERİDİ KALDIRILDI: dört sayının üçü ekranda zaten vardı.
-        "Toplam müşteri" hem alt başlıkta hem "Tümü" çipinde yazıyor;
-        "Tekrarlayan" ve "Yeni müşteri" kutuları filtre çipleriyle aynı
-        bağlantıya ve aynı sayıya gidiyor. Özgün tek değer müşteri
-        başına harcamaydı, o da alt başlığa taşındı.
+      {truncated ? <KNot ton="uyari">Müşteri görünümü en yeni 20.000 siparişten hesaplandı; daha eski siparişler toplamlara dâhil değil.</KNot> : null}
 
-        Bedeli 114px'di ve liste ekranlarında aynı kalıbı üç kez
-        ölçtük (siparişler, ürünler, stok — 27.09.2026).
-      */}
-
-      <section className="ac ac-pad-sm cust-toolbar">
-        <form className="ac-filter cust-search" role="search">
-          {segment !== "all" ? <input type="hidden" name="segment" value={segment} /> : null}
-          {sort !== "spent" ? <input type="hidden" name="sort" value={sort} /> : null}
-          <input name="q" defaultValue={search} placeholder="Ad veya e-posta ile ara" aria-label="Müşterilerde ara" />
-          <button className="ac-btn ac-btn-primary" type="submit">Ara</button>
-          {search ? <Link prefetch={false} className="ac-btn" href={listHref(state, { q: "", page: 1 })}>Temizle</Link> : null}
-        </form>
-        <nav className="ac-filter" aria-label="Sıralama">
-          {SORTS.map(([key, label]) => (
-            <Link prefetch={false} key={key} className="ac-btn" href={listHref(state, { sort: key, page: 1 })} aria-current={sort === key ? "page" : undefined}>{label}</Link>
+      <nav className="kayit-serit talep-serit" aria-label="Segmente göre süz">
+        <dl>
+          {SEGMENTS.map(([key, label]) => (
+            <div key={key} className={[segment === key ? "is-active" : "", key === "risk" && counts[key] ? "is-uyari" : ""].filter(Boolean).join(" ") || undefined}>
+              <dt>{label}</dt>
+              <dd><Link prefetch={false} href={listHref(state, { segment: key, page: 1 })} aria-current={segment === key ? "page" : undefined}>{counts[key].toLocaleString("tr-TR")}</Link></dd>
+            </div>
           ))}
-        </nav>
-      </section>
-
-      <nav className="ac-filter" aria-label="Müşteri segmenti">
-        {SEGMENTS.map(([key, label]) => (
-          <Link prefetch={false} key={key} className="ac-btn" href={listHref(state, { segment: key, page: 1 })} aria-current={segment === key ? "page" : undefined}>
-            {label}
-            <span className="ac-count" data-tone={key === "risk" && counts[key] ? "warn" : undefined}>{counts[key].toLocaleString("tr-TR")}</span>
-          </Link>
-        ))}
+        </dl>
       </nav>
 
-      <section className="ac table list-table customer-list">
-        <div className="ac-head ac-pad-sm list-table-head">
-          <div>
-            <h3>Müşteri listesi</h3>
-            <p>“Uzun süredir yok”: son siparişi {RISK_DAYS} günden eski. Satıra tıklayarak profili açın.</p>
-          </div>
+      <section className="panel-card talep-bilgi" aria-label="Müşteri listesi">
+        <div className="ekip-suzgec talep-suzgec">
+          {SORTS.map(([key, label]) => (
+            <Link prefetch={false} key={key} href={listHref(state, { sort: key, page: 1 })} className={sort === key ? "is-active" : undefined} aria-current={sort === key ? "page" : undefined}>{label}</Link>
+          ))}
+          <form className="talep-ara" role="search">
+            {segment !== "all" ? <input type="hidden" name="segment" value={segment} /> : null}
+            {sort !== "spent" ? <input type="hidden" name="sort" value={sort} /> : null}
+            <input name="q" defaultValue={search} placeholder="Ad veya e-posta ile ara" aria-label="Müşterilerde ara" />
+          </form>
         </div>
+
         {visible.length ? (
-          <>
-            <div className="list-row th">
-              <span className="cl-avatar" />
-              <span className="cl-name">MÜŞTERİ</span>
-              <span className="cl-orders">SİPARİŞ</span>
-              <span className="cl-spent">NET HARCAMA</span>
-              <span className="cl-last">SON SİPARİŞ</span>
-              <span className="cl-tags">SEGMENT</span>
-            </div>
-            {visible.map((customer) => (
-              <div className="list-row" key={customer.key}>
-                <span className="cl-avatar">{initials(customer.name)}</span>
-                {/* title: satır metni üç nokta ile kırpılıyor, uzun ad ve
-                    e-posta kaydı açmadan okunamıyordu. */}
-                <span className="cl-name">
-                  <Link prefetch={false} className="list-row-link" href={`/musteriler/${encodeURIComponent(customer.key)}`}><b title={customer.name}>{customer.name}</b></Link>
-                  <small title={customer.email || undefined}>{customer.email || "E-posta yok"}</small>
-                </span>
-                <span className="cl-orders"><b>{customer.orders}</b><small>{customer.orders === customer.paidOrders ? "sipariş" : `${customer.orders - customer.paidOrders} iptal/iade`}</small></span>
-                <span className="cl-spent"><b>{money.format(customer.spent / 100)}</b><small>ort. {money.format(customer.paidOrders ? customer.spent / customer.paidOrders / 100 : 0)}</small></span>
-                <span className="cl-last"><b>{dateFormat.format(new Date(customer.lastOrderAt))}</b><small>{daysAgo(customer.lastOrderAt, now)}</small></span>
-                <span className="cl-tags">{customerTags(customer, now).map((tag) => <em className="ac-tag" data-tone={tag.tone} key={tag.label}>{tag.label}</em>)}</span>
-              </div>
-            ))}
-          </>
+          <div className="talep-tablo">
+            <table className="crm-data-table" data-cols="musteriler">
+              <thead>
+                <tr>
+                  <th>Müşteri</th>
+                  <th className="crm-col-amount">Sipariş</th>
+                  <th className="crm-col-amount">Net harcama</th>
+                  <th>Son sipariş</th>
+                  <th>Segment</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((customer) => {
+                  const href = `/musteriler/${encodeURIComponent(customer.key)}`;
+                  const etiketler = customerTags(customer, now);
+                  return (
+                    <tr key={customer.key}>
+                      <td data-label="Müşteri">
+                        <Link prefetch={false} className="crm-row-link" href={href} title={customer.name}>{customer.name}</Link>
+                        <small className="crm-cell-sub" title={customer.email || undefined}>{customer.email || "E-posta yok"}</small>
+                      </td>
+                      <td className="crm-col-amount" data-label="Sipariş">
+                        <b>{customer.orders}</b>
+                        <small className="crm-cell-sub">{customer.orders === customer.paidOrders ? "sipariş" : `${customer.orders - customer.paidOrders} iptal/iade`}</small>
+                      </td>
+                      <td className="crm-col-amount" data-label="Net harcama">
+                        <b>{money.format(customer.spent / 100)}</b>
+                        <small className="crm-cell-sub">ort. {money.format(customer.paidOrders ? customer.spent / customer.paidOrders / 100 : 0)}</small>
+                      </td>
+                      <td data-label="Son sipariş">
+                        {dateFormat.format(new Date(customer.lastOrderAt))}
+                        <small className="crm-cell-sub">{daysAgo(customer.lastOrderAt, now)}</small>
+                      </td>
+                      <td data-label="Segment"><span className="musteri-etiketler">{etiketler.map((tag) => <span className="status-pill" data-tone={rozetTonu(tag.tone)} key={tag.label}>{tag.label}</span>)}</span></td>
+                      <td className="crm-table-actions"><span className="crm-row-chevron" aria-hidden="true">›</span></td>
+                      <MobilSatir
+                        href={href}
+                        baslik={customer.name}
+                        durum={etiketler[0] ? { etiket: etiketler[0].label, ton: rozetTonu(etiketler[0].tone) } : null}
+                        alt={[customer.email || "E-posta yok", `son ${daysAgo(customer.lastOrderAt, now)}`]}
+                        isaretler={[
+                          { metin: money.format(customer.spent / 100), ton: "guclu" },
+                          { metin: `${customer.orders} sipariş`, ton: "sessiz" },
+                        ]}
+                      />
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <SatirTiklama />
+            {pageCount > 1 ? (
+              <nav className="liste-sayfalar" aria-label="Sayfalar">
+                {page > 1 ? <Link prefetch={false} href={listHref(state, { page: page - 1 })}>← Önceki</Link> : <span aria-disabled="true">← Önceki</span>}
+                <b>{Math.min(page, pageCount)} / {pageCount} · {sorted.length.toLocaleString("tr-TR")} müşteri</b>
+                {page < pageCount ? <Link prefetch={false} href={listHref(state, { page: page + 1 })}>Sonraki →</Link> : <span aria-disabled="true">Sonraki →</span>}
+              </nav>
+            ) : null}
+          </div>
         ) : (
           /*
             Müşteri listesi siparişlerden türüyor; hiç müşteri yoksa
-            değiştirilecek bir segment de yok. Yeni mağazaya "segmenti
-            değiştirin" demek, olmayan bir düğmeyi aratmaktı.
+            değiştirilecek bir segment de yok.
           */
-          customers.length === 0 ? (
-            <ListeBos
-              baslik="Henüz müşteri yok."
-              aciklama="Müşteri kaydı siparişlerden oluşuyor: vitrinden ilk sipariş geldiğinde alıcı burada görünür."
-            >
-              <ListeBosEylem href="/siparisler" birincil>Siparişlere git</ListeBosEylem>
-            </ListeBos>
-          ) : (
-            <ListeBos
-              baslik="Bu ölçütlere uygun müşteri yok."
-              aciklama="Ad ve e-postada arama yapılır. Aramayı veya segmenti değiştirin."
-            >
-              <ListeBosEylem href={listHref(state, { q: "", segment: "all", page: 1 })}>Filtreleri temizle</ListeBosEylem>
-            </ListeBos>
-          )
-        )}
-        {/* Kayıt yokken şerit gizli: boş ekran zaten "kayıt yok" diyor ve
-              altındaki ikinci "Kayıt yok" 45px yeri tekrara harcıyordu. */}
-        <div className="list-pagination" data-bos={sorted.length ? undefined : ""}>
-          <span>{sorted.length ? `${(from + 1).toLocaleString("tr-TR")}–${(from + visible.length).toLocaleString("tr-TR")} / ${sorted.length.toLocaleString("tr-TR")} müşteri` : "Kayıt yok"}</span>
-          {pageCount > 1 ? (
-            <div>
-              {page > 1 ? <Link prefetch={false} className="ac-btn" href={listHref(state, { page: page - 1 })}>← Önceki</Link> : <span className="ac-btn" aria-disabled="true">← Önceki</span>}
-              <span className="order-page-number">{Math.min(page, pageCount)} / {pageCount}</span>
-              {page < pageCount ? <Link prefetch={false} className="ac-btn" href={listHref(state, { page: page + 1 })}>Sonraki →</Link> : <span className="ac-btn" aria-disabled="true">Sonraki →</span>}
+          <div className="crm-empty-state talep-bos-kutu">
+            <h2>{customers.length === 0 ? "Henüz müşteri yok" : "Bu ölçütlere uygun müşteri yok"}</h2>
+            <p>{customers.length === 0
+              ? "Müşteri kaydı siparişlerden oluşuyor: vitrinden ilk sipariş geldiğinde alıcı burada görünür."
+              : `Ad ve e-postada arama yapılır. “Uzun süredir yok”: son siparişi ${RISK_DAYS} günden eski.`}</p>
+            <div className="crm-empty-actions">
+              {filtreli ? <Link prefetch={false} className="panel-secondary" href="/musteriler">Süzgeci temizle</Link> : null}
+              {customers.length === 0 ? <Link prefetch={false} className="panel-primary" href="/siparisler">Siparişlere git</Link> : null}
             </div>
-          ) : null}
-        </div>
+          </div>
+        )}
       </section>
-    </div>
-  </>;
+    </main>
+  );
 }

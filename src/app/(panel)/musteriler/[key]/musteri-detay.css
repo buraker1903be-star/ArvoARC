@@ -1,0 +1,10 @@
+/* Müşteri detayı: ArvoOS kayıt detayı kalıbı (16.10.2026). */
+.os-root .musteri-detay{display:grid;gap:var(--sp-4)}
+.os-root .musteri-detay .talep-bas h1{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+.os-root .musteri-detay .talep-bas h1 .status-pill{font-size:var(--fs-sm)}
+.os-root .musteri-detay .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .musteri-detay .kayit-serit small{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro)}
+.os-root .musteri-detay .kayit-serit .is-uyari dd{color:var(--warning)}
+.os-root .musteri-izgara{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:var(--sp-4);align-items:start}
+.os-root .musteri-yan{display:grid;gap:var(--sp-4)}
+@media (max-width:900px){.os-root .musteri-izgara{grid-template-columns:1fr}}

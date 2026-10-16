@@ -4,9 +4,13 @@ import { orderBadge, sourceLabel } from "@/lib/commerce-labels";
 import { countsAsRevenue, revenueAmount } from "@/lib/order-flow";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { requireTenant } from "@/lib/tenant";
-import { Icon } from "@/components/panel/icons";
 import { currentTime, customerTags, DAY, daysAgo, type Customer } from "../customer-data";
+import { KKart, KListe, KOge } from "@/components/arvo-ui/k-ui";
+import { rozetTonu } from "@/lib/rozet-tonu";
+// Yan kartların tanım listesi ve favori ürünler (customer-dl, customer-fav) hâlâ orada.
 import "../customers.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./musteri-detay.css";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 const dateFormat = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Istanbul" });
@@ -91,75 +95,71 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
   }
   const topProducts = [...favourites.values()].sort((a, b) => b.quantity - a.quantity || b.total - a.total).slice(0, 5);
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <Link prefetch={false} className="customer-back" href="/musteriler">← Müşteriler</Link>
-        <h1>{customerName}</h1>
-        <p>{customerEmail || "E-posta bilgisi yok"} · {dateFormat.format(new Date(firstAt))} tarihinden beri müşteri</p>
-      </div>
-      <div className="customer-head-actions">
-        {customerTags(summary, now).map((tag) => <em className="ac-tag" data-tone={tag.tone} key={tag.label}>{tag.label}</em>)}
-        {customerEmail ? <a className="ac-btn" href={`mailto:${customerEmail}`}><Icon name="mail" size={16} />E-posta gönder</a> : null}
-      </div>
-    </section>
+  /*
+    ArvoOS'un kayıt detayı kalıbı (16.10.2026): başlık, özet şeridi, solda
+    geçmiş (iOS listesi), sağda kartlar. Sipariş geçmişi eskiden kendi
+    ızgarasıydı (customers.css → co-*); artık konsolun liste satırı.
+  */
+  const etiketler = customerTags(summary, now);
+  return (
+    <main className="talep musteri-detay">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker"><Link prefetch={false} href="/musteriler">Müşteriler</Link></small>
+          <h1>{customerName} {etiketler.map((tag) => <span className="status-pill" data-tone={rozetTonu(tag.tone)} key={tag.label}>{tag.label}</span>)}</h1>
+          <p className="talep-bas-alt">{customerEmail || "E-posta bilgisi yok"} · {dateFormat.format(new Date(firstAt))} tarihinden beri müşteri</p>
+        </div>
+        <div className="talep-bas-eylem">
+          {customerEmail ? <a className="panel-secondary" href={`mailto:${customerEmail}`}>E-posta gönder</a> : null}
+        </div>
+      </header>
 
-    <div className="ac-stack">
-      <section className="ac-metrics" aria-label="Müşteri özeti">
-        <article className="ac-metric"><span>Sipariş</span><strong>{orders.length}</strong><small>{orders.length === paidOrders.length ? "Tamamı geçerli" : `${orders.length - paidOrders.length} iptal veya iade`}</small></article>
-        <article className="ac-metric"><span>Net harcama</span><strong>{money.format(totalSpent / 100)}</strong><small>İptal ve iadeler hariç</small></article>
-        <article className="ac-metric"><span>Ortalama sepet</span><strong>{money.format(averageOrder / 100)}</strong><small>Geçerli sipariş başına</small></article>
-        <article className="ac-metric" data-tone={now - lastAt > 120 * DAY ? "warn" : undefined}><span>Son sipariş</span><strong>{shortDate.format(new Date(lastAt))}</strong><small>{daysAgo(lastAt, now)}</small></article>
-      </section>
+      <nav className="kayit-serit talep-serit" aria-label="Müşteri özeti">
+        <dl>
+          <div><dt>Sipariş</dt><dd>{orders.length}</dd><small>{orders.length === paidOrders.length ? "tamamı geçerli" : `${orders.length - paidOrders.length} iptal veya iade`}</small></div>
+          <div><dt>Net harcama</dt><dd>{money.format(totalSpent / 100)}</dd><small>iptal ve iadeler hariç</small></div>
+          <div><dt>Ortalama sepet</dt><dd>{money.format(averageOrder / 100)}</dd><small>geçerli sipariş başına</small></div>
+          <div className={now - lastAt > 120 * DAY ? "is-uyari" : undefined}><dt>Son sipariş</dt><dd>{shortDate.format(new Date(lastAt))}</dd><small>{daysAgo(lastAt, now)}</small></div>
+        </dl>
+      </nav>
 
-      <div className="customer-layout">
-        <section className="ac table list-table customer-orders">
-          <div className="ac-head ac-pad-sm list-table-head">
-            <div><h3>Sipariş geçmişi</h3><p>{orders.length} sipariş · en yeniden eskiye</p></div>
-          </div>
-          <div className="list-row th">
-            <span className="co-main">SİPARİŞ</span>
-            <span className="co-source">KAYNAK</span>
-            <span className="co-amount">TUTAR</span>
-            <span className="co-status">DURUM</span>
-          </div>
-          {orders.map((order) => {
-            const badge = orderBadge(order.status, order.payment_status);
-            return (
-              <div className="list-row" key={order.id}>
-                <span className="co-main">
-                  <Link prefetch={false} className="list-row-link" href={`/siparisler/${order.id}`}><b>{order.order_number}</b></Link>
-                  <small>{shortDate.format(new Date(order.created_at))}</small>
-                </span>
-                <span className="co-source">{sourceLabel(order.source)}</span>
-                <span className="co-amount">{money.format(order.total / 100)}</span>
-                <span className="co-status"><em className="ac-tag" data-tone={badge.tone}>{badge.label}</em></span>
-              </div>
-            );
-          })}
-        </section>
+      <div className="musteri-izgara">
+        <KKart baslik="Sipariş geçmişi" aciklama={`${orders.length} sipariş · en yeniden eskiye`}>
+          <KListe>
+            {orders.map((order) => {
+              const badge = orderBadge(order.status, order.payment_status);
+              return (
+                <KOge
+                  key={order.id}
+                  href={`/siparisler/${order.id}`}
+                  baslik={order.order_number}
+                  alt={`${shortDate.format(new Date(order.created_at))} · ${sourceLabel(order.source)}`}
+                  durum={{ etiket: badge.label, ton: rozetTonu(badge.tone) }}
+                  deger={money.format(order.total / 100)}
+                />
+              );
+            })}
+          </KListe>
+        </KKart>
 
-        <aside className="customer-side">
-          <section className="ac ac-pad customer-card">
-            <h3>İletişim</h3>
+        <aside className="musteri-yan">
+          <KKart baslik="İletişim">
             <dl className="customer-dl">
               <div><dt>E-posta</dt><dd>{customerEmail ? <a href={`mailto:${customerEmail}`}>{customerEmail}</a> : "Bulunmuyor"}</dd></div>
               <div><dt>Telefon</dt><dd>{address?.phone ? <a href={`tel:${address.phone}`}>{address.phone}</a> : "Bulunmuyor"}</dd></div>
               <div><dt>Son teslimat adresi</dt><dd>{addressLines.length ? addressLines.join(", ") : "Adres bilgisi bulunmuyor"}</dd></div>
             </dl>
-          </section>
+          </KKart>
 
-          <section className="ac ac-pad customer-card">
-            <h3>Alışveriş alışkanlığı</h3>
+          <KKart baslik="Alışveriş alışkanlığı">
             <dl className="customer-dl">
               <div><dt>Sipariş sıklığı</dt><dd>{cadence ? `Ortalama ${cadence.toLocaleString("tr-TR")} günde bir` : "Tek sipariş"}</dd></div>
               <div><dt>İlk sipariş</dt><dd>{dateFormat.format(new Date(firstAt))}</dd></div>
               <div><dt>Son sipariş</dt><dd>{dateFormat.format(new Date(lastAt))} · {daysAgo(lastAt, now)}</dd></div>
             </dl>
-          </section>
+          </KKart>
 
-          <section className="ac ac-pad customer-card">
-            <h3>En çok aldığı ürünler</h3>
+          <KKart baslik="En çok aldığı ürünler">
             {topProducts.length ? (
               <ul className="customer-fav">
                 {topProducts.map((product) => (
@@ -170,9 +170,9 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
                 ))}
               </ul>
             ) : <p className="customer-muted">Ürün kalemi bulunmuyor.</p>}
-          </section>
+          </KKart>
         </aside>
       </div>
-    </div>
-  </>;
+    </main>
+  );
 }
