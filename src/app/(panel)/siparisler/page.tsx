@@ -272,7 +272,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     <main className="talep liste-sayfa siparis-listesi">
       <header className="talep-bas">
         <div className="talep-bas-metin">
-          <small className="panel-kicker">Satış</small>
+          <small className="panel-kicker">Siparişler</small>
           <h1>Siparişler</h1>
           <p className="talep-bas-alt">{counts.all.toLocaleString("tr-TR")} sipariş · {periodLabel}{search ? ` · “${search}”` : ""}</p>
         </div>
@@ -280,7 +280,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
           {canManage ? <a className="panel-secondary" href="/api/disari-aktar/siparisler">CSV indir</a> : null}
           {/* Manuel sipariş çekmecede: eskiden listenin dibinde açılır bir karttı. */}
           {canManage ? (
-            <PanelDrawer triggerLabel="+ Manuel sipariş" title="Manuel sipariş" kicker="Satış" description="Telefonla veya elden alınan siparişler için · çok kalemli" genis>
+            <PanelDrawer triggerLabel="+ Manuel sipariş" title="Manuel sipariş" kicker="Siparişler" description="Telefonla veya elden alınan siparişler için · çok kalemli" genis>
               <OrderForm variants={variantOptions} />
             </PanelDrawer>
           ) : null}

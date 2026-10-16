@@ -14,6 +14,10 @@ const YOLLAR: Record<OsIkon | YardimciSimge, React.ReactNode> = {
   home: <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
   satis: <><path d="M5 8h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></>,
   katalog: <><path d="M21 7.5 12 3 3 7.5v9L12 21l9-4.5z" /><path d="M3 7.5 12 12l9-4.5M12 12v9" /></>,
+  /* İade: geri dönen ok; indirim: yüzdeli etiket; finans: ArvoOS'un finans kartı. */
+  iade: <><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></>,
+  indirim: <><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" /><path d="m9.5 13.5 4-4" /><circle cx="9.5" cy="9.5" r=".8" fill="currentColor" stroke="none" /><circle cx="13.5" cy="13.5" r=".8" fill="currentColor" stroke="none" /></>,
+  finans: <><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10h18M16 14.5h2" /></>,
   analiz: <><path d="M4 20V4M4 20h16" /><path d="M8 16v-4M12 16V8M16 16v-6" /></>,
   tedarik: <><path d="M3 6h11v10H3zM14 9h4l3 3.5V16h-7" /><circle cx="7" cy="17.5" r="1.8" /><circle cx="17" cy="17.5" r="1.8" /></>,
   magaza: <><path d="M4 9.5 5.5 4h13L20 9.5" /><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0" /><path d="M5.5 11.5V20h13v-8.5M10 20v-5h4v5" /></>,

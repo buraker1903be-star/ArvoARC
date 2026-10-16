@@ -168,7 +168,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
   return <main className="talep analiz-sayfasi">
     <header className="talep-bas">
       <div className="talep-bas-metin">
-        <small className="panel-kicker">Analiz</small>
+        <small className="panel-kicker">Finans</small>
         <h1>Satış analitiği</h1>
         <p className="talep-bas-alt">{periodLabel} · önceki eşit dönemle karşılaştırmalı · iptal ve iadeler ciroya dâhil değil</p>
       </div>

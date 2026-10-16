@@ -43,7 +43,10 @@ export function OsDock({ uygulamalar, digerUygulamalar }: { uygulamalar: OsUygul
   const pencere = useRef<HTMLDialogElement>(null);
   const etkin = etkinUygulama(uygulamalar, yol);
   const home = uygulamalar.find((u) => u.key === "home");
-  const dockta = uygulamalar.filter((u) => u.key !== "home" && u.key !== "settings" && !u.yalnizBaslatici);
+  /* ArvoOS'tan farkı: Ayarlar DOCK'TA (16.10.2026, kurum sahibinin dizilimi:
+     Ana Sayfa · Siparişler · İadeler · İndirimler · Finans · Katalog · Tedarik ·
+     Ayarlar · Tüm Uygulamalar). ArvoOS'ta Ayarlar yalnızca başlatıcıda. */
+  const dockta = uygulamalar.filter((u) => u.key !== "home" && !u.yalnizBaslatici);
 
   const zaman = useGecikme();
   /* Açıldığı sayfa da tutulur: sayfa değişince ikinci dock kendiliğinden

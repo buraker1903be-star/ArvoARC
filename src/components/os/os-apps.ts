@@ -15,7 +15,7 @@
 */
 
 export type OsIkon =
-  | "home" | "satis" | "katalog" | "analiz" | "tedarik" | "settings" | "apps" | "magaza";
+  | "home" | "satis" | "iade" | "indirim" | "finans" | "katalog" | "analiz" | "tedarik" | "settings" | "apps" | "magaza";
 
 /** altYollar: bölümün kendi yolu dışında onu etkin sayan yollar. */
 export type Bolum = { key: string; href: string; label: string; altYollar?: string[] };
@@ -40,41 +40,55 @@ export type OsSayfa = { label: string; href: string; uygulama: string };
 export const ANA_SAYFA = "/";
 
 /*
-  Uygulamalar ArvoARC'ın eski menü gruplarından (SATIŞ, KATALOG, ANALİZ,
-  SİSTEM) türedi. Sistem ikiye ayrıldı: tedarikçi ve veri aktarımı
-  günlük bir İŞ, mağaza ayarları bir kez kurulan bir YAPILANDIRMA —
-  dock'ta ArvoOS'taki gibi Ayarlar en sağda, ayrı.
+  DOCK DİZİLİMİ (16.10.2026, kurum sahibinin tarifi): Ana Sayfa ·
+  Siparişler · İadeler · İndirimler · Finans · Katalog · Tedarik ·
+  Ayarlar · Tüm Uygulamalar. İlk taslakta Satış (siparişler, iadeler,
+  müşteriler, operasyon) tek uygulamaydı; günlük işin ilk üçü ayrı
+  simgelere çıktı. Alt menüler (bölümler) kurum sahibinin gözden
+  geçirmesini bekliyor: Operasyon merkezi ve Müşteriler şimdilik
+  Siparişler'in, satış analitiği Finans'ın altında.
 
-  Tema (/tema) bilerek menüde yoktu (vitrin teması, ileri düzey); Ayarlar'ın
-  bölümü oldu ama yol öneki Ayarlar uygulamasında.
+  Yol öneklerinde UZUNLUK önemli: "/siparisler/iadeler" İadeler'e,
+  "/siparisler/<id>" Siparişler'e düşer (etkinUygulama en uzun eşleşeni seçer).
 */
 export function arcUygulamalari(rozet?: { operasyon?: number; iade?: number }): OsUygulama[] {
   const operasyon = Math.max(0, Math.round(rozet?.operasyon ?? 0));
+  const iade = Math.max(0, Math.round(rozet?.iade ?? 0));
   return [
-    { key: "home", label: "Ana Ekran", href: ANA_SAYFA, ikon: "home", yollar: [] },
+    { key: "home", label: "Ana Sayfa", href: ANA_SAYFA, ikon: "home", yollar: [] },
     {
-      key: "satis", label: "Satış", href: "/operasyon", ikon: "satis",
-      yollar: ["/operasyon", "/siparisler", "/musteriler"],
+      key: "siparisler", label: "Siparişler", href: "/siparisler", ikon: "satis",
+      yollar: ["/siparisler", "/operasyon", "/musteriler"],
       ...(operasyon ? { rozet: operasyon } : {}),
       bolumler: [
-        { key: "operasyon", href: "/operasyon", label: "Operasyon merkezi" },
         { key: "siparisler", href: "/siparisler", label: "Siparişler" },
-        { key: "iadeler", href: "/siparisler/iadeler", label: "İadeler" },
+        { key: "operasyon", href: "/operasyon", label: "Operasyon merkezi" },
         { key: "musteriler", href: "/musteriler", label: "Müşteriler" },
       ],
     },
     {
+      key: "iadeler", label: "İadeler", href: "/siparisler/iadeler", ikon: "iade",
+      yollar: ["/siparisler/iadeler"],
+      ...(iade ? { rozet: iade } : {}),
+    },
+    { key: "indirimler", label: "İndirimler", href: "/indirimler", ikon: "indirim", yollar: ["/indirimler"] },
+    {
+      key: "finans", label: "Finans", href: "/analitik", ikon: "finans",
+      yollar: ["/analitik"],
+      bolumler: [
+        { key: "analitik", href: "/analitik", label: "Satış analitiği" },
+      ],
+    },
+    {
       key: "katalog", label: "Katalog", href: "/urunler", ikon: "katalog",
-      yollar: ["/urunler", "/koleksiyonlar", "/stok", "/medya", "/indirimler"],
+      yollar: ["/urunler", "/koleksiyonlar", "/stok", "/medya"],
       bolumler: [
         { key: "urunler", href: "/urunler", label: "Ürünler" },
         { key: "koleksiyonlar", href: "/koleksiyonlar", label: "Koleksiyonlar" },
         { key: "stok", href: "/stok", label: "Stok" },
         { key: "medya", href: "/medya", label: "Medya" },
-        { key: "indirimler", href: "/indirimler", label: "İndirimler" },
       ],
     },
-    { key: "analiz", label: "Analiz", href: "/analitik", ikon: "analiz", yollar: ["/analitik"] },
     {
       key: "tedarik", label: "Tedarik", href: "/tedarikci", ikon: "tedarik",
       yollar: ["/tedarikci", "/veri-aktarimi"],

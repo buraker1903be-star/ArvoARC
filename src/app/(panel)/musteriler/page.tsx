@@ -82,7 +82,7 @@ export default async function Customers({ searchParams }: { searchParams: Promis
     <main className="talep liste-sayfa musteri-listesi">
       <header className="talep-bas">
         <div className="talep-bas-metin">
-          <small className="panel-kicker">Satış</small>
+          <small className="panel-kicker">Siparişler</small>
           <h1>Müşteriler</h1>
           <p className="talep-bas-alt">{customers.length.toLocaleString("tr-TR")} müşteri · müşteri başına {money.format(customers.length ? totalSpent / customers.length / 100 : 0)} · {orderCount.toLocaleString("tr-TR")} siparişten</p>
         </div>

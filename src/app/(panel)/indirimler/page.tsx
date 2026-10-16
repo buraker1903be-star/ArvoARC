@@ -57,7 +57,7 @@ export default async function DiscountsPage({searchParams}:{searchParams:Promise
     <main className="talep liste-sayfa indirim-sayfasi">
       <header className="talep-bas">
         <div className="talep-bas-metin">
-          <small className="panel-kicker">Katalog</small>
+          <small className="panel-kicker">İndirimler</small>
           <h1>İndirimler</h1>
           <p className="talep-bas-alt">Ürün indirimi, kupon ve kargo kuralları.</p>
         </div>
@@ -139,7 +139,7 @@ export default async function DiscountsPage({searchParams}:{searchParams:Promise
       </KKart>
 
       {pencere?(
-        <Pencere key="yeni" ust="Katalog" baslik="Yeni indirim paketi" kapatAdresi="/indirimler">
+        <Pencere key="yeni" ust="İndirimler" baslik="Yeni indirim paketi" kapatAdresi="/indirimler">
           <p className="indirim-pencere-alt">Kupon kodunu boş bırakırsanız kural sepette otomatik uygulanır.</p>
           <form action={createDiscount}>
             <div className="discount-form-grid">

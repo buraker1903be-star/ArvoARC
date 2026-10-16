@@ -122,7 +122,7 @@ export default async function ReturnsPage({
     <main className="talep liste-sayfa iade-listesi">
       <header className="talep-bas">
         <div className="talep-bas-metin">
-          <small className="panel-kicker">Satış</small>
+          <small className="panel-kicker">İadeler</small>
           <h1>İade talepleri</h1>
           <p className="talep-bas-alt">{counts.beklemede ? `${counts.beklemede} talep karar bekliyor.` : "Karar bekleyen talep yok."}</p>
         </div>
