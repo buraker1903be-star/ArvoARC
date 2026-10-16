@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
-import { PanelBildirimi } from "@/components/panel/bildirim";
+import { rozetTonu } from "@/lib/rozet-tonu";
 import { updateCollection } from "../actions";
 import "../../catalog.css";
 import "../../modules.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "../koleksiyon-listesi.css";
 
 type Membership={product_id:string;position:number|null};
 type ProductRow={id:string;name:string;status:string;source:string|null;metadata:unknown};
@@ -54,21 +56,17 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
   const memberSet=new Set(memberIds);
   const candidates=((candidateResult.data??[]) as ProductRow[]).filter(product=>!memberSet.has(product.id));
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <Link prefetch={false} className="product-back" href="/koleksiyonlar">← Koleksiyonlar</Link>
-        <h1>{collection.title}</h1>
-        <p>/koleksiyon/{collection.slug} · {members.length.toLocaleString("tr-TR")} ürün · {collection.source==="shopify"?"Shopify eşlemesi":"ArvoARC"}</p>
+  /* ArvoOS kayıt detayı başlığı (16.10.2026); ürün seçici düzenleyici aynen. */
+  return <main className="talep koleksiyon-detay">
+    <header className="talep-bas">
+      <div className="talep-bas-metin">
+        <small className="panel-kicker"><Link prefetch={false} href="/koleksiyonlar">Koleksiyonlar</Link></small>
+        <h1>{collection.title} <span className="status-pill" data-tone={rozetTonu(collection.status==="active"?"good":collection.status==="draft"?"warn":"muted")}>{collection.status==="active"?"Aktif":collection.status==="draft"?"Taslak":"Arşivlenmiş"}</span></h1>
+        <p className="talep-bas-alt">/koleksiyon/{collection.slug} · {members.length.toLocaleString("tr-TR")} ürün · {collection.source==="shopify"?"Shopify eşlemesi":"ArvoARC"}</p>
       </div>
-      <div className="product-head-actions"><em className="ac-tag" data-tone={collection.status==="active"?"good":collection.status==="draft"?"warn":"muted"}>{collection.status==="active"?"Aktif":collection.status==="draft"?"Taslak":"Arşivlenmiş"}</em></div>
-    </section>
+    </header>
 
     <div className="ac-stack">
-      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
-          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
-          gösterebiliyordu (lib/panel-bildirim.ts). */}
-      <PanelBildirimi />
 
       {canManage?<>
         {/* Ayrı form: kaydetme formunun içine yerleştirilemez (iç içe form). */}
@@ -107,5 +105,5 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
         </form>
       </>:<p className="list-hint">Bu koleksiyonu düzenleme yetkiniz bulunmuyor.</p>}
     </div>
-  </>;
+  </main>;
 }
