@@ -25,6 +25,7 @@ import { rozetTonu } from "@/lib/rozet-tonu";
 import "../orders.css";
 import "@/components/arvo-ui/kayit-detay.css";
 import "./siparis-detay.css";
+import { formatPersonName } from "@/lib/format-name";
 
 const money=(value:number,currency:string)=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:currency||"TRY"}).format(value/100);
 /* Sunucu UTC'de çalışıyor; saat Türkiye saatine göre gösterilir. */
@@ -296,7 +297,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         <div className="talep-bas-metin">
           <small className="panel-kicker"><Link prefetch={false} href="/siparisler" className="order-noprint">Siparişler</Link></small>
           <h1>{order.order_number} <span className="status-pill" data-tone={rozetTonu(badge.tone)}>{badge.label}</span></h1>
-          <p className="talep-bas-alt">{when(order.created_at)} · {order.customer_name||order.customer_email||"Misafir müşteri"} · {sourceLabel(order.source)}</p>
+          <p className="talep-bas-alt">{when(order.created_at)} · {formatPersonName(order.customer_name)||order.customer_email||"Misafir müşteri"} · {sourceLabel(order.source)}</p>
         </div>
         <div className="talep-bas-eylem order-noprint">
           {PENCERELER.filter((p)=>p.gorunur).map((p)=>(
@@ -392,7 +393,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
       <section className="siparis-taraflar">
         <article className="panel-card order-party">
           <small>MÜŞTERİ</small>
-          <p><b>{order.customer_name||"İsimsiz müşteri"}</b></p>
+          <p><b>{formatPersonName(order.customer_name)||"İsimsiz müşteri"}</b></p>
           {order.customer_email?<p><a href={`mailto:${order.customer_email}`}>{order.customer_email}</a></p>:<p className="is-empty">E-posta yok</p>}
           {meta.notes?<p className="order-party-note"><b>Müşteri notu:</b> {meta.notes}</p>:null}
         </article>

@@ -11,6 +11,7 @@ import { rozetTonu } from "@/lib/rozet-tonu";
 import "../customers.css";
 import "@/components/arvo-ui/kayit-detay.css";
 import "./musteri-detay.css";
+import { formatPersonName } from "@/lib/format-name";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" });
 const dateFormat = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Istanbul" });
@@ -56,7 +57,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
 
   const latestOrder = orders[0];
   const firstOrder = orders[orders.length - 1];
-  const customerName = latestOrder.customer_name?.trim() || "İsimsiz müşteri";
+  const customerName = formatPersonName(latestOrder.customer_name) || "İsimsiz müşteri";
   const customerEmail = latestOrder.customer_email?.trim() || "";
   const paidOrders = orders.filter((order) => countsAsRevenue(order.status, order.payment_status));
   const totalSpent = paidOrders.reduce((sum, order) => sum + revenueAmount({ ...order, refunded_amount: (order.metadata as { refunded_amount?: unknown } | null)?.refunded_amount }), 0);

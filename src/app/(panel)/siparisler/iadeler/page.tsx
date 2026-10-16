@@ -9,6 +9,7 @@ import "@/components/arvo-ui/k-ui";
 import "@/components/arvo-ui/kayit-detay.css";
 import "./iadeler.css";
 import { iadeTedarikcileri, iadeYonu, type GonderiEslesme, type SiparisKalemiEslesme } from "@/lib/iade-yonlendirme";
+import { formatPersonName } from "@/lib/format-name";
 
 export const dynamic = "force-dynamic";
 
@@ -189,7 +190,7 @@ export default async function ReturnsPage({
                     {order ? <Link prefetch={false} href={`/siparisler/${request.order_id}`}>{order.order_number}</Link> : "Sipariş bulunamadı"}
                   </h3>
                   <p>
-                    {order?.customer_name || order?.customer_email || "Müşteri"} · {dateTime.format(new Date(request.created_at))}
+                    {formatPersonName(order?.customer_name) || order?.customer_email || "Müşteri"} · {dateTime.format(new Date(request.created_at))}
                   </p>
                 </div>
                 <span className="status-pill" data-tone={rozetTonu(state.tone)}>{state.label}</span>

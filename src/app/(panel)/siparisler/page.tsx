@@ -11,6 +11,10 @@ import { gorunumSorgusu, SIPARIS_DONEMLERI, SIPARIS_DURUMLARI } from "@/lib/kayi
 import { OrderForm } from "./order-form";
 import { OrderTable, type OrderRow } from "./order-table";
 import { PanelDrawer } from "@/components/arvo-ui/panel-drawer";
+import { IstatistikKarti, degisimYazisi, kisaPara, tamPara } from "@/components/arvo-ui/istatistik-karti";
+import { fetchAllRows } from "@/lib/fetch-all";
+import { formatPersonName } from "@/lib/format-name";
+import { istatistikBaslangici, siparisIstatistikleri, type IstatistikSiparisi } from "@/lib/siparis-istatistik";
 // Liste kalıbı (talep-*, crm-data-table) ve kart dili: sayfa kullandığı sınıfın CSS'ini kendi import eder.
 import "@/components/arvo-ui/k-ui";
 import "@/components/arvo-ui/crm.css";
@@ -58,6 +62,11 @@ function listHref(state: ListState, patch: Partial<ListState>) {
   return text ? `/siparisler?${text}` : "/siparisler";
 }
 
+/* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın (Ana Ekran ile aynı). */
+function simdi() {
+  return Date.now();
+}
+
 type Params = { q?: string; filter?: string; period?: string; page?: string; kargo?: string };
 
 export default async function Orders({ searchParams }: { searchParams: Promise<Params> }) {
@@ -90,7 +99,6 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   */
   const aktifSorgu = gorunumSorgusu("siparisler", params as Record<string, string | undefined>);
   const since = periodStart(period);
-  const periodLabel = PERIODS.find(([key]) => key === period)?.[2] ?? "Tüm zamanlar";
 
   /* Arama ve dönem hem listeye hem sekme sayaçlarına uygulanır. */
   type Filterable<T> = { gte(column: string, value: string): T; or(filters: string): T };
@@ -134,11 +142,27 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   const from = (page - 1) * PAGE_SIZE;
 
   /*
+    İSTATİSTİK PENCERESİ (sağdaki kart): son altı ay, süzgeçten bağımsız.
+    1000'lik sayfalarla okunuyor (Ana Ekran ve Analitik ile aynı yöntem):
+    tek istek Supabase'in satır tavanında kesilir ve yoğun ayda sayılar
+    sessizce eksilirdi. Yalnızca hesabın gerektirdiği sütunlar.
+  */
+  const istatistikAni = simdi();
+  const istatistikPenceresi = fetchAllRows<IstatistikSiparisi>((bas, son) =>
+    supabase.from("arc_orders")
+      .select("total,status,payment_status,refunded_amount:metadata->refunded_amount,created_at,source")
+      .eq("organization_id", organization.id)
+      .gte("created_at", new Date(istatistikBaslangici(istatistikAni)).toISOString())
+      .order("created_at", { ascending: false })
+      .range(bas, son) as unknown as PromiseLike<{ data: IstatistikSiparisi[] | null; error: { message: string } | null }>,
+  );
+
+  /*
     Manuel sipariş için varyant listesi yalnızca yetkili kullanıcıda
     çekilir. Tüm katalog değil, kendi ürünlerimiz: manuel sipariş
     telefonla gelen siparişler için, tedarikçi kataloğu için değil.
   */
-  const [listResult, variantsResult, returnsResult, sorunluResult, siparisSayimi, gorunumler, ...countResults] = await Promise.all([
+  const [listResult, variantsResult, returnsResult, sorunluResult, siparisSayimi, gorunumler, istatistikSonucu, ...countResults] = await Promise.all([
     listQuery.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
     canManage
       ? supabase.from("arc_product_variants").select("id,product_id,sku,price,stock,allow_backorder").eq("organization_id", organization.id).is("supplier", null).order("sku").limit(500)
@@ -153,6 +177,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     */
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
     gorunumleriOku(supabase, organization.id, "siparisler"),
+    istatistikPenceresi,
     ...STATUS_TABS.map(([key]) => countQuery(key)),
   ]);
 
@@ -223,7 +248,9 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   const rows: OrderRow[] = (listResult.data ?? []).map((order) => ({
     id: order.id,
     number: order.order_number,
-    customer: order.customer_name || order.customer_email || "Misafir müşteri",
+    /* Ad "Adı Soyadı" biçiminde (lib/format-name): vitrinde müşteri kendisi
+       yazıyor, aynı listede BÜYÜK ve küçük harfli adlar yan yana duruyordu. */
+    customer: formatPersonName(order.customer_name) || order.customer_email || "Misafir müşteri",
     email: order.customer_name ? order.customer_email ?? "" : "",
     source: sourceLabel(order.source),
     total: money.format(order.total / 100),
@@ -266,15 +293,15 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     durum bir sütun, sayısı o durumla süzen bir bağlantı. İade talebi
     şeritte duruyor, çünkü çiplerde karşılığı olmayan tek iş o.
   */
+  const istatistik = siparisIstatistikleri(istatistikSonucu.rows, istatistikAni);
   const filtreli = Boolean(search) || statusFilter !== "all" || period !== "all" || Boolean(kargo);
 
   return (
-    <main className="talep liste-sayfa siparis-listesi">
+    <main className="talep cari ekip talepler teklifler liste-sayfa siparis-listesi">
       <header className="talep-bas">
         <div className="talep-bas-metin">
           <small className="panel-kicker">Siparişler</small>
           <h1>Siparişler</h1>
-          <p className="talep-bas-alt">{counts.all.toLocaleString("tr-TR")} sipariş · {periodLabel}{search ? ` · “${search}”` : ""}</p>
         </div>
         <div className="talep-bas-eylem">
           {canManage ? <a className="panel-secondary" href="/api/disari-aktar/siparisler">CSV indir</a> : null}
@@ -312,6 +339,8 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
         </dl>
       </nav>
 
+      {/* Solda liste, sağda istatistikler: ArvoOS'un iş listesiyle aynı ızgara. */}
+      <div className="talep-izgara personel-iki ekip-izgara">
       <section className="panel-card talep-bilgi" aria-label="Sipariş listesi">
         <div className="ekip-suzgec talep-suzgec">
           {PERIODS.map(([key, label]) => (
@@ -367,6 +396,21 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
           ) : null}
         </OrderTable>
       </section>
+
+      <IstatistikKarti
+        kapsam={istatistikSonucu.truncated ? "son 6 ay · ilk 20.000 sipariş" : "son 6 ay · süzgeçten bağımsız"}
+        kutular={[
+          { ad: "Son 30 gün", deger: istatistik.son30.toLocaleString("tr-TR"), alt: degisimYazisi(istatistik.siparisDegisimi) ?? "sipariş", ton: istatistik.siparisDegisimi !== null && istatistik.siparisDegisimi < 0 ? "uyari" : istatistik.siparisDegisimi !== null ? "arti" : undefined },
+          { ad: "Ciro · 30 gün", deger: tamPara(istatistik.ciro30), alt: degisimYazisi(istatistik.ciroDegisimi) ?? "iptal ve iadeler hariç", ton: istatistik.ciroDegisimi !== null && istatistik.ciroDegisimi < 0 ? "uyari" : istatistik.ciroDegisimi !== null ? "arti" : undefined },
+          { ad: "Ortalama sepet", deger: istatistik.ortalamaSepet === null ? "—" : tamPara(istatistik.ortalamaSepet), alt: `${istatistik.ciroyaSayilan30} geçerli sipariş` },
+          { ad: "İptal / iade", deger: istatistik.kapananOrani === null ? "—" : `%${istatistik.kapananOrani}`, alt: `${istatistik.kapanan30}/${istatistik.son30} sipariş · 30 gün`, ton: (istatistik.kapananOrani ?? 0) >= 20 ? "uyari" : undefined },
+        ]}
+        gruplar={[
+          { baslik: "Son 6 ay · ciro", satirlar: istatistik.aylik.map((ay) => ({ ad: ay.ad, adet: ay.ciro, etiket: `${kisaPara(ay.ciro)} · ${ay.adet}` })) },
+          { baslik: "Kaynağa göre · 30 gün", satirlar: istatistik.kaynaklar.map((k) => ({ ad: sourceLabel(k.kaynak), adet: k.adet })) },
+        ]}
+      />
+      </div>
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import { fetchAllRows } from "@/lib/fetch-all";
 import { countsAsRevenue, revenueAmount } from "@/lib/order-flow";
 import type { requireTenant } from "@/lib/tenant";
+import { formatPersonName } from "@/lib/format-name";
 
 type Supabase = Awaited<ReturnType<typeof requireTenant>>["supabase"];
 
@@ -41,8 +42,12 @@ export async function loadCustomers(supabase: Supabase, organizationId: string) 
   const grouped = new Map<string, Customer>();
   for (const order of rows) {
     const email = (order.customer_email ?? "").trim().toLocaleLowerCase("tr-TR");
-    const name = (order.customer_name ?? "").trim() || "İsimsiz müşteri";
-    const key = email || `name:${name.toLocaleLowerCase("tr-TR")}`;
+    const hamAd = (order.customer_name ?? "").trim() || "İsimsiz müşteri";
+    /* Anahtar KAYITLI addan: müşteri detayı onu ilike ile arıyor ve
+       biçimlenmiş ad (boşlukları sıkıştırılmış) kaydı bulamayabilirdi.
+       Ekranda "Adı Soyadı" (lib/format-name). */
+    const name = formatPersonName(hamAd) || hamAd;
+    const key = email || `name:${hamAd.toLocaleLowerCase("tr-TR")}`;
     const at = Date.parse(order.created_at);
     const paid = countsAsRevenue(order.status, order.payment_status);
     const existing = grouped.get(key);

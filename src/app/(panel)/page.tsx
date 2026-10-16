@@ -10,6 +10,7 @@ import { ayarlardanOlgular, kurulumDurumu } from "@/lib/kurulum-adimlari";
 import { GenelBakis, ListeIzgarasi, ListeKarti, ListeSatiri, SeriKarti, yeniMi } from "@/components/arvo-ui/genel-bakis";
 import { gunlukSeri } from "@/lib/gunluk-seri";
 import { liraYaz } from "@/lib/lira";
+import { formatPersonName } from "@/lib/format-name";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });
@@ -218,7 +219,7 @@ export default async function Dashboard() {
               <ListeSatiri
                 key={order.id}
                 href={`/siparisler/${order.id}`}
-                baslik={order.customer_name || "Misafir müşteri"}
+                baslik={formatPersonName(order.customer_name) || "Misafir müşteri"}
                 alt={`${order.order_number} · ${liraYaz(order.total)} · ${shortDate.format(new Date(order.created_at))}`}
                 sag={<span className="status-pill" data-tone={ROZET_TONU[badge.tone] ?? "neutral"}>{badge.label}</span>}
                 yeni={yeniMi(order.created_at)}

@@ -14,6 +14,7 @@ function waitingFor(createdAt:string,now:number){
   return hours<24?`${hours} saattir`:`${Math.floor(hours/24)} gündür`;
 }
 import "./operasyon.css";
+import { formatPersonName } from "@/lib/format-name";
 
 
 type ProductMeta={image_paths?:string[];images?:string[];images_migrated?:boolean};
@@ -113,7 +114,7 @@ export default async function Operations(){
         <ListeKarti baslik="Açık siparişler" alt="Onay ve hazırlık bekleyenler" bos="Açık sipariş bulunmuyor." href="/siparisler?filter=pending" hrefEtiket="Siparişler" sayi={(openOrders??[]).length}>
           {(openOrders??[]).map(order=>(
             <ListeSatiri key={order.id} href={`/siparisler/${order.id}`}
-              baslik={order.customer_name||"Müşteri"}
+              baslik={formatPersonName(order.customer_name)||"Müşteri"}
               alt={`${order.order_number} · ${orderStatusLabel(order.status)} · ${shortDate.format(new Date(order.created_at))}`}
               sag={<Rozet ton={order.status==="pending"?"warning":"info"}>{money.format(order.total/100)}</Rozet>}/>
           ))}
@@ -135,7 +136,7 @@ export default async function Operations(){
               return (
                 <li key={order.id} className="operasyon-havale">
                   <Link prefetch={false} className="dash-col-row" href={`/siparisler/${order.id}`}>
-                    <span className="dash-col-main"><b>{order.customer_name||"Müşteri"}</b><small>{order.order_number} · {detail}</small></span>
+                    <span className="dash-col-main"><b>{formatPersonName(order.customer_name)||"Müşteri"}</b><small>{order.order_number} · {detail}</small></span>
                     <Rozet ton={ton}>{money.format(order.total/100)}</Rozet>
                   </Link>
                   <HavaleEylemleri
@@ -146,7 +147,7 @@ export default async function Operations(){
                 </li>
               );
             }
-            return <ListeSatiri key={order.id} href={`/siparisler/${order.id}`} baslik={order.customer_name||"Müşteri"} alt={`${order.order_number} · ${detail}`} sag={<Rozet ton={ton}>{money.format(order.total/100)}</Rozet>}/>;
+            return <ListeSatiri key={order.id} href={`/siparisler/${order.id}`} baslik={formatPersonName(order.customer_name)||"Müşteri"} alt={`${order.order_number} · ${detail}`} sag={<Rozet ton={ton}>{money.format(order.total/100)}</Rozet>}/>;
           })}
         </ListeKarti>
 
