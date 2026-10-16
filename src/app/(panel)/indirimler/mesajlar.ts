@@ -15,12 +15,15 @@ export const ERRORS:Record<string,string>={
   "23505":"Bu kupon kodu başka bir kampanyada kullanılıyor.",
   "invalid-date":"Başlangıç veya bitiş tarihi geçersiz.",
   "invalid-range":"Bitiş tarihi başlangıçtan sonra olmalı.",
+  "not-found":"Kampanya bulunamadı. Silinmiş olabilir ya da başka bir mağazaya ait.",
+  invalid:"İstek anlaşılamadı. Sayfayı yenileyip tekrar deneyin.",
 };
 
 export const BASARILAR: Record<string, string> = {
   created: "İndirim paketi oluşturuldu.",
   status: "İndirim durumu güncellendi.",
   deleted: "İndirim paketi silindi.",
+  updated: "Kampanya güncellendi.",
 };
 
 /* Tanınmayan kod olduğu gibi basılmıyor: ham bir veritabanı kodu

@@ -1,8 +1,39 @@
-/* İndirimler: ArvoOS kalıbı (16.10.2026). */
+/*
+  İNDİRİM EKRANLARI (16.10.2026).
+
+  Liste ve kampanya detayı sipariş ekranlarının kalıbını kullanıyor;
+  burada yalnızca indirime özgü olan var. Sabit renk ve yarıçap yok,
+  jeton var (npm run check:css).
+*/
+
+/* ---------- Liste ---------- */
 .os-root .indirim-sayfasi{display:grid;gap:var(--sp-4)}
 .os-root .indirim-sayfasi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
 .os-root .indirim-sayfasi .kayit-serit small{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro)}
+/* Süresi geçmiş sütunu: aktif görünen ama tarihi geçmiş kurallar. */
+.os-root .indirim-sayfasi .kayit-serit .is-tehlike dd a{color:var(--danger)}
+
+/* Eylem sütunu sağda ve daralmıyor: "Etkinleştir" satırdan satıra kaymasın. */
+.os-root .indirim-tablo .indirim-eylem-sutun{width:1%;white-space:nowrap;text-align:right}
+.os-root .indirim-tablo .indirim-ilerlet{white-space:nowrap}
+/* Limiti dolmak üzere olan kural sessizce bitiyor; hücrede uyarı rengi. */
+.os-root .indirim-tablo .crm-cell-sub.is-uyari{color:var(--warning);font-weight:650}
+.os-root .indirim-tablo .crm-cell-sub .status-pill{font-size:var(--fs-micro)}
+.os-root .indirim-tablo .crm-col-amount{font-variant-numeric:tabular-nums}
+
+/* Eski liste (KOge) için satır içi eylemler; ürün ekranlarında da kullanılıyor. */
 .os-root .indirim-eylem{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .os-root .indirim-eylem form{margin:0}
 .os-root .indirim-eylem :is(button,summary){min-height:30px;padding:4px 10px;font-size:var(--fs-sm)}
 .indirim-pencere-alt{margin:0;color:var(--muted);font-size:var(--fs-sm)}
+
+/* ---------- Kampanya detayı ---------- */
+/* Kullanım sayısı kararın merkezinde: limit dolmuşsa kampanya fiilen bitmiştir. */
+.os-root .indirim-detay .indirim-kullanim{
+  margin:0 0 var(--sp-2);color:var(--ink);font-variant-numeric:tabular-nums
+}
+.os-root .indirim-detay .indirim-kullanim b{font-size:var(--fs-lg);font-weight:700}
+.os-root .indirim-detay .indirim-kullanim span{color:var(--muted);font-size:var(--fs-sm)}
+/* Düzenleme formu kartın içinde: ızgara modules.css'ten, boşluk burada. */
+.os-root .indirim-detay .discount-form-grid{margin-top:var(--sp-3)}
+.os-root .indirim-detay .talep-bas-eylem form{margin:0}

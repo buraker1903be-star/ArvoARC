@@ -27,7 +27,7 @@
   Saf dosya; testi tests/kayitli-gorunum.test.ts.
 */
 
-export type GorunumListesi = "siparisler" | "urunler" | "iadeler";
+export type GorunumListesi = "siparisler" | "urunler" | "iadeler" | "indirimler";
 
 /** [anahtar, kısa etiket] ya da [anahtar, kısa etiket, uzun etiket]. */
 type Secenek = readonly [string, string] | readonly [string, string, string];
@@ -75,6 +75,25 @@ export const URUN_KAYNAKLARI = [
   ["tarzyeri", "Tarzyeri"],
 ] as const satisfies readonly Secenek[];
 
+/*
+  İndirim durumları. "expired" kısıtta var ama durumu oraya çeken bir
+  iş yok (süresi geçmiş kural "active" kalıyor); süzgece koymak, hiç
+  dolmayan bir sekme çizmek olurdu. Süresi geçmişler şeritte AYRI bir
+  sütun olarak, tarihe bakılarak sayılıyor.
+*/
+export const INDIRIM_DURUMLARI = [
+  ["all", "Tümü"],
+  ["active", "Aktif"],
+  ["paused", "Duraklatıldı"],
+  ["draft", "Taslak"],
+] as const satisfies readonly Secenek[];
+
+export const INDIRIM_TURLERI = [
+  ["all", "Tüm türler"],
+  ["kupon", "Kupon kodlu", "Kupon kodlu kampanyalar"],
+  ["otomatik", "Otomatik", "Koşul sağlanınca uygulanan"],
+] as const satisfies readonly Secenek[];
+
 type Alan =
   | { anahtar: string; tur: "metin"; onek: string }
   | { anahtar: string; tur: "secim"; secenekler: readonly Secenek[]; varsayilan: string }
@@ -102,6 +121,12 @@ const SEMA: Record<GorunumListesi, readonly Alan[]> = {
     { anahtar: "filter", tur: "secim", secenekler: URUN_DURUMLARI, varsayilan: "all" },
     { anahtar: "source", tur: "secim", secenekler: URUN_KAYNAKLARI, varsayilan: "all" },
   ],
+  indirimler: [
+    { anahtar: "q", tur: "metin", onek: "Arama" },
+    { anahtar: "filter", tur: "secim", secenekler: INDIRIM_DURUMLARI, varsayilan: "all" },
+    { anahtar: "tur", tur: "secim", secenekler: INDIRIM_TURLERI, varsayilan: "all" },
+    { anahtar: "biten", tur: "bayrak", deger: "1", etiket: "Süresi geçmiş" },
+  ],
   iadeler: [
     { anahtar: "q", tur: "metin", onek: "Arama" },
     { anahtar: "filter", tur: "secim", secenekler: IADE_DURUMLARI, varsayilan: "beklemede" },
@@ -119,6 +144,7 @@ const YOLLAR: Record<GorunumListesi, string> = {
   siparisler: "/siparisler",
   urunler: "/urunler",
   iadeler: "/siparisler/iadeler",
+  indirimler: "/indirimler",
 };
 
 export const GORUNUM_LISTELERI = Object.keys(SEMA) as GorunumListesi[];
