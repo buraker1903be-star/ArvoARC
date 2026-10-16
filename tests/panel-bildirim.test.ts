@@ -77,8 +77,10 @@ test("bildirim çerezi tek kullanımlık olarak temizleniyor", () => {
     ve kullanıcı işlemi ikinci kez yaptığını sanar; hata mesajında daha
     da yanıltıcı, düzelttiği hatayı düzelmemiş görür.
   */
-  const temizleyici = fs.readFileSync(path.join(process.cwd(), "src/components/panel/bildirim-temizle.tsx"), "utf8");
-  assert.match(temizleyici, /Max-Age=0/);
-  const bildirim = fs.readFileSync(path.join(process.cwd(), "src/components/panel/bildirim.tsx"), "utf8");
-  assert.match(bildirim, /BildirimTemizle/);
+  /* 16.10.2026'dan beri çerezi kabuktaki balon (FlashToast) okuyup siliyor;
+     sayfa içi şerit (PanelBildirimi) artık hiçbir şey çizmiyor. */
+  const balon = fs.readFileSync(path.join(process.cwd(), "src/components/os/flash-toast.tsx"), "utf8");
+  assert.match(balon, /BILDIRIM_CEREZI\}=; Max-Age=0/);
+  const yerlesim = fs.readFileSync(path.join(process.cwd(), "src/app/(panel)/layout.tsx"), "utf8");
+  assert.match(yerlesim, /<FlashToast \/>/);
 });
