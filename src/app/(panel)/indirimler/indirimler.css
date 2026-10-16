@@ -18,9 +18,14 @@
   listelenen ŞEYİ değiştiriyor (kurallar ↔ ürün indirimleri). Ayrımı
   sol kenardaki çizgi taşıyor — sipariş listesindeki "İade talebi"
   sütunuyla aynı işi yapıyor ve aynı yerde duruyor.
+
+  Sağa yaslamak (margin-left:auto) İŞE YARAMIYOR: şeridin <dl>'si
+  içeriği kadar geniş, yani itecek boş alan onun İÇİNDE değil kartta.
+  Yaslamak için ortak şeridi genişletmek gerekirdi; çizgi zaten ayrımı
+  taşıdığı için denenip kaldırıldı.
 */
 .os-root .indirim-sayfasi .kayit-serit .is-gorunum{
-  margin-left:auto;padding-left:var(--sp-4);border-left:1px solid var(--line)
+  padding-left:var(--sp-4);border-left:1px solid var(--line)
 }
 
 /* Eylem sütunu sağda ve daralmıyor: "Etkinleştir" satırdan satıra kaymasın. */
