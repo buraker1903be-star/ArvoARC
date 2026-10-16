@@ -1,8 +1,10 @@
 import { requireTenant } from "@/lib/tenant";
-import { PanelBildirimi } from "@/components/panel/bildirim";
+import { KKart } from "@/components/arvo-ui/k-ui";
 import { updateSupplier, resetCursor } from "./actions";
 import "../catalog.css";
 import "../modules.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./tedarikci.css";
 import { yetkiYok } from "@/lib/yetki-metni";
 
 export const dynamic = "force-dynamic";
@@ -24,23 +26,19 @@ export default async function SuppliersPage() {
   const { data: suppliers, error } = await supabase.from("arc_suppliers").select("*").eq("organization_id", organization.id).order("name");
   if (error) throw new Error(error.message);
 
+  /* ArvoOS kalıbı (16.10.2026): başlık, her tedarikçi bir panel kartı. */
   return (
-    <>
-      <section className="ac-bar">
-        <div>
+    <main className="talep tedarikci-sayfasi">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker">Tedarik</small>
           <h1>Tedarikçiler</h1>
-          <p>Fiyat kuralları ve katalog aktarım durumu.</p>
+          <p className="talep-bas-alt">Fiyat kuralları ve katalog eşitleme durumu.</p>
         </div>
-      </section>
-
-      <div className="ac-stack">
-        {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
-            okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
-            gösterebiliyordu (lib/panel-bildirim.ts). */}
-        <PanelBildirimi />
+      </header>
 
         {(suppliers ?? []).length === 0 ? (
-          <section className="ac list-empty"><b>Tanımlı tedarikçi yok.</b><p>Tedarikçi entegrasyonu kurulduğunda burada görünür.</p></section>
+          <div className="panel-card crm-empty-state talep-bos-kutu"><h2>Tanımlı tedarikçi yok</h2><p>Tedarikçi entegrasyonu kurulduğunda burada görünür.</p></div>
         ) : null}
 
         {(suppliers ?? []).map((supplier) => {
@@ -51,25 +49,35 @@ export default async function SuppliersPage() {
           const shipping = supplier.shipping_markup ?? 0;
           const service = supplier.service_fee ?? 0;
           const round = supplier.round_to_kurus ?? 90;
+          /*
+            İMLEÇ ARTIK YALNIZCA TAM AKTARIMIN (16.10.2026). Stok turu her
+            on dakikada kataloğun tamamını tek seferde işliyor ve imlece
+            dokunmuyor; ekran eskiden "0 / 3.161 · %0 aktarıldı" yazıp işi
+            durmuş gösteriyordu. Çubuk yalnızca elle başlatılmış bir tam
+            aktarım yarıdayken görünür.
+          */
+          const tamSuruyor = cursor > 0 && total > 0;
+          const sonEsitleme = supplier.last_synced_at ? Date.parse(supplier.last_synced_at) : null;
+          const gecikmeDk = sonEsitleme ? Math.round((saat() - sonEsitleme) / 60_000) : null;
+          const durum = tamSuruyor
+            ? { etiket: `Tam aktarım %${percent}`, ton: "info" }
+            : gecikmeDk === null ? { etiket: "Henüz eşitlenmedi", ton: "neutral" }
+            : gecikmeDk > 30 ? { etiket: `${gecikmeDk} dk'dır eşitlenmedi`, ton: "danger" }
+            : { etiket: "Güncel", ton: "success" };
 
           return (
-            <section key={supplier.id} className="ac ac-pad">
-              <div className="ac-head">
-                <div>
-                  <h3>{supplier.name}</h3>
-                  <p>{supplier.code} · {supplier.publish_directly ? "Yeni ürünler doğrudan yayınlanır" : "Yeni ürünler taslak olarak gelir"}</p>
+            <KKart key={supplier.id} baslik={supplier.name} aciklama={`${supplier.code} · ${supplier.publish_directly ? "yeni ürünler doğrudan yayınlanır" : "yeni ürünler taslak olarak gelir"}`} sag={<span className="status-pill" data-tone={durum.ton}>{durum.etiket}</span>}>
+              <dl className="tedarikci-ozet">
+                <div><dt>Son eşitleme</dt><dd>{supplier.last_synced_at ? dateTime.format(new Date(supplier.last_synced_at)) : "Henüz yapılmadı"}</dd></div>
+                <div><dt>Son not</dt><dd>{supplier.last_sync_note || "—"}</dd></div>
+                <div><dt>Katalog</dt><dd>{total ? `${total.toLocaleString("tr-TR")} ürün` : "—"} · stok ve fiyat her 10 dakikada</dd></div>
+              </dl>
+              {tamSuruyor ? (
+                <div className="supplier-sync">
+                  <div className="supplier-sync-top"><span>Tam aktarım</span><b>{cursor.toLocaleString("tr-TR")} / {total.toLocaleString("tr-TR")} ürün</b></div>
+                  <div className="supplier-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><i style={{ "--w": `${percent}%` } as React.CSSProperties} /></div>
                 </div>
-                <em className="ac-tag" data-tone={total ? (percent >= 100 ? "good" : "warn") : "muted"}>{total ? `%${percent} aktarıldı` : "Aktarım başlamadı"}</em>
-              </div>
-
-              <div className="supplier-sync">
-                <div className="supplier-sync-top"><span>Aktarım imleci</span><b>{cursor.toLocaleString("tr-TR")} / {total ? total.toLocaleString("tr-TR") : "—"} ürün</b></div>
-                <div className="supplier-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><i style={{ "--w": `${percent}%` } as React.CSSProperties} /></div>
-                <dl className="supplier-facts">
-                  <div><dt>Son eşitleme</dt><dd>{supplier.last_synced_at ? dateTime.format(new Date(supplier.last_synced_at)) : "Henüz yapılmadı"}</dd></div>
-                  <div><dt>Son not</dt><dd>{supplier.last_sync_note || "—"}</dd></div>
-                </dl>
-              </div>
+              ) : null}
 
               {canManage ? (
                 <>
@@ -81,7 +89,7 @@ export default async function SuppliersPage() {
                     <label>Stok tamponu (adet)<input name="stock_buffer" type="number" min="0" max="100" step="1" defaultValue={supplier.stock_buffer ?? 5} className="ac-input" /></label>
                     <label>Yuvarlama (kuruş)<input name="round_to_kurus" type="number" min="0" max="99" step="1" defaultValue={round} required className="ac-input" /></label>
                     <label className="check-inline is-wide"><input name="publish_directly" type="checkbox" defaultChecked={supplier.publish_directly ?? false} /> Yeni ürünler doğrudan yayınlansın (kapalıysa taslak gelir)</label>
-                    <div className="catalog-form-actions"><button className="ac-btn ac-btn-primary" type="submit">Kaydet</button></div>
+                    <div className="catalog-form-actions"><button className="panel-primary" type="submit">Kaydet</button></div>
                   </form>
 
                   {/* Önizleme içe aktarmadaki hesabın aynısı; ek hizmet
@@ -90,25 +98,37 @@ export default async function SuppliersPage() {
                     Örnek: {money.format(200)} alış{service ? ` + ${money.format(service / 100)} hizmet` : ""} · %{margin} kâr · {money.format(shipping / 100)} kargo payı →
                     <strong>{money.format(previewPrice(20000, margin, shipping, round, service) / 100)}</strong> satış
                   </p>
-                  <p className="list-hint">Tedarikçi stoğu tampon değerin altına düştüğünde ürün satışa kapanır ve vitrinde “Tükendi” görünür; siparişi iletene kadar tükenme riskine karşı güvenlik payıdır. Fiyat değişikliği yalnızca yeni aktarımlarda uygulanır.</p>
+                  <p className="list-hint">Tedarikçi stoğu tampon değerin altına düştüğünde ürün satışa kapanır ve vitrinde “Tükendi” görünür; siparişi iletene kadar tükenme riskine karşı güvenlik payıdır.</p>
 
-                  <div className="supplier-reset">
-                    <form action={resetCursor}>
-                      <input type="hidden" name="code" value={supplier.code} />
-                      <button type="submit" className="ac-btn">Aktarım imlecini sıfırla</button>
-                    </form>
-                    <p className="list-hint">Mevcut ürünlerin fiyatını yeni kurala göre güncellemek için imleci sıfırlayın; bir sonraki aktarım kataloğu baştan dolaşır.</p>
-                  </div>
+                  {/*
+                    Fiyat kuralı değişince imleci sıfırlamak GEREKMİYOR: stok
+                    turu her on dakikada bütün kataloğun fiyatını yeni kurala
+                    göre yazıyor. Sıfırlama yalnızca yarım kalan bir tam
+                    aktarımı baştan başlatmak için.
+                  */}
+                  <p className="list-hint">Fiyat kuralını değiştirdiğinizde bir sonraki eşitleme (en geç 10 dakika) bütün kataloğun satış fiyatını yeni kurala göre günceller.</p>
+                  {tamSuruyor ? (
+                    <div className="supplier-reset">
+                      <form action={resetCursor}>
+                        <input type="hidden" name="code" value={supplier.code} />
+                        <button type="submit" className="panel-secondary">Tam aktarımı baştan başlat</button>
+                      </form>
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <p className="list-hint">{yetkiYok("tedarikçi ayarları", "sahiplik")}</p>
               )}
-            </section>
+            </KKart>
           );
         })}
-      </div>
-    </>
+    </main>
   );
+}
+
+/* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
+function saat() {
+  return Date.now();
 }
 
 /**

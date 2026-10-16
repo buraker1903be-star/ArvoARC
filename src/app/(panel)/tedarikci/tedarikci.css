@@ -1,0 +1,7 @@
+/* Tedarikçiler: ArvoOS kalıbı (16.10.2026). Form ve önizleme biçimi ../catalog.css, ../modules.css. */
+.os-root .tedarikci-sayfasi{display:grid;gap:var(--sp-4)}
+.os-root .tedarikci-sayfasi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .tedarikci-ozet{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-3);margin:0 0 var(--sp-4)}
+.os-root .tedarikci-ozet dt{color:var(--muted);font-size:var(--fs-micro);font-weight:var(--fw-semibold)}
+.os-root .tedarikci-ozet dd{margin:2px 0 0;font-size:var(--fs-sm)}
+@media (max-width:760px){.os-root .tedarikci-ozet{grid-template-columns:1fr}}
