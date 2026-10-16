@@ -1,29 +1,32 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { panelAra, type AramaSonucu } from "@/lib/panel-arama";
-import { Icon, type IconName } from "@/components/panel/icons";
+import { KKart, KListe, KOge } from "@/components/arvo-ui/k-ui";
+import { rozetTonu } from "@/lib/rozet-tonu";
+import "@/components/arvo-ui/kayit-detay.css";
 import "./search.css";
 
 /* Biçimlendirme lib/panel-arama.ts'te: tutar ve tarih metinleri sonuçla birlikte geliyor. */
 
-type Hit = { key: string; href: string; icon: IconName; title: string; detail: string; side?: React.ReactNode };
-
-function Section({ title, hits, more }: { title: string; hits: Hit[]; more?: { href: string; label: string } }) {
-  if (!hits.length) return null;
+/* Bir sonuç grubu: ArvoOS kartı + iOS listesi (16.10.2026). Sonuç yoksa hiç çizilmez. */
+function Bolum({ baslik, satirlar, daha }: { baslik: string; satirlar: AramaSonucu[]; daha?: { href: string; label: string } }) {
+  if (!satirlar.length) return null;
   return (
-    <section className="ac table list-table search-list">
-      <div className="ac-head ac-pad-sm list-table-head">
-        <div><h3>{title}</h3><p>{hits.length} sonuç</p></div>
-        {more ? <Link prefetch={false} href={more.href}>{more.label} →</Link> : null}
-      </div>
-      {hits.map((hit) => (
-        <div className="list-row" key={hit.key}>
-          <span className="sr-icon"><Icon name={hit.icon} size={16} /></span>
-          <span className="sr-main"><Link prefetch={false} className="list-row-link" href={hit.href}><b>{hit.title}</b></Link><small>{hit.detail}</small></span>
-          <span className="sr-side">{hit.side}</span>
-        </div>
-      ))}
-    </section>
+    <KKart baslik={baslik} aciklama={`${satirlar.length} sonuç`} sag={daha ? <Link prefetch={false} className="panel-secondary" href={daha.href}>{daha.label} →</Link> : undefined}>
+      <KListe>
+        {satirlar.map((satir) => (
+          <KOge
+            key={satir.anahtar}
+            href={satir.yol}
+            simge={satir.baslik}
+            baslik={satir.baslik}
+            alt={satir.detay}
+            durum={satir.rozet ? { etiket: satir.rozet.metin, ton: rozetTonu(satir.rozet.ton) } : null}
+            deger={satir.yan}
+          />
+        ))}
+      </KListe>
+    </KKart>
   );
 }
 
@@ -38,59 +41,50 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const { supabase, organization } = await requireTenant();
   const term = (q ?? "").replace(/[,()*\\"%_]/g, " ").trim().slice(0, 80);
 
+  const baslik = (h1: React.ReactNode, alt: string) => (
+    <header className="talep-bas">
+      <div className="talep-bas-metin">
+        <small className="panel-kicker">Arama</small>
+        <h1>{h1}</h1>
+        <p className="talep-bas-alt">{alt}</p>
+      </div>
+    </header>
+  );
+
   if (!term) {
-    return <>
-      <section className="ac-bar"><div><h1>Arama</h1><p>Sipariş numarası, müşteri adı veya e-postası, ürün adı, SKU ya da koleksiyon adı yazın.</p></div></section>
-      <section className="ac list-empty"><b>Aramak istediğiniz kelimeyi yazın.</b><p>İpucu: üst çubuktaki kutuya ⌘K (Windows’ta Ctrl+K) veya “/” ile hızlıca geçebilirsiniz.</p></section>
-    </>;
+    return (
+      <main className="talep arama-sayfasi">
+        {baslik("Arama", "Sipariş numarası, müşteri adı veya e-postası, ürün adı, SKU ya da koleksiyon adı yazın.")}
+        <div className="panel-card crm-empty-state talep-bos-kutu">
+          <h2>Aramak istediğiniz kelimeyi yazın</h2>
+          <p>İpucu: üst çubuktaki arama kutusunu Ctrl+K (Mac&apos;te ⌘K) ile açabilirsiniz.</p>
+        </div>
+      </main>
+    );
   }
 
   /*
-    Sorgular lib/panel-arama.ts'te ve ⌘K komut paletiyle PAYLAŞILIYOR.
-    İkinci bir kopya yazmak, birinde düzeltilen bir sorgunun ötekinde
-    eskimesi demekti.
+    Sorgular lib/panel-arama.ts'te: ikinci bir kopya yazmak, birinde
+    düzeltilen bir sorgunun ötekinde eskimesi demekti.
   */
   const sonuc = await panelAra(supabase, organization.id, term);
-
-  const rozet = (deger?: { metin: string; ton?: string }) =>
-    deger ? <em className="ac-tag" data-tone={deger.ton}>{deger.metin}</em> : null;
-  const hit = (satir: AramaSonucu, ikon: IconName, yanTarz?: string): Hit => ({
-    key: satir.anahtar,
-    href: satir.yol,
-    icon: ikon,
-    title: satir.baslik,
-    detail: satir.detay,
-    side: <>{satir.yan ? <span className={yanTarz}>{satir.yan}</span> : null}{rozet(satir.rozet)}</>,
-  });
-
-  const orderHits = sonuc.siparisler.map((satir) => hit(satir, "box", "sr-amount"));
-  const customerHits = sonuc.musteriler.map((satir) => hit(satir, "users", "sr-muted"));
-  const productHits = sonuc.urunler.map((satir) => hit(satir, "tag"));
-  const collectionHits = sonuc.koleksiyonlar.map((satir) => hit(satir, "layers"));
-
   const total = sonuc.toplam;
   const encoded = encodeURIComponent(term);
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <h1>“{term}”</h1>
-        <p>{total ? `${total} sonuç · sipariş, müşteri, ürün ve koleksiyonlarda arandı` : "Sonuç bulunamadı"}</p>
-      </div>
-    </section>
-
-    <div className="ac-stack">
+  return (
+    <main className="talep arama-sayfasi">
+      {baslik(`“${term}”`, total ? `${total} sonuç · sipariş, müşteri, ürün ve koleksiyonlarda arandı` : "Sonuç bulunamadı")}
       {total ? <>
-        <Section title="Siparişler" hits={orderHits} more={sonuc.dahaFazlaSiparis ? { href: `/siparisler?q=${encoded}`, label: "Tüm siparişlerde" } : undefined} />
-        <Section title="Müşteriler" hits={customerHits} more={{ href: `/musteriler?q=${encoded}`, label: "Müşteri listesinde" }} />
-        <Section title="Ürünler" hits={productHits} more={{ href: `/urunler?q=${encoded}`, label: "Katalogda" }} />
-        <Section title="Koleksiyonlar" hits={collectionHits} />
+        <Bolum baslik="Siparişler" satirlar={sonuc.siparisler} daha={sonuc.dahaFazlaSiparis ? { href: `/siparisler?q=${encoded}`, label: "Tüm siparişlerde" } : undefined} />
+        <Bolum baslik="Müşteriler" satirlar={sonuc.musteriler} daha={{ href: `/musteriler?q=${encoded}`, label: "Müşteri listesinde" }} />
+        <Bolum baslik="Ürünler" satirlar={sonuc.urunler} daha={{ href: `/urunler?q=${encoded}`, label: "Katalogda" }} />
+        <Bolum baslik="Koleksiyonlar" satirlar={sonuc.koleksiyonlar} />
       </> : (
-        <section className="ac list-empty">
-          <b>Bu aramayla eşleşen kayıt yok.</b>
-          <p>Sipariş numarasını (#AC-1048), müşteri adını veya e-postasını, ürün adını ya da SKU’yu deneyin.</p>
-        </section>
+        <div className="panel-card crm-empty-state talep-bos-kutu">
+          <h2>Bu aramayla eşleşen kayıt yok</h2>
+          <p>Sipariş numarasını (AC261016-…), müşteri adını veya e-postasını, ürün adını ya da SKU&apos;yu deneyin.</p>
+        </div>
       )}
-    </div>
-  </>;
+    </main>
+  );
 }
