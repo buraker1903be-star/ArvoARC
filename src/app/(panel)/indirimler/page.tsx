@@ -205,17 +205,22 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
     sınırı görünür.
   */
   type VaryantSatiri = { id: string; product_id: string; title: string | null; sku: string | null; price: number; compare_at_price: number | null };
-  const urunSonucu = urunGorunumu
-    ? await fetchAllRows<VaryantSatiri>((bas, son) =>
-        supabase.from("arc_product_variants")
-          .select("id,product_id,title,sku,price,compare_at_price")
-          .eq("organization_id", organization.id)
-          .is("supplier", null)
-          .not("compare_at_price", "is", null)
-          .order("updated_at", { ascending: false })
-          .range(bas, son) as unknown as PromiseLike<{ data: VaryantSatiri[] | null; error: { message: string } | null }>,
-      )
-    : { rows: [] as VaryantSatiri[], truncated: false };
+  /*
+    OKUMA HER İKİ GÖRÜNÜMDE DE YAPILIYOR: şeritteki "Ürün indirimi"
+    sütunu sayıyı kampanya görünümünde de yazıyor. PostgREST iki sütunu
+    karşılaştıramadığı için (compare_at_price > price) sayım head
+    sorgusuyla alınamıyor; satırlar okunup bellekte süzülüyor. Yalnızca
+    fiyat sütunları çekiliyor ve tedarikçi ürünleri dışarıda, yük küçük.
+  */
+  const urunSonucu = await fetchAllRows<VaryantSatiri>((bas, son) =>
+    supabase.from("arc_product_variants")
+      .select("id,product_id,title,sku,price,compare_at_price")
+      .eq("organization_id", organization.id)
+      .is("supplier", null)
+      .not("compare_at_price", "is", null)
+      .order("updated_at", { ascending: false })
+      .range(bas, son) as unknown as PromiseLike<{ data: VaryantSatiri[] | null; error: { message: string } | null }>,
+  );
 
   const indirimliVaryantlar = urunSonucu.rows
     .filter((v) => (v.compare_at_price ?? 0) > v.price)
@@ -269,19 +274,52 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
         </div>
       </header>
 
-      {/*
-        İKİ SEKME, AYRI SAYFA DEĞİL. Ürün indirimleri önce başlıktaki bir
-        düğmeyle açılıyordu ve kendi başlığı olan ayrı bir ekran gibi
-        davranıyordu: kullanıcı "nereye gittim" diye geri düğmesini
-        arıyordu. İkisi de aynı listenin iki görünümü — biri kuralları,
-        öteki varyantın karşılaştırma fiyatını listeliyor.
 
-        Sekme ADRESTE taşınıyor (bağlantı, düğme değil): yenilenince
-        aynı sekme açılıyor ve paylaşılan bağlantı doğru yere gidiyor.
+      {/*
+        TEK ŞERİT, İKİ İŞ. Ürün indirimleri önce ayrı sayfaydı, sonra
+        başlığın altında altı çizili bir sekme şeridi oldu: ekranda üst
+        üste iki "sekme gibi" satır duruyordu (sekme barı ve durum
+        şeridi) ve en ağır öğe en az iş yapandı. Geçiş artık şeridin
+        sağ ucunda ayrık bir sütun — sipariş listesindeki "İade talebi"
+        sütunuyla aynı kalıp: şerit zaten "neyi listeliyorum" sorusunu
+        cevaplayan yer.
       */}
-      <nav className="talep-akis-sekmeler indirim-sekmeler" role="tablist" aria-label="İndirim görünümü">
-        <Link prefetch={false} role="tab" aria-selected={!urunGorunumu} className={!urunGorunumu ? "is-active" : undefined} href={listHref(durum, {})}>Kampanyalar</Link>
-        <Link prefetch={false} role="tab" aria-selected={urunGorunumu} className={urunGorunumu ? "is-active" : undefined} href="/indirimler?gorunum=urun">Ürün indirimleri</Link>
+      <nav className="kayit-serit talep-serit" aria-label="Görünüm ve duruma göre süz">
+        <dl>
+          {DURUMLAR.map(([key, label]) => (
+            <div key={key} className={!urunGorunumu && filter === key ? "is-active" : undefined}>
+              <dt>{label}</dt>
+              <dd>
+                <Link prefetch={false} href={listHref(durum, { filter: key, page: 1 })} aria-current={!urunGorunumu && filter === key ? "page" : undefined}>
+                  {sayilar[key].toLocaleString("tr-TR")}
+                </Link>
+              </dd>
+            </div>
+          ))}
+          {/*
+            SÜRESİ GEÇMİŞ yalnızca varken ve yalnızca kampanya
+            görünümünde: ürün sekmesinde karşılığı yok.
+          */}
+          {!urunGorunumu && (biten || suresiGecmisSayisi > 0) ? (
+            <div className={biten ? "is-active is-tehlike" : "is-tehlike"}>
+              <dt>Süresi geçmiş</dt>
+              <dd>
+                <Link prefetch={false} href={listHref(durum, { biten: !biten, page: 1 })} aria-current={biten ? "page" : undefined}>
+                  {suresiGecmisSayisi.toLocaleString("tr-TR")}
+                </Link>
+              </dd>
+            </div>
+          ) : null}
+          {/* Görünüm sütunu ayrık: durum süzgeci değil, listelenen ŞEY. */}
+          <div className={urunGorunumu ? "is-active is-gorunum" : "is-gorunum"}>
+            <dt>Ürün indirimi</dt>
+            <dd>
+              <Link prefetch={false} href={urunGorunumu ? listHref(durum, {}) : "/indirimler?gorunum=urun"} aria-current={urunGorunumu ? "page" : undefined}>
+                {indirimliVaryantlar.length.toLocaleString("tr-TR")}
+              </Link>
+            </dd>
+          </div>
+        </dl>
       </nav>
 
       {urunGorunumu ? (
@@ -343,39 +381,6 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
         />
         </div>
       ) : (
-        <>
-          <nav className="kayit-serit talep-serit" aria-label="Duruma göre süz">
-            <dl>
-              {DURUMLAR.map(([key, label]) => (
-                <div key={key} className={filter === key ? "is-active" : undefined}>
-                  <dt>{label}</dt>
-                  <dd>
-                    <Link prefetch={false} href={listHref(durum, { filter: key, page: 1 })} aria-current={filter === key ? "page" : undefined}>
-                      {sayilar[key].toLocaleString("tr-TR")}
-                    </Link>
-                  </dd>
-                </div>
-              ))}
-              {/*
-                SÜRESİ GEÇMİŞ yalnızca varken: sıfır gösteren bir sütun
-                gürültü olurdu. Aktif görünen ama tarihi geçmiş kural
-                panelde "Aktif" yazıyor, vitrin uygulamıyor — tek
-                söyleyen yer burası (sipariş listesindeki "Sorunlu
-                kargo" sütunuyla aynı kalıp).
-              */}
-              {biten || suresiGecmisSayisi > 0 ? (
-                <div className={biten ? "is-active is-tehlike" : "is-tehlike"}>
-                  <dt>Süresi geçmiş</dt>
-                  <dd>
-                    <Link prefetch={false} href={listHref(durum, { biten: !biten, page: 1 })} aria-current={biten ? "page" : undefined}>
-                      {suresiGecmisSayisi.toLocaleString("tr-TR")}
-                    </Link>
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
-          </nav>
-
           <div className="talep-izgara personel-iki ekip-izgara">
             <section className="panel-card talep-bilgi" aria-label="Kampanya listesi">
               <div className="ekip-suzgec talep-suzgec">
@@ -450,7 +455,6 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
               ]}
             />
           </div>
-        </>
       )}
 
       {pencere ? (

@@ -14,13 +14,14 @@
 .os-root .indirim-sayfasi .kayit-serit .is-tehlike dd a{color:var(--danger)}
 
 /*
-  SEKME ŞERİDİ. Ortak biçim kayıt akışından geliyor
-  (.talep-akis-sekmeler) ama orası KART İÇİ: yanlarda boşluğu var.
-  Burada şerit sayfanın kendi genişliğinde duruyor ve altındaki durum
-  şeridiyle hizalanıyor.
+  GÖRÜNÜM SÜTUNU. Şeridin öteki sütunları durum SÜZGECİ; bu sütun
+  listelenen ŞEYİ değiştiriyor (kurallar ↔ ürün indirimleri). Ayrımı
+  sol kenardaki çizgi taşıyor — sipariş listesindeki "İade talebi"
+  sütunuyla aynı işi yapıyor ve aynı yerde duruyor.
 */
-.os-root .indirim-sekmeler{padding:0;border-bottom:1px solid var(--line)}
-.os-root .indirim-sekmeler a{text-decoration:none}
+.os-root .indirim-sayfasi .kayit-serit .is-gorunum{
+  margin-left:auto;padding-left:var(--sp-4);border-left:1px solid var(--line)
+}
 
 /* Eylem sütunu sağda ve daralmıyor: "Etkinleştir" satırdan satıra kaymasın. */
 .os-root .indirim-tablo .indirim-eylem-sutun{width:1%;white-space:nowrap;text-align:right}
