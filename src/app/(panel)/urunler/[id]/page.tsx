@@ -6,15 +6,18 @@ import { magazaAdresi } from "@/lib/magaza-adresi";
 import { createVariant, kitapliktanGorselEkle, removeProductImage, updateProduct, updateVariant, uploadProductImages, urunuKopyala, varyantMatrisi } from "./actions";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel, sourceLabel } from "@/lib/commerce-labels";
-import { Icon } from "@/components/panel/icons";
-import { PanelBildirimi } from "@/components/panel/bildirim";
+import { Pencere } from "@/components/os/pencere";
+import { rozetTonu } from "@/lib/rozet-tonu";
 import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 import { trIsoToLocal } from "@/lib/tr-time";
 import { yayinOzeti } from "@/lib/yayin-plani";
 import { terimiTemizle } from "@/lib/panel-arama";
 import { SeoFields } from "./seo-fields";
 import { VaryantFiyatlari, YeniVaryantFiyatlari } from "./fiyat-alanlari";
+// Düzenleyicinin iç biçimi (product-*, variant-*, kitaplik) hâlâ orada; kabuk ve başlık ArvoOS.
 import "../../catalog.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./urun-detay.css";
 
 const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"});
 
@@ -27,8 +30,8 @@ type Meta={
 };
 
 
-export default async function ProductDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{medya?:string}>}){
-  const {id}=await params; const {medya}=await searchParams; const {supabase,organization,membership}=await requireTenant();
+export default async function ProductDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{medya?:string;pencere?:string}>}){
+  const {id}=await params; const sp=await searchParams; const {medya}=sp; const {supabase,organization,membership}=await requireTenant();
   const [{data:product,error},{data:variants,error:variantError},{data:settings}]=await Promise.all([
     supabase.from("arc_products").select("id,name,slug,description,status,source,metadata,created_at,publish_at,unpublish_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
     supabase.from("arc_product_variants").select("id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price,image_path").eq("organization_id",organization.id).eq("product_id",id).order("title"),
@@ -108,51 +111,54 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
   const statusTone=product.status==="active"?undefined:product.status==="draft"?"warn":"muted";
   const planOzeti=yayinOzeti(product.publish_at,product.unpublish_at);
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <Link prefetch={false} className="product-back" href="/urunler">← Ürünler</Link>
-        <h1>{product.name}</h1>
-        <p>{meta.subtitle||[meta.vendor||"ArvoARC",meta.type,sourceLabel(product.source)].filter(Boolean).join(" · ")}</p>
-      </div>
-      <div className="product-head-actions">
-        <em className="ac-tag" data-tone={statusTone}>{productStatusLabel(product.status)}</em>
-        {storeHref?<a className="ac-btn" href={storeHref} target="_blank" rel="noreferrer"><Icon name="external" size={16}/>Mağazada gör</a>:null}
-        {/*
-          Kopyalama ONAY İSTEMİYOR: yeni bir taslak üretiyor, hiçbir
-          şeyi bozmuyor ve yanlışlıkla basılırsa kopya arşivlenip
-          geçiliyor. ConfirmSubmit geri alınamayan işler için.
-        */}
-        {canManage?(
-          <form action={urunuKopyala}>
-            <input type="hidden" name="product_id" value={product.id}/>
-            <button className="ac-btn" type="submit" title="Varyantları ve görselleriyle taslak bir kopya oluşturur">Kopyala</button>
-          </form>
-        ):null}
-      </div>
-    </section>
+  /*
+    PENCERELER (16.10.2026): varyant oluşturma formları (seçeneklerden
+    toplu üretim ve tek varyant) varyant listesinin dibinde açılır
+    kartlardı. Varyant listesi uzun ürünlerde ekranları aşıyor, formlar
+    görünmüyordu. Artık başlıktaki düğmeyle aynı sayfada pencere.
+  */
+  const urunAdresi=`/urunler/${product.id}`;
+  const pencere=canManage&&(sp.pencere==="matris"||sp.pencere==="varyant")?sp.pencere:null;
 
-    <div className="ac-stack">
-      {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
-          okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
-          gösterebiliyordu (lib/panel-bildirim.ts). */}
-      <PanelBildirimi />
+  return (
+    <main className="talep urun-detay">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker"><Link prefetch={false} href="/urunler">Ürünler</Link></small>
+          <h1>{product.name} <span className="status-pill" data-tone={rozetTonu(statusTone??"good")}>{productStatusLabel(product.status)}</span></h1>
+          <p className="talep-bas-alt">{meta.subtitle||[meta.vendor||"ArvoARC",meta.type,sourceLabel(product.source)].filter(Boolean).join(" · ")}</p>
+        </div>
+        <div className="talep-bas-eylem">
+          {storeHref?<a className="panel-secondary" href={storeHref} target="_blank" rel="noreferrer">Mağazada gör ↗</a>:null}
+          {canManage?<Link prefetch={false} scroll={false} className="panel-secondary" href={`${urunAdresi}?pencere=matris`}>Seçeneklerden varyant üret</Link>:null}
+          {canManage?<Link prefetch={false} scroll={false} className="panel-secondary" href={`${urunAdresi}?pencere=varyant`}>+ Varyant</Link>:null}
+          {/*
+            Kopyalama ONAY İSTEMİYOR: yeni bir taslak üretiyor, hiçbir
+            şeyi bozmuyor ve yanlışlıkla basılırsa kopya arşivlenip
+            geçiliyor. ConfirmSubmit geri alınamayan işler için.
+          */}
+          {canManage?(
+            <form action={urunuKopyala}>
+              <input type="hidden" name="product_id" value={product.id}/>
+              <button className="panel-secondary" type="submit" title="Varyantları ve görselleriyle taslak bir kopya oluşturur">Kopyala</button>
+            </form>
+          ):null}
+        </div>
+      </header>
 
-      <section className="ac-metrics product-facts" aria-label="Ürün özeti">
-        <article className="ac-metric"><span>Fiyat</span><strong>{prices.length?(minPrice===maxPrice?money.format(minPrice/100):`${money.format(minPrice/100)} – ${money.format(maxPrice/100)}`):"—"}</strong><small>KDV dâhil satış fiyatı</small></article>
-        <article className="ac-metric" data-tone={totalStock<0?"bad":totalStock===0?"warn":undefined}><span>Toplam stok</span><strong>{totalStock.toLocaleString("tr-TR")} adet</strong><small>{backorderCount?`${backorderCount} varyantta stoksuz satış açık`:"Stoksuz satış kapalı"}</small></article>
-        <article className="ac-metric"><span>Varyant</span><strong>{variantList.length}</strong><small>Beden, renk ve seçenekler</small></article>
-        <article className="ac-metric"><span>Görsel</span><strong>{imageEntries.length} / 8</strong><small>{imageEntries.length?"İlk görsel kapak olarak kullanılır":"Kapak görseli eksik"}</small></article>
-        {/*
-          Zamanlama kutusu YALNIZCA plan varken. Boşken "—" gösteren
-          beşinci bir kutu, bugün bu panelden kaldırdığımız gürültünün
-          aynısı olurdu.
-        */}
-        {planOzeti?<article className="ac-metric" data-tone="warn"><span>Zamanlama</span><strong>{product.status==="draft"?"Yayına girecek":"Yayından çıkacak"}</strong><small>{planOzeti}</small></article>:null}
-      </section>
+      <nav className="kayit-serit talep-serit" aria-label="Ürün özeti">
+        <dl>
+          <div><dt>Fiyat</dt><dd>{prices.length?(minPrice===maxPrice?money.format(minPrice/100):`${money.format(minPrice/100)} – ${money.format(maxPrice/100)}`):"—"}</dd><small>KDV dâhil satış fiyatı</small></div>
+          <div className={totalStock<0?"is-tehlike":totalStock===0?"is-uyari":undefined}><dt>Toplam stok</dt><dd>{totalStock.toLocaleString("tr-TR")} adet</dd><small>{backorderCount?`${backorderCount} varyantta stoksuz satış açık`:"stoksuz satış kapalı"}</small></div>
+          <div><dt>Varyant</dt><dd>{variantList.length}</dd><small>beden, renk ve seçenekler</small></div>
+          <div className={imageEntries.length?undefined:"is-uyari"}><dt>Görsel</dt><dd>{imageEntries.length} / 8</dd><small>{imageEntries.length?"ilk görsel kapak":"kapak görseli eksik"}</small></div>
+          {/* Zamanlama YALNIZCA plan varken: boşken "—" gösteren bir sütun gürültü olurdu. */}
+          {planOzeti?<div className="is-uyari"><dt>Zamanlama</dt><dd>{product.status==="draft"?"Yayına girecek":"Yayından çıkacak"}</dd><small>{planOzeti}</small></div>:null}
+        </dl>
+      </nav>
 
       <div className="product-layout">
-        <section className="ac product-media" aria-label="Ürün görselleri">
+        <section className="panel-card product-media" aria-label="Ürün görselleri">
           {imageEntries.length?(
             <div className="product-gallery">
               {imageEntries.map((image,index)=>(
@@ -208,7 +214,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
           ):null}
         </section>
 
-        <section className="ac product-editor">
+        <section className="panel-card product-editor">
           <div className="ac-head"><div><h3>Ürün bilgileri</h3><p>İçerik, SEO ve Google Merchant verileri tek kayıtta saklanır.</p></div></div>
           {canManage?<form action={updateProduct} className="product-editor-form"><input type="hidden" name="id" value={product.id}/>
             <section className="product-editor-section">
@@ -261,7 +267,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
         </section>
       </div>
 
-      <section className="ac table list-table variant-list" data-manage={canManage?"":undefined}>
+      <section className="panel-card table list-table variant-list" data-manage={canManage?"":undefined}>
         <div className="ac-head ac-pad-sm list-table-head">
           <div><h3>Varyantlar</h3><p>{variantList.length} varyant · stok miktarına tıklayarak Stok Yönetimi’nde giriş veya çıkış yapın</p></div>
         </div>
@@ -320,17 +326,13 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
             })}
           </>
         ):<ListeBos baslik="Bu ürünün varyantı yok." aciklama="Ürün varyantsız satılamaz: fiyat, stok ve SKU varyantta tutulur. Tek seçenekli üründe bile bir varyant gerekir.">
-          {canManage?<ListeBosEylem href="#yeni-varyant" birincil>Varyant ekle</ListeBosEylem>:null}
+          {canManage?<ListeBosEylem href={`${urunAdresi}?pencere=varyant`} birincil>Varyant ekle</ListeBosEylem>:null}
         </ListeBos>}
-        {canManage?(
-          <>
-          {/*
-            MATRİS ÖNCE: dört renk × beş bedenlik bir üründe tek tek
-            ekleme yirmi gönderim demekti. Tekil form altında duruyor,
-            çünkü artık istisna olan o.
-          */}
-          <details className="variant-create-wrap" id="varyant-matrisi">
-            <summary>Seçeneklerden toplu varyant üret</summary>
+      </section>
+
+      {pencere==="matris"?(
+        /* MATRİS: dört renk × beş bedenlik bir üründe tek tek ekleme yirmi gönderim demekti. */
+        <Pencere key="matris" ust={product.name} baslik="Seçeneklerden varyant üret" kapatAdresi={urunAdresi}>
             <form action={varyantMatrisi} className="variant-matrix">
               <input type="hidden" name="product_id" value={product.id}/>
               <p className="list-hint">Renk ve beden gibi seçenekleri yazın; her birleşim için bir varyant üretilir. Değerleri virgülle ayırın. Üründe zaten olan birleşimler atlanır. <b>Renk seçeneği başa alınır</b> — mağaza varyant başlığının ilk parçasını renk olarak okuyor.</p>
@@ -352,9 +354,11 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
                 <button className="ac-btn ac-btn-primary" type="submit">Varyantları üret</button>
               </div>
             </form>
-          </details>
-          <details className="variant-create-wrap" id="yeni-varyant">
-            <summary>Tek varyant ekle</summary>
+        </Pencere>
+      ):null}
+
+      {pencere==="varyant"?(
+        <Pencere key="varyant" ust={product.name} baslik="Tek varyant ekle" kapatAdresi={urunAdresi} genis={false}>
             <form action={createVariant} className="variant-create-grid">
               <input type="hidden" name="product_id" value={product.id}/>
               <label>Varyant adı<input name="title" placeholder="Örn. Siyah / M" required className="ac-input"/></label>
@@ -366,10 +370,8 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
                 <button className="ac-btn ac-btn-primary" type="submit">Varyant oluştur</button>
               </div>
             </form>
-          </details>
-          </>
-        ):null}
-      </section>
-    </div>
-  </>;
+        </Pencere>
+      ):null}
+    </main>
+  );
 }

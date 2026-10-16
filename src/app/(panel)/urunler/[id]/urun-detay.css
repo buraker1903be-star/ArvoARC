@@ -1,0 +1,10 @@
+/* Ürün detayı: ArvoOS kayıt detayı başlığı ve özet şeridi (16.10.2026). İç düzenleyici ../../catalog.css. */
+.os-root .urun-detay{display:grid;gap:var(--sp-4)}
+.os-root .urun-detay .talep-bas h1{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+.os-root .urun-detay .talep-bas h1 .status-pill{font-size:var(--fs-sm)}
+.os-root .urun-detay .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .urun-detay .talep-bas-eylem{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+.os-root .urun-detay .talep-bas-eylem form{margin:0}
+.os-root .urun-detay .kayit-serit small{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro)}
+.os-root .urun-detay .kayit-serit .is-uyari dd{color:var(--warning)}
+.os-root .urun-detay .kayit-serit .is-tehlike dd{color:var(--danger)}
