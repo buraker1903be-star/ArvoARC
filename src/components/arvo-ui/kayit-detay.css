@@ -1,0 +1,813 @@
+/* ============================================================
+   KAYIT DETAYI (2026-10) — üç sütun: müşteri · kayıt · akış.
+   Talep detayıyla başladı, teklif detayı da aynı düzeni kullanıyor;
+   sınıf adları bu yüzden talep- önekli. Yalnızca panel-tokens.css
+   değerleri.
+   ============================================================ */
+.os-root .talep{display:flex;flex-direction:column;gap:var(--sp-4)}
+
+/* Baş: konu + asıl işlem + ⋯ */
+.talep-bas{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap}
+.talep-bas-metin{min-width:0}
+.talep-bas h1{margin:2px 0 0;font-size:clamp(20px,1.8vw,var(--fs-xl));font-weight:var(--fw-semibold);line-height:var(--lh-tight);letter-spacing:-.015em;color:var(--ink)}
+.talep-bas-eylem{display:flex;align-items:center;gap:var(--sp-2)}
+/*
+  BAŞLIK DÜĞMELERİ TELEFONDA SARAR (15.10.2026, kurum sahibi:
+  "mobilde butonların bu şekilde gözükmesi hoş değil").
+
+  Sıra sarmıyordu (nowrap) ve sayfa da yatay kaymıyor: Ürünler
+  sayfasında dört düğme 614 piksel tutuyor, ekran 375. Son düğme
+  ("Sistem sağlığı") 626'da bitiyordu, yani KIRPILMIŞ değil —
+  telefondan hiçbir şekilde erişilemiyordu. Rapor sayfası aynı sorunu
+  daha önce kendi içinde çözmüş (reporting.css); kural asıl buraya
+  aitmiş.
+
+  Düğmeler de biraz küçüldü (dolgu 16 → 12, yazı 14 → 13,5): dördü iki
+  satıra sığıyor ve başlık bölgesi hafifliyor. Yükseklik 44'te kalıyor,
+  dokunma hedefi küçülmüyor.
+
+  Müşteri detayının pencere sekmeleri dışarıda: orada kayan ray kuralı
+  var (platform.css) ve dördüncü sekme kenardan görünerek devamı
+  olduğunu söylüyor.
+*/
+@media (max-width:760px){
+  .os-root main.plt .talep-bas-eylem:not(.musteri-pencereleri){flex-wrap:wrap}
+  .os-root main.plt .talep-bas-eylem:not(.musteri-pencereleri)>:is(a,button){padding:0 var(--sp-3);font-size:13.5px}
+}
+
+/* Aşama çizgisi */
+.talep-asama{list-style:none;margin:0;padding:var(--sp-3) var(--sp-4);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.talep-asama li{position:relative;display:flex;align-items:center;gap:var(--sp-2);color:var(--muted);font-size:var(--fs-sm);font-weight:var(--fw-medium)}
+.talep-asama li::after{content:"";flex:1;height:2px;margin:0 var(--sp-2);border-radius:2px;background:var(--line)}
+.talep-asama li:last-child::after{display:none}
+.talep-asama i{flex:none;width:12px;height:12px;border-radius:50%;border:2px solid var(--n-300);background:var(--surface)}
+.talep-asama li.is-done{color:var(--ink-soft)}
+.talep-asama li.is-done i{border-color:var(--primary);background:var(--primary)}
+.talep-asama li.is-done::after{background:var(--primary)}
+.talep-asama li.is-current{color:var(--primary);font-weight:var(--fw-semibold)}
+.talep-asama li.is-current i{border-color:var(--primary);background:var(--surface);box-shadow:0 0 0 4px var(--primary-soft)}
+.talep-arsiv{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;margin:0;padding:var(--sp-3) var(--sp-4);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface-2);color:var(--ink-soft);font-size:var(--fs-sm)}
+
+/* Üç sütun */
+.talep-izgara{display:grid;grid-template-columns:minmax(260px,1fr) minmax(0,1.6fr) minmax(320px,1.4fr);gap:var(--sp-4);align-items:start}
+.os-root .talep-izgara>.panel-card{padding:var(--sp-5);min-width:0}
+.talep-izgara h2{margin:0;font-size:var(--fs-md);font-weight:var(--fw-semibold);color:var(--ink)}
+.talep-izgara h3{margin:0 0 var(--sp-1);font-size:var(--fs-sm);font-weight:var(--fw-semibold);color:var(--muted)}
+
+.talep-musteri-kimlik{display:flex;align-items:center;gap:var(--sp-3)}
+.talep-musteri-kimlik small{color:var(--muted);font-size:var(--fs-sm)}
+.talep-avatar{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:50%;background:var(--primary-soft);color:var(--primary-strong);font-weight:var(--fw-semibold)}
+.talep-iletisim{display:flex;gap:var(--sp-2);flex-wrap:wrap;margin:var(--sp-4) 0}
+.os-root .talep-iletisim>a{flex:1 1 auto;min-height:36px;padding:0 var(--sp-3);font-size:var(--fs-sm)}
+
+.talep-liste{margin:0;display:flex;flex-direction:column}
+.talep-liste>div{display:flex;justify-content:space-between;gap:var(--sp-3);padding:var(--sp-2) 0;border-top:1px solid var(--line-soft)}
+.talep-liste dt{color:var(--muted);font-size:var(--fs-sm)}
+.talep-liste dd{margin:0;text-align:right;font-size:var(--fs-sm);font-weight:var(--fw-medium);color:var(--ink);overflow-wrap:anywhere}
+.talep-liste em{font-style:normal;color:var(--muted);font-weight:400}
+.talep-liste--iki{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:var(--sp-6);margin-top:var(--sp-3)}
+.talep-liste--iki>div{flex-direction:column;gap:2px}
+.talep-liste--iki dd{text-align:left}
+.talep-not{margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--line-soft)}
+.talep-not p{margin:0;color:var(--ink);font-size:var(--fs-base);line-height:var(--lh-base);white-space:pre-line}
+.talep-bos{color:var(--muted) !important}
+
+/* Akış: sekmeler + panel. İçteki bileşenlerin kendi kart çerçevesi
+   kaldırılır: zaten bir kartın içindeler. */
+.os-root .talep-akis{padding:0 !important;overflow:hidden}
+/* SARMAK ZORUNLU. Şerit ne kayıyordu (overflow-x: visible) ne de
+   sarıyordu; kapsayıcı da taşanı kesiyor (.talep-akis overflow:hidden).
+   375 pikselde beş sekme 418 piksel istiyor: "Geçmiş" 361'de başlıyor,
+   yani yalnızca 14 pikseli görünüyor ve ona ulaşmanın HİÇBİR yolu yok —
+   kayıt geçmişi telefonda erişilemezdi (15.10.2026, iş detayında
+   ölçüldü). flex-wrap sığdığında hiçbir şeyi değiştirmiyor, bu yüzden
+   genişlik koşuluna bağlanmadı. */
+.talep-akis-sekmeler{display:flex;flex-wrap:wrap;gap:var(--sp-1);padding:0 var(--sp-3);border-bottom:1px solid var(--line)}
+.talep-akis-sekmeler button{min-height:44px;padding:0 var(--sp-3);border:0;background:transparent;color:var(--muted);font:inherit;font-size:var(--fs-sm);font-weight:var(--fw-medium);cursor:pointer}
+.talep-akis-sekmeler button:hover{color:var(--ink)}
+.talep-akis-sekmeler button.is-active{color:var(--ink);font-weight:var(--fw-semibold);box-shadow:inset 0 -2px 0 var(--primary)}
+.talep-akis-sekmeler button:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--focus)}
+.talep-akis-panel{max-height:calc(100dvh - 370px);min-height:240px;overflow:auto}
+/* Uzun kapsam ve notlar sayfayı uzatmasın: orta sütun kendi içinde kayar. Sınırlar
+   dock'un üstünde bitecek şekilde: başlık + aşama çizgisi ~216px, dock ~100px. */
+/* LİSTE IZGARASI (.ekip-izgara) DIŞARIDA. Orada da kart kendi içinde kayıyor
+   ama yüksekliği sabit bir sayıyla değil, kalan alanı doldurarak belirleniyor
+   (os-shell.css · "Liste sayfaları"). Buradaki 320px kayıt detayının başlık +
+   aşama çizgisine göre ölçülmüş; liste sayfalarının üst bölümü daha uzun ve
+   kart ekranın altından taşıyor, taşan satırlara ulaşılamıyordu. */
+.os-root .talep-izgara:not(.ekip-izgara)>:is(.talep-bilgi,.talep-musteri){max-height:calc(100dvh - 320px);overflow:auto}
+.os-root .talep-akis-panel>.panel-card,.os-root .talep-akis-panel>section{margin:0;border:0;border-radius:0;box-shadow:none;background:transparent}
+.talep-akis-panel:empty::after{content:"Bu talebe bağlı yazışma yok.";display:block;padding:var(--sp-8) var(--sp-5);text-align:center;color:var(--muted);font-size:var(--fs-sm)}
+
+@media (max-width:1200px){
+  .talep-izgara{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr)}
+  .talep-izgara>.talep-akis{grid-column:1/-1}
+  /* Seçici sütun sınırındakiyle (:not(.ekip-izgara)) aynı özgüllükte olmalı. Eskiden
+     daha zayıftı ve hiç işlemiyordu: telefonda müşteri ve bilgi kartları ekranın bir
+     bölümünde kesilip kendi içinde kayıyordu (12.10.2026, sözleşme detayında ölçüldü). */
+  .talep-akis-panel,.os-root .talep-izgara:not(.ekip-izgara)>:is(.talep-bilgi,.talep-musteri){max-height:none}
+}
+@media (max-width:760px){
+  .talep-izgara{grid-template-columns:minmax(0,1fr)}
+  .talep-asama{grid-template-columns:none;grid-auto-flow:column;overflow-x:auto}
+  .talep-asama li span{white-space:nowrap}
+  .talep-liste--iki{grid-template-columns:minmax(0,1fr)}
+}
+
+/* ---------- Müşterinin diğer kayıtları (sol sütun) ---------- */
+.talep-gecmis{margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--line-soft)}
+.talep-gecmis-ozet{margin:0 0 var(--sp-2);color:var(--ink-soft);font-size:var(--fs-sm)}
+.talep-gecmis ul{list-style:none;margin:0 calc(var(--sp-2) * -1);padding:0;display:flex;flex-direction:column}
+.talep-gecmis li>a,.talep-gecmis li>div{display:flex;align-items:center;gap:var(--sp-2);min-height:44px;padding:var(--sp-1) var(--sp-2);border-radius:var(--r-sm);color:var(--ink);text-decoration:none}
+.talep-gecmis li>a:hover{background:var(--surface-2)}
+.talep-gecmis-metin{flex:1;min-width:0;display:flex;flex-direction:column}
+.talep-gecmis-metin b{font-size:var(--fs-sm);font-weight:var(--fw-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.talep-gecmis-metin small{font-size:var(--fs-micro);color:var(--muted)}
+.talep-gecmis .status-pill{flex:none}
+
+/* ---------- Yorumlar sekmesi: sade akış ----------
+   Eskiden yazma alanı iç içe iki çerçeveydi (kutu + ortak form stilinin
+   textarea çerçevesi), kare ve kenarlıklı avatar, büyük harfli "… adına
+   kurum içi not" etiketi ve gri alt şerit vardı. Tek çerçeve, odakta
+   kurum rengi; yuvarlak avatar. */
+.os-root .ic-akis{padding:0}
+.os-root .ic-akis .crm-internal-comment-form{grid-template-columns:32px minmax(0,1fr);gap:var(--sp-3);margin:0;padding:var(--sp-4);border-bottom:1px solid var(--line-soft);background:transparent}
+.os-root .ic-akis :is(.crm-internal-comment-composer-avatar,.crm-internal-comment-avatar){width:32px;height:32px;flex-basis:32px;border:0;border-radius:50%;background:var(--primary-soft);color:var(--primary-strong);font-size:var(--fs-micro);font-weight:var(--fw-semibold);letter-spacing:0}
+.os-root .ic-akis .crm-internal-comment-composer{border:1px solid var(--n-300);border-radius:var(--r-md);background:var(--surface);box-shadow:none}
+.os-root .ic-akis .crm-internal-comment-composer:focus-within{border-color:var(--primary);box-shadow:var(--shadow-glow)}
+.os-root .ic-akis .crm-internal-comment-composer textarea{display:block;width:100%;min-height:72px;margin:0;padding:var(--sp-3);border:0 !important;border-radius:var(--r-md) var(--r-md) 0 0;background:transparent;box-shadow:none !important;resize:none;font-size:var(--fs-base);line-height:var(--lh-base)}
+/* Dar ekranda da tek satır: eski mobil kural (request-page.css) düğmeyi tam genişliğe yayıyordu. */
+.os-root .ic-akis .crm-internal-comment-composer>div{display:flex;align-items:center;justify-content:space-between;flex-direction:row;gap:var(--sp-2);padding:var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);border-top:1px solid var(--line-soft);background:transparent}
+.os-root .ic-akis .crm-internal-comment-composer small{color:var(--muted);font-size:var(--fs-micro)}
+.os-root .ic-akis .crm-internal-comment-composer .panel-primary{width:auto;flex:none;min-height:32px;padding:0 var(--sp-3);font-size:var(--fs-sm)}
+.os-root .ic-akis .crm-internal-comment-list{display:flex;flex-direction:column;gap:var(--sp-4);padding:var(--sp-4)}
+.os-root .ic-akis .crm-internal-comment-list>article{display:grid;grid-template-columns:32px minmax(0,1fr);gap:var(--sp-3);padding:0;border:0;background:transparent}
+.os-root .ic-akis .crm-internal-comment-meta strong{font-size:var(--fs-sm)}
+.ic-akis-bos{margin:0;padding:var(--sp-6) var(--sp-4);text-align:center;color:var(--muted);font-size:var(--fs-sm)}
+
+/* ---------- Postalar sekmesi: araç çubuğu + liste ---------- */
+.posta-akis-arac{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);flex-wrap:wrap;padding:var(--sp-3) var(--sp-4);border-bottom:1px solid var(--line-soft)}
+.posta-akis-arac p{margin:0;color:var(--muted);font-size:var(--fs-sm)}
+.posta-akis-arac>div{display:flex;gap:var(--sp-2)}
+.os-root .posta-akis-arac :is(.panel-primary,.panel-secondary){min-height:32px;padding:0 var(--sp-3);font-size:var(--fs-sm)}
+.posta-akis-liste{list-style:none;margin:0;padding:var(--sp-2);display:flex;flex-direction:column}
+.posta-akis-liste a{display:flex;align-items:center;gap:var(--sp-3);min-height:48px;padding:var(--sp-2);border-radius:var(--r-sm);color:var(--ink);text-decoration:none}
+.posta-akis-liste a:hover{background:var(--surface-2)}
+.posta-akis-metin{flex:1;min-width:0;display:flex;flex-direction:column}
+.posta-akis-metin b{font-size:var(--fs-sm);font-weight:var(--fw-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.posta-akis-metin small{font-size:var(--fs-micro);color:var(--muted)}
+.posta-akis-liste li.is-unread .posta-akis-metin b{font-weight:var(--fw-bold)}
+.posta-akis-zaman{flex:none;font-size:var(--fs-micro);color:var(--muted)}
+
+/* ---------- İnce kaydırma çubuğu ----------
+   Uzun metinde gri ve kalın çubuk her zaman görünüyordu; artık ince ve
+   yalnızca sütunun üzerine gelince belirgin. */
+.os-root .talep-izgara:not(.ekip-izgara)>:is(.talep-bilgi,.talep-musteri),.talep-akis-panel{scrollbar-width:thin;scrollbar-color:transparent transparent;scrollbar-gutter:stable}
+.os-root .talep-izgara:not(.ekip-izgara)>:is(.talep-bilgi,.talep-musteri):hover,.talep-akis-panel:hover{scrollbar-color:var(--n-300) transparent}
+.os-root .talep-izgara:not(.ekip-izgara)>:is(.talep-bilgi,.talep-musteri)::-webkit-scrollbar,.talep-akis-panel::-webkit-scrollbar{width:6px}
+.os-root .talep-izgara:not(.ekip-izgara)>:is(.talep-bilgi,.talep-musteri)::-webkit-scrollbar-thumb,.talep-akis-panel::-webkit-scrollbar-thumb{border-radius:6px;background:transparent}
+.os-root .talep-izgara:not(.ekip-izgara)>:is(.talep-bilgi,.talep-musteri):hover::-webkit-scrollbar-thumb,.talep-akis-panel:hover::-webkit-scrollbar-thumb{background:var(--n-300)}
+
+/* ---------- Teklif detayı ---------- */
+.teklif-tutar{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap;padding-bottom:var(--sp-4);border-bottom:1px solid var(--line-soft)}
+.teklif-tutar strong{display:block;margin-top:var(--sp-1);font-size:var(--fs-2xl);font-weight:var(--fw-semibold);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.teklif-tutar small{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-sm)}
+.teklif-gecerlilik{display:flex;flex-direction:column;align-items:flex-end;gap:var(--sp-1);font-size:var(--fs-sm);color:var(--ink)}
+.teklif-gecerlilik h3{margin:0}
+.teklif-kilit{margin:var(--sp-3) 0 0;padding:var(--sp-3);border-radius:var(--r-md);background:var(--surface-2);color:var(--ink-soft);font-size:var(--fs-sm)}
+.teklif-baglanti{margin:0 0 var(--sp-1);color:var(--ink-soft);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:var(--fs-micro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Menüdeki form düğmeleri (Sözleşmeye dönüştür) tam genişlikte */
+.os-root .os-menu-list form{display:contents}
+
+/* Sözleşme detayı: takip kodu ve akıştaki müşteri mesajları. Mesajlar
+   panelin içinde kayar, yanıt kutusu panelin altına yapışık durur
+   (yorumlardaki yazma kutusuyla aynı görünüm). */
+/* Takip kodu penceresi: kod kartı + açma/kapama + gönderim. Eskiden satır içi stillerle duruyordu. */
+.sozlesme-takip{display:grid;gap:var(--sp-4)}
+.sozlesme-takip-kart{display:grid;gap:var(--sp-2);justify-items:center;padding:var(--sp-5) var(--sp-4);border:1px solid var(--line-soft);border-radius:14px;background:var(--surface-2);text-align:center}
+.sozlesme-takip-kart>small:first-child{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.sozlesme-takip-kart .sozlesme-takip-kod{font-size:28px}
+.sozlesme-takip-adres{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
+.sozlesme-takip .tracking-toggle{margin:0}
+.sozlesme-takip .panel-page-actions{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+.sozlesme-takip-kod{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:var(--fs-lg);font-weight:var(--fw-semibold);letter-spacing:.18em;color:var(--ink)}
+.sozlesme-mesaj{display:flex;flex-direction:column;min-height:100%}
+.os-root .sozlesme-mesaj .contract-chat{flex:1;max-height:none;overflow:visible;padding:var(--sp-4);gap:var(--sp-3)}
+.os-root .sozlesme-mesaj .contract-bubble{border-color:var(--line);border-radius:var(--r-md)}
+.os-root .sozlesme-mesaj .contract-bubble.is-staff{background:var(--primary-soft);border-color:transparent}
+.os-root .sozlesme-mesaj .contract-bubble p{font-size:var(--fs-sm);color:var(--ink)}
+.os-root .sozlesme-mesaj .contract-reply{position:sticky;bottom:0;gap:0;margin:0 var(--sp-4) var(--sp-4);border:1px solid var(--n-300);border-radius:var(--r-md);background:var(--surface)}
+.os-root .sozlesme-mesaj .contract-reply:focus-within{border-color:var(--primary);box-shadow:var(--shadow-glow)}
+.os-root .sozlesme-mesaj .contract-reply textarea{min-height:64px;border:0 !important;border-radius:var(--r-md) var(--r-md) 0 0;box-shadow:none !important;resize:none;font-size:var(--fs-base);color:var(--ink)}
+.os-root .sozlesme-mesaj .contract-reply>div{flex-wrap:nowrap;padding:var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);border-top:1px solid var(--line-soft)}
+.os-root .sozlesme-mesaj .contract-reply small{color:var(--muted);font-size:var(--fs-micro)}
+.os-root .sozlesme-mesaj .contract-reply .panel-primary{width:auto;flex:none;min-height:32px;padding:0 var(--sp-3);font-size:var(--fs-sm)}
+.os-root .talep-bilgi .plan-addenda li{border-color:var(--line);border-radius:var(--r-md)}
+.os-root .talep-bilgi .plan-timeline li{font-size:var(--fs-sm)}
+
+/* Cari ve personel detayı: özet şeridi (aşama çizgisinin yerinde), satır listeleri. */
+.kayit-serit{display:flex;align-items:center;gap:var(--sp-6);flex-wrap:wrap;padding:var(--sp-3) var(--sp-5);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.kayit-serit dl{display:flex;gap:var(--sp-6);flex-wrap:wrap;margin:0}
+.kayit-serit dl>div{display:flex;flex-direction:column;gap:2px}
+.kayit-serit dt{color:var(--muted);font-size:var(--fs-micro);font-weight:var(--fw-medium)}
+.kayit-serit dd{margin:0;font-size:var(--fs-md);font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums;color:var(--ink)}
+/* Kurucu konsolunun şeritleri sayının altına bir not satırı koyuyor
+   ("3 bildirim · tüm zamanlar"); panelin şeritlerinde bu yok, oradan
+   gelen şeritler etkilenmiyor (13.10.2026). Notsuz bırakılsaydı sayfa
+   puntosunda, dt ve dd'den büyük bir satır olurdu. */
+.kayit-serit small{color:var(--muted);font-size:var(--fs-micro);line-height:1.35}
+.kayit-serit .cari-bakiye dd{font-size:var(--fs-lg)}
+.kayit-serit .cari-bakiye[data-tone="warning"] dd{color:var(--warning)}
+.kayit-serit .cari-bakiye[data-tone="success"] dd{color:var(--success)}
+.cari-oran{flex:1;min-width:200px;display:flex;flex-direction:column;gap:var(--sp-1);color:var(--muted);font-size:var(--fs-sm)}
+.cari-oran-cubuk{height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.cari-oran-cubuk i{display:block;width:var(--p,0%);height:100%;border-radius:inherit;background:var(--success)}
+.cari-arti{color:var(--success) !important}
+.cari-baslik{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-2);margin-bottom:var(--sp-2)}
+.cari-baslik small{color:var(--muted);font-size:var(--fs-sm)}
+.cari-hareketler{list-style:none;margin:0 calc(var(--sp-2) * -1);padding:0;display:flex;flex-direction:column}
+.cari-hareketler li{display:flex;align-items:center;gap:var(--sp-3);min-height:52px;padding:var(--sp-2);border-top:1px solid var(--line-soft)}
+.cari-hareketler li:first-child{border-top:0}
+.cari-hareketler li>a{flex:1;display:flex;align-items:center;gap:var(--sp-3);margin:calc(var(--sp-2) * -1);padding:var(--sp-2);border-radius:var(--r-sm);color:inherit;text-decoration:none}
+.cari-hareketler li>a:hover{background:var(--surface-2)}
+.cari-hareketler .status-pill{flex:none;min-width:76px;justify-content:center}
+.cari-hareket-metin{flex:1;min-width:0;display:flex;flex-direction:column}
+.cari-hareket-metin b{font-size:var(--fs-sm);font-weight:var(--fw-medium);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cari-hareket-metin small{font-size:var(--fs-micro);color:var(--muted)}
+.cari-hareketler strong{flex:none;font-size:var(--fs-sm);font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums;color:var(--ink)}
+.cari .status-pill[data-tone="gold"]{background:var(--accent-soft);color:var(--accent-strong)}
+.cari .cari-toplam{font-weight:var(--fw-semibold)}
+.cari .cari-toplam dt{color:var(--ink)}
+.cari-not{margin:0;font-size:var(--fs-sm)}
+/* Sağ sütun ana içerik değil: diğer detaylardaki akışla aynı genişlikte. */
+.os-root .cari .talep-izgara>.cari-sag{max-height:calc(100dvh - 320px);overflow:auto}
+/* Cari detayında sekmeli orta sütun (hareketler, WhatsApp, posta) dar ekranda da ortada kalır;
+   kayıt detaylarındaki akış kutusu gibi tam satıra yayılsaydı künye kartı tek başına kalırdı. */
+@media (max-width:1200px) and (min-width:761px){.cari .talep-izgara>.talep-akis{grid-column:auto}}
+@media (max-width:1200px){.cari .talep-izgara>.cari-sag{grid-column:1/-1}.os-root .cari .talep-izgara>.cari-sag{max-height:none}}
+@media (max-width:760px){
+  .cari-hareket-metin b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .cari-hareketler .status-pill{min-width:0}
+  .kayit-serit{gap:var(--sp-3)}
+  /*
+    ŞERİT TELEFONDA EŞİT İKİ SÜTUN (15.10.2026).
+
+    Şerit flex ve kutular İÇERİK genişliğindeydi: dar ekranda "Tüm kayıt"
+    ile "Kurumsal" 174px olup yan yana geliyor, etiketi uzun olan
+    ("Dikkat gerektiren", 220px) eşleşemeyip tek başına kalıyordu.
+    Sonuç 2 + 1 + 1 tırtıklı bir dizilim ve her sayfada farklı bir kırılma
+    noktası — telefonda bakınca bozuk görünüyor.
+
+    Izgara, kutuların genişliğini etiketten bağımsız kılıyor: sayı ne
+    olursa olsun hizalı iki sütun. Tek kalan son kutu satırın tamamına
+    yayılıyor (beş kutulu Sistem Sağlığı şeridi böyle).
+  */
+  /* Liste tam genişliğe yayılıyor: dl bir flex öğesi ve içerik boyunda
+     kalınca ızgara da onun içine sıkışıyordu — Kullanıcılar'da şerit 351
+     piksel genişken kutular 216 pikseli paylaşıyor, sayfadan sayfaya
+     farklı genişlikte görünüyordu. */
+  .kayit-serit dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-3) var(--sp-5);flex:1 1 100%}
+  .kayit-serit dl>div{min-width:0}
+  .kayit-serit dl>div:last-child:nth-child(odd){grid-column:1/-1}
+}
+
+/* Personel detayı */
+.talep-izgara.personel-iki{grid-template-columns:minmax(260px,1fr) minmax(0,2fr)}
+.personel-erisim{display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-2)}
+.personel-erisim .talep-iletisim{margin:0}
+.personel-erisim .hr-access-form{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+.personel .cari-hareketler li>form{flex:none;margin:0}
+.os-root .personel .personel-sil{min-height:30px;padding:0 var(--sp-3);font-size:var(--fs-micro)}
+.personel-yukle{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);margin-top:var(--sp-3);padding:var(--sp-3);border:1px dashed var(--n-300);border-radius:var(--r-md)}
+.personel-yukle input[type="file"]{flex:1;min-width:0;font-size:var(--fs-sm)}
+.os-root .personel-yukle .panel-primary{min-height:32px;padding:0 var(--sp-3);font-size:var(--fs-sm)}
+.personel .kayit-serit dd .status-pill{font-size:var(--fs-sm)}
+@media (max-width:760px){.talep-izgara.personel-iki{grid-template-columns:minmax(0,1fr)}}
+
+/* Ekip listesi: liste solda geniş, departman/davet sağda. Liste
+   sayfalarının ilk örneği; diğer listeler bu kalıba geçecek. */
+.talep-izgara.ekip-izgara{grid-template-columns:minmax(0,2.4fr) minmax(280px,1fr)}
+.ekip-suzgec{display:flex;flex-wrap:wrap;gap:var(--sp-1);margin-bottom:var(--sp-3);padding-bottom:var(--sp-3);border-bottom:1px solid var(--line-soft)}
+.ekip-suzgec a{display:inline-flex;align-items:center;gap:var(--sp-1);min-height:32px;padding:0 var(--sp-3);border-radius:999px;color:var(--muted);font-size:var(--fs-sm);font-weight:var(--fw-medium);text-decoration:none}
+.ekip-suzgec a:hover{background:var(--surface-2);color:var(--ink)}
+.ekip-suzgec a.is-active{background:var(--primary-soft);color:var(--primary-strong)}
+.ekip-suzgec small{font-size:var(--fs-micro);opacity:.75}
+.ekip-suzgec .ekip-suzgec-dep{margin-left:auto;background:var(--surface-2);color:var(--ink)}
+.ekip-liste{list-style:none;margin:0 calc(var(--sp-2) * -1);padding:0;display:flex;flex-direction:column}
+.ekip-liste li+li{border-top:1px solid var(--line-soft)}
+.ekip-liste a{display:flex;align-items:center;gap:var(--sp-3);min-height:60px;padding:var(--sp-2);border-radius:var(--r-sm);color:var(--ink);text-decoration:none}
+.ekip-liste a:hover{background:var(--surface-2)}
+.ekip-liste a.is-pasif{opacity:.6}
+.ekip-liste .talep-avatar{width:36px;height:36px;font-size:var(--fs-sm)}
+.ekip-iletisim{flex:none;width:150px;color:var(--muted);font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ekip-liste .status-pill{flex:none}
+.ekip-erisim{min-width:120px;justify-content:center}
+.ekip-ok{flex:none;color:var(--dim);font-size:var(--fs-lg)}
+.ekip .cari-hareketler li>a.is-active{background:var(--primary-soft)}
+.ekip-dep-kod{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:var(--r-sm);background:var(--primary-soft);color:var(--primary-strong);font-size:var(--fs-micro);font-weight:var(--fw-semibold)}
+.ekip-dep-kod[data-pasif]{background:var(--surface-2);color:var(--muted)}
+.os-root .ekip .ekip-baglanti{flex:none;min-height:30px;padding:0 var(--sp-3);font-size:var(--fs-micro)}
+@media (max-width:1200px){.ekip-iletisim{display:none}}
+@media (max-width:760px){
+  .talep-izgara.ekip-izgara{grid-template-columns:minmax(0,1fr)}
+  .os-root .ekip-liste :is(.ekip-erisim,.ekip-ok){display:none}
+  .ekip-suzgec .ekip-suzgec-dep{margin-left:0}
+}
+.ekip-liste .cari-hareket-metin small{font-weight:400;color:var(--muted)}
+
+/* Talepler listesi: aşama şeridi bağlantı, satırın sağında temsilci ve son not. */
+.talep-serit dd a{color:inherit;text-decoration:none}
+.talep-serit dd a:hover{color:var(--primary)}
+.talep-serit dl>div.is-active dd a{color:var(--primary);text-decoration:underline;text-underline-offset:4px}
+
+/*
+  ŞERİDİN SAYISI SÜZGEÇ; DOKUNMA ALANI DA ÖYLE OLSUN (15.10.2026).
+
+  Liste sayfalarının birincil süzgeci bu şerit: "Kurumsal" bölümünün
+  sayısına basınca liste süzülüyor. Ama tıklanabilen yalnızca SAYIYDI —
+  ölçülen hedef 10×19 piksel, hem masaüstünde hem telefonda. Üstündeki
+  etiket, yani kullanıcının nişan aldığı yer, ölüydü; imleç de ancak
+  rakamın üstünde değiştiği için bölümün bir süzgeç olduğu
+  anlaşılmıyordu. Bölümün kendisi zaten 62-78 piksel yüksekliğinde,
+  bağlantıyı ona yaydık: ölçüler değişmedi, hedef 10×19'dan en az
+  50×62'ye çıktı. Üstüne gelince de artık bütün bölüm tepki veriyor.
+
+  Kaplama yalnızca bölümün TEK bağlantısı olduğunda açılıyor (:has
+  koruması): etiketinde ya da alt yazısında ayrı bir bağlantı olan bir
+  bölümde kaplama onu yutardı.
+
+  Odak halkası bölüme taşınıyor; yoksa klavyeyle gezen kişi kocaman bir
+  hedefin içinde rakamı çevreleyen minik bir halka görürdü.
+*/
+.kayit-serit dl>div:has(>dd>a):not(:has(dt a)):not(:has(small a)){position:relative}
+.kayit-serit dl>div>dd>a::after{content:"";position:absolute;inset:0;border-radius:var(--r-md)}
+.kayit-serit dl>div:has(>dd>a:focus-visible){border-radius:var(--r-md);box-shadow:var(--shadow-glow)}
+.kayit-serit dl>div>dd>a:focus-visible{outline:none}
+.talep-suzgec{align-items:center}
+.talep-suzgec-etiket{display:inline-flex;align-items:center;min-height:32px;padding:0 var(--sp-3);border-radius:999px;background:var(--primary-soft);color:var(--primary-strong);font-size:var(--fs-sm);font-weight:var(--fw-medium)}
+.talep-ara{margin-left:auto;flex:0 1 280px;min-width:180px}
+.talep-suzgec .ekip-suzgec-dep{margin-left:0}
+.talep-ara input{width:100%;height:34px;padding:0 var(--sp-3);border:1px solid var(--n-300);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
+.talep-ara input:focus{outline:none;border-color:var(--primary);box-shadow:var(--shadow-glow)}
+.talep-satir-yan{flex:none;width:170px;display:flex;flex-direction:column;font-size:var(--fs-sm);color:var(--ink);min-width:0}
+.talep-satir-yan>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.talep-satir-yan .is-bos{color:var(--warning)}
+.talep-satir-yan small{color:var(--muted);font-size:var(--fs-micro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.talep-satir-durum{flex:none;width:150px;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.talep-satir-durum small{max-width:150px;color:var(--muted);font-size:var(--fs-micro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.talepler .cari-hareketler strong{margin-left:auto}
+.talep-uyari{color:var(--warning) !important}
+.talep-bos-kutu{border:0;box-shadow:none;background:transparent}
+@media (max-width:1200px){.talep-satir-yan{display:none}}
+@media (max-width:760px){
+  .talep-satir-durum{width:auto}
+  .talep-satir-durum small{display:none}
+  .talep-ara{flex-basis:100%;margin-left:0}
+}
+/* Liste kartının yüksekliği artık os-shell.css'te, kalan alanı doldurarak. */
+
+/* Teklifler listesi: tutar sütunu ve bağlantı hazır şeridi. */
+.teklif-tutar-satir{flex:none;width:120px;text-align:right;font-size:var(--fs-sm);font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums;color:var(--ink)}
+.teklif-paylasim{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;padding:var(--sp-3) var(--sp-4);border:1px solid color-mix(in srgb,var(--success) 35%,var(--line));border-radius:var(--r-lg);background:var(--success-soft)}
+.teklif-paylasim-ikon{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:50%;background:var(--success);color:var(--n-0);font-weight:var(--fw-bold)}
+.teklif-paylasim-metin{flex:1;min-width:0;display:flex;flex-direction:column}
+.teklif-paylasim-metin b{font-size:var(--fs-sm);color:var(--ink)}
+.teklif-paylasim-metin small{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:var(--fs-micro);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.teklif-paylasim .talep-iletisim{margin:0}
+.os-root .teklif-paylasim .talep-iletisim>:is(a,button){flex:none;min-height:34px;padding:0 var(--sp-3);font-size:var(--fs-sm)}
+@media (max-width:760px){.teklif-tutar-satir{width:auto}}
+/* Telefonda teklif satırı iki sütun: solda müşteri ve teklif, sağda tutar ve durum alt alta. */
+@media (max-width:760px){
+  .teklifler .ekip-liste a{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--sp-3);row-gap:2px}
+  .teklifler .ekip-liste .talep-avatar{display:none}
+  .teklifler .ekip-liste .cari-hareket-metin{grid-column:1;grid-row:1/3}
+  .teklifler .teklif-tutar-satir{grid-column:2;grid-row:1}
+  .teklifler .talep-satir-durum{grid-column:2;grid-row:2}
+}
+/* Satır bağlantıları genel bir bağlantı kuralından 800 kalınlık alıyordu;
+   alt yazılar da kalın görünüyordu. Kalınlığı satırın içindeki öğeler belirler. */
+.os-root :is(.ekip-liste a,.cari-hareketler li>a){font-weight:400}
+.os-root .talep-satir-yan>span{font-weight:var(--fw-medium)}
+
+.talep-temsilci-sec{flex:none;height:34px;max-width:180px;padding:0 var(--sp-3);border:1px solid var(--n-300);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit;font-size:var(--fs-sm)}
+.talep-ara--secimli{display:flex;gap:var(--sp-2);flex:0 1 460px}
+.talep-ara--secimli input{flex:1;min-width:0}
+@media (max-width:760px){.talep-ara--secimli{flex-wrap:wrap}.talep-temsilci-sec{max-width:none;flex:1 1 100%}}
+
+/* Talepler: kartın içindeki tablo (önceki sürümün sütunları) ve istatistik kartı. */
+.talep-tablo{margin:0 calc(var(--sp-5) * -1) calc(var(--sp-5) * -1)}
+.os-root .talep-tablo .crm-data-table{width:100%;border:0;border-radius:0;box-shadow:none}
+/* Başlık satırın içindeki tıklanabilir öğelerin (bağlantı, düğme: z-index 1,
+   aşağıda) ÜSTÜNDE kalmalı. Eskiden ikisi de z-index 1'di ve eşitlikte sonra
+   gelen kazandığı için kaydırınca müşteri adı, temsilci rozeti başlığın
+   üstünden geçiyor, başlık satırların arasında kayboluyordu (13.10.2026). */
+.os-root .talep-tablo .crm-data-table thead th{position:sticky;top:0;z-index:3;background:var(--surface)}
+.istat-kutular{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-3);margin:0}
+.istat-kutular>div{display:flex;flex-direction:column;gap:2px;padding:var(--sp-3);border:1px solid var(--line-soft);border-radius:var(--r-md);background:var(--surface-2)}
+.istat-kutular dt{color:var(--muted);font-size:var(--fs-micro);font-weight:var(--fw-medium)}
+.istat-kutular dd{margin:0;font-size:var(--fs-xl);font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums;color:var(--ink)}
+.istat-kutular small{color:var(--muted);font-size:var(--fs-sm)}
+.istat-cubuklar{list-style:none;margin:var(--sp-2) 0 0;padding:0;display:flex;flex-direction:column;gap:var(--sp-2)}
+.istat-cubuklar li{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(32px,auto);align-items:center;gap:var(--sp-2);font-size:var(--fs-sm)}
+.istat-cubuklar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.istat-cubuklar i{display:block;height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.istat-cubuklar b{display:block;height:100%;border-radius:inherit;background:var(--primary)}
+.istat-cubuklar strong{text-align:right;font-variant-numeric:tabular-nums;font-weight:var(--fw-semibold)}
+@media (max-width:760px){
+  .talep-tablo{margin:0}
+  .os-root .talep-tablo .crm-data-table,.os-root .talep-tablo .crm-data-table tbody{display:block;min-width:0;width:100%}
+}
+
+/*
+  LİSTE TABLOSU TİPOGRAFİSİ (talepler, teklifler, sözleşmeler). Eski
+  tablo kuralları (panel-premium.css, panel-tables.css) 12–15px ve
+  650–780 kalınlıkla yazıyordu; yeni tasarımın ölçeğine çekildi: ad
+  satırı --fs-sm/orta, alt satır --fs-micro/normal, satır ~56px, başlık
+  sessiz. Liste satırlarıyla (ekip, cari) aynı yoğunluk.
+*/
+.os-root .talep-tablo .crm-data-table thead th{padding:var(--sp-2) var(--sp-3);background:var(--surface);border-bottom:1px solid var(--line);color:var(--muted);font-size:var(--fs-micro);font-weight:var(--fw-medium);letter-spacing:0;text-transform:none;white-space:nowrap}
+.os-root .talep-tablo .crm-data-table thead th:first-child,.os-root .talep-tablo .crm-data-table tbody td:first-child{padding-left:var(--sp-5)}
+.os-root .talep-tablo .crm-data-table tbody td{height:56px;padding:var(--sp-2) var(--sp-3);border-top:1px solid var(--line-soft);border-bottom:0;color:var(--ink);font-size:var(--fs-sm);font-weight:400;line-height:var(--lh-tight);vertical-align:middle}
+.os-root .talep-tablo .crm-data-table tbody tr:first-child td{border-top:0}
+.os-root .talep-tablo .crm-data-table tbody tr:hover td{background:var(--surface-2)}
+.os-root .talep-tablo .crm-data-table .crm-table-mono{color:var(--muted);font-size:var(--fs-micro);font-weight:var(--fw-medium);letter-spacing:.01em}
+.os-root .talep-tablo .crm-data-table .crm-table-title{display:block;max-width:240px;color:var(--ink);font-size:var(--fs-sm);font-weight:var(--fw-medium);letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.os-root .talep-tablo .crm-data-table .crm-table-sub{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.os-root .talep-tablo .crm-rep{gap:var(--sp-2);font-size:var(--fs-sm);font-weight:400}
+.os-root .talep-tablo .crm-rep>i{width:26px;height:26px;background:var(--primary-soft);color:var(--primary-strong);box-shadow:none;font-size:var(--fs-micro);font-weight:var(--fw-semibold)}
+.os-root .talep-tablo .crm-col-amount{font-variant-numeric:tabular-nums;font-weight:var(--fw-semibold);white-space:nowrap}
+.os-root .talep-tablo .crm-col-date{color:var(--ink-soft);font-size:var(--fs-sm);white-space:nowrap}
+.os-root .talep-tablo :is(.crm-waiting,.crm-liste-sebep){display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro);font-weight:400}
+.os-root .talep-tablo .crm-waiting.is-late{color:var(--warning)}
+.os-root .talep-tablo .crm-last-contact,.os-root .talep-tablo .crm-last-contact-none{font-size:var(--fs-micro);font-weight:400;color:var(--muted)}
+.os-root .talep-tablo .crm-row-chevron{font-size:var(--fs-lg);color:var(--dim)}
+.os-root .talep-tablo .talep-revizyon{margin-left:var(--sp-1);font-size:var(--fs-micro)}
+@media (max-width:760px){
+  .os-root .talep-tablo .crm-data-table tbody td{height:auto}
+  .os-root .talep-tablo .crm-data-table tbody td:first-child{padding-left:var(--sp-3)}
+  .os-root .talep-tablo .crm-data-table .crm-table-title,.os-root .talep-tablo .crm-data-table .crm-table-sub{max-width:none;white-space:normal}
+}
+/* Telefonda kart görünümü: hücre değeri sağda, ikinci satırı (telefon,
+   bekleme notu) altına sarılır; yan yana sıkışıp üst üste biniyordu. */
+@media (max-width:760px){
+  .os-root .talep-tablo .crm-data-table tbody td{flex-wrap:wrap;column-gap:var(--sp-2)}
+  .os-root .talep-tablo .crm-data-table tbody td>:is(.crm-table-sub,.crm-waiting,.crm-liste-sebep){flex-basis:100%;text-align:right;margin-top:0}
+}
+
+/*
+  SATIRIN TAMAMI TIKLANABİLİR. Kural panel-premium.css'te .crm-page-stack
+  altına yazılıydı; yeni liste sayfalarında o sarmalayıcı olmadığı için
+  yalnızca numara hücresi tıklanıyordu. Aynı yöntem: ilk hücredeki gerçek
+  <a> bir ::after ile satırı kaplar (klavye, orta tık, yeni sekme çalışır).
+*/
+/*
+  SATIR TIKLAMA KATMANI KALDIRILDI.
+
+  Tüm satırı tıklanabilir yapmak için ilk hücredeki bağlantıya bir ::after
+  kaplaması konuyordu: tr{position:relative} + ::after{inset:0}. Bu, <tr>'nin
+  mutlak konumlu alt öğeler için kapsayıcı blok oluşturmasına dayanıyor ve
+  Safari bunu yapmıyor: kaplama satır boyunda kalmıyor, yukarıdaki ilk
+  konumlanmış ataya — pratikte kartın tamamına — yayılıyor.
+
+  Sonuç (08.10.2026, kullanıcı bildirimi): kartın neresine basılsa alakasız
+  bir kayıt açılıyor, tekerlek ve klavye liste kabına hiç ulaşamıyordu
+  (imleç her yerde kabın dışına konumlanmış bir katmanın üstünde), yalnızca
+  yapışkan tablo başlığına tıklandıktan sonra kaydırma çalışıyordu.
+
+  Tıklama hedefi artık ilk hücredeki bağlantı ve o bağlantı hücresini
+  dolduruyor. Satır genişliğinde tıklama bir kolaylıktı; kartın her yerinin
+  yanlışlıkla kayıt açması ve listenin kaymaması kullanılamazlıktı.
+*/
+/* Satırın tamamı yine tıklanabilir ama kaplamayla değil: tabloya bağlı tek
+   bir dinleyici satırdaki gerçek bağlantıya gidiyor (crm/satir-tiklama.tsx).
+   position:static bilerek — konumlanmış <tr>'ye güvenmek Safari'de kırılıyordu. */
+.os-root .talep-tablo .crm-data-table tbody tr{position:static;cursor:pointer}
+.os-root .talep-tablo .crm-data-table tbody td:first-child .crm-row-link{
+  display:flex;flex-direction:column;justify-content:center;gap:2px;
+  margin:calc(var(--sp-2) * -1) calc(var(--sp-3) * -1);
+  padding:var(--sp-2) var(--sp-3);
+  color:inherit;text-decoration:none;border-radius:var(--r-sm);
+}
+.os-root .talep-tablo .crm-data-table tbody td:first-child .crm-row-link:hover{background:var(--surface-2)}
+.os-root .talep-tablo .crm-data-table tbody td :is(a:not(.crm-row-link),button,select,input,summary,details,form){position:relative;z-index:1}
+.os-root .talep-tablo .crm-data-table tbody tr:focus-within td{background:var(--surface-2)}
+/* Eski tablo kuralı 920px en az genişlik veriyordu; kartın içinde tablo
+   taşıyor, son sütun (ok) istatistik kartının altında kalıyordu. Tablo
+   kart genişliğinde; uzun ad ve konu üç noktayla kısalır. */
+.os-root .talep-tablo .crm-data-table{min-width:0}
+.os-root .talep-tablo .crm-data-table .crm-table-title,.os-root .talep-tablo .crm-data-table .crm-table-sub{max-width:190px}
+.os-root .talep-tablo .crm-rep>span{max-width:110px}
+.os-root .talep-tablo .crm-data-table :is(th,td).crm-col-contact{white-space:nowrap}
+/* Sütunlar içeriğe göre daralabilsin: ad, konu, alt satır ve temsilci en
+   çok iki satıra sarılır (tek satıra zorlamak tabloyu kartın dışına
+   itiyordu). Hücre aralığı sıkılaştı; istatistik kartı sabit 340px. */
+.talep-izgara.ekip-izgara:has(.talep-istatistik){grid-template-columns:minmax(0,1fr) 340px}
+.os-root .talep-tablo .crm-data-table :is(thead th,tbody td){padding-left:var(--sp-2);padding-right:var(--sp-2)}
+.os-root .talep-tablo .crm-data-table :is(.crm-table-title,.crm-table-sub,.crm-waiting,.crm-liste-sebep){max-width:none;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.os-root .talep-tablo .crm-rep>span{max-width:none;white-space:normal;line-height:var(--lh-tight)}
+@media (max-width:1200px){.talep-izgara.ekip-izgara:has(.talep-istatistik){grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){.os-root .talep-tablo .crm-data-table :is(.crm-table-title,.crm-table-sub,.crm-waiting,.crm-liste-sebep){display:block;-webkit-line-clamp:unset}}
+/* Liste fazla genişti (geniş ekranda sütunlar arası boşluk), istatistik
+   kartı sıkışıktı (tutar kutudan taşıyor, kart kayıyordu). Oran ~64/36. */
+.talep-izgara.ekip-izgara:has(.talep-istatistik){grid-template-columns:minmax(0,1.8fr) minmax(360px,1fr)}
+@media (max-width:1200px){.talep-izgara.ekip-izgara:has(.talep-istatistik){grid-template-columns:minmax(0,1fr)}}
+.istat-kutular dd{font-size:var(--fs-lg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* İstatistik kartı tek ekrana sığsın: dört sayı kutusu tek sırada,
+   çubuk listeleri sıkı (kart ~240px uzundu ve kayıyordu). */
+.talep-istatistik .istat-kutular{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-2)}
+.talep-istatistik .istat-kutular>div{padding:var(--sp-2) var(--sp-3)}
+.talep-istatistik .istat-kutular dt{line-height:var(--lh-tight)}
+.talep-istatistik .istat-kutular small{line-height:var(--lh-tight)}
+.talep-istatistik .talep-not{margin-top:var(--sp-3);padding-top:var(--sp-3)}
+.talep-istatistik .istat-cubuklar{gap:var(--sp-1);margin-top:var(--sp-1)}
+.talep-istatistik .istat-cubuklar li{min-height:24px;font-size:var(--fs-micro)}
+.talep-istatistik .istat-cubuklar span{color:var(--ink-soft)}
+/* Çubuklu dağılımlar yan yana iki sütun; her satırda ad ve değer üstte,
+   çubuk altta (dar sütunda ad, çubuk ve değer aynı satıra sığmıyordu). */
+.istat-gruplar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:var(--sp-4)}
+.talep-istatistik .istat-cubuklar li{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"ad deger" "cubuk cubuk";row-gap:3px;min-height:0}
+.talep-istatistik .istat-cubuklar span{grid-area:ad}
+.talep-istatistik .istat-cubuklar strong{grid-area:deger}
+.talep-istatistik .istat-cubuklar i{grid-area:cubuk;height:4px}
+@media (max-width:420px){.istat-gruplar{grid-template-columns:minmax(0,1fr)}}
+/* Sütun genişlikleri: "her yerden kır" kuralı tabloya müşteri sütununu
+   63px'e kadar daraltma izni veriyordu (ad üç satıra, satır 82px'e
+   çıkıyordu) ve numara sütunu boşlukla genişliyordu. Numara içeriği kadar,
+   metin sütunlarının en az genişliği var; kelime ortasından kırılmaz. */
+.os-root .talep-tablo .crm-data-table :is(.crm-table-title,.crm-table-sub,.crm-waiting,.crm-liste-sebep){overflow-wrap:break-word}
+.os-root .talep-tablo .crm-data-table td.crm-table-mono,.os-root .talep-tablo .crm-data-table thead th:first-child{width:1%;white-space:nowrap}
+.os-root .talep-tablo .crm-data-table td[data-label="Müşteri"]{min-width:160px}
+.os-root .talep-tablo .crm-data-table td[data-label="Hizmet türü"]{min-width:140px}
+.os-root .talep-tablo .crm-data-table td.crm-col-rep{min-width:130px}
+@media (max-width:760px){.os-root .talep-tablo .crm-data-table tbody td:is(.crm-table-mono,[data-label="Müşteri"],[data-label="Hizmet türü"],.crm-col-rep){width:auto;min-width:0}}
+/* 1600px altında sekiz-dokuz sütun %64'e sığmıyor: istatistik kartı
+   sabit 340px, metin sütunlarının en az genişliği biraz daha dar. */
+.os-root .talep-tablo .crm-data-table td[data-label="Müşteri"]{min-width:150px}
+.os-root .talep-tablo .crm-data-table td[data-label="Hizmet türü"]{min-width:120px}
+.os-root .talep-tablo .crm-data-table td.crm-col-rep{min-width:120px}
+@media (max-width:1600px) and (min-width:1201px){.talep-izgara.ekip-izgara:has(.talep-istatistik){grid-template-columns:minmax(0,1fr) 340px}}
+/* 1360px altında dokuz sütun sığmıyor: "Son temas" gizlenir (kayıt detayında var). */
+@media (max-width:1360px) and (min-width:761px){.os-root .talep-tablo .crm-data-table .crm-col-contact{display:none}.os-root .talep-tablo .crm-data-table td[data-label="Müşteri"]{min-width:130px}}
+/* İşler tablosu: iş adı hücresi sarılabilir (bağlantı tek satıra
+   zorluyordu, sütun 310px oluyordu); termin etiketi tarihin altında. */
+.os-root .talep-tablo .crm-data-table td[data-label="İş"]{min-width:180px}
+.os-root .talep-tablo .crm-data-table td[data-label="İş"] .crm-row-link{display:block;white-space:normal}
+.os-root .talep-tablo .crm-data-table td.crm-col-date small{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro);white-space:nowrap}
+.os-root .talep-tablo .crm-data-table td.crm-col-date.is-late small{color:var(--danger)}
+.os-root .talep-tablo .ops-status-cell{white-space:normal}
+.os-root .talep-tablo .ops-status-cell .status-pill+.status-pill{margin-top:var(--sp-1)}
+.os-root .talep-tablo .crm-alert-chip{display:inline-block;margin-top:var(--sp-1)}
+/* İş adlarında boşluksuz uzun zincirler var ("Teslim+Analiz+T.Makale+Savunma");
+   kelime sınırında kırılamadıkları için sütun 310px'e çıkıyordu. Yalnızca bu
+   hücrede her yerden kırılır; en az 180px olduğu için aşırı daralmaz. */
+.os-root .talep-tablo .crm-data-table td[data-label="İş"] :is(.crm-table-title,.crm-table-sub){overflow-wrap:anywhere}
+/* İlerleme hücresi: çubuğun düzeni (flex satır) eski .crm-page-stack
+   kuralındaydı; yeni tabloda çubuk satır içi bir span olarak kalıyor ve
+   yeşil bir lekeye dönüşüyordu. Sabit genişlikte ince çubuk, yanında yüzde. */
+.os-root .talep-tablo .crm-data-table td.crm-col-progress{white-space:nowrap;min-width:104px}
+.os-root .talep-tablo .ops-progress-mini{display:inline-block;vertical-align:middle;flex:none;width:56px;min-width:0;height:6px;border-radius:999px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line-soft);overflow:hidden}
+.os-root .talep-tablo .ops-progress-mini i{display:block;width:var(--p,0%);height:100%;border-radius:inherit;background:var(--success)}
+.os-root .talep-tablo .crm-data-table td.crm-col-progress b{display:inline-block;vertical-align:middle;min-width:0;margin-left:var(--sp-2);color:var(--ink-soft);font-size:var(--fs-micro);font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums}
+
+/* Yapışkan başlık kartın iç boşluğunun üstüne yapışıyordu; kayarken
+   satırlar başlığın üstündeki 20px'lik boşlukta görünüyordu. */
+.os-root .talep-tablo .crm-data-table thead th{top:calc(var(--sp-5) * -1)}
+.os-root .talep-izgara>.talep-bilgi:has(.talep-tablo){scroll-padding-top:var(--sp-5)}
+
+/* Cari hesaplar tablosu: sıfır tutar soluk, satırda küçük "Tahsilat". */
+.os-root .talep-tablo .crm-data-table td.cari-sifir{color:var(--muted);font-weight:400}
+.os-root .talep-tablo .crm-data-table td.crm-col-amount small{display:block;margin-top:2px;font-weight:400}
+.os-root .talep-tablo td.cari-satir-eylem{white-space:nowrap;text-align:right}
+.os-root .talep-tablo td.cari-satir-eylem .crm-row-chevron{display:inline-block;width:auto;margin-left:var(--sp-2);vertical-align:middle}
+.os-root .talep-tablo .cari-tahsilat-btn{min-height:30px;padding:0 var(--sp-3);font-size:var(--fs-micro)}
+
+/* Liste sayfalarında sağ sütun birden çok kart taşıyabilir (ekip:
+   istatistik + bekleyen davetler); sütun kendi içinde kayar. */
+.liste-sag{display:flex;flex-direction:column;gap:var(--sp-4);min-width:0}
+.os-root .liste-sag>.panel-card{padding:var(--sp-5);margin:0}
+.os-root .talep-izgara:not(.ekip-izgara)>.liste-sag{max-height:calc(100dvh - 350px);overflow:auto;scrollbar-width:thin}
+.os-root .liste-sag>.talep-istatistik{max-height:none;overflow:visible;flex:none}
+.os-root .talep-tablo .crm-data-table tbody tr.is-pasif td{color:var(--muted)}
+.os-root .talep-tablo .crm-data-table tbody tr.is-pasif .crm-table-title{color:var(--muted)}
+@media (max-width:1200px){.os-root .talep-izgara>.liste-sag{max-height:none}}
+/* Ekip tablosunda ilk sütun numara değil ad: "içeriği kadar" kuralı adı 106px'e sıkıştırıp üç satıra bölüyordu. */
+.os-root .talep-tablo .crm-data-table[data-cols="team"] thead th:first-child{width:auto}
+.os-root .talep-tablo .crm-data-table td[data-label="Personel"]{min-width:200px}
+.os-root .talep-tablo .crm-data-table td[data-label="Personel"] .crm-row-link{display:block}
+@media (max-width:760px){.os-root .talep-tablo .crm-data-table tbody td.crm-col-date>small{flex-basis:100%;text-align:right}}
+/* Teklif detayı: akıştaki revizyon listesi. */
+.os-root .talep-akis-panel>.teklif-revizyonlar{margin:0;padding:var(--sp-2) var(--sp-4)}
+.ekip-liste a.is-active{background:var(--primary-soft)}
+/* Sözleşme detayı: ödeme özeti (ödenen / toplam, vadesi geçen). */
+.sozlesme-odeme-ozet{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-2);font-size:var(--fs-sm);color:var(--ink-soft)}
+.sozlesme-odeme-ozet b{color:var(--ink);font-weight:var(--fw-semibold)}
+.sozlesme-odeme-ozet>i{flex:1 1 100%;display:block;height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.sozlesme-odeme-ozet>i>b{display:block;height:100%;border-radius:inherit;background:var(--success)}
+.opd-zaman{margin:var(--sp-3) 0 0;color:var(--muted);font-size:var(--fs-micro)}
+.os-root .cari-oran{min-width:140px}
+/* Cari detayı: başlık + bakiye şeridi detaylardaki aşama çizgisinden uzun; sütunlar dock'un üstünde bitsin. */
+.os-root .cari:not(.ekip) .talep-izgara>:is(.talep-bilgi,.talep-musteri,.cari-sag){max-height:calc(100dvh - 350px)}
+@media (max-width:1200px){.os-root .cari:not(.ekip) .talep-izgara>:is(.talep-bilgi,.talep-musteri,.cari-sag){max-height:none}}
+/* Personel detayı: performans kutuları dört sütun, liste başlığında "listede aç". */
+.personel-performans{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))!important;margin-bottom:var(--sp-2)}
+.personel-tumu{color:var(--primary);font-size:var(--fs-sm);font-weight:var(--fw-medium);text-decoration:none}
+.personel-tumu:hover{text-decoration:underline}
+/* Müşteri sayfası: akıştaki mesajlar ve cari özeti. */
+.os-root .talep-akis-panel>:is(.musteri-mesajlar,.musteri-cari){padding:var(--sp-3) var(--sp-4)}
+.musteri-mesaj-govde{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal!important;color:var(--ink-soft)!important}
+.musteri-cari .panel-secondary{margin-top:var(--sp-3)}
+.musteri-sekme-bag{margin-top:var(--sp-3)}
+.musteri-alt-baslik{margin:var(--sp-4) 0 var(--sp-1);color:var(--muted);font-size:var(--fs-sm);font-weight:var(--fw-medium)}
+.os-root .talep-tablo .crm-data-table[data-cols="musteri"] td[data-label="Kayıt"]{min-width:200px}
+/* Müşteri sayfası: başlık + sayı şeridi, sütunlar dock'un üstünde bitsin. */
+.os-root .musteri-sayfa .talep-izgara>:is(.talep-bilgi,.talep-musteri){max-height:calc(100dvh - 350px)}
+.os-root :is(.musteri-sayfa,.personel) .talep-akis-panel{max-height:calc(100dvh - 400px)}
+@media (max-width:1200px){.os-root .musteri-sayfa .talep-izgara>:is(.talep-bilgi,.talep-musteri),.os-root :is(.musteri-sayfa,.personel) .talep-akis-panel{max-height:none}}
+.musteri-sayfa .talep-izgara{grid-template-columns:minmax(260px,1fr) minmax(0,2fr) minmax(300px,1.1fr)}
+@media (max-width:1200px){.musteri-sayfa .talep-izgara{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr)}}
+@media (max-width:760px){.musteri-sayfa .talep-izgara{grid-template-columns:minmax(0,1fr)}}
+/* Tablodaki müşteri adı bağlantısı (müşteri sayfası); satır bağlantısının üstünde. */
+.os-root .talep-tablo .crm-musteri-link{color:var(--ink);text-decoration:none}
+.os-root .talep-tablo .crm-musteri-link:hover{color:var(--primary);text-decoration:underline;text-underline-offset:3px}
+/* İşler tablosu 1440px'te 27px taşıyordu: ilerleme sütunu ve "1 gündür müşteride" rozeti daraldı. */
+.os-root .talep-tablo .crm-data-table td.crm-col-progress{min-width:0}
+.os-root .talep-tablo .ops-progress-mini{width:44px}
+.os-root .talep-tablo .ops-status-cell .status-pill{white-space:normal;text-align:left;line-height:var(--lh-tight)}
+
+/* Cari ödeme bağlantıları (accounts/odeme-baglantisi.tsx): işlemler satırın altında, durum rozetinin hizasından başlar. */
+.cari-odeme-linkleri li{flex-wrap:wrap}
+.cari-link-eylem{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1);padding-left:calc(76px + var(--sp-3))}
+.cari-link-eylem form{margin:0;display:flex;gap:var(--sp-1)}
+.os-root .cari-link-eylem :is(.panel-primary,.panel-secondary){width:auto;min-height:28px;padding:0 var(--sp-2);font-size:var(--fs-micro)}
+.os-root .cari-link-eylem .is-danger:hover{border-color:var(--danger);color:var(--danger)}
+.os-root .talep-tablo td.cari-satir-eylem .cari-tahsilat-btn+.cari-tahsilat-btn{margin-left:var(--sp-1)}
+.os-root .cari-link-form .panel-form-actions{flex-wrap:wrap}
+.os-root .cari-link-form .panel-form-actions>button{flex:1 1 auto;width:auto}
+@media (max-width:620px){.cari-link-eylem{padding-left:0}}
+
+/* CARİ PENCERESİ (accounts/cari-hesap.tsx): müşteri sayfasında ortada açılan pencere.
+   Üstte işlemler, altında bakiye şeridi, sonra iki sütun: hareketler | sözleşmeler ve bakiye. */
+.cari-pencere{display:flex;flex-direction:column;gap:var(--sp-4)}
+.cari-pencere-eylem{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:var(--sp-2)}
+.os-root .cari-pencere>.kayit-serit{margin:0}
+.cari-pencere-izgara{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:var(--sp-5);align-items:start}
+.cari-pencere-izgara>section{min-width:0}
+.cari-pencere-izgara h3{margin:0;font-size:var(--fs-md);font-weight:var(--fw-semibold);color:var(--ink)}
+@media (max-width:900px){.cari-pencere-izgara{grid-template-columns:minmax(0,1fr)}}
+/* Müşteri bilgileri formunun ara başlıkları (Künye, Fatura bilgileri). */
+/* Müşterinin birden çok carisi: her biri ayrı bölüm, aralarında çizgi. */
+.cari-coklu-not{margin:0 0 var(--sp-4);padding:var(--sp-2) var(--sp-3);border-radius:var(--r-sm);background:var(--warning-soft);color:var(--warning);font-size:var(--fs-sm)}
+.cari-pencere-bolum+.cari-pencere-bolum{margin-top:var(--sp-6);padding-top:var(--sp-5);border-top:1px solid var(--line)}
+.cari-pencere-ad{margin:0 0 var(--sp-3);font-size:var(--fs-md);font-weight:var(--fw-semibold);line-height:1.35;color:var(--ink);overflow-wrap:anywhere}
+
+/* MÜŞTERİLER LİSTESİ (finance/page.tsx): tahsil oranı çubuğu ve sütun genişlikleri. */
+.musteri-tahsil{display:flex;align-items:center;gap:var(--sp-2);min-width:96px}
+.musteri-tahsil .cari-oran-cubuk{flex:1;min-width:56px}
+.musteri-tahsil small{flex:none;min-width:34px;color:var(--muted);font-size:var(--fs-micro);font-variant-numeric:tabular-nums;text-align:right}
+.os-root .talep-tablo .crm-data-table[data-cols="musteriler"] td[data-label="Müşteri"]{min-width:170px}
+/* Dar masaüstünde temsilci sütunu düşer: bilgi müşteri detayında var. */
+@media (max-width:1360px) and (min-width:761px){.os-root .talep-tablo .crm-data-table[data-cols="musteriler"] .crm-col-rep{display:none}}
+@media (max-width:760px){.musteri-tahsil{justify-content:flex-end;min-width:0}.musteri-tahsil .cari-oran-cubuk{max-width:120px}}
+
+/* İŞ MALİYETLERİ LİSTESİ (finance/page.tsx): sorumlular iki satır, kâr oranı çubuğu renkli. */
+.os-root .talep-tablo .crm-data-table .maliyet-sorumlu{display:block;white-space:nowrap}
+.maliyet-sorumlu b{margin-right:var(--sp-1);color:var(--muted);font-weight:var(--fw-medium)}
+.maliyet-oran[data-ton="warning"] .cari-oran-cubuk i{background:var(--warning)}
+.maliyet-oran[data-ton="danger"] .cari-oran-cubuk i{background:var(--danger)}
+.maliyet-oran[data-ton="danger"] small{color:var(--danger)}
+.os-root .talep-tablo .crm-data-table[data-cols="maliyetler"] td[data-label="İş / Müşteri"]{min-width:190px}
+@media (max-width:1360px) and (min-width:761px){.os-root .talep-tablo .crm-data-table[data-cols="maliyetler"] .crm-col-rep{display:none}}
+
+/* Cari penceresi · ödeme takvimi: taksit başına "Vade" düğmesi ve kaydırma seçeneği. */
+.os-root .cari-hareketler .cari-taksit-btn{flex:none;width:auto;min-height:28px;padding:0 var(--sp-2);font-size:var(--fs-micro)}
+.os-root .panel-form label.cari-kaydir{flex-direction:row;align-items:center;gap:var(--sp-2);font-weight:var(--fw-medium)}
+.os-root .panel-form label.cari-kaydir input{width:auto;min-height:0;margin:0}
+/* Ödeme takvimi: düzenlenebilir taksitin satırı tıklanabilir (SatirTiklama). */
+.os-root .satir-tiklanir > li:has(.satir-ac){cursor:pointer}
+.os-root .satir-tiklanir > li:has(.satir-ac):hover{background:var(--surface-2)}
+/* Hareket ayrıntısı: etiket solda, değer sağda. */
+.os-root .cari-hareket-ayrinti{display:grid;gap:0;margin:0}
+.os-root .cari-hareket-ayrinti>div{display:grid;grid-template-columns:120px minmax(0,1fr);gap:var(--sp-3);padding:var(--sp-2) 0;border-top:1px solid var(--line-soft)}
+.os-root .cari-hareket-ayrinti>div:first-child{border-top:0}
+.os-root .cari-hareket-ayrinti dt{color:var(--muted);font-size:var(--fs-sm)}
+.os-root .cari-hareket-ayrinti dd{margin:0;overflow-wrap:anywhere}
+.os-root .cari-hareket-duzelt{margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--line-soft)}
+.os-root .cari-hareket-sil{margin-top:var(--sp-3)}
+.os-root .cari-hareket-sil>summary{display:inline-flex;align-items:center;list-style:none;cursor:pointer}
+.os-root .cari-hareket-sil>summary::-webkit-details-marker{display:none}
+.os-root .cari-hareket-sil form{display:grid;gap:var(--sp-2);justify-items:start;margin-top:var(--sp-2)}
+.os-root .cari-plan-eylem{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin:0 0 var(--sp-2)}
+.os-root .cari-plan-eylem .cari-taksit-btn{flex:none;width:auto;min-height:28px;padding:0 var(--sp-2);font-size:var(--fs-micro)}
+
+/* Liste sayfa çubuğu (posta, belge merkezi): tablonun ALTINDA, kartın
+   içinde. Tablo kendi kutusunda kaydığı için çubuk kaydırmanın dışında
+   kalmalı; flex:0 0 auto onu kartın dibine sabitliyor. */
+.os-root .liste-sayfalar{display:flex;align-items:center;justify-content:center;gap:var(--sp-3);flex:0 0 auto;
+  margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--line-soft);
+  font-size:var(--fs-sm);font-weight:var(--fw-semibold)}
+.os-root .liste-sayfalar a{padding:5px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--primary);text-decoration:none}
+.os-root .liste-sayfalar a:hover{border-color:var(--primary);background:var(--surface-2)}
+.os-root .liste-sayfalar span{padding:5px 12px;color:var(--muted)}
+.os-root .liste-sayfalar b{color:var(--muted);font-weight:var(--fw-medium);font-variant-numeric:tabular-nums}
+
+/* Belge merkezi tablosu: ilk sütun (belge no + konu) en geniş olanı
+   olmalı. Otomatik tablo düzeninde ilk hücredeki dikey flex bağlantı
+   "dar" sayılıyor ve müşteri sütunu onu eziyordu (iş maliyetlerinde de
+   aynısı olmuştu). */
+/* Sabit tablo düzeni: sütun genişliği başlıktan gelir, içerik onu büyütemez. Belge sütunu kalanı alır.
+   eskiden uzun bir konu satırı tek satırda kaldığı için sütunu ~900 piksele açıyor,
+   tablo kutudan taşıp yatay kaydırma çıkıyor ve Durum sütunu kesiliyordu (12.10.2026). */
+@media (min-width:761px){
+  .os-root .talep-tablo .crm-data-table[data-cols="belgeler"]{table-layout:fixed;width:100%}
+  /* Genel tablo kuralı ilk sütunu içeriği kadar yapıyor (width:1%); burada kalanı alsın. */
+  .os-root .talep-tablo .crm-data-table[data-cols="belgeler"] thead th:first-child{width:auto}
+  .os-root .talep-tablo .crm-data-table[data-cols="belgeler"] thead th:nth-child(2){width:24%}
+  .os-root .talep-tablo .crm-data-table[data-cols="belgeler"] thead th:nth-child(3){width:128px}
+  .os-root .talep-tablo .crm-data-table[data-cols="belgeler"] thead th:nth-child(4){width:132px}
+  .os-root .talep-tablo .crm-data-table[data-cols="belgeler"] thead th:nth-child(5){width:112px}
+  .os-root .talep-tablo .crm-data-table[data-cols="belgeler"] thead th:nth-child(6){width:92px}
+  .os-root .talep-tablo .crm-data-table[data-cols="belgeler"] td{overflow:hidden}
+}
+/* Orta genişlikte (yanında istatistik kartı varken) tarih sütunu çekiliyor: yoksa belge sütunu 130–190 piksele sıkışıyordu. */
+@media (min-width:761px) and (max-width:1400px){
+  .os-root .talep-tablo .crm-data-table[data-cols="belgeler"] :is(th,td):nth-child(5){display:none}
+}
+.os-root .talep-tablo .crm-data-table[data-cols="belgeler"] .crm-table-title{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.os-root .talep-tablo .crm-data-table[data-cols="belgeler"] .crm-table-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+
+/*
+  DİKEY ZAMAN ÇİZELGESİ (belge yaşam döngüsü, teklif revizyonları).
+
+  Eskiden belge sayfasında satır içi stillerle çiziliyordu: renkler,
+  daireler ve ızgara doğrudan JSX'teydi, tema değişkenleri elle
+  yazıldığı için koyu temada iki renk sabit kalıyordu ve aynı görünüm
+  başka bir sayfada kullanılamıyordu.
+
+  Durum data-durum ile: complete (olmuş), current (sırada), pending
+  (henüz gelmedi).
+*/
+.os-root .kayit-zaman{display:flex;flex-direction:column;margin:0;padding:0;list-style:none}
+.os-root .kayit-zaman li{
+  display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:start;gap:var(--sp-3);
+  padding:var(--sp-4) 0;border-bottom:1px solid var(--line-soft)}
+.os-root .kayit-zaman li:last-child{border-bottom:0;padding-bottom:0}
+/* Bekleyen adım soluk: hangi adımların henüz gelmediği bir bakışta görünsün. */
+.os-root .kayit-zaman li[data-durum="pending"]{opacity:.55}
+.os-root .kayit-zaman i{
+  display:grid;place-items:center;width:32px;height:32px;border-radius:50%;
+  background:var(--surface-2);color:var(--muted);font-style:normal;font-size:var(--fs-sm);font-weight:var(--fw-semibold)}
+.os-root .kayit-zaman li[data-durum="complete"] i{background:var(--success-soft);color:var(--success)}
+.os-root .kayit-zaman li[data-durum="current"] i{background:var(--warning-soft);color:var(--warning)}
+/* Ret, iptal, geciken taksit: süreç orada kırıldı (belge yaşam döngüsü). */
+.os-root .kayit-zaman li[data-durum="danger"] i{background:var(--danger-soft);color:var(--danger)}
+.os-root .kayit-zaman h3{margin:0;font-size:var(--fs-md);font-weight:var(--fw-semibold);color:var(--ink)}
+.os-root .kayit-zaman p{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .kayit-zaman small{display:block;margin-top:4px;color:var(--muted);font-size:var(--fs-micro);font-variant-numeric:tabular-nums}
+
+
+/*
+  ZAMAN ÇİZELGELİ DETAY SAYFALARININ IZGARALARI (belge yaşam döngüsü,
+  belge erişim geçmişi, teklif revizyonları).
+*/
+/* Sağdaki künye sabit genişlikte: ad/değer listesi 500px'e yayılınca
+   iki sütun arası boşluk okuma akışını kesiyordu. İstatistik kartıyla
+   aynı ölçü. */
+.os-root .talep-izgara.kayit-iki-izgara{grid-template-columns:minmax(0,1fr) 360px}
+@media (max-width:1100px){.os-root .talep-izgara.kayit-iki-izgara{grid-template-columns:minmax(0,1fr)}}
+
+/* Künye kartının altındaki bağlantılar alt alta değil yan yana sarmalı. */
+.os-root .kayit-kunye-eylem{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-top:var(--sp-3)}
+
+/* Erişim geçmişi tek sütun: kütüğün yanına koyulacak bir özet yok,
+   sayılar zaten şeritte. (.talep-izgara varsayılanı üç sütun.) */
+.os-root .talep-izgara.kayit-tek-izgara{grid-template-columns:minmax(0,1fr)}
+/* Erişim türü hücresinde rozetin altındaki kaynak satırı. */
+.os-root .crm-data-table[data-cols="erisim"] .status-pill + .crm-table-sub{display:block;margin-top:3px}
+
+/* Revizyon kapsamı uzun olabiliyor: çizelgede paragraf gibi aksın. */
+.os-root .kayit-zaman-kapsam{white-space:pre-wrap}
+
+/* Belge önizlemesi (documents/[type]/[id]/preview): panel başlığının altında
+   müşteriye giden belge, kâğıt kartı içinde. Belgenin kendi kökü (doc-root)
+   tam ekran ve bej zeminle çiziliyor; panelde kart gibi dursun. */
+.os-root .belge-onizleme-not{margin:0 0 var(--sp-3);color:var(--muted);font-size:var(--fs-sm)}
+.os-root .belge-onizleme-kagit{border:1px solid var(--line-soft);border-radius:16px;overflow:hidden}
+.os-root .belge-onizleme-kagit .doc-root{min-height:0;padding:24px 12px 40px}
+.os-root .belge-onizleme .talep-bas-eylem{align-items:center}
+
+/* Cari penceresi, dar ekran: hareket ve taksit satırı iki satır. Üstte rozet, tutar ve
+   düğme; altta açıklama tam genişlikte. Eskiden dördü tek satıra sığmaya çalışıyor,
+   açıklama kelime kelime alt alta kırılıyordu ("KAYNAK… VE ATIF…"). */
+@media (max-width:640px){
+  .cari-pencere .cari-hareketler li:has(>.status-pill){display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;column-gap:var(--sp-2);row-gap:4px}
+  .cari-pencere .cari-hareketler li:has(>.status-pill)>.status-pill{grid-column:1;grid-row:1}
+  .cari-pencere .cari-hareketler li:has(>.status-pill)>strong{grid-column:3;grid-row:1}
+  .cari-pencere .cari-hareketler li:has(>.status-pill)>.cari-taksit-btn{grid-column:4;grid-row:1}
+  .cari-pencere .cari-hareketler li:has(>.status-pill)>.cari-hareket-metin{grid-column:1/-1;grid-row:2}
+  .cari-pencere .cari-hareketler li:has(>.status-pill) .cari-hareket-metin b{-webkit-line-clamp:3}
+}
+
+/* Sıralanabilir sütun başlığı (işler → Termin): başlık gibi görünür, tıklanır. */
+.os-root .talep-tablo th .liste-sirala{color:inherit;text-decoration:none;white-space:nowrap}
+.os-root .talep-tablo th .liste-sirala:hover{color:var(--primary)}

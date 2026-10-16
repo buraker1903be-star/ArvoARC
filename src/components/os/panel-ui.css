@@ -1,0 +1,170 @@
+/* ============================================================
+   ORTAK UYGULAMA GÖRÜNÜMÜ (2026-10) — işletim sistemi kabuğunda
+   Uygulamaların (CRM, Operasyon, Finans, İK…) paylaştığı sınıfları tek
+   dilde toplar: sayfa başlığı, sekmeler, düğmeler, kartlar, sayı
+   kartları, tablolar, rozetler, formlar, boş durumlar.
+
+   NEDEN AYRI KATMAN: bu sınıflar 12 eski dosyada 5–8 kez yeniden
+   tanımlanıyordu (.panel-primary 5, .panel-pagehead 6…);
+   hangisinin kazandığı import sırasına kalmıştı. Burası en son yüklenir
+   ve .os-root önekiyle özgüldür; kurucu konsolu (eski kabuk) etkilenmez.
+   Yalnızca panel-tokens.css değerleri kullanılır.
+   ============================================================ */
+
+/* ---------- Sayfa başlığı ---------- */
+.os-root .panel-pagehead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:var(--sp-4);min-height:0;margin:0 0 var(--sp-5);padding:0}
+.os-root .panel-pagehead h1{margin:2px 0 0;font-family:var(--font-heading);font-size:clamp(22px,2vw,var(--fs-xl));font-weight:var(--fw-semibold);line-height:var(--lh-tight);letter-spacing:-.02em;color:var(--ink)}
+.os-root .panel-pagehead p{max-width:720px;margin:var(--sp-1) 0 0;color:var(--muted);font-size:var(--fs-base);line-height:var(--lh-base)}
+.os-root .panel-kicker{color:var(--muted);font-size:var(--fs-micro);font-weight:var(--fw-semibold);letter-spacing:.06em}
+.os-root .panel-page-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+
+/* ---------- Düğmeler ---------- */
+.os-root :is(.panel-primary,.panel-secondary,.panel-danger){
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
+  min-height:40px;padding:0 var(--sp-4);border-radius:var(--r-md);
+  font-family:inherit;font-size:var(--fs-base);font-weight:var(--fw-semibold);line-height:1;letter-spacing:0;text-transform:none;
+  cursor:pointer;text-decoration:none;white-space:nowrap;
+  transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);
+}
+.os-root .panel-primary{border:1px solid transparent;background:var(--primary);color:var(--primary-on);box-shadow:var(--shadow-xs)}
+.os-root .panel-primary:hover{background:var(--primary-strong);transform:none}
+.os-root .panel-secondary{border:1px solid var(--n-300);background:var(--surface);color:var(--ink-soft);box-shadow:var(--shadow-xs)}
+.os-root .panel-secondary:hover{border-color:var(--n-400);background:var(--surface-2);color:var(--ink)}
+.os-root .panel-danger{border:1px solid color-mix(in srgb,var(--danger) 30%,var(--line));background:var(--surface);color:var(--danger)}
+.os-root .panel-danger:hover{background:var(--danger-soft)}
+.os-root :is(.panel-primary,.panel-secondary,.panel-danger):focus-visible{outline:none;box-shadow:var(--shadow-glow)}
+.os-root :is(.panel-primary,.panel-secondary,.panel-danger):disabled{opacity:.5;cursor:not-allowed}
+html[data-theme="dark"] .os-root .panel-secondary{border-color:var(--line);color:var(--ink)}
+
+/* ---------- Kartlar ---------- */
+.os-root .panel-card{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow-xs)}
+
+/* ---------- Sayı kartları (her modülün KPI şeridi) ----------
+   Etiketler eskiden büyük harf + geniş harf aralığıydı ("TOPLAM DEĞER");
+   cümle düzenine çekildi. Sayılar sekmeli rakamla hizalanır. */
+.os-root :is(.crm-metrics,.finance-metrics,.ops-metrics,.metric-strip,.metric-strip-five,.finance-cost-kpis,.finance-payment-kpis){gap:var(--sp-3)}
+.os-root :is(.crm-metrics,.finance-metrics,.ops-metrics,.metric-strip,.metric-strip-five,.finance-cost-kpis,.finance-payment-kpis)>article{
+  min-height:0;padding:var(--sp-4);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow-xs)
+}
+.os-root :is(.crm-metrics,.finance-metrics,.ops-metrics,.metric-strip,.metric-strip-five,.finance-cost-kpis,.finance-payment-kpis)>article:hover{transform:none;box-shadow:var(--shadow-sm)}
+.os-root :is(.crm-metrics,.finance-metrics,.ops-metrics,.metric-strip,.metric-strip-five,.finance-cost-kpis,.finance-payment-kpis) small{
+  color:var(--muted);font-size:var(--fs-sm);font-weight:var(--fw-medium);letter-spacing:0;text-transform:none
+}
+.os-root :is(.crm-metrics,.finance-metrics,.ops-metrics,.metric-strip,.metric-strip-five,.finance-cost-kpis,.finance-payment-kpis) strong{
+  font-size:var(--fs-xl);font-weight:var(--fw-semibold);letter-spacing:-.02em;text-transform:none;font-variant-numeric:tabular-nums;color:var(--ink)
+}
+.os-root :is(.crm-metrics,.finance-metrics,.ops-metrics,.metric-strip,.metric-strip-five,.finance-cost-kpis,.finance-payment-kpis) :is(p,span){color:var(--muted);font-size:var(--fs-sm)}
+
+/* ---------- Tablolar ----------
+   On kadar tablo ailesi vardı (crm-data-table, fin-table, hr-table,
+   rpt-table…); başlık satırı büyük harf, 11px ve geniş
+   aralıklıydı. Tek görünüm: sakin başlık, yumuşak çizgi, satır üzerine
+   gelince hafif zemin. Yerleşim (sütunlar, mobil kart düzeni) modülde kalır. */
+.os-root :is(.crm-data-table,.fin-table,.hr-table,.panel-table,.ops-table) :is(thead th,th[scope="col"]){
+  color:var(--muted);font-size:var(--fs-sm);font-weight:var(--fw-medium);letter-spacing:0;text-transform:none;background:var(--surface-2)
+}
+.os-root :is(.crm-data-table,.fin-table,.hr-table,.panel-table,.ops-table) td{font-size:var(--fs-base);color:var(--ink)}
+.os-root :is(.crm-data-table,.fin-table,.hr-table,.panel-table,.ops-table) tbody tr{border-color:var(--line-soft)}
+@media(hover:hover){
+  .os-root :is(.crm-data-table,.fin-table,.hr-table,.panel-table,.ops-table) tbody tr:hover>td{background:var(--surface-2)}
+}
+
+/* ---------- Durum rozetleri ----------
+   135 yerde kullanılan .status-pill; ton data-tone ile. */
+.os-root .status-pill{
+  display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 var(--sp-2);border-radius:var(--r-pill);
+  font-size:var(--fs-micro);font-weight:var(--fw-medium);line-height:1.2;letter-spacing:0;text-transform:none;white-space:nowrap;box-shadow:none
+}
+
+/* ---------- Formlar ---------- */
+/* Ortak kayıt formunun alanları (components/kayit-formu.css) hariç: bu kural
+   özgüllükte onu eziyordu ve sayfa içindeki formlarda (Ayarlar, Abonelik)
+   açılır liste oku siliniyor, punto ve köşeler çekmecedekinden farklı
+   çıkıyordu. Çekmeceler .panel-content dışında çizildiği için etkilenmiyordu. */
+.os-root .panel-content :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *){
+  border:1px solid var(--n-300);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font-size:var(--fs-base);
+  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
+}
+.os-root .panel-content :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),select,textarea):not(.kayit-formu > label > *):focus{
+  outline:none;border-color:var(--primary);box-shadow:var(--shadow-glow)
+}
+.os-root .panel-content :is(input,textarea)::placeholder{color:var(--muted)}
+.os-root .panel-content label>:is(span,small):first-child{font-weight:var(--fw-medium)}
+html[data-theme="dark"] .os-root .panel-content :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea):not(.kayit-formu > label > *){border-color:var(--line);background:var(--surface-2)}
+
+/* ---------- Boş durumlar ----------
+   ~18 ayrı tasarım vardı; ortak çerçeve: kesik çizgili, ortalanmış, sakin. */
+.os-root :is(.panel-empty,.crm-empty-state,.crm-empty,.hr-empty-state,.fin-empty,.dash-empty,.stg-empty,.opsov-empty,.opd-empty){
+  color:var(--muted);font-size:var(--fs-base);text-align:center
+}
+.os-root :is(.panel-empty,.crm-empty-state,.hr-empty-state,.fin-empty){
+  padding:var(--sp-8) var(--sp-5);border:1px dashed var(--n-300);border-radius:var(--r-lg);background:var(--surface);box-shadow:none
+}
+.os-root :is(.panel-empty,.crm-empty-state,.hr-empty-state,.fin-empty) :is(h2,h3,b,strong){color:var(--ink);font-weight:var(--fw-semibold)}
+
+/* ---------- Telefon ---------- */
+@media(max-width:900px){
+  .os-root .panel-pagehead{align-items:stretch}
+  .os-root .panel-page-actions>*{flex:1 1 auto}
+  .os-root :is(.panel-primary,.panel-secondary,.panel-danger){min-height:44px}
+}
+
+/* Sayı kartı etiketleri kaynakta çoğunlukla BÜYÜK HARF yazılı ("TEKLİFLERE
+   DEVREDİLDİ"). Cümle düzenine burada çevriliyor: belge dili tr olduğu için
+   lowercase "İ"yi "i", "I"yı "ı" yapar; ilk harf yeniden büyür. */
+.os-root :is(.crm-metrics,.finance-metrics,.ops-metrics,.metric-strip,.metric-strip-five,.finance-cost-kpis,.finance-payment-kpis) small{display:block;text-transform:lowercase}
+.os-root :is(.crm-metrics,.finance-metrics,.ops-metrics,.metric-strip,.metric-strip-five,.finance-cost-kpis,.finance-payment-kpis) small::first-letter{text-transform:uppercase}
+
+/* ---------- Özet kartları (widget) ----------
+   Aynı "iOS widget" kartı altı modülde kopyalanmıştı (dash-, fin-, hr-,
+   opsov-, rpt-, stg-widget); her birinde köşede dekoratif bir daire,
+   22px köşe ve farklı rakam boyu vardı. Tek görünüm: sade kart, köşede
+   ikon, büyük rakam. Renk tonu (data-tone) ikonda kalır. */
+.os-root :is(.dash-widget,.fin-widget,.hr-widget,.opsov-widget,.rpt-widget,.stg-widget){
+  border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow-xs)
+}
+.os-root :is(.dash-widget,.fin-widget,.hr-widget,.opsov-widget,.rpt-widget,.stg-widget)::after{content:none;display:none}
+@media(hover:hover) and (pointer:fine){
+  .os-root :is(.dash-widget,.fin-widget,.hr-widget,.opsov-widget,.rpt-widget,.stg-widget):hover{transform:none;border-color:color-mix(in srgb,var(--primary) 30%,var(--line));box-shadow:var(--shadow-sm)}
+}
+.os-root :is(.dash-widget,.fin-widget,.hr-widget,.opsov-widget,.rpt-widget,.stg-widget) small{color:var(--muted);font-size:var(--fs-sm);font-weight:var(--fw-medium);letter-spacing:0;text-transform:none}
+.os-root :is(.dash-widget,.fin-widget,.hr-widget,.opsov-widget,.rpt-widget,.stg-widget) strong{font-size:var(--fs-2xl);font-weight:var(--fw-semibold);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.os-root :is(.dash-widget-icon,.fin-widget-icon,.hr-widget-icon,.opsov-widget-icon,.rpt-widget-icon,.stg-widget-icon){border-radius:var(--r-md)}
+/* Tutarlar ("₺486.250,00") telefonda iki sütuna 30px sığmıyor. */
+@media(max-width:900px){
+  .os-root :is(.dash-widget,.fin-widget,.hr-widget,.opsov-widget,.rpt-widget,.stg-widget) strong{font-size:var(--fs-lg);overflow-wrap:normal;white-space:nowrap}
+}
+
+/* ---------- Sayfa genişliği ----------
+   İç sayfalar panel genişliğinde (2026-10). Modül sarmalayıcıları kendi
+   içinde 1500–1680px'e sınırlıydı; geniş ekranda iki yanda boşluk
+   kalıyordu. Belge gibi okunan sayfalar (gizlilik sözleşmesi .nda-page)
+   bilerek dar kalır: uzun satır okunmuyor. */
+.os-root .panel-content>:is(main,.dash,.crm-page-stack,.finance-page-stack,.finance-ledger-page,.operations-page,.reporting-page,.crm-page,.finance-page,.work-page,.structure-page,.audit-page,.inventory-page){
+  width:100%;max-width:none;margin-inline:0
+}
+@media (min-width:1600px){
+  .os-root .panel-content{padding-inline:var(--sp-8)}
+}
+
+/* ---------- "⋯" işlem menüsü (details.os-menu) ----------
+   Sayfa başlığında asıl işlemin yanında ikincil işlemler. Kapanma
+   davranışı os/os-menu-kapat.tsx'te. Öğeler çoğunlukla çekmece
+   tetikleyicisi (PanelDrawer triggerClassName="os-menu-item"). */
+.os-root .os-menu{position:relative}
+.os-root .os-menu>summary{list-style:none;cursor:pointer;min-width:40px;padding:0 var(--sp-3);font-size:var(--fs-lg);letter-spacing:.1em}
+.os-root .os-menu>summary::-webkit-details-marker{display:none}
+.os-root .os-menu-list{
+  position:absolute;right:0;top:calc(100% + 6px);z-index:40;min-width:220px;
+  display:flex;flex-direction:column;padding:var(--sp-1);
+  border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface-raised);box-shadow:var(--shadow-lg);
+}
+.os-root .os-menu-item{
+  display:flex;align-items:center;width:100%;min-height:40px;padding:0 var(--sp-3);
+  border:0;border-radius:var(--r-sm);background:transparent;color:var(--ink);
+  font:inherit;font-size:var(--fs-base);text-align:left;text-decoration:none;cursor:pointer;
+}
+.os-root .os-menu-item:hover{background:var(--surface-2)}
+.os-root .os-menu-item:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
+.os-root .os-menu-item.is-danger{color:var(--danger)}
+.os-root .os-menu-item.is-danger:hover{background:var(--danger-soft)}

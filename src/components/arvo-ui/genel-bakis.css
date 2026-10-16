@@ -1,0 +1,298 @@
+/* ============================================================
+   ANA SAYFA — iOS widget dili (page.tsx)
+   Renkler yalnızca panel-tokens.css'teki değişkenlerden.
+   ============================================================ */
+
+.dash{--dash-ease:cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;gap:18px}
+
+/* Tonlar */
+.dash [data-tone]{--tone-bg:var(--surface-2);--tone-fg:var(--muted)}
+.dash [data-tone="info"]{--tone-bg:var(--info-soft);--tone-fg:var(--info)}
+.dash [data-tone="gold"]{--tone-bg:var(--accent-soft);--tone-fg:var(--accent-strong)}
+.dash [data-tone="success"]{--tone-bg:var(--success-soft);--tone-fg:var(--success)}
+.dash [data-tone="danger"]{--tone-bg:var(--danger-soft);--tone-fg:var(--danger)}
+.dash [data-tone="brand"]{--tone-bg:color-mix(in srgb,var(--brand-500) 14%,var(--surface));--tone-fg:var(--brand-600)}
+html[data-theme="dark"] .dash [data-tone="brand"]{--tone-fg:var(--brand-200)}
+
+/* ---------- Selamlama ---------- */
+.dash-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.dash-hero h1{margin:6px 0 0;color:var(--ink);font-size:clamp(26px,2.2vw,var(--fs-2xl));font-weight:var(--fw-semibold);line-height:var(--lh-tight);letter-spacing:-.02em}
+.dash-hero p{margin:8px 0 0;max-width:620px;color:var(--muted);font-size:15px;line-height:1.5}
+/* Kurucu konsolunun selamlama altı özeti ("Bugün 1 kiracı dikkat
+   istiyor"). GenelBakis başlığın altına metin almıyor; cümle kartların
+   üstünde ayrı bir satır olarak duruyor (13.10.2026). */
+
+/* ---------- Widget'lar ---------- */
+/* 2026-10: köşedeki dekoratif daire kaldırıldı (sade dil; koyu temada gri leke gibi duruyordu). */
+@media(hover:hover) and (pointer:fine){
+}
+
+/* ---------- Kartlar ---------- */
+.dash-card{display:flex;flex-direction:column;gap:14px;min-width:0;padding:20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.dash-chart,.dash-activity{grid-column:span 2}
+.dash-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.dash-card-head h2{margin:0;color:var(--ink);font-size:17px;font-weight:700;letter-spacing:-.015em}
+.dash-card-head p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.dash-card-link{display:inline-flex;align-items:center;gap:2px;align-self:flex-start;color:var(--accent);font-size:14px;font-weight:600;text-decoration:none}
+.dash-empty{margin:0;color:var(--muted);font-size:14px;line-height:1.55}
+/* Sorgu hatası şeridi: sayfa boş rakam göstermek yerine nedenini söyler. */
+.dash-uyari{display:flex;gap:10px;align-items:flex-start;margin:0 0 16px;padding:12px 14px;border-radius:12px;background:var(--tone-bg);color:var(--tone-fg);font-size:14px;line-height:1.5}
+.dash-uyari b{display:block;font-size:14px}
+.dash-uyari small{display:block;color:inherit;opacity:.85;font-size:13px}
+.dash-chevron{flex:none;color:var(--dim)}
+
+/* Grafik: son 14 gün */
+.dash-stat{text-align:right}
+.dash-stat strong{display:block;color:var(--ink);font-size:28px;font-weight:700;line-height:1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.dash-stat span{display:inline-block;margin-top:6px;color:var(--tone-fg);font-size:12.5px;font-weight:600}
+/*
+  Çubukların yerine geçen boş durum (15.10.2026). Izgara 190 piksel;
+  burası onun beşte biri kadar: blok küçülüyor ama kart kaybolmuyor,
+  tahsilat başladığında grafik aynı yere geri geliyor.
+*/
+.dash-seri-bos{
+  display:flex;align-items:center;min-height:44px;margin:0;padding:var(--sp-3) 0 0;
+  color:var(--muted);font-size:var(--fs-sm);line-height:1.5;
+}
+.dash-bars{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));align-items:end;gap:8px;height:190px;padding-top:6px}
+.dash-bar{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%;min-width:0}
+.dash-bar-fill{width:100%;max-width:30px;height:var(--h,4%);min-height:4px;border-radius:8px 8px 5px 5px;background:linear-gradient(180deg,color-mix(in srgb,var(--brand-400) 70%,var(--surface)),var(--brand-500));transform-origin:bottom;animation:dash-grow .8s var(--dash-ease) both}
+.dash-bar.is-empty .dash-bar-fill{background:var(--surface-2)}
+.dash-bar.is-today .dash-bar-fill{background:linear-gradient(180deg,var(--accent-bright),var(--primary))}
+.dash-bar small{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.dash-bar.is-today small{color:var(--accent-strong);font-weight:700}
+.dash-bar-value{color:var(--ink-soft);font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;min-height:13px}
+.dash-bar:nth-child(2) .dash-bar-fill{animation-delay:.03s}.dash-bar:nth-child(3) .dash-bar-fill{animation-delay:.06s}
+.dash-bar:nth-child(4) .dash-bar-fill{animation-delay:.09s}.dash-bar:nth-child(5) .dash-bar-fill{animation-delay:.12s}
+.dash-bar:nth-child(6) .dash-bar-fill{animation-delay:.15s}.dash-bar:nth-child(7) .dash-bar-fill{animation-delay:.18s}
+.dash-bar:nth-child(n+8) .dash-bar-fill{animation-delay:.21s}
+@keyframes dash-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+/* Odak listesi (iOS gruplanmış liste) */
+
+/* Aşama dağılımı */
+.dash-stage-list{display:flex;flex-direction:column;gap:12px;margin:0;padding:0;list-style:none}
+.dash-stage-top{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:13.5px}
+.dash-stage-top span{color:var(--ink-soft)}
+.dash-stage-top b{color:var(--ink);font-variant-numeric:tabular-nums}
+.dash-stage-track{height:8px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.dash-stage-track span{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--brand-500),var(--brand-400));transform-origin:left;animation:dash-fill .9s var(--dash-ease) both}
+@keyframes dash-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* Son hareketler */
+.dash-activity-list{display:flex;flex-direction:column;margin:0 -8px;padding:0;list-style:none}
+.dash-activity-list li{position:relative}
+.dash-activity-list li+li::before{content:"";position:absolute;top:0;left:54px;right:8px;height:1px;background:var(--line-soft)}
+.dash-activity-row{display:flex;align-items:center;gap:12px;padding:10px 8px;border-radius:12px;color:var(--ink);text-decoration:none;transition:background-color .18s ease}
+a.dash-activity-row:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+.dash-avatar{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--surface-2);color:var(--ink-soft);font-size:12px;font-weight:700;letter-spacing:.02em}
+.dash-activity-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:14px;line-height:1.4}
+.dash-activity-body b{font-weight:650}
+.dash-activity-body small{color:var(--muted);font-size:12.5px}
+
+/* Kurulum kartı (yeni kurum; tüm adımlar bitince gizlenir) */
+.dash-setup{gap:16px}
+.dash-setup-progress{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+.dash-setup-progress b{color:var(--ink);font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.dash-setup-progress span{display:block;width:132px;height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.dash-setup-progress i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:var(--success);transform-origin:left;animation:dash-fill .9s var(--dash-ease) both}
+.dash-setup-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:0;padding:0;list-style:none}
+.dash-setup-list li{display:flex}
+.dash-setup-step{flex:1;display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);text-decoration:none;transition:border-color .2s ease,background-color .2s ease,transform .3s var(--dash-ease)}
+a.dash-setup-step:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--surface-2)}
+a.dash-setup-step:active{transform:scale(.985)}
+.dash-setup-step.is-done{border-color:transparent;background:var(--surface-2)}
+.dash-setup-dot{flex:none;display:grid;place-items:center;width:26px;height:26px;border:1.5px solid var(--accent);border-radius:50%;color:var(--accent-strong);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.is-done .dash-setup-dot{border-color:transparent;background:var(--success-soft);color:var(--success)}
+.dash-setup-text{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:14px;line-height:1.35}
+.dash-setup-text b{font-weight:650}.is-done .dash-setup-text b{color:var(--muted)}
+.dash-setup-text small{color:var(--muted);font-size:12.5px}
+.dash-setup-go,.dash-setup-state{display:inline-flex;align-items:center;gap:2px;margin-top:6px;font-size:12.5px;font-weight:650}
+.dash-setup-go{color:var(--accent)}
+.dash-setup-state{color:var(--success)}
+
+@media(max-width:1180px){
+  .dash-chart,.dash-activity{grid-column:1/-1}
+}
+@media(max-width:760px){
+  .dash-bars{gap:4px;height:160px}
+  .dash-card{padding:16px;border-radius:20px}
+  .dash-setup .dash-card-head{flex-direction:column}
+  .dash-setup-progress{align-items:flex-start}
+  .dash-setup-list{grid-template-columns:minmax(0,1fr);gap:8px}
+}
+@media(prefers-reduced-motion:reduce){.dash-bar-fill,.dash-stage-track span{animation:none}}
+
+/* Satırın altındaki açıklama. Bölüm listesinde "Lisans ve kota" tek
+   başına neyin nerede olduğunu söylemiyordu. */
+/* Para tutarı widget'a sığmıyordu: "₺1.234.567,00" tek satıra kesiliyordu. */
+
+/* ---------- Canlı akış (2026-10) ----------
+   Anlık tazelemeyle gelen hareket (son 3 dk) kurum renginde belirir ve
+   birkaç saniyede sönümlenir; kullanıcı neyin yeni olduğunu görür. */
+.dash-live{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;height:24px;padding:0 9px;border-radius:var(--r-pill);background:var(--success-soft);color:var(--success);font-size:var(--fs-micro);font-weight:var(--fw-semibold)}
+.dash-live>i{width:6px;height:6px;border-radius:50%;background:currentColor;animation:dash-nabiz 2s ease-in-out infinite}
+@keyframes dash-nabiz{0%,100%{opacity:1}50%{opacity:.35}}
+.dash-activity-list li.is-new>.dash-activity-row{animation:dash-yeni 4s var(--dash-ease) both}
+.dash-activity-list li.is-new .dash-avatar{background:var(--primary);color:var(--primary-on)}
+@keyframes dash-yeni{
+  0%{opacity:0;transform:translateY(-6px);background:var(--primary-soft)}
+  15%{opacity:1;transform:none;background:var(--primary-soft)}
+  100%{background:transparent}
+}
+@media(prefers-reduced-motion:reduce){
+  .dash-live>i,.dash-activity-list li.is-new>.dash-activity-row{animation:none}
+}
+
+/* ============================================================
+   ANA EKRAN v2 (2026-10) — kurum sahibinin çizdiği düzen:
+   selamlama · tam genişlikte "Yeni talepler" · dört sütun liste.
+   ============================================================ */
+.dash-v2{gap:var(--sp-4)}
+.dash-v2 .dash-card{border-radius:var(--r-xl);box-shadow:var(--shadow-xs)}
+.dash-v2 .dash-card-head h2{margin:0;font-size:var(--fs-md);font-weight:var(--fw-semibold);color:var(--ink)}
+.dash-v2 .dash-card-head p{margin:2px 0 0;font-size:var(--fs-sm);color:var(--muted)}
+.dash-v2 .dash-chart{grid-column:auto}
+.dash-v2 .dash-bars{height:80px}
+
+.dash-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--sp-4);align-items:stretch}
+.dash-col{gap:var(--sp-3)}
+.dash-col .dash-card-link{margin-top:auto}
+.dash-col .dash-empty{flex:1;display:grid;place-items:center;padding:var(--sp-6) var(--sp-2);text-align:center;font-size:var(--fs-sm)}
+/*
+  BOŞ CÜMLE TELEFONDA SOLA YASLI (15.10.2026).
+
+  Yukarıdaki ortalama masaüstü için doğru: orada kartlar dört sütun yan
+  yana ve ızgara hepsini eşit yüksekliğe çekiyor, boş kartın tek
+  cümlesini dikeyde ortalamak o boşluğu dengeliyor.
+
+  Telefonda kartlar alt alta ve içeriğe göre büyüyor; ortalanacak bir
+  boşluk yok, kural yalnızca üretiyor: tek bir cümle 68 piksellik bir
+  alanın ortasında yüzüyor ve konsolun geri kalanı sola yaslıyken
+  yabancı duruyordu. Sola yaslanınca cümle başlığın altına, kartın
+  parçası gibi oturuyor (kart 185 → 157 piksel).
+*/
+@media (max-width:760px){
+  .dash-col .dash-empty{flex:0 0 auto;display:block;padding:var(--sp-2) 0 var(--sp-3);text-align:start}
+}
+.dash-col-list{list-style:none;margin:0 calc(var(--sp-2) * -1);padding:0;display:flex;flex-direction:column}
+.dash-col-list li+li{border-top:1px solid var(--line-soft)}
+.dash-col-row{display:flex;align-items:center;gap:var(--sp-2);min-height:44px;padding:var(--sp-2);border-radius:var(--r-sm);color:var(--ink);text-decoration:none;transition:background-color var(--dur) var(--ease)}
+.dash-col-row:hover{background:var(--surface-2)}
+.dash-col-row:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
+.dash-col-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.dash-col-main b{font-size:var(--fs-sm);font-weight:var(--fw-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-col-main small{font-size:var(--fs-micro);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-col-row .status-pill{flex:none}
+/*
+  GÖRELİ ZAMAN --dim DEĞİL --muted (15.10.2026).
+
+  --dim bir METİN rengi olarak iki temada da AA'nın altında kalıyor:
+  koyu temada 3.39–3.88, açık temada 2.40–2.58 (eşik 4.5). Belirteç
+  panelde çoğunlukla SİMGE rengi olarak kullanılıyor (satır okları) ve
+  simgede eşik 3:1 — orada sorun yok, sorun onu yazıya vermekte.
+
+  Bu satır gerçek bir metin ("23 gün önce") ve ikincil metnin kendi
+  belirteci zaten var: --muted (koyu 7.03, açık 5.4).
+*/
+.dash-col-time{flex:none;align-self:flex-start;margin-top:2px;font-size:var(--fs-micro);color:var(--muted);white-space:nowrap}
+/*
+  ROZETİ OLAN SATIRDA AD KIRPILMAZ (15.10.2026).
+
+  Satır düz bir flex: ad esner (flex:1), durum rozeti ve zaman sabit.
+  Rozet 109, zaman 71 piksel tuttuğu için ada KALAN ne ise o düşüyordu
+  ve rozetli satırlarda ad kesiliyordu — rozeti olmayan aynı kiracının
+  satırında ad tam görünürken.
+
+  Masaüstünde daha kötüydü: konsolun ana sayfası orada dört sütuna
+  bölünüyor ve kart 296 piksele iniyor, yani TELEFONDAKİNDEN (325) dar.
+  Ada 58 piksel kalıyordu. Zamanı göreli yapmak telefonu kurtardı,
+  masaüstünü kurtarmadı; genişlik kazanmak bu sorunu çözmüyor çünkü
+  kiracı adı kullanıcı verisi ve uzunluğunun üst sınırı yok.
+
+  Çözüm ada TAM SATIR vermek: rozet ve zaman alt satıra iniyor, zaman
+  sağa yaslı. Yalnızca İKİSİ BİRDEN olan satırlarda (:has) — "Bugün
+  neye bakmalı?" gibi zamansız kartlar tek satırda kalsın diye.
+  Bedeli, rozetli satırların bir satır uzaması: bir durum taşıyan satır
+  gerçekten daha fazla şey anlatıyor.
+
+  KURAL KONSOLA BAĞLI (.os-konsol). Satır bileşeni ortak: aynı rozet
+  yuvasını finans genel bakışı TUTARLA dolduruyor ("+₺1.500", "3 gün
+  gecikti"), operasyon ve CRM ise sorumluyla. Orada rozet satırın en
+  önemli değeri; onu alt satıra atmak kartın anlamını değiştirirdi.
+  Konsolda ise rozet bir DURUM etiketi ("hata · çözüldü") ve ad —
+  kiracının kim olduğu — ondan önce gelir.
+*/
+.os-konsol .dash-col-row:has(> .status-pill):has(> .dash-col-time){flex-wrap:wrap}
+.os-konsol .dash-col-row:has(> .status-pill):has(> .dash-col-time)>.dash-col-main{flex:1 1 100%}
+.os-konsol .dash-col-row:has(> .status-pill):has(> .dash-col-time)>.dash-col-time{margin-top:0;margin-left:auto;align-self:center}
+/* Okunmamış mesaj ve posta: kalın ad + kurum renginde nokta */
+.dash-col-list li.is-unread .dash-col-main b{font-weight:var(--fw-bold)}
+.dash-col-list li.is-unread .dash-col-main b::before{content:"";display:inline-block;width:7px;height:7px;margin-right:6px;border-radius:50%;background:var(--primary);vertical-align:1px}
+/* Anlık gelen satır kurum renginde belirir (canlı akıştaki gibi) */
+.dash-col-list li.is-new>.dash-col-row{animation:dash-yeni 4s var(--dash-ease) both}
+
+@media (max-width:1200px){
+  .dash-cols{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:700px){
+  .dash-cols{grid-template-columns:minmax(0,1fr)}
+  .dash-col{min-height:0}
+}
+@media(prefers-reduced-motion:reduce){.dash-col-list li.is-new>.dash-col-row{animation:none}}
+/* Tek ekran (1440×900 ve 1280×800 dizüstü): kart iç boşluğu ve başlık
+   aralıkları biraz daha sıkı; satırlar 44px dokunma hedefinde kalır. */
+.dash-v2 .dash-card{padding:var(--sp-4) var(--sp-5);gap:var(--sp-2)}
+.dash-v2 .dash-hero h1{margin-top:2px}
+.dash-v2 .dash-col-row{padding:6px var(--sp-2)}
+@media (min-width:901px){.dash-v2 .dash-tarih{display:none}}
+/* Kısa dizüstü ekranları (1366×768 gibi): 6 satır ve dört sütun aynı
+   kalır, grafik alçalır ve aralıklar daralır ki sayfa kaymasın. */
+@media (min-width:901px) and (max-height:820px){
+  .dash-v2{gap:var(--sp-3)}
+  .dash-v2 .dash-hero h1{font-size:var(--fs-xl)}
+  .dash-v2 .dash-bars{height:44px}
+  .dash-v2 .dash-bar small{display:none}
+  .dash-v2 .dash-card{padding:var(--sp-3) var(--sp-4)}
+  .dash-v2 .dash-col-row{padding:4px var(--sp-2)}
+  .dash-cols{gap:var(--sp-3)}
+}
+@media (min-width:901px){.dash-v2 .panel-kicker:has(> .dash-tarih:only-child){display:none}}
+/* Modül genel bakışlarında başlığın altında sekme çubuğu var (~44px); tek
+   ekrana sığması için sekme boşluğu ve grafik biraz daha alçak. */
+/* Telefonda 14 çubuk dar: tutar etiketleri ("₺16.000") birbirine giriyordu.
+   Toplam kart başlığında, gün değeri çubuğun ipucunda. */
+@media (max-width:700px){.dash-v2 .dash-bar-value{display:none}}
+/* Modül genel bakışlarının yalnızca ekran okuyucuya görünen başlığı. */
+.dash-gizli-baslik{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* Grafik başlığındaki özet (SeriKarti ozet): başlık ile toplam arasında, tek satır. */
+.dash-ozet{flex:1;display:flex;flex-wrap:wrap;justify-content:center;gap:var(--sp-2) var(--sp-6);margin:0;padding:0 var(--sp-4)}
+.dash-ozet>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dash-ozet dt{color:var(--muted);font-size:var(--fs-micro);white-space:nowrap}
+.dash-ozet dd{margin:0;color:var(--ink);font-size:var(--fs-md);font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dash-ozet dd a{color:inherit;text-decoration:none}
+.dash-ozet dd a:hover{color:var(--primary)}
+.dash-ozet>div[data-tone="warning"] dd{color:var(--warning)}
+@media (max-width:900px){.dash-ozet{order:3;flex-basis:100%;justify-content:flex-start;padding:var(--sp-2) 0 0}.dash-v2 .dash-chart .dash-card-head{flex-wrap:wrap}}
+/*
+  ÖZET SAYILARI TELEFONDA İKİ SÜTUNLU IZGARA (15.10.2026).
+
+  Sarmalayan bir esnek kutuydu ve her hücre kendi içeriği kadar
+  genişliyordu: 375 pikselde sütunlar 81 / 81 / 75 ve alt sırada
+  83 / 96 çıkıyor, yani iki sıra birbirini TUTMUYORDU (ikinci sıranın
+  ikinci sütunu üsttekinden 2 piksel kayıktı). Göze "bozuk" demiyor,
+  "özensiz" dedirtiyor.
+
+  Üç sütunlu ızgara denendi, sütunlar hizalandı ama 95 piksele düşen
+  hücrede "Dikkat gerektiren" iki satıra iniyor ve bu sefer DEĞERLER
+  hizasını kaybediyordu. İki sütunda her etiket tek satırda kalıyor,
+  değerler satır satır aynı hizada ve genişlik tam 145 piksel.
+
+  İki sütun ayrıca müşteri detayındaki şeritle (kayit-detay.css) aynı
+  karar: konsolun iki ayrı özet şeridi telefonda aynı ritmi tutuyor.
+  Bedeli 60 piksel yükseklik.
+*/
+@media (max-width:760px){
+  .dash-ozet{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-3) var(--sp-5)}
+}

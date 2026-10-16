@@ -1,0 +1,85 @@
+/*
+  ONAY PENCERESİ (15.10.2026). Panelin her yerinde kullanılabilsin diye
+  konsolun platform.css'inden buraya ayrıldı: kiracı panelindeki iki
+  düğme (WhatsApp gönderimi, belge metni) de aynı pencereyi istiyordu ve
+  onlar için konsolun bütün stilini CRM rotalarına sokmak gerekiyordu.
+
+  Dosya kendi kendine yeter; yalnızca panelin ortak değişkenlerini
+  (panel-tokens) kullanıyor. Kabuk kuralları plt-pencere'den alındı,
+  orada öğrenilen iki şeyle birlikte:
+
+  - Konum, inset ve margin AÇIKÇA yazılıyor. Kipli pencereyi ortalayan
+    `margin:auto` tarayıcı varsayılanı; bir yerde margin ezilince kutu
+    sol üst köşeye yapışıyor (takip ekranında canlıda yaşandı).
+  - display yalnızca AÇIK pencereye yazılıyor: tarayıcının kendi
+    `dialog:not([open]){display:none}` kuralı yazar kuralından zayıf,
+    yani [open] koymayan bir display:flex kapalı pencereyi her sayfada
+    açık gösterirdi.
+*/
+dialog.onay-pencere {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 64px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 22%);
+  overflow: hidden;
+}
+dialog.onay-pencere[open] { display: flex; flex-direction: column }
+.onay-pencere::backdrop { background: rgb(9 20 34 / 45%) }
+
+/* Telefonda alttan açılan yaprak: panelin öteki pencereleri de böyle. */
+@media (max-width: 760px) {
+  dialog.onay-pencere {
+    inset: auto 0 0;
+    margin: 0;
+    width: 100vw;
+    max-height: 92dvh;
+    border-width: 1px 0 0;
+    border-radius: 18px 18px 0 0;
+  }
+}
+
+/* Taban boyu `auto`: gerekçe platform.css · .plt-pencere-govde. */
+.onay-govde { display: grid; gap: var(--sp-4); padding: 20px 22px 22px; flex: 1 1 auto; min-height: 0; overflow: auto }
+.onay-govde > * { min-width: 0 }
+.onay-bas { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3) }
+.onay-bas small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase }
+.onay-bas h2 { margin: 3px 0 0; font-size: 17px; font-weight: 650; letter-spacing: -.01em; color: var(--ink) }
+.onay-kapat {
+  flex: none; width: 32px; height: 32px; padding: 0;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); color: var(--muted);
+  font-size: 18px; line-height: 1; cursor: pointer;
+}
+.onay-kapat:hover { border-color: var(--danger); color: var(--danger) }
+
+.onay-metin { margin: 0; color: var(--ink); font-size: 14px; line-height: 1.55 }
+/* Onaydan önce göze çarpması gereken maddeler (ör. beklenenle uyuşmayan tutar). */
+.onay-uyari {
+  display: grid; gap: 4px; margin: 0; padding: 10px 12px 10px 28px;
+  border-radius: var(--r-md); background: var(--warning-soft, var(--surface-2));
+  color: var(--warning, var(--ink)); font-size: 13px; line-height: 1.45;
+}
+.onay-sebep { display: grid; gap: 6px }
+.onay-sebep > span { color: var(--muted); font-size: 12px; font-weight: 650 }
+.onay-sebep textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.5; resize: vertical;
+}
+.onay-sebep textarea:focus-visible { outline: none; border-color: var(--primary); box-shadow: var(--shadow-glow) }
+.onay-sebep small { color: var(--muted); font-size: 11.5px; line-height: 1.4 }
+
+.onay-eylem { display: flex; justify-content: flex-end; gap: var(--sp-2); flex-wrap: wrap }
+.onay-eylem > button { min-height: 44px }
+/* Dar ekranda alt alta ve TERS: başparmağa en yakın düğme "Vazgeç" olsun,
+   yıkıcı olan değil (iOS eylem sayfalarının sırası). */
+@media (max-width: 420px) {
+  .onay-eylem { flex-direction: column-reverse }
+  .onay-eylem > button { width: 100% }
+}

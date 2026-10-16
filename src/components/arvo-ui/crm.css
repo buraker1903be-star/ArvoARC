@@ -1,0 +1,293 @@
+/* ============================================================
+   ArvoOS Panel — CRM & Sales Pipeline
+   ============================================================ */
+
+.crm-page-stack{display:flex;flex-direction:column;gap:24px}
+.crm-page-stack>.panel-pagehead,.crm-page-stack>.crm-metrics,.crm-page-stack>.crm-create,.crm-page-stack>.section-heading,.crm-page-stack>.crm-board,.crm-page-stack>.crm-lost{margin:0}
+
+
+.crm-create{padding:0;overflow:hidden}
+.crm-create summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:56px;padding:16px 20px;cursor:pointer;list-style:none}
+.crm-create summary::-webkit-details-marker{display:none}
+.crm-create summary span,.crm-create summary b,.crm-create summary small{display:block}
+.crm-create summary b{font-size:13px;color:var(--ux-primary)}
+.crm-create summary small{margin-top:4px;color:var(--ux-muted);font-size:11px;font-weight:600}
+.crm-create summary em{padding:7px 10px;border:1px solid var(--ux-line);border-radius:7px;color:var(--ux-primary);font-size:11px;font-style:normal;font-weight:800}
+.crm-create[open] summary{border-bottom:1px solid var(--ux-line)}
+.crm-create[open] summary em{background:var(--ux-soft)}
+.crm-create .panel-form{padding:20px}
+.crm-create .panel-form-actions{padding-top:4px}
+
+/* ---------- Kanban board ---------- */
+.crm-board{display:grid;grid-template-columns:repeat(6,minmax(230px,1fr));gap:14px;overflow-x:auto;padding-bottom:12px}
+.crm-column{min-width:230px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:14px;padding:12px}
+.crm-column>header{display:flex;justify-content:space-between;align-items:center;padding:4px 3px 12px}
+.crm-column>header div{display:flex;align-items:center;gap:8px}
+.crm-column>header small{font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--muted)}
+.crm-column>header strong{display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:12px;color:var(--ink)}
+.crm-column>header span{font-size:11px;color:var(--muted)}
+.crm-cards{display:flex;flex-direction:column;gap:12px}
+.crm-card{padding:15px;border:1px solid var(--line);border-radius:13px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.crm-card-top{display:flex;justify-content:space-between;gap:8px}
+.crm-card-top small{color:var(--primary);font-size:11px;font-weight:800}
+.crm-card-top span{font-size:11px;color:var(--muted)}
+.crm-card h3{margin:10px 0 4px;font-size:14px;color:var(--ink)}
+.crm-card p{margin:0 0 12px;font-size:12px;color:var(--muted)}
+.crm-card>strong{display:block;margin-bottom:6px;font-size:15px;color:var(--ink)}
+.crm-card>small{display:block;margin-bottom:12px;color:var(--muted);font-size:11px}
+.crm-card form{display:flex;flex-direction:column;gap:9px;margin-top:14px;padding-top:12px;border-top:1px solid var(--ux-line)}
+.crm-card form label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:11px;font-weight:800}
+.crm-card select,.crm-card input{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:11px var(--font-body)}
+.crm-card button{min-height:34px;padding:8px;border:0;border-radius:8px;background:var(--brand-700);color:#fff;font:800 11px var(--font-body);cursor:pointer;transition:filter .18s ease}
+.crm-card button:hover{filter:brightness(1.1)}
+.crm-empty{padding:20px 10px;text-align:center;color:var(--muted);font-size:11px}
+.crm-lost>small{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--danger)}
+.crm-lost p{margin:10px 0 0;font-size:12px;color:var(--muted)}
+
+.crm-empty-state{text-align:center;padding:48px 20px}
+.crm-empty-state h2{margin:0 0 6px;font-size:16px;color:var(--ink)}
+.crm-empty-state p{margin:0;color:var(--muted);font-size:12px}
+/* Boş liste: açıklama, süreç adımları ve eylemler */
+.panel-root .crm-empty-state p{max-width:520px;font-size:14px;line-height:1.55}
+.panel-root .crm-empty-steps{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:10px 0 4px;padding:0;list-style:none}
+.panel-root .crm-empty-steps li{display:inline-flex;align-items:center;gap:8px;padding:5px 12px 5px 5px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font-size:13px;font-weight:600}
+.panel-root .crm-empty-steps b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent-strong);font-size:12px;font-weight:700}
+.panel-root .crm-empty-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:10px}
+.panel-root .crm-empty-actions:empty{display:none}
+
+.crm-page-stack .panel-drawer-header{position:sticky;top:0;z-index:3;background:var(--surface);align-items:flex-start}
+.crm-page-stack .panel-drawer-header>div{min-width:0;flex:1}
+.crm-page-stack .panel-drawer-close{position:sticky;top:0;margin-left:auto;flex:none}
+.crm-page-stack .panel-drawer-header h2{font-size:30px;line-height:1.15}
+.crm-page-stack .panel-drawer-header p{font-size:13px}
+.crm-page-stack .panel-drawer-body .request-entry-form{gap:16px}
+.crm-page-stack .panel-drawer-body .request-entry-form label{font-size:13px;line-height:1.4}
+.crm-page-stack .panel-drawer-body .request-entry-form input,.crm-page-stack .panel-drawer-body .request-entry-form select,.crm-page-stack .panel-drawer-body .request-entry-form textarea{min-height:44px;padding:12px 13px;font-size:13px}
+.crm-page-stack .panel-drawer-body .request-entry-form textarea{min-height:112px}
+
+.request-other-service{animation:requestFieldIn .18s ease-out}
+@keyframes requestFieldIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+
+@media(max-width:620px){
+  .crm-page-stack{gap:18px}
+  .crm-create .panel-form{grid-template-columns:1fr}
+  .crm-create .wide{grid-column:auto}
+  .crm-create summary{align-items:flex-start}
+  .crm-board{gap:10px}
+  .crm-page-stack .panel-drawer-header h2{font-size:26px}
+  .crm-page-stack .panel-drawer-header p{font-size:12px}
+  .crm-page-stack .panel-drawer-body .request-entry-form label{font-size:13px}
+  .crm-page-stack .panel-drawer-body .request-entry-form input,.crm-page-stack .panel-drawer-body .request-entry-form select,.crm-page-stack .panel-drawer-body .request-entry-form textarea{font-size:12px}
+}
+
+/* ---------- Excel benzeri veri tablosu (Talepler / Teklifler / Sözleşmeler) ---------- */
+.crm-table-wrap{padding:0;overflow-x:auto}
+.crm-data-table{width:100%;min-width:920px;border-collapse:collapse;font-size:13px}
+.crm-data-table thead th{position:sticky;top:0;z-index:1;background:var(--surface-2);color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+.crm-data-table tbody td{padding:12px 16px;border-bottom:1px solid var(--line-soft);color:var(--ink);vertical-align:middle}
+.crm-data-table tbody tr:last-child td{border-bottom:0}
+.crm-data-table tbody tr:hover{background:var(--surface-2)}
+.crm-data-table .crm-table-mono{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted);white-space:nowrap}
+.crm-data-table .crm-table-title{display:block;font-weight:700;color:var(--ink);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.crm-data-table .crm-table-sub{display:block;margin-top:2px;color:var(--muted);font-size:11px}
+.crm-comment-count-badge{display:inline-flex;align-items:center;justify-content:center;min-height:24px;padding:4px 9px;border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);border-radius:999px;background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--accent-strong,var(--accent));font-size:11px;font-weight:800;line-height:1;text-decoration:none;white-space:nowrap;transition:background .18s ease,border-color .18s ease,transform .18s ease}
+.crm-comment-count-badge:hover{background:color-mix(in srgb,var(--accent) 16%,var(--surface));border-color:color-mix(in srgb,var(--accent) 42%,transparent);transform:translateY(-1px)}
+.crm-comment-count-empty{color:var(--muted)}
+.crm-table-actions{display:flex;gap:6px;flex-wrap:nowrap;justify-content:flex-end}
+.crm-table-actions form{margin:0}
+.crm-table-actions .panel-primary,.crm-table-actions .panel-secondary,.crm-table-actions .panel-danger{min-height:28px;padding:0 10px;font-size:11px;white-space:nowrap}
+
+/* ---------- Mobilde: tablo satırları kart olarak gösterilir, butonlar altta ---------- */
+@media(max-width:760px){
+  .crm-table-wrap{overflow-x:visible;padding:0;border:0;border-radius:0;margin-left:0!important;margin-right:0!important;width:100%!important;background:transparent;box-shadow:none}
+  .crm-table-wrap .crm-data-table{display:block;width:100%;min-width:0!important;max-width:100%;border-collapse:separate}
+  .crm-data-table thead{display:none}
+  .crm-data-table tbody{display:block;width:100%;min-width:0;max-width:100%}
+  .crm-data-table tbody tr{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin-bottom:12px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow-sm);overflow:hidden}
+  .crm-data-table tbody tr:hover{background:var(--surface)}
+  .crm-data-table td{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-soft,var(--n-0));font-size:13px;text-align:right;min-width:0;overflow-wrap:anywhere;word-break:break-word}
+  .crm-data-table td:before{content:attr(data-label);flex:none;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:left}
+  .crm-data-table td>*{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+  .crm-data-table td.crm-table-actions{display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:stretch;gap:8px;border-bottom:0;padding:12px 0 0;margin-top:2px}
+  .crm-data-table td.crm-table-actions:before{content:none}
+  .crm-table-actions form{flex:1 1 auto;margin:0}
+  .crm-table-actions .panel-primary,.crm-table-actions .panel-secondary,.crm-table-actions .panel-danger{min-height:40px;padding:0 12px;font-size:13px;white-space:nowrap;width:100%}
+  .crm-table-actions .panel-primary{background:var(--surface);color:var(--ink);border:1px solid var(--line);font-weight:700}
+  .crm-table-mono{font-size:13px;font-weight:800}
+  .crm-data-table td .crm-table-title,.crm-data-table td .crm-table-sub{text-align:right;max-width:none;white-space:normal}
+}
+
+@media(max-width:900px){
+  .crm-table-wrap{border-left:0;border-right:0;border-radius:0;margin-left:-16px;margin-right:-16px;width:calc(100% + 32px)}
+}
+
+/* ---------- Düzenleme formunda müşteri/talep ve teklif/sözleşme bölümlerini ayıran başlık ---------- */
+.panel-form-note{width:100%;margin:4px 0 0;padding-top:10px;border-top:1px solid var(--line);color:var(--primary);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.panel-form-note:first-child{margin-top:0;padding-top:0;border-top:0}
+
+/* ---------- Arşivlenen sözleşmeler (Operasyon panosuyla aynı görünüm) ---------- */
+.ops-archive{margin:16px 18px 0;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.ops-archive summary{display:flex;align-items:center;gap:10px;padding:14px 18px;cursor:pointer;list-style:none}
+.ops-archive summary::-webkit-details-marker{display:none}
+.ops-archive summary span{font:700 13px var(--font-heading);color:var(--ink)}
+.ops-archive summary em{padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-size:12px;font-style:normal;font-weight:800}
+.ops-archive summary small{margin-left:auto;color:var(--muted);font-size:11px}
+.ops-archive[open] summary{border-bottom:1px solid var(--line)}
+.ops-archive-list{display:flex;flex-direction:column}
+.ops-archive-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-top:1px solid var(--line-soft);text-decoration:none;transition:.18s ease}
+.ops-archive-row:first-child{border-top:0}
+.ops-archive-row:hover{background:var(--surface-2)}
+.ops-archive-row b{display:block;font-size:13px;color:var(--ink)}
+.ops-archive-row small{display:block;margin-top:2px;color:var(--muted);font-size:11px}
+.ops-archive-row .status-pill{background:var(--success-soft);color:var(--success);white-space:nowrap}
+
+/* ---------- İmza/Teklif bağlantısı hazır kartı (marka standardında) ---------- */
+.share-ready-card{display:flex;align-items:flex-start;gap:16px;border-color:var(--success);background:linear-gradient(180deg,var(--success-soft),var(--surface) 70%)}
+.share-ready-icon{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--success);color:#fff;font-size:16px;font-weight:800}
+.share-ready-body{flex:1;min-width:0}
+.share-ready-body h2{margin:2px 0 10px;font:800 15px var(--font-heading)}
+.share-ready-link{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:13px;color:var(--muted);font-family:var(--font-body)}
+
+/* ============================================================
+   Son temas — "kaç yorum var" yerine "en son ne zaman konuşuldu".
+   Sayı, sorulan soruyu cevaplamıyordu: iki yorumun ikisi de bir ay
+   önce yazılmış olabilir. Asıl sinyal notun YOKLUĞU.
+   ============================================================ */
+.crm-last-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.crm-last-contact-who {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.crm-last-contact-when {
+  color: var(--ink-soft);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.crm-last-contact:hover .crm-last-contact-when {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.crm-last-contact-none {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Bekleme süresi — durum rozetinin altında.
+   Yedi günü geçince renk değişiyor; takip edilmesi gereken kayıt bu. */
+.crm-waiting {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.crm-waiting.is-late {
+  color: var(--danger);
+  font-weight: 750;
+}
+
+/* Zorunlu alan işareti — hangi alanların şart olduğu belli değildi.
+   aria-hidden çünkü input'un kendisinde zaten required var; ekran
+   okuyucu bunu iki kez duyurmasın. */
+.panel-form label .req {
+  margin-left: 3px;
+  color: var(--danger);
+  font-weight: 800;
+}
+
+/* Takip kodu — operasyon detayında müşteriye verilecek kod.
+   Rakam ve harf karışık olduğu için tek aralıklı yazı tipiyle,
+   telefonda okunurken karışmasın. */
+.ops-tracking-code {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+/* Operasyon detayında yönetim işlemleri */
+.ops-detail-manage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.ops-detail-manage form { margin: 0; }
+
+/* Teklif / direkt sözleşme: talepte satış temsilcisi yoksa zorunlu seçim */
+.panel-root .proposal-rep-required{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid color-mix(in srgb,var(--warning) 38%,var(--line));border-radius:14px;background:var(--warning-soft)}
+.panel-root .proposal-rep-required>span{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--warning);color:var(--n-0);font-weight:800}
+.panel-root .proposal-rep-required strong{display:block;color:var(--ink);font-size:14px}
+.panel-root .proposal-rep-required p{margin:3px 0 0;color:var(--ink-soft);font-size:13px;line-height:1.5}
+.panel-root .proposal-rep-select select:invalid{border-color:color-mix(in srgb,var(--warning) 55%,var(--line))}
+
+/* Sözleşmedeki abonelik seçimi: hangi modülleri açıyor.
+   Yalnızca Arvo'nun kendi kurumunda çiziliyor. */
+.abonelik-ipucu { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.55 }
+.abonelik-modul {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.abonelik-modul legend { padding: 0 6px }
+.abonelik-modul legend label { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; cursor: pointer }
+.abonelik-modul > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 6px }
+.abonelik-modul label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; min-width: 0 }
+.abonelik-modul input[type="text"], .abonelik-modul input:not([type]), .abonelik-modul select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+}
+/* Onay kutusu kendi satırında: "bağımsız" uzun bir cümle ve dar sütunda
+   etiketi girdisinden kopuyordu. */
+.abonelik-bagimsiz { grid-column: 1 / -1; display: flex !important; align-items: center; gap: 7px; cursor: pointer }
+.abonelik-bagimsiz input { width: auto }
+
+/* Arşiv sebebi — talep listesinde durum rozetinin altında.
+   Uzun sebep satırı şişirmesin diye iki satıra kırpılıyor; tamamı
+   title özniteliğinde duruyor. */
+.crm-liste-sebep{
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+  overflow:hidden;
+  max-width:28ch;
+  margin-top:6px;
+  color:var(--muted);
+  font-size:11.5px;
+  line-height:1.4;
+}
+
+/* "Müşteri bağlantısı" kartındaki resmi bilgi uyarısı: engel değil,
+   belgede ne görüneceğini söyleyen bir not (crm/resmi-bilgi-uyarisi).
+   Belge müşteriye bu karttan gidiyor. */
+.panel-root .crm-resmi-uyari{margin:8px 0 10px;color:var(--warning);font-size:12px;line-height:1.5}
+.panel-root .crm-resmi-uyari b{font-weight:650}
+.panel-root .crm-resmi-uyari a{color:inherit;text-decoration:underline;text-underline-offset:2px}

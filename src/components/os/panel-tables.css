@@ -1,0 +1,273 @@
+/* ============================================================
+   TABLO SİSTEMİ (2026-09)
+   Paneldeki tüm veri tabloları tek dilde: aynı başlık, satır ritmi,
+   sağa hizalı tutarlar, duruma göre renklenen rozetler, tek tip boş
+   durum. Panel düzeninde en son yüklenir; sayfa CSS'lerinin (crm.css,
+   finance.css, commissions.css…) önüne geçmek için tüm kurallar
+   .panel-root önekli. Renkler yalnızca panel-tokens.css'ten.
+   ============================================================ */
+
+.panel-root{
+  --tbl-head-bg:var(--surface-2);
+  --tbl-head-ink:var(--muted);
+  --tbl-line:var(--line-soft);
+  --tbl-row-hover:color-mix(in srgb,var(--primary-soft) 42%,var(--surface));
+}
+
+/* ------------------------------------------------------------
+   DURUM ROZETLERİ
+   Varsayılan nötr; data-tone ile renklenir (lib/status-tone.ts).
+   Rozet eskiden 5 dosyada farklı ölçülerle tanımlıydı.
+   ------------------------------------------------------------ */
+.panel-root .status-pill{
+  display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:3px 10px;
+  border-radius:999px;background:var(--surface-2);color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--line);
+  font-size:12px;font-weight:700;line-height:1.2;letter-spacing:.01em;white-space:nowrap
+}
+.panel-root .status-pill[data-tone]::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.9}
+.panel-root .status-pill:is([data-tone="success"],.is-paid,.domain-status-verified){background:var(--success-soft);color:var(--success);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--success) 24%,transparent)}
+.panel-root .status-pill[data-tone="info"]{background:var(--info-soft);color:var(--info);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--info) 22%,transparent)}
+.panel-root .status-pill:is([data-tone="warning"],.domain-status-pending){background:var(--warning-soft);color:color-mix(in srgb,var(--warning) 78%,var(--ink));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warning) 28%,transparent)}
+.panel-root .status-pill:is([data-tone="danger"],.is-late,.domain-status-failed){background:var(--danger-soft);color:var(--danger);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--danger) 24%,transparent)}
+.panel-root .status-pill[data-tone="gold"]{background:var(--accent-soft);color:var(--accent-strong);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 32%,transparent)}
+.panel-root .ops-archive-row .status-pill{background:var(--success-soft);color:var(--success)}
+
+/* Prim ve oturum durumları da aynı rozet dilinde */
+.panel-root :is(.commission-status,.activity-status){display:inline-flex;align-items:center;min-height:24px;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line);font-size:12px;font-weight:700;white-space:nowrap}
+.panel-root .commission-status.paid,.panel-root .activity-status.online{background:var(--success-soft);color:var(--success);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--success) 24%,transparent)}
+.panel-root .commission-status.approved{background:var(--info-soft);color:var(--info);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--info) 22%,transparent)}
+.panel-root .commission-status.accrued{background:var(--accent-soft);color:var(--accent-strong);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 32%,transparent)}
+
+/* ------------------------------------------------------------
+   CRM VE OPERASYON LİSTELERİ (table.crm-data-table)
+   Talepler, Teklifler ve Sözleşmeler aynı sırayı izler (crm/table-cells.tsx):
+   No · Müşteri · Konu · Temsilci · [Tutar] · Durum · Tarih · Son temas.
+   Geniş ekranda tek yüzeyli, ince çizgilerle ayrılmış bir tablo (satırlar
+   eskiden ayrı ayrı gölgeli kartlardı). Başlık ve satırlar aynı sütun
+   şablonunu (--cols) paylaşır. Ekran daraldıkça önce "Son temas", sonra
+   tarih gizlenir ve temsilci baş harf rozetine iner; 1100px altında
+   etiketli kart görünümü.
+   ------------------------------------------------------------ */
+.panel-root .crm-data-table{--cols:128px minmax(0,1.25fr) minmax(0,1.6fr) minmax(0,1fr) 156px 104px 112px 16px}
+.panel-root .crm-data-table:is([data-cols="proposals"],[data-cols="contracts"]){--cols:128px minmax(0,1.2fr) minmax(0,1.5fr) minmax(0,1fr) 128px 156px 104px 112px 16px}
+.panel-root .crm-data-table[data-cols="operations"]{--cols:minmax(0,1.5fr) minmax(0,1.15fr) minmax(0,.95fr) 96px 140px 120px 104px 112px 16px}
+
+/* Temsilci: baş harf rozeti + ad (her genişlikte) */
+.panel-root .crm-rep{display:inline-flex;align-items:center;gap:9px;min-width:0;max-width:100%;color:var(--ink);font-size:13px}
+.panel-root .crm-rep>i{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent-strong);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 30%,transparent);font-size:11px;font-style:normal;font-weight:800;letter-spacing:.03em}
+.panel-root .crm-rep>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-root .crm-rep.is-empty{color:var(--muted)}
+.panel-root .crm-rep.is-empty>i{background:var(--surface-2);color:var(--dim);box-shadow:inset 0 0 0 1px var(--line)}
+/* Operasyon: ilerleme çubuğu ve geciken termin */
+/* Genel hücre kuralı (.crm-page-stack … tbody td) dikey düzene zorluyor; çubuk
+   yüksekliği sıfıra iniyordu. Aynı ağırlıkta, daha belirgin seçici. */
+.panel-root .crm-page-stack .crm-data-table tbody td.crm-col-progress{flex-direction:row;align-items:center;justify-content:flex-start;gap:8px}
+.panel-root .ops-progress-mini{flex:1;min-width:36px;height:6px;border-radius:999px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line-soft);overflow:hidden}
+.panel-root .ops-progress-mini i{display:block;width:var(--p,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,color-mix(in srgb,var(--success) 70%,var(--n-0)),var(--success))}
+.panel-root .crm-data-table td.crm-col-progress b{min-width:38px;color:var(--ink);font-size:12.5px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.panel-root .crm-data-table td.crm-col-date.is-late{color:var(--danger);font-weight:650}
+.panel-root .crm-data-table td.crm-col-date.is-late small{color:var(--danger);font-size:11.5px;font-weight:600}
+/* Müşteriden okunmamış mesajı olan iş: kırmızı işaret (operasyon listesi) */
+.panel-root .crm-page-stack .crm-data-table tbody tr.has-alert{border-color:color-mix(in srgb,var(--danger) 40%,var(--line));background:color-mix(in srgb,var(--danger) 4%,var(--surface));box-shadow:inset 3px 0 0 var(--danger)}
+.panel-root .crm-page-stack .crm-data-table tbody tr.has-alert:hover{background:color-mix(in srgb,var(--danger) 7%,var(--surface));box-shadow:inset 3px 0 0 var(--danger),inset 0 0 0 1px color-mix(in srgb,var(--danger) 28%,transparent)}
+.panel-root .crm-alert-chip{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;margin-top:5px;padding:2px 9px 2px 7px;border-radius:999px;background:var(--danger-soft);color:var(--danger);font-size:11.5px;font-weight:700;white-space:nowrap}
+.panel-root .crm-alert-chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;animation:crm-alert-pulse 1.8s ease-in-out infinite}
+@keyframes crm-alert-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--danger) 45%,transparent)}50%{box-shadow:0 0 0 5px transparent}}
+.panel-root .crm-inline-action{display:inline-flex;align-self:flex-start;padding:3px 10px;border:1px dashed color-mix(in srgb,var(--primary) 55%,var(--line));border-radius:999px;color:var(--accent-strong);font-size:12.5px;font-weight:600;text-decoration:none;white-space:nowrap;transition:background-color .2s ease}
+.panel-root .crm-inline-action:hover{border-style:solid;background:var(--accent-soft)}
+/* Kayıt numaraları da tek yazı tipinde (eskiden kod yazı tipi); rakamlar eşit genişlikte */
+.panel-root .crm-data-table .crm-table-mono{font-family:var(--font-body);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+
+@media(min-width:1101px){
+  .panel-root .crm-page-stack .crm-table-wrap{padding:0;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--shadow-sm);overflow:clip}
+  .panel-root .crm-page-stack .crm-data-table{display:block;width:100%}
+  .panel-root .crm-page-stack .crm-data-table thead{display:block;position:sticky;top:72px;z-index:3;background:var(--surface-2);border-bottom:1px solid var(--line)}
+  .panel-root .crm-page-stack .crm-data-table :is(thead,tbody) tr{display:grid;grid-template-columns:var(--cols);column-gap:14px;align-items:center;padding-inline:20px}
+  .panel-root .crm-page-stack .crm-data-table thead tr{min-height:44px;margin:0;padding-block:0;border:0;background:transparent}
+  .panel-root .crm-page-stack .crm-data-table thead th{position:static;min-width:0;padding:0;border:0;background:transparent;color:var(--tbl-head-ink);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .panel-root .crm-page-stack .crm-data-table tbody{display:block}
+  .panel-root .crm-page-stack .crm-data-table tbody tr{min-height:66px;margin:0;padding-block:11px;border:0;border-top:1px solid var(--tbl-line);border-radius:0;background:transparent;box-shadow:none;transform:none;contain-intrinsic-size:auto 66px}
+  .panel-root .crm-page-stack .crm-data-table tbody tr:first-child{border-top:0}
+  .panel-root .crm-page-stack .crm-data-table tbody tr:hover{transform:none;border-color:var(--tbl-line);background:var(--tbl-row-hover);box-shadow:inset 3px 0 0 var(--primary)}
+  .panel-root .crm-page-stack .crm-data-table tbody tr:focus-within{outline:2px solid var(--accent);outline-offset:-2px}
+  .panel-root .crm-page-stack .crm-data-table tbody td{display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:3px;min-width:0;min-height:0;padding:0;border:0;background:transparent;color:var(--ink);font-size:13px;line-height:1.35}
+  .panel-root .crm-page-stack .crm-data-table tbody td::before{display:none}
+  /* Uzun ad/konu tek satırda kalır, taşarsa üç noktayla kısalır (tamamı ipucunda) */
+  .panel-root .crm-page-stack .crm-data-table tbody td :is(.crm-table-title,.crm-table-sub){display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .panel-root .crm-page-stack .crm-data-table .crm-table-title{color:var(--ink);font-size:14px;font-weight:650;letter-spacing:-.005em}
+  .panel-root .crm-page-stack .crm-data-table .crm-table-sub{color:var(--muted);font-size:12px;font-weight:500}
+  .panel-root .crm-page-stack .crm-data-table td.crm-table-mono{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:6px;color:var(--ink);font-size:12px;font-weight:700;letter-spacing:.02em}
+  .panel-root .crm-page-stack .crm-data-table td[data-label="Durum"]{align-items:flex-start}
+  /* Tutar sağa, tablo rakamlarıyla; tarih eşit genişlikte rakamlarla */
+  .panel-root .crm-page-stack .crm-data-table th.crm-col-amount{text-align:right}
+  .panel-root .crm-page-stack .crm-data-table td.crm-col-amount{align-items:flex-end;text-align:right;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .panel-root .crm-page-stack .crm-data-table td.crm-col-date{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .panel-root .crm-page-stack .crm-data-table[data-cols="operations"] td:is(:nth-child(6),:nth-child(7)){font-variant-numeric:tabular-nums}
+  .panel-root .crm-page-stack .crm-data-table td.crm-table-actions{align-items:flex-end}
+  .panel-root .crm-page-stack .crm-data-table .crm-row-chevron{color:var(--dim);font-size:18px;transition:transform .15s ease,color .15s ease}
+  .panel-root .crm-page-stack .crm-data-table tbody tr:hover .crm-row-chevron{color:var(--accent);transform:translateX(2px)}
+}
+/* 1101–1599px: "Son temas" gizlenir */
+@media(min-width:1101px) and (max-width:1599px){
+  .panel-root .crm-data-table{--cols:124px minmax(0,1.25fr) minmax(0,1.6fr) minmax(0,1fr) 150px 100px 16px}
+  .panel-root .crm-data-table:is([data-cols="proposals"],[data-cols="contracts"]){--cols:124px minmax(0,1.2fr) minmax(0,1.5fr) minmax(0,1fr) 124px 150px 100px 16px}
+  .panel-root .crm-data-table[data-cols="operations"]{--cols:minmax(0,1.5fr) minmax(0,1.15fr) minmax(0,.95fr) 92px 136px 110px 100px 16px}
+  .panel-root .crm-page-stack .crm-data-table .crm-col-contact{display:none}
+}
+/* 1101–1359px: tarih de gizlenir, temsilci yalnızca rozet (ad ipucunda) */
+@media(min-width:1101px) and (max-width:1359px){
+  .panel-root .crm-data-table{--cols:116px minmax(0,1.2fr) minmax(0,1.5fr) 34px 148px 16px}
+  .panel-root .crm-data-table:is([data-cols="proposals"],[data-cols="contracts"]){--cols:116px minmax(0,1.2fr) minmax(0,1.5fr) 34px 120px 148px 16px}
+  .panel-root .crm-data-table[data-cols="operations"]{--cols:minmax(0,1.5fr) minmax(0,1.2fr) 34px 88px 132px 100px 16px}
+  .panel-root .crm-page-stack .crm-data-table .crm-col-date{display:none}
+  .panel-root .crm-page-stack .crm-data-table th.crm-col-rep{visibility:hidden}
+  .panel-root .crm-page-stack .crm-data-table .crm-rep>span{display:none}
+}
+@media(max-width:1100px){
+  /* Satırlar karta dönünce başlık gizlenir, hücre etiketleri görünür. */
+  .panel-root .crm-page-stack .crm-data-table thead{display:none}
+  .panel-root .crm-page-stack .crm-data-table tbody td[data-label]:not(:nth-child(2))::before{display:block}
+  .panel-root .crm-page-stack .crm-data-table[data-cols="operations"] tbody td[data-label]:nth-child(2)::before{display:block}
+  /* Kart hücreleri dar: uzun rozet yan hücreye taşmasın; numara hücresinin
+     etiketi kod yazı tipini devralmasın; ad ve iletişim alt alta dursun. */
+  .panel-root .crm-page-stack .crm-data-table tbody td{min-width:0}
+  .panel-root .crm-page-stack .crm-data-table tbody td .crm-row-link{align-items:flex-start;justify-items:start;text-align:left}
+  .panel-root .crm-page-stack .crm-data-table tbody td .crm-row-link>div{display:flex;flex-direction:column;align-items:flex-start;text-align:left}
+  .panel-root .crm-page-stack .crm-data-table tbody td :is(.crm-table-title,.crm-table-sub){display:block}
+  .panel-root .crm-page-stack .crm-data-table tbody .status-pill{max-width:100%;white-space:normal}
+  .panel-root .crm-page-stack .crm-data-table tbody td[data-label]::before{font-family:var(--font-body);letter-spacing:.02em}
+}
+@media(min-width:761px) and (max-width:1100px){
+  .panel-root .crm-page-stack .crm-data-table[data-cols="operations"] tbody tr{grid-template-columns:minmax(200px,1.4fr) minmax(150px,1fr) repeat(3,minmax(100px,.7fr))}
+}
+/* Telefon (≤760px): Talep/Teklif/Sözleşme satırı derli toplu bir iOS kartı.
+   Eskiden her alan alt alta tek sütundu (kayıt başına ~560px, ekranda bir
+   kart) ve Konu sağa yaslıydı. Şimdi: numara + ok üstte, müşteri kart
+   başlığı, konu tam satır, kalan alanlar iki sütunlu etiketli ızgara.
+   Operasyon tabloları kendi bölümünde (dosyanın sonu). */
+@media(max-width:760px){
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px;padding:12px 16px;border-radius:18px;contain-intrinsic-size:auto 260px}
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody td{grid-column:auto;min-height:0;padding:9px 0;border:0;border-top:1px solid var(--line-soft);align-items:flex-start;justify-content:flex-start;text-align:left;font-size:14px}
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody td[data-label]::before{margin-bottom:3px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.01em}
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody td :is(.crm-table-title,.crm-table-sub){max-width:100%;text-align:left;white-space:normal}
+  /* Numara: küçük, etiketsiz, en üstte */
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody td:nth-child(1){grid-column:1/-1;padding:0 32px 2px 0;border-top:0;color:var(--muted);font-size:12px;font-weight:700}
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody td:nth-child(1)::before{display:none}
+  /* Müşteri: kart başlığı */
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody td:nth-child(2){grid-column:1/-1;padding:0 0 10px;border-top:0}
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody td:nth-child(2) .crm-table-title{font-size:17px;font-weight:700;letter-spacing:-.01em}
+  /* Konu: tam satır */
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody td:nth-child(3){grid-column:1/-1}
+  /* Yön oku sağ üst köşede (ayrı bir satır kaplamasın) */
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody td.crm-table-actions{position:absolute;top:10px;right:12px;grid-column:auto;width:auto;min-height:0;margin:0!important;padding:0!important;border:0!important}
+  .panel-root .crm-page-stack .crm-data-table:is([data-cols="requests"],[data-cols="proposals"],[data-cols="contracts"]) tbody td.crm-table-actions .crm-row-chevron{font-size:22px}
+}
+
+/* ------------------------------------------------------------
+   KLASİK TABLOLAR: cari hareketler, primler, personel hareketleri,
+   gizlilik sözleşmeleri. Kart görünümüne geçen mobil kurallara
+   dokunmamak için geniş ekranla sınırlı.
+   ------------------------------------------------------------ */
+@media(min-width:701px){
+  .panel-root :is(.panel-table,.commission-table-wrap,.activity-table-wrap,.confidentiality-table) table{width:100%;border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums}
+  .panel-root :is(.panel-table,.commission-table-wrap,.activity-table-wrap,.confidentiality-table) th{padding:11px 14px;border-bottom:1px solid var(--line);background:var(--tbl-head-bg);color:var(--tbl-head-ink);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;text-align:left;white-space:nowrap}
+  .panel-root :is(.panel-table,.commission-table-wrap,.activity-table-wrap,.confidentiality-table) td{padding:13px 14px;border-bottom:1px solid var(--tbl-line);color:var(--ink);font-size:13px;line-height:1.45;vertical-align:middle}
+  .panel-root :is(.panel-table,.commission-table-wrap,.activity-table-wrap,.confidentiality-table) tbody tr:last-child td{border-bottom:0}
+  .panel-root :is(.panel-table,.commission-table-wrap,.activity-table-wrap,.confidentiality-table) tbody tr:hover td{background:var(--tbl-row-hover)}
+  .panel-root :is(.panel-table,.commission-table-wrap,.activity-table-wrap,.confidentiality-table) td :is(b,strong){color:var(--ink)}
+  .panel-root :is(.panel-table,.commission-table-wrap,.activity-table-wrap,.confidentiality-table) td small{display:block;margin-top:2px;color:var(--muted);font-size:12px}
+  /* Tutar ve süre sütunları sağa */
+  .panel-root .panel-table :is(th,td):nth-child(5):last-child,
+  .panel-root .commission-table-wrap :is(th,td):is(:nth-child(5),:nth-child(6),:nth-child(7)),
+  .panel-root .activity-table-wrap :is(th,td):nth-child(4){text-align:right}
+}
+
+/* ------------------------------------------------------------
+   FİNANS IZGARALARI: karlılık, maliyet hareketleri, PAYTR ödemeleri
+   ------------------------------------------------------------ */
+.panel-root :is(.finance-cost-table-head,.finance-cost-movement-table .head){padding-block:11px;border-bottom:1px solid var(--line);background:var(--tbl-head-bg);color:var(--tbl-head-ink);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.panel-root :is(.finance-cost-table,.finance-cost-movement-table)>article{border-bottom:1px solid var(--tbl-line);transition:background-color .14s ease}
+.panel-root :is(.finance-cost-table,.finance-cost-movement-table)>article:hover{background:var(--tbl-row-hover)}
+.panel-root :is(.finance-cost-table,.finance-cost-movement-table,.finance-payment-list){font-variant-numeric:tabular-nums}
+/* Karlılık: Sözleşme, Maliyet, Toplam Kâr, Kâr Oranı sağa */
+.panel-root .finance-cost-table-head>span:is(:nth-child(4),:nth-child(5),:nth-child(6),:nth-child(7)),
+.panel-root .finance-cost-table>article>:is(:nth-child(4),:nth-child(5),:nth-child(6),:nth-child(7)){text-align:right;justify-self:end}
+/* Maliyet hareketleri: Tutar sağa (başlık da) */
+.panel-root .finance-cost-movement-table .head>span:nth-child(6){text-align:right;justify-self:end}
+/* PAYTR: tutar sağa; ödenmiş satırda eksik hücre kaymasın */
+.panel-root .finance-payment-list>article>strong{text-align:right;justify-self:end}
+@media(min-width:1051px){.panel-root .finance-payment-list>article>.finance-payment-complete{grid-column:4/-1}}
+.panel-root .finance-payment-list .finance-payment-complete{justify-self:start;color:var(--success);font-size:12px;font-weight:700;text-align:left}
+.panel-root .finance-payment-list .status-pill{justify-self:start}
+
+/* ------------------------------------------------------------
+   BOŞ DURUMLAR — tek görünüm (eskiden 8 farklı biçim)
+   ------------------------------------------------------------ */
+.panel-root :is(.crm-empty,.crm-empty-state,.activity-empty,.hr-empty),
+.panel-root :is(div,p,section).panel-empty{
+  display:grid;place-items:center;gap:6px;min-height:150px;padding:32px 20px;
+  border:1px dashed color-mix(in srgb,var(--primary) 32%,var(--line));border-radius:16px;
+  background:color-mix(in srgb,var(--surface-2) 72%,transparent);box-shadow:none;
+  color:var(--muted);font-size:14px;line-height:1.55;text-align:center
+}
+.panel-root .crm-empty-state h2,.panel-root div.panel-empty h2{margin:0;font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--ink)}
+/*
+  TELEFONDA BOŞ DURUM BAŞLIĞI SAYFA BAŞLIĞINI AŞMASIN (15.10.2026).
+
+  Yukarıdaki 24 piksel masaüstü için verilmiş bir karardı (12.09.2026,
+  sekiz ayrı boş-durum biçimini birleştiren düzen): geniş bir tablonun
+  ortasındaki boşlukta iri bir başlık doğru duruyor.
+
+  Telefonda ekranın hiyerarşisi tersine dönüyordu: sayfa başlığı 20,
+  kart başlığı 16, boş kutunun başlığı 24 piksel. Yani ekrandaki EN İRİ
+  yazı, "burada bir şey yok" cümlesiydi — üstelik dar kartta iki satıra
+  sarıyordu ("Onay bekleyen sözleşme yok", 60 piksel yükseklik).
+
+  18 piksel ikisinin arasına oturuyor: kartın mesajı olduğu belli,
+  sayfanın adını bastırmıyor. Kutunun 150 piksellik alt sınırı ve 32
+  piksellik dolgusu da telefonda yer kaplamaktan başka bir şey
+  yapmıyordu (kutu 175 → 122 piksel).
+*/
+@media (max-width:760px){
+  .panel-root .crm-empty-state h2,.panel-root div.panel-empty h2{font-size:18px}
+  .panel-root :is(.crm-empty,.crm-empty-state,.activity-empty,.hr-empty),
+  .panel-root :is(div,p,section).panel-empty{min-height:0;padding:var(--sp-6) var(--sp-5)}
+}
+/* Tablo hücresi olarak kullanılan boş durum: hücre görünümü bozulmasın */
+.panel-root td.panel-empty{display:table-cell;min-height:0;padding:40px 16px;border:0;border-radius:0;background:transparent;color:var(--muted);font-size:14px;text-align:center}
+
+/* ------------------------------------------------------------
+   Operasyon arşiv + genel bakış
+   İşler tablosunda tamamlanan satırın "Arşivle" düğmesi (Durum hücresi)
+   ve Arşiv sekmesinin tablosu (data-cols="ops-archive"):
+   İş · Sorumlu · Arşivlenme · Arşivleyen · Termin · Arşivden çıkar.
+   1101–1359px'te tarih sütunları genel kural gereği gizlenir.
+   ------------------------------------------------------------ */
+.panel-root .crm-data-table[data-cols="ops-archive"]{--cols:minmax(0,1.6fr) minmax(0,1fr) 120px minmax(0,1fr) 110px 158px}
+@media(min-width:1101px) and (max-width:1359px){
+  .panel-root .crm-data-table[data-cols="ops-archive"]{--cols:minmax(0,1.6fr) 34px minmax(0,1fr) 158px}
+}
+@media(min-width:761px) and (max-width:1100px){
+  .panel-root .crm-page-stack .crm-data-table[data-cols="ops-archive"] tbody tr{grid-template-columns:minmax(200px,1.5fr) repeat(3,minmax(110px,.8fr))}
+  .panel-root .crm-page-stack .crm-data-table[data-cols="ops-archive"] tbody td.crm-table-actions{grid-column:2/-1;grid-row:auto;justify-content:flex-end}
+}
+@media(max-width:1100px){
+  .panel-root .crm-page-stack .crm-data-table[data-cols="ops-archive"] tbody td[data-label]:nth-child(2)::before{display:block}
+}
+/* Durum hücresi: rozet + "Arşivle" */
+.panel-root .crm-page-stack .crm-data-table td.ops-status-cell{gap:6px}
+.panel-root .ops-archive-form{margin:0}
+.panel-root .ops-archive-btn{display:inline-flex;align-items:center;gap:5px;min-height:28px;padding:3px 11px 3px 9px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink-soft);font:inherit;font-size:12px;font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color .18s ease,border-color .18s ease,color .18s ease}
+.panel-root .ops-archive-btn:hover{border-color:color-mix(in srgb,var(--primary) 45%,var(--line));background:var(--accent-soft);color:var(--accent-strong)}
+.panel-root .ops-ready-hint{color:var(--success);font-size:11.5px;font-weight:650}
+/* Arşiv satırı: "Arşivden çıkar" */
+.panel-root .crm-page-stack .crm-data-table td.ops-row-actions form{margin:0}
+.panel-root .ops-unarchive-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,var(--surface-raised),var(--surface-2));color:var(--ink);font:inherit;font-size:12.5px;font-weight:650;white-space:nowrap;cursor:pointer;box-shadow:var(--shadow-sm);transition:border-color .18s ease,color .18s ease}
+.panel-root .ops-unarchive-btn:hover{border-color:color-mix(in srgb,var(--primary) 45%,var(--line));color:var(--accent-strong)}
+@media(max-width:760px){
+  .panel-root .crm-page-stack .crm-data-table td.ops-row-actions form,
+  .panel-root .crm-page-stack .crm-data-table td.ops-row-actions .ops-unarchive-btn{width:100%}
+  .panel-root .ops-unarchive-btn{min-height:44px;font-size:14px}
+  .panel-root .ops-archive-btn{min-height:36px;padding-inline:14px;font-size:13px}
+}

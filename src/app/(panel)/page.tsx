@@ -9,6 +9,8 @@ import { Icon, type IconName } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
 import { KurulumRehberi } from "@/components/panel/kurulum-rehberi";
 import { ayarlardanOlgular, kurulumDurumu } from "@/lib/kurulum-adimlari";
+// Eski ana ekran dili (dash-*); sayfa yeni kalıba geçince kalkacak. Yerleşimde dururken ArvoOS'un genel bakış CSS'iyle (aynı sınıf adları) çakışıyordu.
+import "./dashboard.css";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });

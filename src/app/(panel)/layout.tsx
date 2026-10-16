@@ -20,7 +20,10 @@ import "./panel-tokens.css";
 import "@/components/os/os-tokens.css";
 import "./design.css";
 import "./panel.css";
-import "./dashboard.css";
+// ArvoOS'un sayfa ilkelleri (düğme, kart, rozet, tablo, iskelet): yeni sayfalar bunlarla yazılıyor.
+import "@/components/os/panel-page-system.css";
+import "@/components/os/panel-ui.css";
+import "@/components/os/panel-tables.css";
 import "./activity.css";
 import "@/components/os/os-motion.css";
 import "@/components/os/os-shell.css";

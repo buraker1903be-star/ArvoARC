@@ -1,0 +1,61 @@
+.panel-drawer-root .panel-drawer{--drawer-gutter:30px}
+.panel-drawer-root .panel-drawer .panel-drawer-header{position:relative!important;display:block!important;box-sizing:border-box;width:100%;min-height:112px;padding:26px 82px 22px var(--drawer-gutter)!important;background:var(--surface);text-align:left}
+.panel-drawer-root .panel-drawer .panel-drawer-header>div{display:block!important;width:100%;min-width:0;margin:0!important;padding:0!important;text-align:left}
+.panel-drawer-root .panel-drawer .panel-drawer-header .panel-kicker{display:block;margin:0 0 9px!important;text-align:left}
+.panel-drawer-root .panel-drawer .panel-drawer-header h2{max-width:100%;margin:0!important;font-size:22px!important;line-height:1.2!important;text-align:left;overflow-wrap:anywhere}
+.panel-drawer-root .panel-drawer .panel-drawer-header p{max-width:100%;margin:9px 0 0!important;font-size:13px;line-height:1.55;text-align:left}
+.panel-drawer-root .panel-drawer .panel-drawer-close{position:absolute!important;top:24px!important;right:var(--drawer-gutter)!important;left:auto!important;flex:0 0 auto;margin:0!important;transform:none!important}
+.panel-drawer-root .panel-drawer .panel-drawer-body{box-sizing:border-box;padding-left:var(--drawer-gutter)!important;padding-right:var(--drawer-gutter)!important;overscroll-behavior:contain}
+/* Kaydet çubuğu gövdenin kenarına kadar uzanır. Kenar payı eskiden 30px,
+   çubuğun taşması 20px'ti (621–760px): çubuk iki yanda boşluk bırakıyordu. */
+.panel-drawer-root .panel-drawer .panel-drawer-body:has(>form>.panel-form-actions:last-child,>.panel-form>.panel-form-actions:last-child){padding-bottom:0}
+.panel-drawer-root .panel-drawer .panel-drawer-body .panel-form-actions{margin-inline:calc(var(--drawer-gutter) * -1);padding-inline:var(--drawer-gutter)}
+@media(max-width:620px){.panel-drawer-root .panel-drawer{--drawer-gutter:20px}.panel-drawer-root .panel-drawer .panel-drawer-header{min-height:98px;padding:20px 66px 18px var(--drawer-gutter)!important}.panel-drawer-root .panel-drawer .panel-drawer-header h2{font-size:19px!important;line-height:1.25!important}.panel-drawer-root .panel-drawer .panel-drawer-close{top:18px!important}.panel-drawer-root .panel-drawer .panel-drawer-header p{font-size:13px}}
+
+/* ============================================================
+   TELEFONDA ALTTAN AÇILAN SAYFA (iOS sheet), ≤760px
+   Ortada açılan pencere telefonda tam genişlikte, alttan kayan bir
+   sayfaya döner: tutma çizgisi, yuvarlak üst köşeler, ev çubuğu payı,
+   gövdede momentum kaydırma ve altta yapışık kaydet çubuğu.
+   Açıkken transform:none — içerideki fixed öğeler hapsolmaz.
+   ============================================================ */
+@media(max-width:760px){
+  .panel-root .panel-drawer-root{align-items:flex-end;justify-content:stretch;padding:max(10px,env(safe-area-inset-top)) 0 0;transition:visibility 0s linear .45s}
+  .panel-root .panel-drawer-root.open{transition:visibility 0s}
+  .panel-root .panel-drawer-backdrop{background:rgba(4,12,24,.46);-webkit-backdrop-filter:none;backdrop-filter:none}
+  .panel-root .panel-drawer-root .panel-drawer{
+    --drawer-gutter:20px;
+    width:100%;max-width:none;max-height:calc(100dvh - max(10px,env(safe-area-inset-top)) - 6px);
+    border:0;border-radius:22px 22px 0 0;opacity:1;
+    box-shadow:0 -16px 48px rgba(4,14,28,.26);
+    transform:translateY(104%);
+    transition:transform .5s cubic-bezier(.32,.72,0,1)
+  }
+  .panel-root .panel-drawer-root.open .panel-drawer{transform:none}
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-header{min-height:0;padding:24px 64px 14px var(--drawer-gutter)!important;border-bottom:1px solid var(--line-soft);background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none}
+  /* Tutma çizgisi */
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-header::before{content:"";position:absolute;top:8px;left:50%;width:38px;height:5px;margin-left:-19px;border-radius:999px;background:color-mix(in srgb,var(--muted) 40%,transparent)}
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-header .panel-kicker{margin-bottom:6px!important}
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-header h2{font-size:20px!important;line-height:1.2!important}
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-header p{margin-top:6px!important}
+  /* Yuvarlak iOS kapat düğmesi; dokunma alanı 44px */
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-close{top:20px!important;right:16px!important;display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:50%;background:var(--surface-2);color:var(--muted);font-size:20px}
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-close::after{content:"";position:absolute;inset:-6px}
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-body{padding-top:18px;padding-bottom:calc(24px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-body:has(>form>.panel-form-actions:last-child,>.panel-form>.panel-form-actions:last-child){padding-bottom:0}
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-body .panel-form{grid-template-columns:minmax(0,1fr)}
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-body .panel-form .wide{grid-column:auto}
+  /* Kaydet çubuğu: altta yapışık, buzlu, ev çubuğu payıyla */
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-body .panel-form-actions{
+    position:sticky;bottom:0;z-index:4;display:flex;gap:8px;
+    margin:16px calc(var(--drawer-gutter) * -1) 0;padding:12px var(--drawer-gutter) calc(12px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);background:color-mix(in srgb,var(--surface) 92%,transparent);
+    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)
+  }
+  .panel-root .panel-drawer-root .panel-drawer .panel-drawer-body .panel-form-actions>*{flex:1 1 0;min-height:48px;justify-content:center}
+}
+@media(max-width:760px) and (prefers-reduced-motion:reduce){
+  .panel-root .panel-drawer-root .panel-drawer{transition:none}
+}
+/* Geniş pencere (PanelDrawer genis): içinde liste olan formlar. Telefonda zaten tam genişlik. */
+.panel-drawer-root .panel-drawer.is-genis{width:min(960px,100%)}

@@ -14,6 +14,8 @@ function waitingFor(createdAt:string,now:number){
   return hours<24?`${hours} saattir`:`${Math.floor(hours/24)} gündür`;
 }
 import "../modules.css";
+// Eski ana ekran dili (dash-*); sayfa yeni kalıba geçince kalkacak. Yerleşimde dururken ArvoOS'un genel bakış CSS'iyle (aynı sınıf adları) çakışıyordu.
+import "../dashboard.css";
 
 
 type ProductMeta={image_paths?:string[];images?:string[];images_migrated?:boolean};

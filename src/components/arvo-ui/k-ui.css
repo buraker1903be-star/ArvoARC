@@ -1,0 +1,293 @@
+/* ============================================================
+   KONSOL = PANEL (konsol-ui.tsx). Panelin liste kartı ve tablosu
+   (.talep-tablo .crm-data-table, kayit-detay.css) olduğu gibi
+   kullanılıyor; burada yalnızca kartın başlık satırı ve konsolun
+   tek başına duran (ızgara dışındaki) kartlarının iç boşluğu var.
+   Renkler yalnızca panel-tokens.css'ten.
+   ============================================================ */
+
+/* Izgaranın dışındaki kart da panel kartı kadar iç boşluk alır: tablo
+   kenara yaslanmak için bu boşluğun eksisini kullanıyor (.talep-tablo). */
+.os-root .k-kart{padding:var(--sp-5);min-width:0}
+.os-root .k-kart+.k-kart{margin-top:var(--sp-4)}
+
+.k-kart-bas{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-3);margin-bottom:var(--sp-3)}
+.k-kart-bas h2{margin:0;color:var(--ink);font-size:var(--fs-md);font-weight:var(--fw-semibold)}
+/* Açıklama TEK SATIR (kompakt): sığmazsa üç nokta, tamamı title'da. */
+.k-kart-bas>div{min-width:0}
+/*
+  AÇIKLAMA İKİ SATIR (15.10.2026). Kart açıklaması tek satıra kırpılıyor,
+  tamamı yalnızca fareyle üstüne gelince görünüyordu (14.10'daki kompaktlık
+  kararı). Ölçünce kırpmanın bedeli göründü: Sağlık sayfasında 1440
+  pikselde SEKİZ açıklamanın SEKİZİ de kesikti, Aboneler'de dar bir kartta
+  732 piksellik bir cümle 138 piksel genişlikte duruyordu — cümlenin beşte
+  biri. Kaçış yolu da (title) fare ipucu: telefonda ve tabletta, yani
+  genişliğin en dar olduğu yerde, hiç yok.
+
+  İki satır: Sağlık'ta sekiz açıklamanın yedisi tamamlandı, sayfa 2856'dan
+  2991'e çıktı (yüzde beş). Rozetin başlıkla aynı satırda durması
+  değişmedi — kart başlığının düzenine dokunulmadı.
+*/
+.k-kart-bas p{margin:2px 0 0;max-width:72ch;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:var(--muted);font-size:var(--fs-micro);line-height:1.4}
+.k-kart-sag{flex:none;display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
+
+/* Kartın son öğesi tabloysa kartın alt kenarına yaslanır (panel listesi gibi). */
+.os-root .k-kart>.k-tablo:last-child{margin-bottom:calc(var(--sp-5) * -1)}
+.os-root .k-kart>.k-tablo+.k-not{margin-top:var(--sp-5)}
+
+.k-bos{padding:var(--sp-6) var(--sp-4)}
+
+/* Sade not. Bilgi notu kutusuz, küçük ve soluk (sayfa metni kalabalık
+   değil); uyarı ve tehlike solda ince renk çizgisiyle, kutu yine sade. */
+.k-not{margin:var(--sp-2) 0 0;padding:0;color:var(--muted);font-size:var(--fs-micro);line-height:1.5}
+.k-not:is([data-ton="uyari"],[data-ton="tehlike"],[data-ton="basari"]){padding:var(--sp-2) var(--sp-3);border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink-soft);box-shadow:inset 3px 0 0 var(--warning)}
+.k-not[data-ton="tehlike"]{box-shadow:inset 3px 0 0 var(--danger)}
+.k-not[data-ton="basari"]{box-shadow:inset 3px 0 0 var(--success)}
+
+/* Kart içi sayı ve kısa metin sütunları sağa değil, panel gibi sola. */
+.os-root .k-tablo .crm-data-table td.k-sayi{font-variant-numeric:tabular-nums;white-space:nowrap}
+.os-root .k-tablo .crm-data-table td.k-sessiz{color:var(--muted);font-size:var(--fs-micro)}
+
+@media (max-width:760px){
+  .os-root .k-kart{padding:var(--sp-4)}
+  .os-root .k-kart>.k-tablo:last-child{margin-bottom:calc(var(--sp-4) * -1)}
+  .k-kart-bas{flex-wrap:wrap}
+}
+
+/* Kimlik hücresi: baş harf avatarı + başlık/alt bilgi (İşler'deki sorumlu
+   avatarının karşılığı). Satıra tıklama bağlantısı metnin üstünde. */
+.os-root .talep-tablo .crm-data-table tbody td.k-kimlik{white-space:nowrap}
+.os-root .talep-tablo .crm-data-table tbody td.k-kimlik>.k-avatar{display:inline-grid;place-items:center;width:30px;height:30px;margin-right:var(--sp-3);border-radius:9px;background:var(--primary-soft);color:var(--primary-strong);font-size:11px;font-style:normal;font-weight:var(--fw-semibold);letter-spacing:.02em;vertical-align:middle}
+.os-root .talep-tablo .crm-data-table tbody td.k-kimlik>.k-kimlik-metin{display:inline-flex;flex-direction:column;vertical-align:middle;max-width:calc(100% - 44px)}
+.os-root .talep-tablo .crm-data-table tbody td.k-kimlik .crm-row-link{margin:0;padding:0;border-radius:0}
+.os-root .talep-tablo .crm-data-table tbody td.k-kimlik .crm-row-link:hover{background:transparent}
+.os-root .talep-tablo .crm-data-table tbody td.k-kimlik .crm-table-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+
+/* ============================================================
+   iOS LİSTESİ (KListe / KOge)
+   ============================================================ */
+.os-root .talep-tablo.k-ios-kap{overflow-x:hidden}
+/* .panel-card :is(ul,ol) listelere sol boşluk veriyor; burada kenara yaslı. */
+.os-root .panel-card .k-ios{margin:0;padding:0;list-style:none}
+.k-ios-ic{position:relative;display:flex;align-items:center;gap:var(--sp-3);min-height:60px;padding:10px var(--sp-5);color:inherit;font-weight:400;text-decoration:none;transition:background-color .15s ease}
+/* Bağlantı satırı ince yazıyla: genel ".panel-card a" kuralı (800) tek
+   sınıflı .k-ios-ic kuralından sonra yüklendiğinde satırın bütün yazısı —
+   alt satır, "aylık", "yenileme" dahil — kalın çıkıyordu (14.10.2026). */
+.os-root .panel-card a.k-ios-ic{font-weight:400}
+a.k-ios-ic:hover{background:var(--surface-2)}
+a.k-ios-ic:focus-visible{outline:none;background:var(--surface-2);box-shadow:inset 3px 0 0 var(--primary)}
+/* Ayraç metnin başından: iOS'taki gibi simgenin altından geçmiyor. */
+.k-ios-oge+.k-ios-oge>.k-ios-ic::before{content:"";position:absolute;top:0;right:0;left:var(--sp-5);height:1px;background:var(--line-soft)}
+.k-ios-oge+.k-ios-oge>.k-ios-ic:has(>.k-ios-simge)::before{left:calc(var(--sp-5) + 36px + var(--sp-3))}
+
+.k-ios-simge{
+  --k-on:var(--primary-soft);--k-yazi:var(--primary-strong);
+  flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:10px;
+  background:var(--k-on);color:var(--k-yazi);font-size:12px;font-weight:var(--fw-semibold);letter-spacing:.03em
+}
+.k-ios-simge[data-renk="1"]{--k-on:var(--info-soft);--k-yazi:var(--info)}
+.k-ios-simge[data-renk="2"]{--k-on:var(--success-soft);--k-yazi:var(--success)}
+.k-ios-simge[data-renk="3"]{--k-on:var(--warning-soft);--k-yazi:var(--warning)}
+.k-ios-simge[data-renk="4"]{--k-on:var(--surface-2);--k-yazi:var(--ink-soft)}
+.k-ios-simge[data-renk="5"]{--k-on:color-mix(in srgb,var(--info) 10%,var(--surface));--k-yazi:var(--primary)}
+
+.k-ios-govde{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.k-ios-baslik{overflow:hidden;color:var(--ink);font-size:14.5px;font-weight:var(--fw-semibold);letter-spacing:-.01em;line-height:1.3;text-overflow:ellipsis;white-space:nowrap}
+.k-ios-alt{overflow:hidden;color:var(--muted);font-size:12.5px;font-weight:400;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+/* Özetteki e-posta/telefon bağlantısı: genel ".panel-card a" kuralı (800,
+   vurgu rengi) onu kalın ve renkli yapıyordu; satırın asıl bilgisi
+   değil, özetin parçası (14.10.2026). */
+.os-root .panel-card .k-ios-alt a{color:inherit;font-weight:inherit;text-decoration:none}
+.os-root .panel-card .k-ios-alt a:hover{color:var(--primary);text-decoration:underline}
+
+/* Durum: kenarlıksız, renkli nokta + metin (iOS'un sade rozeti). */
+.k-ios-durum{--k-ton:var(--dim);flex:none;display:inline-flex;align-items:center;gap:6px;min-width:96px;color:var(--ink-soft);font-size:12.5px;font-weight:var(--fw-medium);white-space:nowrap}
+.k-ios-durum::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--k-ton)}
+.k-ios-durum[data-ton="success"]{--k-ton:var(--success)}
+.k-ios-durum[data-ton="warning"]{--k-ton:var(--warning)}
+.k-ios-durum[data-ton="danger"]{--k-ton:var(--danger);color:var(--danger)}
+.k-ios-durum[data-ton="info"]{--k-ton:var(--info)}
+
+/* Değer sütunu sabit genişlikte: "yenileme 16.08.2027" gibi uzun bir alt
+   yazı sütunu genişletince durum rozeti o satırda sola kayıyor, sütunlar
+   satırdan satıra hizasız görünüyordu. */
+.k-ios-deger{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:1px;min-width:136px;text-align:right}
+.k-ios-deger b{color:var(--ink);font-size:14px;font-weight:var(--fw-semibold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.k-ios-deger small{color:var(--muted);font-size:11.5px;white-space:nowrap}
+.k-ios-deger .k-ios-eksik{color:var(--warning);font-weight:var(--fw-medium)}
+/*
+  SAYI DEĞİL ETİKET OLAN DEĞER (15.10.2026, kurum sahibinin tespiti).
+
+  Değer yuvası satırın sayısı için kurulu: koyu ink, yarı kalın, tabular
+  rakam. Kullanıcılar listesinde oraya kişinin ROLÜ düşüyor ("Operasyon
+  Personeli") ve satırda yan yana iki kalın metin kalıyordu — hangisinin
+  ad olduğu bir an karışıyor.
+
+  Sönükleştirme çağrı yerinde işaretleniyor, yuvanın kendisinde değil:
+  aynı yuva Müşteriler'de tutarı, Fiyatlar'da ücreti taşıyor ve orada
+  kalın olması doğru.
+*/
+.k-ios-deger b .k-ios-sessiz{color:var(--ink-soft);font-weight:400}
+/* Değer metin de olabilir (müşteri detayında e-posta, unvan): uzunsa
+   başlığı ezmesin, kendi içinde kısalsın. Bağlantı panel rengiyle. */
+.k-ios-deger{max-width:62%}
+.k-ios-deger b{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.k-ios-deger a{color:var(--primary);font-weight:var(--fw-medium);text-decoration:none}
+.k-ios-deger a:hover{text-decoration:underline}
+/* Özetin altındaki küçük rozetler (ürünler): sade, durum renginde. */
+.k-ios-etiketler{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.k-ios-etiket{--k-on:var(--surface-2);--k-yazi:var(--ink-soft);padding:1px 7px;border-radius:var(--r-pill);background:var(--k-on);color:var(--k-yazi);font-size:11px;font-weight:var(--fw-medium);line-height:1.6;white-space:nowrap}
+.k-ios-etiket[data-ton="success"]{--k-on:var(--success-soft);--k-yazi:var(--success)}
+.k-ios-etiket[data-ton="warning"]{--k-on:var(--warning-soft);--k-yazi:var(--warning)}
+.k-ios-etiket[data-ton="danger"]{--k-on:var(--danger-soft);--k-yazi:var(--danger)}
+.k-ios-etiket[data-ton="info"]{--k-on:var(--info-soft);--k-yazi:var(--info)}
+.k-ios-ok{flex:none;color:var(--dim)}
+.k-ios-sonu{flex:none;display:inline-flex;align-items:center;gap:var(--sp-2)}
+
+/*
+  ÖZET TAM GENİŞLİKTE: SINIR 900, 760 DEĞİL (15.10.2026).
+
+  Kural önce telefon bloğuna yazılmıştı. 820 pikselde (iPad dikey)
+  ölçüldüğünde beş özetin beşi hâlâ kırpıktı ve metnin ancak %45'i
+  görünüyordu: o genişlikte liste iki sütuna bölünüyor, listeye 500
+  piksel kalıyor ve özete 128. Yani "telefon mu değil mi" yanlış ölçüt;
+  belirleyici olan SATIRIN kendi genişliği.
+
+  Doğrusu kapsayıcı sorgusu (@container) olurdu ama bu depoda hiç
+  kullanılmıyor ve masaüstündeki dar sütunlarda alt satırlı liste yok:
+  1280 ve 1600 pikselde kırpılma sıfır. Yeni bir mekanizma getirmek
+  yerine sınır, dosyanın kendi tablet eşiğine (900 — açılır pencere de
+  onu kullanıyor) çekildi.
+
+  Telefona özgü olanlar 760'ta kaldı: eksi kenar boşlukları, durumun
+  yalnızca noktaya inmesi, satır formunun en alta gitmesi.
+*/
+@media (max-width:900px){
+  .k-ios-ic{flex-wrap:wrap;row-gap:3px}
+  .k-ios-govde{display:contents}
+  /*
+    BAŞLIK DA İKİ SATIR (15.10.2026). Satır başlığı tek satıra kırpılıyor,
+    tamamı yalnızca title ile (fareyle üstüne gelince) okunuyordu —
+    dokunmatikte böyle bir şey yok. Ölçüldüğünde 366 pikselde seksen
+    harflik bir kurum adının %43'ü gizliydi; "… Anonim Şirketi" ile biten
+    adlar bu üründe olağan ve iki kurumu birbirinden ayıran parça tam da
+    kesilen yerde olabiliyor. İki satır: uzun ad tamamen görünüyor
+    (satır 161'den 180 piksele), kısa adlı satır 115 pikselde kalıyor —
+    yani bugünkü listede hiçbir şey değişmiyor. Alt satır (.k-ios-alt)
+    zaten aynı kuralla iki satır.
+  */
+  .k-ios-baslik{
+    flex:1 1 auto;min-width:0;
+    white-space:normal;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .k-ios-alt{
+    flex:1 1 100%;order:10;
+    padding-left:calc(36px + var(--sp-3));
+    white-space:normal;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .k-ios-etiketler{flex:1 1 100%;order:11;margin-top:0;padding-left:calc(36px + var(--sp-3))}
+  .k-ios-ic:not(:has(>.k-ios-simge))>.k-ios-alt,
+  .k-ios-ic:not(:has(>.k-ios-simge))>.k-ios-etiketler{padding-left:0}
+}
+
+@media (max-width:760px){
+  /* Telefonda .talep-tablo eksi kenar boşluğunu bırakıyor; liste yine kartın
+     kenarına yaslansın (liste kartı sp-5, tek başına kart sp-4 iç boşluklu). */
+  .os-root .talep-bilgi>.talep-tablo.k-ios-kap{margin:0 calc(var(--sp-5) * -1) calc(var(--sp-5) * -1)}
+  .os-root .k-kart>.talep-tablo.k-ios-kap{margin:0 calc(var(--sp-4) * -1) calc(var(--sp-4) * -1)}
+  .k-ios-ic{padding:10px var(--sp-4)}
+  .k-ios-deger small{display:none}
+  /* Satırın kendi formu (fiyat taslağı, deneme süresi…) telefonda alt
+     satıra iner: yan yana sıkışınca başlık okunmaz oluyordu. */
+  .k-ios-ic:has(>.k-ios-sonu){flex-wrap:wrap}
+  .k-ios-sonu{flex-basis:100%;display:flex;flex-wrap:wrap;gap:var(--sp-2);padding-left:calc(36px + var(--sp-3))}
+  .k-ios-ic:not(:has(>.k-ios-simge))>.k-ios-sonu{padding-left:0}
+  /*
+    ÖZET SATIRI TELEFONDA TAM GENİŞLİKTE (15.10.2026).
+
+    Başlık, özet ve çipler tek bir sütunun (.k-ios-govde) içindeydi;
+    satırın geri kalanını durum, değer ve ok paylaşıyordu. 375 pikselde
+    o sütuna 131 piksel kalıyor ve özet oraya sığmıyordu: Müşteriler
+    listesinde BEŞ SATIRIN BEŞİ de kırpıktı ve yazının yalnızca dörtte
+    biri görünüyordu (524 piksellik metinden 131). Kurucu "Grup markası
+    · Özel …" görüyordu; paketi, kullanıcı sayısı, telefonu hiç yoktu.
+    Sağlık ekranında 10 satırın 6'sı, Ücret ve Paketler'de 5'in 3'ü aynı
+    durumdaydı — fiyat kodu (arvoos-baslangic) kesiliyordu.
+
+    Önce özeti iki satıra açmak denendi: sütun zaten dar olduğu için
+    beşi de kırpık kaldı, satır yalnızca uzadı (82 → 99 piksel). Sorun
+    satır sayısı değil, SÜTUNUN GENİŞLİĞİ.
+
+    display:contents gövdeyi aradan çıkarıyor: başlık, özet ve çipler
+    satırın doğrudan çocukları oluyor. Böylece başlık değerle aynı
+    satırda kalıyor (asıl taranan ikisi), özet ve çipler ALTTA tam
+    genişlik alıyor — 131 yerine 317 piksel. İki satırla sınırlı:
+    sınırsız bırakılınca en uzun satır üçe çıkıp listeyi 132 piksele
+    şişiriyordu; iki satırda hepsi tek tip 115 piksel.
+
+    Girintiyi simgenin varlığı belirler. Simgesiz satırlarda (Ücret ve
+    Paketler) 48 piksel girinti başlığı solda, özeti içeride bırakıyor
+    ve ikisi hizasız görünüyordu — aynı koruma .k-ios-sonu'da da var.
+  */
+  /* Satırın kendi formu en altta kalsın: özet ve çipler ondan önce.
+     Yalnızca telefonda: 760'ın üstünde form zaten satıra sığıyor. */
+  .k-ios-sonu{order:12}
+  .k-ios-oge+.k-ios-oge>.k-ios-ic::before{left:var(--sp-4)}
+  .k-ios-oge+.k-ios-oge>.k-ios-ic:has(>.k-ios-simge)::before{left:calc(var(--sp-4) + 36px + var(--sp-3))}
+  /* Telefonda durum yalnızca nokta: metin değerin altında yer kaplamasın. */
+  .k-ios-durum{min-width:0;font-size:0;gap:0}
+  .k-ios-deger{min-width:0}
+}
+
+/* İkinci süzgeç satırı (ürün + sıralama): ilk satırın hemen altında, ince
+   bir ayraçla iki grup. */
+.os-root .ekip-suzgec.k-ikinci-suzgec{margin-top:calc(var(--sp-2) * -1);padding-top:0;border-top:0}
+.k-suzgec-ayrac{flex:none;align-self:center;width:1px;height:18px;margin:0 var(--sp-1);background:var(--line)}
+
+/*
+  TELEFONDA SÜZGEÇ RAYI (15.10.2026).
+
+  Konsolun liste sayfalarında süzgeç çipleri sarmalanıyordu: 375 piksel
+  ekranda Müşteriler'in iki süzgeç bloğu 246 piksel yer kaplıyor,
+  başlık ve şeritle birlikte 812 pikselin 720'si ilk müşteri satırından
+  ÖNCE tükeniyordu — telefonda listeyi açınca liste görünmüyordu.
+
+  Çipler artık tek sıra, yatay kaydırılabilir bir ray (telefon
+  uygulamalarının alışılmış kalıbı). Kaydırma çubuğu gizli; dokunmatikte
+  zaten parmakla kaydırılıyor, farede ray görünmüyor çünkü bu kural
+  yalnızca dar ekranda.
+
+  ARAMA KUTUSU RAYIN İÇİNDE DEĞİL. Masaüstünde çiplerle aynı satırda
+  duruyor ve orası doğru; bu yüzden çipler `display:contents` olan bir
+  sarmalayıcıya alındı: geniş ekranda sarmalayıcı yokmuş gibi davranıyor
+  (çipler doğrudan flex çocuğu kalıyor), dar ekranda ray oluyor ve form
+  kendi satırına iniyor.
+*/
+@media (max-width:760px){
+  .os-root main.plt .suzgec-ray{
+    display:flex;flex:1 1 100%;min-width:0;gap:inherit;
+    flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  }
+  .os-root main.plt .suzgec-ray::-webkit-scrollbar{display:none}
+  /*
+    ÇİP YÜKSEKLİĞİ 44 (15.10.2026). Süzgeç çipleri 32 pikseldi ve
+    konsolun telefondaki birincil süzme aracı onlar. Kısa hedef yatay
+    KAYAN bir rayda iki kat zor: parmak kaymayla dokunmayı karıştırıyor,
+    yanlış süzgeç açılıyor.
+
+    Görünmez bir katman yerine çipin kendisi büyüdü — hedef neyse
+    görünen de o olsun; sonradan bakan biri "neden burası tıklanıyor"
+    diye sormasın. Önce 40 denendi (rayın altındaki arama kutusuna 4
+    piksel kalıyor diye); oysa gerçek yükseklik değişince düzen kendisi
+    akıyor ve kutu aşağı iniyor, çakışma olmuyor. 44 hem kılavuzun
+    değeri hem de arama kutusunun yüksekliği: telefonda bütün
+    kontroller tek boya geliyor. Bedeli süzgeç satırı başına 12 piksel.
+  */
+  .os-root main.plt .suzgec-ray>*{flex:0 0 auto;min-height:44px}
+  .os-root main.plt .ekip-suzgec>.talep-ara{flex:1 1 100%;min-width:0}
+}
+/* Geniş ekranda sarmalayıcı yokmuş gibi: çipler doğrudan flex çocuğu. */
+.suzgec-ray{display:contents}

@@ -1,0 +1,239 @@
+/* ============================================================
+   ArvoOS Panel — Page System (dashboards, drawers, secondary UI)
+   ============================================================ */
+
+.panel-secondary{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font-size:13px;font-weight:800;cursor:pointer;transition:.18s ease}
+.panel-secondary:hover{border-color:color-mix(in srgb, var(--primary) 45%, var(--line));background:var(--surface-2)}
+
+.metric-strip-five{grid-template-columns:repeat(5,minmax(0,1fr));margin-top:0}
+.metric-strip-five article{min-width:0}
+
+.dashboard-grid{margin-top:18px}
+.section-heading.compact{margin-bottom:18px}
+.section-heading.compact h2{font-size:19px}
+.dashboard-actions{display:grid;gap:8px}
+.dashboard-actions a{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:750;text-decoration:none;transition:.18s ease}
+.dashboard-actions a:hover{border-color:color-mix(in srgb, var(--primary) 40%, var(--line));background:var(--primary-soft)}
+.dashboard-actions b{min-width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:var(--primary-soft);color:var(--primary);font-size:13px}
+.dashboard-summary-number{margin:16px 0 8px;font:750 46px/1 var(--font-heading);letter-spacing:-.05em;color:var(--ink)}
+.panel-text-link{display:inline-flex;margin-top:12px;color:var(--primary);font-size:13px;font-weight:800;text-decoration:none}
+
+.panel-form-actions{display:flex;justify-content:flex-end;padding-top:2px}
+
+.crm-create{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.crm-create summary{display:flex;align-items:center;justify-content:space-between;gap:16px;cursor:pointer;list-style:none;padding:20px 22px}
+.crm-create summary::-webkit-details-marker{display:none}
+.crm-create summary span{font:700 15px var(--font-heading);color:var(--ink)}
+.crm-create summary small{color:var(--muted);font-size:12px}
+.crm-create[open] summary{padding-bottom:18px;margin-bottom:0;border-bottom:1px solid var(--line)}
+.crm-create .panel-form{padding:0 22px 22px}
+
+.panel-pagehead h1{max-width:760px}
+.panel-pagehead p{max-width:720px;line-height:1.55}
+.panel-primary,.panel-secondary{white-space:nowrap}
+.panel-table th{font-weight:800;letter-spacing:.04em}
+.panel-card{box-shadow:var(--shadow-sm)}
+.status-pill{white-space:nowrap}
+
+.panel-theme-toggle{font-size:15px;line-height:1;display:grid;place-items:center}
+
+/* ---------- Navigation progress bar (click feedback on page transitions) ---------- */
+.nav-progress{position:fixed;top:0;left:0;z-index:2000;height:3px;width:0;background:linear-gradient(90deg,var(--primary),var(--accent-bright));box-shadow:0 0 12px color-mix(in srgb, var(--primary) 70%, transparent);opacity:0;pointer-events:none;transition:width .16s ease,opacity .18s ease}
+.nav-progress.visible{opacity:1}
+.nav-progress-glow{position:absolute;top:0;right:0;width:70px;height:100%;background:linear-gradient(90deg,transparent,#fff9);filter:blur(1px);animation:navProgressShimmer 1s ease-in-out infinite}
+@keyframes navProgressShimmer{0%,100%{opacity:.5}50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.nav-progress{transition:none}.nav-progress-glow{animation:none}}
+
+/* ---------- Instant press feedback for buttons & primary links ---------- */
+.panel-primary:active,.panel-secondary:active,.panel-danger:active,.panel-icon-button:active,
+.hero-actions a:active,.workspace-switcher summary:active,.crm-card>button:active,
+.ops-add-step button:active,.ops-move button:active,.dashboard-actions a:active,
+.panel-quick-action:active,.status-pill:is(button):active{
+  transform:scale(.96);
+  filter:brightness(.97);
+  transition:transform .08s ease,filter .08s ease;
+}
+.panel-module a:active,.crm-column>header:active{opacity:.85}
+
+/* ---------- New customer setup wizard ---------- */
+.wizard{display:flex;flex-direction:column;gap:22px}
+.wizard-steps{display:flex;list-style:none;margin:0;padding:0;gap:6px;counter-reset:none}
+.wizard-steps li{flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--muted);font-size:12px;font-weight:800;white-space:nowrap;transition:.18s ease}
+.wizard-steps li span{width:20px;height:20px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--line);color:var(--muted);font-size:12px}
+.wizard-steps li.active{background:var(--primary-soft);color:var(--primary)}
+.wizard-steps li.active span{background:var(--primary);color:var(--primary-on)}
+.wizard-steps li.done{color:var(--muted)}
+.wizard-steps li.done span{background:var(--primary);color:var(--primary-on)}
+.wizard-step-intro{margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.6}
+.wizard-check{display:flex!important;align-items:center;gap:8px;font-weight:700!important}
+.wizard-check input{width:16px;height:16px;margin:0}
+.wizard-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0}
+.wizard-summary div{padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+.wizard-summary dt{color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.08em}
+.wizard-summary dd{margin:5px 0 0;color:var(--ink);font-size:13px;font-weight:700;overflow-wrap:anywhere}
+.wizard-nav{display:flex;justify-content:space-between;align-items:center;padding-top:6px}
+.wizard-success{display:flex;align-items:flex-start;gap:14px;padding:18px 20px;margin-bottom:16px;border:1px solid color-mix(in srgb, var(--success) 30%, var(--line));border-radius:var(--r-lg);background:var(--success-soft)}
+.wizard-success>span{width:28px;height:28px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--success);color:#fff;font-weight:800}
+.wizard-success b{display:block;color:var(--ink);font-size:13px}
+.wizard-success p{margin:5px 0 0;color:var(--muted);font-size:13px;line-height:1.6}
+@media(max-width:620px){.wizard-steps{flex-wrap:wrap}.wizard-steps li{flex:1 1 calc(50% - 6px)}.wizard-summary{grid-template-columns:1fr}}
+
+/* ---------- Specificity guard: button-style links keep their own color
+   even when nested inside a card that styles plain <a> text links ---------- */
+.panel-primary:link,.panel-primary:visited,.panel-primary:hover,.panel-primary:active{color:var(--primary-on)}
+.panel-secondary:link,.panel-secondary:visited,.panel-secondary:hover,.panel-secondary:active{color:var(--ink)}
+.panel-danger:link,.panel-danger:visited,.panel-danger:hover,.panel-danger:active{color:var(--danger)}
+
+/* ---------- Slide-over drawer ---------- */
+.panel-drawer-root{position:fixed;inset:0;z-index:1000;pointer-events:none;visibility:hidden}
+.panel-drawer-root.open{pointer-events:auto;visibility:visible;z-index:1010}
+/* Açık çekmece ortadaki pencerenin (panel-modal, 1000) ÜSTÜNDE: cari penceresinin içinden
+   açılan Tahsilat/İade çekmecesi aynı katmanda pencerenin arkasında kalıyordu (2026-10). */
+.panel-drawer-backdrop{position:absolute;inset:0;border:0;background:rgba(6,13,25,.55);opacity:0;transition:opacity .24s ease}
+.panel-drawer-root.open .panel-drawer-backdrop{opacity:1}
+/* Sağdan kayan çekmece yerine ortada açılan pencere.
+   Konumlandırma flex ile: absolute + translate kombinasyonu
+   uzun formlarda pencereyi ekran dışına taşırıyordu. */
+.panel-drawer-root{display:flex;align-items:center;justify-content:center;padding:24px}
+.panel-drawer{position:relative;width:min(680px,100%);max-height:min(88dvh,900px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:0 32px 90px rgba(6,13,25,.34);overflow:hidden;opacity:0;transform:translateY(10px) scale(.97);transition:opacity .2s ease,transform .24s cubic-bezier(.2,.8,.3,1)}
+.panel-drawer-root.open .panel-drawer{opacity:1;transform:translateY(0) scale(1)}
+@media(prefers-reduced-motion:reduce){.panel-drawer{transition:opacity .12s ease;transform:none}.panel-drawer-root.open .panel-drawer{transform:none}}
+.panel-drawer-header{position:relative;z-index:5;flex:none;display:block;padding:28px 86px 22px 30px;border-bottom:1px solid var(--line);background:var(--surface)}
+.panel-drawer-header h2{margin:6px 0 0;font:750 26px var(--font-heading);letter-spacing:-.035em;color:var(--ink)}
+.panel-drawer-header p{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:1.6}
+.panel-drawer-close{position:absolute;top:26px;right:30px;width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:22px;line-height:1;cursor:pointer;transition:.18s ease}
+.panel-drawer-close:hover{border-color:var(--primary);color:var(--primary)}
+/* Taban boyu `auto`: gerekçe platform.css · .plt-pencere-govde. */
+.panel-drawer-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:26px 30px 38px}
+.panel-drawer-body .panel-form{grid-template-columns:1fr}
+.panel-drawer-body .panel-form .wide{grid-column:auto}
+.panel-drawer-body .panel-form-actions{position:sticky;bottom:-38px;margin:14px -30px -38px;padding:18px 30px;border-top:1px solid var(--line);background:var(--surface)}
+.panel-drawer-body .panel-form-actions .panel-primary{width:100%;justify-content:center}
+
+@media(max-width:1280px){
+  .metric-strip-five{grid-template-columns:repeat(3,1fr)}
+  .metric-strip-five article:nth-child(3){border-right:0}
+  .metric-strip-five article:nth-child(-n+3){border-bottom:1px solid var(--line)}
+}
+@media(max-width:900px){
+  .metric-strip-five{grid-template-columns:1fr 1fr}
+  .metric-strip-five article:nth-child(odd){border-right:1px solid var(--line)}
+  .metric-strip-five article:nth-child(even){border-right:0}
+  .metric-strip-five article{border-bottom:1px solid var(--line)}
+  .metric-strip-five article:last-child{grid-column:1/-1;border-right:0;border-bottom:0}
+}
+@media(max-width:620px){
+  .panel-page-actions{display:grid;grid-template-columns:1fr 1fr}
+  .panel-page-actions>*{width:100%;justify-content:center}
+  .metric-strip-five{grid-template-columns:1fr}
+  .metric-strip-five article,.metric-strip-five article:nth-child(odd){grid-column:auto;border-right:0}
+  .dashboard-summary-number{font-size:38px}
+  .crm-create summary{align-items:flex-start;flex-direction:column}
+  .panel-form-actions{justify-content:stretch}
+  .panel-form-actions .panel-primary{width:100%;justify-content:center}
+  .panel-drawer{width:100%;max-height:92dvh}
+  .panel-drawer-header{padding:22px 72px 18px 20px}
+  .panel-drawer-close{top:20px;right:20px}
+  .panel-drawer-body{padding:22px 20px 30px}
+  .panel-drawer-body .panel-form-actions{bottom:-30px;margin:12px -20px -30px;padding:16px 20px}
+}
+
+/* ---------- Shared horizontal tab bar (CRM, Operasyon, and any future module) ---------- */
+.module-tabs{display:inline-flex;margin-bottom:0;border:1px solid var(--line);border-bottom:0;border-radius:var(--r-sm) var(--r-sm) 0 0;background:var(--surface);overflow:hidden;position:relative;z-index:1}
+.module-tabs a{padding:9px 16px;font-size:13px;font-weight:800;color:var(--muted);text-decoration:none;white-space:nowrap;transition:.18s ease}
+.module-tabs a+a{border-left:1px solid var(--line)}
+.module-tabs a:hover{background:var(--surface-2);color:var(--ink)}
+.module-tabs a.active{background:var(--brand-700);color:#fff}
+.module-tab-panel{display:flex;flex-direction:column;gap:20px;padding-top:18px;border:1px solid var(--line);border-top:0;border-radius:0 var(--r-md) var(--r-md) var(--r-md);background:var(--surface-2);margin-bottom:20px}
+.module-tab-panel>section,.module-tab-panel>.section-heading,.module-tab-panel>.panel-pagehead,.module-tab-panel>.panel-card{margin-left:18px;margin-right:18px}
+.module-tab-panel>*:last-child{margin-bottom:18px}
+@media(max-width:620px){
+  .module-tabs{display:flex;width:100%}
+  .module-tabs a{flex:1;text-align:center;padding:9px 8px}
+  .module-tab-panel>section,.module-tab-panel>.section-heading,.module-tab-panel>.panel-pagehead,.module-tab-panel>.panel-card{margin-left:12px;margin-right:12px}
+}
+
+/* ---------- Özel alan adı (Ayarlar) ---------- */
+.domain-status-block{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.domain-status-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.domain-status-row>span:first-child{font-size:13px;font-weight:800;color:var(--ink)}
+.status-pill.domain-status-verified{background:var(--success-soft);color:var(--success)}
+.status-pill.domain-status-pending{background:var(--warning-soft);color:var(--warning)}
+.status-pill.domain-status-failed{background:var(--danger-soft);color:var(--danger)}
+.domain-dns-block{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
+.domain-dns-block>small{display:block;margin-bottom:8px;color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.1em}
+.domain-dns-table{width:100%;border-collapse:collapse;margin-bottom:10px}
+.domain-dns-table th,.domain-dns-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:12px;color:var(--ink)}
+.domain-dns-table th{color:var(--muted);font-size:11px;font-weight:800}
+.domain-dns-block>p{margin:8px 0;color:var(--muted);font-size:11px;line-height:1.5}
+
+/* ---------- Global panel loading skeleton (instant feedback while a page's data loads) ---------- */
+/*
+  PANEL HATA EKRANI (15.10.2026).
+
+  Kart satır içi stillerle kuruluyordu (maxWidth/margin/padding) ve
+  başlığı sınıfsız bir <h1>'di. Bu tasarım sisteminde başlıklar
+  varsayılan olarak sıfırlanmış — her bileşen kendi başlığını
+  biçimlendiriyor — dolayısıyla hata başlığı 14 piksel/400 ağırlıkta,
+  yani gövde yazısıyla AYNI çiziliyordu. Bir şeyin ters gittiğini
+  söyleyen ekranın en zayıf yazısı başlığıydı.
+
+  Boyut sayfa başlıklarıyla aynı (20px); telefonda kart kenar
+  boşlukları da daralıyor (32 piksel yan dolgu 351 piksellik kartta
+  fazla).
+*/
+.panel-hata{max-width:640px;margin:var(--sp-6) auto;padding:var(--sp-6)}
+.panel-hata h1{margin:var(--sp-2) 0 var(--sp-3);font-size:20px;font-weight:var(--fw-semibold);color:var(--ink)}
+.panel-hata pre{white-space:pre-wrap;font-size:var(--fs-sm)}
+@media (max-width:760px){
+  .panel-hata{margin:var(--sp-4) 0;padding:var(--sp-5) var(--sp-4)}
+}
+
+.panel-skeleton{display:flex;flex-direction:column;gap:20px}
+.skel{position:relative;overflow:hidden;border-radius:10px;background:var(--surface-2)}
+.skel:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,color-mix(in srgb, var(--surface) 60%, transparent),transparent);animation:skelShimmer 1.4s ease-in-out infinite}
+@keyframes skelShimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.skel-kicker{width:110px;height:9px}
+.skel-title{width:260px;height:28px;margin-top:6px}
+.skel-sub{width:340px;height:12px;margin-top:2px}
+.panel-skeleton-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:6px}
+.skel-card{height:96px;border-radius:14px}
+.skel-block{height:220px;border-radius:16px}
+@media(max-width:900px){.panel-skeleton-metrics{grid-template-columns:1fr 1fr}}
+/*
+  İSKELET SAYFANIN ŞEKLİNİ TAKLİT ETSİN (15.10.2026).
+
+  620 altında ölçü kutuları tek sütuna iniyordu: dört tane 96 piksellik
+  blok alt alta, iskeletin tamamı 931 piksel — telefon ekranından uzun.
+  Oysa gerçek sayfada o bölge TEK bir şerit kartı ve iki sütunlu, 158
+  piksel. Yani yüklenirken uzun bir blok dizisi görünüp sayfa gelince
+  birden kısalıyordu; her gezinmede göz kayması.
+
+  İki sütun + 62 piksellik kutular şeridin kendisine benziyor (136'ya
+  karşı 158) ve iskeletin tamamı 579 piksele iniyor. Liste blokları da
+  220'den 150'ye: telefonda kartlar daha kısa.
+*/
+@media(max-width:620px){
+  .panel-skeleton-metrics{grid-template-columns:1fr 1fr}
+  .panel-skeleton-metrics .skel-card{height:62px}
+  .panel-skeleton .skel-block{height:150px}
+  .skel-title{width:70%}
+  .skel-sub{width:90%}
+}
+@media(prefers-reduced-motion:reduce){.skel:after{animation:none}}
+
+/* ---------- Satır içi silme onayı (tarayıcı confirm() yerine, daha güvenilir) ---------- */
+.confirm-delete-inline{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:var(--danger-soft,var(--danger-soft));flex-wrap:wrap}
+.confirm-delete-inline small{color:var(--danger,var(--danger));font-size:11px;font-weight:700;max-width:220px}
+.confirm-delete-inline span{display:flex;gap:6px;flex:none}
+.confirm-delete-inline .panel-danger,.confirm-delete-inline .panel-secondary{min-height:26px;padding:0 9px;font-size:11px;white-space:nowrap}
+
+/* ---------- Genel işlem geri bildirimi: her buton/link tıklamasında
+   dönen halka + "Lütfen bekleyiniz" mesajı, kullanıcıya tıklamanın
+   algılandığını hemen hissettirir ---------- */
+.panel-action-feedback{position:fixed;inset:0;z-index:400;display:flex;align-items:flex-start;justify-content:center;padding-top:18vh;background:rgba(13,33,56,.12);backdrop-filter:blur(1px);animation:panel-feedback-fade .12s ease}
+.panel-action-feedback-card{display:flex;align-items:center;gap:12px;padding:14px 22px;border-radius:14px;background:var(--surface);box-shadow:0 12px 32px rgba(13,33,56,.22);font:700 12px var(--font-body);color:var(--ink)}
+.panel-action-feedback-ring{width:20px;height:20px;flex:none;border-radius:50%;border:2.5px solid var(--primary-soft);border-top-color:var(--primary);animation:panel-feedback-spin .7s linear infinite}
+@keyframes panel-feedback-spin{to{transform:rotate(360deg)}}
+@keyframes panel-feedback-fade{from{opacity:0}to{opacity:1}}
+@media(max-width:760px){.panel-action-feedback{padding-top:12vh}.panel-action-feedback-card{padding:12px 18px;font-size:13px}}

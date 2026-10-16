@@ -1,0 +1,62 @@
+/* ============================================================
+   PANELİN ORTASINDA AÇILAN PENCERE (panel-modal.tsx)
+
+   Çekmeceden (panel-drawer) farkı: içerik yalnızca açıkken basıldığı
+   için kapanma geçişi yok — açılışta tek yönlü bir animasyon var.
+   Bu bilinçli: geçişi korumak için kapalı pencereyi DOM'da tutmak,
+   müşteri mesajlarını kimse görmeden "okundu" saymak demekti.
+   ============================================================ */
+
+.panel-modal-root{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
+.panel-modal-backdrop{position:absolute;inset:0;border:0;background:rgba(6,13,25,.55);-webkit-backdrop-filter:blur(10px) saturate(120%);backdrop-filter:blur(10px) saturate(120%);animation:panel-modal-fade .22s ease both}
+.panel-modal{position:relative;display:flex;flex-direction:column;width:min(var(--modal-w,720px),100%);max-height:min(88dvh,940px);border:1px solid var(--line);border-radius:var(--r-xl);background:var(--surface);box-shadow:0 32px 90px rgba(6,13,25,.34);overflow:hidden;animation:panel-modal-in .26s cubic-bezier(.2,.8,.3,1) both}
+.panel-modal-root[data-boy="dar"]{--modal-w:560px}
+.panel-modal-root[data-boy="orta"]{--modal-w:720px}
+.panel-modal-root[data-boy="sohbet"]{--modal-w:780px}
+.panel-modal-root[data-boy="genis"]{--modal-w:940px}
+.panel-modal-root[data-boy="tam"]{--modal-w:1180px}
+/* "ekran": prim hesabı gibi hareket listesi + özet yan yana duran pencereler.
+   "tam" (1180) dizüstü ekranda iki sütunu sıkıştırıyordu; kenar boşluğu da daralıyor. */
+.panel-modal-root[data-boy="ekran"]{--modal-w:1480px;padding:16px}
+.panel-modal-root[data-boy="ekran"] .panel-modal{max-height:min(94dvh,1100px)}
+
+@keyframes panel-modal-fade{from{opacity:0}to{opacity:1}}
+@keyframes panel-modal-in{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+  .panel-modal{animation-duration:.12s;animation-name:panel-modal-fade}
+}
+
+.panel-modal-header{position:relative;z-index:5;flex:none;padding:24px 82px 20px 28px;border-bottom:1px solid var(--line);background:var(--surface)}
+.panel-modal-header h2{margin:6px 0 0;font:750 22px var(--font-heading);letter-spacing:-.03em;color:var(--ink);overflow-wrap:anywhere}
+.panel-modal-header p{margin:7px 0 0;color:var(--muted);font-size:13px;line-height:1.55}
+.panel-modal-close{position:absolute;top:22px;right:26px;width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:22px;line-height:1;cursor:pointer;transition:.18s ease}
+.panel-modal-close:hover{border-color:var(--primary);color:var(--primary)}
+/* Taban boyu `auto`: gerekçe platform.css · .plt-pencere-govde. */
+.panel-modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:22px 28px 28px}
+/*
+  SOHBET PENCERESİNDE TEK KAYDIRICI. Gövde de kayarken listenin de
+  kendi kaydırıcısı vardı: iç içe iki çubuk, ve yazma alanı listeyle
+  birlikte yukarı kaçıyordu. Sohbet varken gövde sabitleniyor,
+  kaydırma yalnızca listede kalıyor.
+*/
+.panel-modal-body:has(>.opd-sohbet){display:flex;flex-direction:column;overflow:hidden;padding-bottom:22px}
+.panel-modal-body:has(>.opd-kayit){display:flex;flex-direction:column;overflow:hidden;padding-bottom:22px}
+.panel-modal-root[data-boy="sohbet"] .panel-modal{height:min(88dvh,760px)}
+
+/* Pencere içindeki kart ikinci bir çerçeve çizmesin: pencere zaten kart. */
+.panel-modal-body>.opd-card,.panel-modal-body>.panel-card{padding:0;border:0;border-radius:0;background:none;box-shadow:none}
+
+/* ---------- Pencereyi açan düğme ---------- */
+.panel-modal-trigger-text{display:grid;gap:2px;min-width:0;text-align:left}
+.panel-modal-trigger-text small{color:inherit;font-size:11.5px;font-weight:600;opacity:.78}
+.panel-modal-trigger-rozet{display:grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--n-0);color:var(--danger);font-size:12px;font-style:normal;font-weight:800}
+
+@media(max-width:760px){
+  .panel-modal-root{align-items:flex-end;padding:max(10px,env(safe-area-inset-top)) 0 0}
+  .panel-modal{width:100%;max-width:none;max-height:calc(100dvh - max(10px,env(safe-area-inset-top)) - 6px);border:0;border-radius:22px 22px 0 0;animation-name:panel-modal-up}
+  .panel-modal-header{padding:22px 64px 16px 20px}
+  .panel-modal-header h2{font-size:20px}
+  .panel-modal-close{top:18px;right:16px;display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:var(--surface-2);color:var(--muted)}
+  .panel-modal-body{padding:18px 20px calc(24px + env(safe-area-inset-bottom))}
+  @keyframes panel-modal-up{from{transform:translateY(104%)}to{transform:none}}
+}
