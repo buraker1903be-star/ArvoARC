@@ -8,7 +8,7 @@ import { getStoreBrand, type StoreBrand } from "@/lib/store-brand";
 import { sendEmail } from "@/lib/email/resend";
 import { statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { isOrderClosed } from "@/lib/commerce-labels";
-import { nextOrderStep } from "@/lib/order-flow";
+import { ARSIVLENEBILIR_DURUMLAR, nextOrderStep } from "@/lib/order-flow";
 import { backUrl } from "@/lib/back-url";
 import { isBankTransfer } from "@/lib/payment-method";
 import { notifyTransferPaid } from "@/lib/email/transfer-paid";
@@ -449,4 +449,86 @@ export async function siparisleriSil(formData: FormData) {
   return await backTo(formData, {
     basari: `${silinen.length} sipariş silindi${hatalar.length ? ` · ${hatalar.length} sipariş silinemedi` : ""}.`,
   });
+}
+
+/*
+  SİPARİŞ ARŞİVİ (16.10.2026, migration 20261016124844). Arşiv bir
+  görünüm kararı: kayıt silinmiyor, ciro ve analitik saymaya devam
+  ediyor; yalnızca sipariş listesi arşivdekileri varsayılan olarak
+  göstermiyor. Kural (yalnızca kapanmış sipariş) veritabanında da var;
+  buradaki süzgeç kullanıcıya doğru sayıyı söylemek için.
+*/
+
+/* Bekleyen iade talebi olan sipariş arşive gitmez: talep ekibin önünde kalmalı. */
+async function iadeBekleyenler(supabase: Awaited<ReturnType<typeof requireTenant>>["supabase"], organizationId: string) {
+  const { data, error } = await supabase.from("arc_return_requests")
+    .select("order_id").eq("organization_id", organizationId).eq("status", "beklemede");
+  /* Okunamayan engel "engel yok" demek değil. */
+  if (error) throw new Error("İade talepleri okunamadı: " + error.message);
+  return [...new Set(((data ?? []) as { order_id: string }[]).map((r) => r.order_id))];
+}
+
+/** Listedeki "Tamamlananları arşivle": kapanmış bütün siparişler, tek seferde. */
+export async function tamamlananlariArsivle(formData: FormData) {
+  const { supabase, organization, membership, user } = await requireTenant();
+  if (!MANAGERS.includes(membership.role)) return await backTo(formData, { hata: hataMetni("forbidden") });
+  const haric = await iadeBekleyenler(supabase, organization.id);
+  let sorgu = supabase.from("arc_orders")
+    .update({ archived_at: new Date().toISOString(), archived_by: user.id })
+    .eq("organization_id", organization.id)
+    .is("archived_at", null)
+    .in("status", [...ARSIVLENEBILIR_DURUMLAR]);
+  if (haric.length) sorgu = sorgu.not("id", "in", `(${haric.join(",")})`);
+  const { data, error } = await sorgu.select("id");
+  if (error) return await backTo(formData, { hata: "Arşivlenemedi: " + error.message });
+  revalidatePath("/siparisler");
+  const adet = data?.length ?? 0;
+  return await backTo(formData, {
+    basari: adet
+      ? `${adet} sipariş arşive taşındı. Arşiv bağlantısından görebilir, istediğinizi geri alabilirsiniz.${haric.length ? " İade talebi bekleyenler listede bırakıldı." : ""}`
+      : "Arşivlenecek tamamlanmış sipariş yok.",
+  });
+}
+
+/** Seçili siparişleri arşivle (toplu işlem çubuğu). Açık olanlar atlanır ve sayısı söylenir. */
+export async function secilenleriArsivle(formData: FormData) {
+  const { supabase, organization, membership, user } = await requireTenant();
+  if (!MANAGERS.includes(membership.role)) return await backTo(formData, { hata: hataMetni("forbidden") });
+  const ids = [...new Set(formData.getAll("order_id").map(String).filter(Boolean))].slice(0, 500);
+  if (!ids.length) return await backTo(formData, { hata: "Sipariş seçilmedi." });
+  const haric = new Set(await iadeBekleyenler(supabase, organization.id));
+  const uygun = ids.filter((id) => !haric.has(id));
+  const { data, error } = uygun.length
+    ? await supabase.from("arc_orders")
+        .update({ archived_at: new Date().toISOString(), archived_by: user.id })
+        .eq("organization_id", organization.id)
+        .in("id", uygun)
+        .in("status", [...ARSIVLENEBILIR_DURUMLAR])
+        .select("id")
+    : { data: [], error: null };
+  if (error) return await backTo(formData, { hata: "Arşivlenemedi: " + error.message });
+  revalidatePath("/siparisler");
+  const adet = data?.length ?? 0;
+  const atlanan = ids.length - adet;
+  return await backTo(formData, {
+    basari: `${adet} sipariş arşivlendi.${atlanan ? ` ${atlanan} sipariş açık ya da iade talebi beklediği için listede kaldı.` : ""}`,
+  });
+}
+
+/** Sipariş detayından: arşive al / arşivden çıkar. */
+export async function arsivDurumu(formData: FormData) {
+  const { supabase, organization, membership, user } = await requireTenant();
+  const orderId = String(formData.get("order_id") ?? "");
+  const geri = `/siparisler/${orderId}`;
+  if (!MANAGERS.includes(membership.role)) return await bildirimliDonus(geri, { hata: hataMetni("forbidden") });
+  const arsive = String(formData.get("islem") ?? "") === "al";
+  const { error } = await supabase.from("arc_orders")
+    .update(arsive ? { archived_at: new Date().toISOString(), archived_by: user.id } : { archived_at: null, archived_by: null })
+    .eq("organization_id", organization.id)
+    .eq("id", orderId);
+  /* Veritabanının Türkçe hatası ("Yalnızca tamamlanan…") olduğu gibi gösteriliyor. */
+  if (error) return await bildirimliDonus(geri, { hata: error.message });
+  revalidatePath("/siparisler");
+  revalidatePath(geri);
+  return await bildirimliDonus(geri, { basari: arsive ? "Sipariş arşive taşındı." : "Sipariş arşivden çıkarıldı; listede görünüyor." });
 }

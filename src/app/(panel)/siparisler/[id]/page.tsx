@@ -10,6 +10,8 @@ import { alacakKapat, kalemiDuzenle, refundOrder, updateFulfillmentDetails, upda
 import { PanelDrawer } from "@/components/arvo-ui/panel-drawer";
 import { PanelModal } from "@/components/arvo-ui/panel-modal";
 import { FaturaYazdir } from "./fatura-yazdir";
+import { arsivDurumu } from "../actions";
+import { arsivlenebilirMi } from "@/lib/order-flow";
 import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { statusTone } from "@/lib/status-tone";
 import { cancelTransferOrder, confirmTransferPayment, quickStatus } from "../actions";
@@ -54,7 +56,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   const {id}=await params;const query=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const [{data:order,error},{data:items,error:itemsError},{data:events,error:eventsError},{data:shipments}]=await Promise.all([
-    supabase.from("arc_orders").select("id,order_number,source,status,payment_status,customer_name,customer_email,currency,subtotal,tax,shipping,total,metadata,created_at,updated_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
+    supabase.from("arc_orders").select("id,order_number,source,status,payment_status,customer_name,customer_email,currency,subtotal,tax,shipping,total,metadata,created_at,updated_at,archived_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
     supabase.from("arc_order_items").select("id,variant_id,product_name,sku,quantity,unit_price,total").eq("organization_id",organization.id).eq("order_id",id).order("product_name"),
     supabase.from("arc_order_events").select("id,event_type,event_data,created_by,created_at").eq("organization_id",organization.id).eq("order_id",id).order("created_at",{ascending:false}).limit(50),
     /* Gönderiler ve kalemleri: bir sipariş birden çok firmaya bölünebiliyor. */
@@ -410,7 +412,15 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             <div className="os-menu-list" role="menu">
               <PrintButton className="os-menu-item" />
               {order.customer_email?<a className="os-menu-item" href={`mailto:${order.customer_email}`}>Müşteriye e-posta</a>:null}
-              <Link prefetch={false} className="os-menu-item" href="/siparisler">Siparişlere dön</Link>
+              {/* Arşiv (20261016124844): yalnızca kapanmış sipariş; kural veritabanında da var. */}
+              {canManage&&(order.archived_at||arsivlenebilirMi(order.status))?(
+                <form action={arsivDurumu}>
+                  <input type="hidden" name="order_id" value={order.id}/>
+                  <input type="hidden" name="islem" value={order.archived_at?"cikar":"al"}/>
+                  <button type="submit" className="os-menu-item">{order.archived_at?"Arşivden çıkar":"Arşive taşı"}</button>
+                </form>
+              ):null}
+              <Link prefetch={false} className="os-menu-item" href={order.archived_at?"/siparisler?arsiv=1":"/siparisler"}>{order.archived_at?"Arşive dön":"Siparişlere dön"}</Link>
             </div>
           </details>
         </div>
@@ -450,6 +460,12 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
       ):null}
 
 
+      {order.archived_at?(
+        <p className="talep-arsiv">
+          <span className="status-pill" data-tone="neutral">Arşivde</span>
+          <span>{when(order.archived_at)} · Sipariş listesinde görünmez; ciro ve raporlarda sayılmaya devam eder.</span>
+        </p>
+      ):null}
       {alacak>0?(
         <div className="siparis-havale">
           <KNot ton="uyari">

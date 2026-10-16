@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { bulkStatus, durumIlerletSonuc, quickStatus, siparisleriSil, topluDurumSonuc } from "./actions";
+import { bulkStatus, durumIlerletSonuc, quickStatus, secilenleriArsivle, siparisleriSil, topluDurumSonuc } from "./actions";
 import { ConfirmSubmit } from "@/components/panel/confirm-submit";
 import { KNot } from "@/components/arvo-ui/k-ui";
 import { MobilSatir } from "@/components/arvo-ui/mobil-satir";
@@ -20,6 +20,8 @@ export type OrderRow = {
   date: string;
   badge: { label: string; tone?: string };
   next: { key: string; label: string } | null;
+  /** Kapanmış sipariş (tamamlandı, iptal, iade): arşive taşınabilir. */
+  arsivlenebilir: boolean;
   /** Havale siparişi: ödeme panelden onaylanır. */
   transfer?: boolean;
   /*
@@ -192,6 +194,12 @@ export function OrderTable({ rows, canManage, canDelete, back, bos, children }: 
                 </button>
               );
             })}
+            {/* Arşivle normal gönderimle gidiyor (formAction): durum düğmelerinin yerinde işleme yolu değeri olan düğmeyi bekliyor. */}
+            {chosen.some((row) => row.arsivlenebilir) ? (
+              <button className="panel-secondary" type="submit" formAction={secilenleriArsivle} title="Yalnızca kapanmış (tamamlanan, iptal, iade) siparişler arşivlenir">
+                Arşivle <small>{chosen.filter((row) => row.arsivlenebilir).length}</small>
+              </button>
+            ) : null}
             <button className="panel-secondary" type="button" onClick={() => setSelected(new Set())}>Seçimi temizle</button>
           </span>
         </form>

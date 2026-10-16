@@ -81,6 +81,7 @@ const SEMA: Record<GorunumListesi, readonly Alan[]> = {
     { anahtar: "q", tur: "metin", onek: "Arama" },
     { anahtar: "filter", tur: "secim", secenekler: SIPARIS_DURUMLARI, varsayilan: "all" },
     { anahtar: "kargo", tur: "bayrak", deger: "sorunlu", etiket: "Sorunlu kargo" },
+    { anahtar: "arsiv", tur: "bayrak", deger: "1", etiket: "Arşiv" },
     { anahtar: "period", tur: "secim", secenekler: SIPARIS_DONEMLERI, varsayilan: "all" },
   ],
   urunler: [

@@ -9,6 +9,9 @@ import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gor
 import { gorunumleriOku } from "../gorunumler/oku";
 import { gorunumSorgusu, SIPARIS_DONEMLERI, SIPARIS_DURUMLARI } from "@/lib/kayitli-gorunum";
 import { OrderForm } from "./order-form";
+import { tamamlananlariArsivle } from "./actions";
+import { ConfirmSubmit } from "@/components/panel/confirm-submit";
+import { ARSIVLENEBILIR_DURUMLAR, arsivlenebilirMi } from "@/lib/order-flow";
 import { OrderTable, type OrderRow } from "./order-table";
 import { PanelDrawer } from "@/components/arvo-ui/panel-drawer";
 import { IstatistikKarti, degisimYazisi, kisaPara, tamPara } from "@/components/arvo-ui/istatistik-karti";
@@ -36,7 +39,7 @@ const PERIODS = SIPARIS_DONEMLERI;
 
 type StatusKey = (typeof STATUS_TABS)[number][0];
 type PeriodKey = (typeof PERIODS)[number][0];
-type ListState = { q: string; filter: StatusKey; period: PeriodKey; page: number; kargo: "" | "sorunlu" };
+type ListState = { q: string; filter: StatusKey; period: PeriodKey; page: number; kargo: "" | "sorunlu"; arsiv: boolean };
 
 
 /* Dönem Türkiye saatine göre gün başından sayılır (UTC+3). */
@@ -56,6 +59,7 @@ function listHref(state: ListState, patch: Partial<ListState>) {
   if (next.q) query.set("q", next.q);
   if (next.filter !== "all") query.set("filter", next.filter);
   if (next.kargo) query.set("kargo", next.kargo);
+  if (next.arsiv) query.set("arsiv", "1");
   if (next.period !== "all") query.set("period", next.period);
   if (next.page > 1) query.set("page", String(next.page));
   const text = query.toString();
@@ -67,7 +71,7 @@ function simdi() {
   return Date.now();
 }
 
-type Params = { q?: string; filter?: string; period?: string; page?: string; kargo?: string };
+type Params = { q?: string; filter?: string; period?: string; page?: string; kargo?: string; arsiv?: string };
 
 export default async function Orders({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
@@ -90,7 +94,13 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     sipariş detayının içinde yaşıyor, ayrı bir listesi yok.
   */
   const kargo: ListState["kargo"] = params.kargo === "sorunlu" ? "sorunlu" : "";
-  const state: ListState = { q: search, filter: statusFilter, period, page, kargo };
+  /*
+    ARŞİV (16.10.2026): liste varsayılan olarak arşivdekileri göstermiyor;
+    ?arsiv=1 yalnızca arşivi gösterir. Şerit sayıları da aynı süzgeçten
+    (scoped) geçiyor — AGENTS.md: şerit listeyle aynı süzgeçten.
+  */
+  const arsivde = params.arsiv === "1";
+  const state: ListState = { q: search, filter: statusFilter, period, page, kargo, arsiv: arsivde };
   /*
     Görünüm karşılaştırması için süzgecin KANONİK hâli: sayfa numarası
     düşer, varsayılanlar yazılmaz, anahtarlar hep aynı sırada. Adres
@@ -101,9 +111,9 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   const since = periodStart(period);
 
   /* Arama ve dönem hem listeye hem sekme sayaçlarına uygulanır. */
-  type Filterable<T> = { gte(column: string, value: string): T; or(filters: string): T };
+  type Filterable<T> = { gte(column: string, value: string): T; or(filters: string): T; is(column: string, value: null): T; not(column: string, operator: string, value: null): T };
   const scoped = <T extends Filterable<T>>(query: T): T => {
-    let next = query;
+    let next = arsivde ? query.not("archived_at", "is", null) : query.is("archived_at", null);
     if (since) next = next.gte("created_at", since);
     if (search) next = next.or(`order_number.ilike.%${search}%,customer_name.ilike.%${search}%,customer_email.ilike.%${search}%`);
     return next;
@@ -162,7 +172,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     çekilir. Tüm katalog değil, kendi ürünlerimiz: manuel sipariş
     telefonla gelen siparişler için, tedarikçi kataloğu için değil.
   */
-  const [listResult, variantsResult, returnsResult, sorunluResult, siparisSayimi, gorunumler, istatistikSonucu, ...countResults] = await Promise.all([
+  const [listResult, variantsResult, returnsResult, sorunluResult, siparisSayimi, gorunumler, istatistikSonucu, arsivSayimi, arsivlenecekSayimi, ...countResults] = await Promise.all([
     listQuery.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
     canManage
       ? supabase.from("arc_product_variants").select("id,product_id,sku,price,stock,allow_backorder").eq("organization_id", organization.id).is("supplier", null).order("sku").limit(500)
@@ -178,6 +188,9 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
     gorunumleriOku(supabase, organization.id, "siparisler"),
     istatistikPenceresi,
+    /* Başlıktaki "Arşiv (n)" ve "Tamamlananları arşivle (n)": süzgeçten bağımsız, kurumun tamamı. */
+    supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).not("archived_at", "is", null),
+    supabase.from("arc_orders").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).is("archived_at", null).in("status", [...ARSIVLENEBILIR_DURUMLAR]),
     ...STATUS_TABS.map(([key]) => countQuery(key)),
   ]);
 
@@ -187,6 +200,10 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
   /* Sayım düşerse "hiç sipariş yok" VARSAYILMIYOR; hatayı yutmak dolu
      mağazaya siparişlerinin kaybolduğunu düşündürürdü. */
   if (siparisSayimi.error) throw new Error(siparisSayimi.error.message);
+  if (arsivSayimi.error) throw new Error("Arşiv sayılamadı: " + arsivSayimi.error.message);
+  if (arsivlenecekSayimi.error) throw new Error("Arşivlenecek siparişler sayılamadı: " + arsivlenecekSayimi.error.message);
+  const arsivSayisi = arsivSayimi.count ?? 0;
+  const arsivlenecek = arsivlenecekSayimi.count ?? 0;
 
   const counts = Object.fromEntries(STATUS_TABS.map(([key], index) => [key, countResults[index]?.count ?? 0])) as Record<StatusKey, number>;
   const total = listResult.count ?? counts[statusFilter];
@@ -257,6 +274,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     date: dateFormat.format(new Date(order.created_at)),
     badge: orderBadge(order.status, order.payment_status),
     next: nextOrderStep(order.status, order.payment_status),
+    arsivlenebilir: arsivlenebilirMi(order.status),
     transfer: isBankTransfer(order.metadata),
     kar: (() => {
       const kalem = kalemlerBySiparis.get(order.id) ?? [];
@@ -301,9 +319,22 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
       <header className="talep-bas">
         <div className="talep-bas-metin">
           <small className="panel-kicker">Siparişler</small>
-          <h1>Siparişler</h1>
+          <h1>{arsivde ? "Arşiv" : "Siparişler"}</h1>
         </div>
         <div className="talep-bas-eylem">
+          {arsivde
+            ? <Link prefetch={false} className="panel-secondary" href="/siparisler">← Aktif siparişler</Link>
+            : <Link prefetch={false} className="panel-secondary" href="/siparisler?arsiv=1">Arşiv ({arsivSayisi.toLocaleString("tr-TR")})</Link>}
+          {/*
+            TAMAMLANANLARI ARŞİVLE: kapanmış (tamamlandı, iptal, iade)
+            bütün siparişler tek seferde. İade talebi bekleyenler kalır.
+          */}
+          {canManage && !arsivde && arsivlenecek > 0 ? (
+            <form action={tamamlananlariArsivle}>
+              <input type="hidden" name="back" value={listHref(state, {})} />
+              <ConfirmSubmit className="panel-secondary" message={`${arsivlenecek} kapanmış sipariş (tamamlanan, iptal ve iade edilen) arşive taşınsın mı?\n\nKayıtlar silinmez; ciro ve raporlar saymaya devam eder. Arşivden görebilir, istediğinizi geri alabilirsiniz. İade talebi bekleyen siparişler listede kalır.`}>Tamamlananları arşivle ({arsivlenecek.toLocaleString("tr-TR")})</ConfirmSubmit>
+            </form>
+          ) : null}
           {canManage ? <a className="panel-secondary" href="/api/disari-aktar/siparisler">CSV indir</a> : null}
           {/* Manuel sipariş çekmecede: eskiden listenin dibinde açılır bir karttı. */}
           {canManage ? (
@@ -350,6 +381,7 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
             {statusFilter !== "all" ? <input type="hidden" name="filter" value={statusFilter} /> : null}
             {period !== "all" ? <input type="hidden" name="period" value={period} /> : null}
             {kargo ? <input type="hidden" name="kargo" value={kargo} /> : null}
+            {arsivde ? <input type="hidden" name="arsiv" value="1" /> : null}
             <input name="q" defaultValue={search} placeholder="Sipariş no, müşteri veya e-posta" aria-label="Siparişlerde ara" />
           </form>
           <GorunumKaydet liste="siparisler" aktifSorgu={aktifSorgu} gorunumler={gorunumler} canManage={canManage} />
@@ -370,12 +402,12 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
               ortada olmayan bir filtreyi aratmaktı.
             */
             <div className="crm-empty-state talep-bos-kutu">
-              <h2>{(siparisSayimi.count ?? 0) === 0 ? "Henüz sipariş yok" : "Bu ölçütlere uygun sipariş yok"}</h2>
+              <h2>{arsivde && !filtreli ? "Arşiv boş" : (siparisSayimi.count ?? 0) === 0 ? "Henüz sipariş yok" : "Bu ölçütlere uygun sipariş yok"}</h2>
               <p>{(siparisSayimi.count ?? 0) === 0
                 ? "Vitrinden ilk sipariş geldiğinde burada görünür. Mağazanızı açıp alışveriş akışını kendiniz deneyebilirsiniz."
                 : "Durumu, dönemi veya aramayı değiştirin. Sipariş numarası, müşteri adı ve e-postada arama yapılır."}</p>
               <div className="crm-empty-actions">
-                {filtreli ? <Link prefetch={false} className="panel-secondary" href="/siparisler">Süzgeci temizle</Link> : null}
+                {filtreli ? <Link prefetch={false} className="panel-secondary" href={arsivde ? "/siparisler?arsiv=1" : "/siparisler"}>Süzgeci temizle</Link> : null}
                 {(siparisSayimi.count ?? 0) === 0 ? <a className="panel-primary" href="/magaza" target="_blank" rel="noreferrer">Mağazanı gör</a> : null}
                 {(siparisSayimi.count ?? 0) === 0 ? <Link prefetch={false} className="panel-secondary" href="/veri-aktarimi">Eski siparişleri aktar</Link> : null}
               </div>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isOrderClosed, orderBadge } from "@/lib/commerce-labels";
-import { countsAsRevenue, nextOrderStep, refundedAmount, revenueAmount } from "@/lib/order-flow";
+import { arsivlenebilirMi, countsAsRevenue, nextOrderStep, refundedAmount, revenueAmount } from "@/lib/order-flow";
 
 test("kısmi iadede ciroya yalnızca kalan tutar sayılır", () => {
   assert.equal(revenueAmount({ total: 100000, status: "confirmed", payment_status: "paid" }), 100000);
@@ -61,4 +61,13 @@ test("durum rozeti", () => {
   */
   assert.deepEqual(orderBadge("confirmed", "paid"), { label: "Onaylandı · Ödendi", tone: "info" });
   assert.equal(orderBadge("processing", "paid").tone, "info");
+});
+
+test("yalnızca kapanmış sipariş arşivlenebilir (veritabanı kuralının ikizi)", () => {
+  assert.equal(arsivlenebilirMi("fulfilled"), true);
+  assert.equal(arsivlenebilirMi("cancelled"), true);
+  assert.equal(arsivlenebilirMi("refunded"), true);
+  assert.equal(arsivlenebilirMi("pending"), false);
+  assert.equal(arsivlenebilirMi("processing"), false);
+  assert.equal(arsivlenebilirMi(null), false);
 });

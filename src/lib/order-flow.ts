@@ -52,3 +52,13 @@ export function nextOrderStep(status?: string | null, paymentStatus?: string | n
   if (status === "processing") return { key: "fulfilled", label: "Kargoya ver" };
   return null;
 }
+
+/*
+  ARŞİVLENEBİLİR SİPARİŞ (16.10.2026): yalnızca kapanmış olanlar —
+  tamamlandı, iptal, iade. Aynı kural veritabanında da var
+  (private.arc_order_archive_guard); buradaki ikiz yalnızca düğmeyi
+  göstermek ve kullanıcıya erken cevap vermek için.
+*/
+export const ARSIVLENEBILIR_DURUMLAR = ["fulfilled", "cancelled", "refunded"] as const;
+export const arsivlenebilirMi = (status?: string | null) =>
+  (ARSIVLENEBILIR_DURUMLAR as readonly string[]).includes(status ?? "");
