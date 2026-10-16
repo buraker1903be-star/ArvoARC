@@ -61,6 +61,55 @@
 @media (max-width:760px){.os-root .indirim-urun-tablo .indirim-gorsel-sutun{display:none}}
 
 /* ---------- Kampanya detayı ---------- */
+/*
+  ÜÇ SÜTUN (16.10.2026): künye · düzenleme · ölçüm. İki sütunken
+  sağda koca bir boşluk kalıyordu ve kuponun ne getirdiği hiçbir yerde
+  yazmıyordu.
+*/
+.os-root .indirim-detay .talep-izgara{
+  grid-template-columns:minmax(240px,1fr) minmax(0,1.7fr) minmax(280px,1.05fr)
+}
+@media (max-width:1400px){
+  .os-root .indirim-detay .talep-izgara{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)}
+  .os-root .indirim-detay .indirim-olcum{grid-column:span 2}
+}
+@media (max-width:900px){
+  .os-root .indirim-detay .talep-izgara{grid-template-columns:minmax(0,1fr)}
+  .os-root .indirim-detay .indirim-olcum{grid-column:auto}
+}
+
+/*
+  KAYDET ÇUBUĞU. Eskisi globals.css'ten geliyordu: altın çerçeve, yeşil
+  düğme, 11,5px yazı, 14px köşe — panelin hiçbir yerinde karşılığı
+  olmayan bir kutu. Artık kartın altına yapışık ince bir şerit:
+  solda gerekçe, sağda birincil düğme. Sütun kendi içinde kaydığı için
+  düğme her zaman görünür kalıyor.
+*/
+.os-root .indirim-detay .indirim-kaydet{
+  position:sticky;bottom:calc(var(--sp-4) * -1);z-index:2;
+  display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);
+  margin:var(--sp-4) calc(var(--sp-4) * -1) calc(var(--sp-4) * -1);
+  padding:var(--sp-3) var(--sp-4);
+  border-top:1px solid var(--line);
+  background:color-mix(in srgb,var(--surface) 92%,transparent);
+  backdrop-filter:blur(10px);
+}
+.os-root .indirim-detay .indirim-kaydet span{color:var(--muted);font-size:var(--fs-sm);line-height:1.4}
+.os-root .indirim-detay .indirim-kaydet button{flex:none}
+@media (max-width:620px){
+  .os-root .indirim-detay .indirim-kaydet{flex-direction:column;align-items:stretch}
+}
+
+/* Limit çubuğu: sayının yanında doluluk görünür olsun. */
+.os-root .indirim-detay .indirim-cubuk{
+  height:6px;margin:var(--sp-2) 0 var(--sp-3);overflow:hidden;
+  border-radius:var(--r-pill);background:var(--surface-2)
+}
+.os-root .indirim-detay .indirim-cubuk span{
+  display:block;height:100%;border-radius:var(--r-pill);background:var(--primary)
+}
+.os-root .indirim-detay .indirim-cubuk span[data-dolu]{background:var(--warning)}
+.os-root .indirim-detay .indirim-olcum .talep-liste dd b{font-variant-numeric:tabular-nums}
 /* Kullanım sayısı kararın merkezinde: limit dolmuşsa kampanya fiilen bitmiştir. */
 .os-root .indirim-detay .indirim-kullanim{
   margin:0 0 var(--sp-2);color:var(--ink);font-variant-numeric:tabular-nums

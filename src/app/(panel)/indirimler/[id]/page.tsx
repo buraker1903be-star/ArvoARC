@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { kimlikMi } from "@/lib/kimlik";
 import { yetkiYok } from "@/lib/yetki-metni";
 import { requireTenant } from "@/lib/tenant";
+import { fetchAllRows } from "@/lib/fetch-all";
+import { countsAsRevenue, revenueAmount } from "@/lib/order-flow";
 import { trIsoToLocal } from "@/lib/tr-time";
 import { rozetTonu } from "@/lib/rozet-tonu";
 import { KNot } from "@/components/arvo-ui/k-ui";
@@ -64,6 +66,32 @@ export default async function KampanyaDetayi({ params }: { params: Promise<{ id:
     metadata'sından okunuyor (arc_count_coupon_use da oradan sayıyor);
     kodu olmayan otomatik kuralın karşılığı yok.
   */
+  /*
+    KUPONUN GETİRDİĞİ. Sayaç kaç kez kullanıldığını söylüyor ama
+    "ne kadar sattırdı, ne kadara mal oldu" sorusunu kimse
+    cevaplamıyordu — kampanyayı sürdürme kararı bu iki sayıya bakıyor.
+    İndirim tutarı siparişin metadata'sında (`discount`, kuruş):
+    sipariş fonksiyonu kuponu uygularken oraya yazıyor.
+  */
+  type KuponSiparisi = { total: number; status: string; payment_status: string; created_at: string; metadata: unknown };
+  const { rows: kuponSiparisleri } = kural.code
+    ? await fetchAllRows<KuponSiparisi>((bas, son) =>
+        supabase.from("arc_orders").select("total,status,payment_status,created_at,metadata")
+          .eq("organization_id", organization.id)
+          .ilike("metadata->>coupon_code", kural.code!)
+          .order("created_at", { ascending: false })
+          .range(bas, son) as unknown as PromiseLike<{ data: KuponSiparisi[] | null; error: { message: string } | null }>,
+      )
+    : { rows: [] as KuponSiparisi[] };
+
+  const odenenler = kuponSiparisleri.filter((siparis) => countsAsRevenue(siparis.status, siparis.payment_status));
+  const kuponCirosu = odenenler.reduce((toplam, siparis) => toplam + revenueAmount({ ...siparis, refunded_amount: (siparis.metadata as { refunded_amount?: unknown } | null)?.refunded_amount }), 0);
+  const verilenIndirim = odenenler.reduce((toplam, siparis) => {
+    const tutar = Number((siparis.metadata as { discount?: unknown } | null)?.discount ?? 0);
+    return toplam + (Number.isFinite(tutar) && tutar > 0 ? tutar : 0);
+  }, 0);
+  const sonKullanim = kuponSiparisleri[0]?.created_at ?? null;
+
   const { count: siparisSayisi, error: siparisHatasi } = kural.code
     ? await supabase.from("arc_orders").select("id", { count: "exact", head: true })
         .eq("organization_id", organization.id)
@@ -163,28 +191,6 @@ export default async function KampanyaDetayi({ params }: { params: Promise<{ id:
             <div><dt>Oluşturuldu</dt><dd>{tarihSaat(kural.created_at)}</dd></div>
           </dl>
 
-          <div className="talep-gecmis">
-            <h3>Kullanım</h3>
-            <p className="indirim-kullanim">
-              <b>{kullanim.toLocaleString("tr-TR")}</b>
-              {limit > 0 ? <span> / {limit.toLocaleString("tr-TR")} kullanım</span> : <span> kullanım · limitsiz</span>}
-            </p>
-            {/*
-              Sayaç tetikleyiciyle artıyor (arc_count_coupon_use): sipariş
-              ÖDENDİĞİNDE. İptal edilen ya da ödenmeyen sipariş saymıyor,
-              bu yüzden sipariş sayısıyla sayaç ayrışabiliyor.
-            */}
-            {kural.code ? (
-              <p className="list-hint">
-                Kodu taşıyan {Number(siparisSayisi ?? 0).toLocaleString("tr-TR")} sipariş var.{" "}
-                <Link prefetch={false} href={`/siparisler?filter=all&q=${encodeURIComponent(kural.code)}`}>Siparişleri gör</Link>
-                {" · "}Sayaç yalnızca ÖDENEN siparişte artar.
-              </p>
-            ) : (
-              <p className="list-hint">Otomatik kuralda kupon kodu yok; sayaç sepette uygulanan siparişlerden gelir.</p>
-            )}
-            <p className="list-hint">Kişi başı sınır: {kural.per_customer_limit ? `${kural.per_customer_limit} kullanım` : "yok"}</p>
-          </div>
         </section>
 
         <section className="panel-card talep-bilgi opd-gorevler" aria-label="Kampanyayı düzenle">
@@ -231,13 +237,68 @@ export default async function KampanyaDetayi({ params }: { params: Promise<{ id:
               </div>
               {/* Durum bu formda DEĞİL: başlıktaki düğmeden değişiyor ve
                   kaydetmeyi beklemeden geçerli olması gerekiyor. */}
-              <div className="product-editor-actions">
+              {/*
+                KAYDET ÇUBUĞU panelin dilinde. Eskisi globals.css'ten
+                geliyordu: sabit renkler (altın çerçeve, yeşil düğme),
+                11,5px yazı ve 14px köşe — panelin hiçbir yerinde
+                karşılığı olmayan bir kutu. Artık kartın altına yapışık
+                ince bir şerit ve düğme panelin birincil düğmesi.
+              */}
+              <div className="indirim-kaydet">
                 <span>Kullanım sayacı bu formdan değişmez; sipariş ödendikçe kendisi artar.</span>
-                <button className="ac-btn ac-btn-primary" type="submit">Değişiklikleri kaydet</button>
+                <button className="panel-primary" type="submit">Değişiklikleri kaydet</button>
               </div>
             </form>
           ) : (
             <p className="list-hint">{yetkiYok("kampanya düzenleme")}</p>
+          )}
+        </section>
+
+        {/*
+          ÜÇÜNCÜ SÜTUN: KUPON NE YAPTI. Sayaç kaç kez kullanıldığını
+          söylüyordu ama "ne kadar sattırdı, ne kadara mal oldu"
+          sorusunun cevabı hiçbir yerde yoktu — kampanyayı sürdürme ya
+          da durdurma kararı tam olarak bu iki sayıya bakıyor.
+        */}
+        <section className="panel-card talep-musteri indirim-olcum" aria-label="Kuponun getirdiği">
+          <div className="talep-gecmis">
+            <h3>Kullanım</h3>
+            <p className="indirim-kullanim">
+              <b>{kullanim.toLocaleString("tr-TR")}</b>
+              {limit > 0 ? <span> / {limit.toLocaleString("tr-TR")} kullanım</span> : <span> kullanım · limitsiz</span>}
+            </p>
+            {limit > 0 ? (
+              <div className="indirim-cubuk" role="img" aria-label={`Limitin %${Math.min(100, Math.round((kullanim / limit) * 100))} kadarı kullanıldı`}>
+                <span style={{ width: `${Math.min(100, Math.round((kullanim / limit) * 100))}%` }} data-dolu={kullanim >= limit ? "" : undefined} />
+              </div>
+            ) : null}
+            <p className="list-hint">Kişi başı sınır: {kural.per_customer_limit ? `${kural.per_customer_limit} kullanım` : "yok"}</p>
+          </div>
+
+          {kural.code ? (
+            <div className="talep-gecmis">
+              <h3>Kuponun getirdiği</h3>
+              <dl className="talep-liste">
+                <div><dt>Sipariş</dt><dd>{Number(siparisSayisi ?? 0).toLocaleString("tr-TR")} · {odenenler.length.toLocaleString("tr-TR")} ödenen</dd></div>
+                <div><dt>Ciro</dt><dd><b>{money.format(kuponCirosu / 100)}</b></dd></div>
+                {/* İndirim siparişin metadata'sından: kuponun mağazaya maliyeti. */}
+                <div><dt>Verilen indirim</dt><dd>{money.format(verilenIndirim / 100)}</dd></div>
+                <div><dt>Ortalama sepet</dt><dd>{money.format(odenenler.length ? kuponCirosu / odenenler.length / 100 : 0)}</dd></div>
+                <div><dt>Son kullanım</dt><dd>{sonKullanim ? tarihSaat(sonKullanim) : "—"}</dd></div>
+              </dl>
+              <p className="list-hint">
+                <Link prefetch={false} href={`/siparisler?filter=all&q=${encodeURIComponent(kural.code)}`}>Siparişleri gör</Link>
+                {" · "}Ciro ve indirim yalnızca ÖDENEN siparişlerden; iptal ve iade sayılmaz.
+              </p>
+            </div>
+          ) : (
+            <div className="talep-gecmis">
+              <h3>Kuponun getirdiği</h3>
+              <p className="list-hint">
+                Bu kural otomatik uygulanıyor; siparişte kupon kodu yazmadığı için hangi siparişlerde
+                çalıştığı ayrıştırılamıyor. Ölçmek isterseniz kampanyaya bir kod verin.
+              </p>
+            </div>
           )}
         </section>
       </div>
