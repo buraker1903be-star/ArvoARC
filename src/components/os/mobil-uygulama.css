@@ -1,0 +1,402 @@
+/* ============================================================
+   TELEFONDA UYGULAMA GİBİ (12.10.2026)
+
+   Bu dosyadaki HER kural telefon genişliğinde (≤760px) geçerli;
+   masaüstü bilerek dışarıda (kurum sahibinin kararı: "masaüstüne
+   dokunulmayacak"). Yeni bir mobil kural buraya, aynı medya sorgusunun
+   içine yazılır.
+
+   Seçiciler bir sınıf fazlasıyla (.panel-content) yazılı: sayfaların
+   kendi CSS'i (kayit-detay.css, crm.css) bu dosyadan SONRA yükleniyor
+   ve aynı ağırlıktaki kuralları ezerdi.
+   ============================================================ */
+
+/* Çift dokunuşla büyütme kapalı (dokunmatik ekranların hepsinde, tablet
+   dahil — bu yüzden genişlik sorgusunun dışında). İki parmakla büyütme:
+   panel/layout.tsx viewport + os-uygulama-kabugu.tsx. Yan etkisi iyi:
+   tarayıcı çift dokunuşu beklemediği için dokunuşlar 300 ms gecikmesiz. */
+@media (pointer:coarse){
+  html:has(.os-root),html:has(.os-root) body{touch-action:manipulation}
+}
+
+@media (max-width:760px){
+
+  /* ---------- LİSTELER: iki satırlık kompakt satır ----------
+     Eskiden her tablo satırı "ETİKET … değer" sıralarından oluşan koca
+     bir karta dönüşüyordu: bir talep ekranın yarısını kaplıyor, ekranda
+     aynı anda bir iki kayıt görünüyordu. Telefon uygulamalarındaki liste
+     gibi: üstte ad ve durum, altında ayrıntılar yan yana küçük yazıyla.
+     Bütün listeler aynı ortak yapıda (.talep-tablo .crm-data-table);
+     hangi hücrenin başlık olduğu data-label'dan okunuyor, sayfalara
+     dokunmak gerekmiyor. Satıra dokunmak kaydı açar (crm/satir-tiklama). */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr{
+    display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:3px;
+    margin:0;padding:12px 16px;border:0;border-top:1px solid var(--line-soft);border-radius:0;
+    background:var(--surface);box-shadow:none;overflow:visible;
+  }
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr:first-child{border-top:0}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr:active{background:var(--surface-2)}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td{
+    display:block;flex:none;order:0;width:auto;min-width:0;max-width:100%;height:auto;
+    margin:0;padding:0;border:0;background:none;
+    color:var(--muted);font-size:12.5px;line-height:1.35;text-align:left;
+  }
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr:hover td,
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr:focus-within td{background:none}
+  /* Etiket, değerin önünde küçük ve sessiz ("Teslim 28.10.2026"); kendini
+     anlatan değerlerde (hizmet, temsilci, numara…) hiç yok. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td::before{
+    content:attr(data-label) " ";flex:none;margin:0;color:var(--muted);font-size:inherit;font-weight:400;letter-spacing:0;text-transform:none;
+  }
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:is(
+    [data-label="No"],[data-label="Teklif No"],[data-label="Sözleşme No"],[data-label="Hizmet türü"],[data-label="Temsilci"],
+    [data-label="Durum"],[data-label="Departman"],[data-label="İletişim"],[data-label="Sorumlular"],[data-label="Kategori"],
+    [data-label="Sağlayıcı"],[data-label="Gönderen"],[data-label="Alıcı"],[data-label="İlgilenen"],[data-label="Tür"],
+    [data-label="Cihaz"],[data-label="IP"],[data-label="Erişim"],[data-label="Müşteri"],[data-label="Belge"],[data-label="Personel"],
+    [data-label="İş"],[data-label="İş / Müşteri"],[data-label="Kişi"],[data-label="Kayıt"],[data-label="Kim"],[data-label="Konu"]
+  )::before{content:none}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td>*{display:inline;max-width:none;margin:0;text-align:left;white-space:normal}
+
+  /* Başlık hücresi: satırın ilk sırası, kalın; yanında durum. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:is(
+    [data-label="Müşteri"],[data-label="Belge"],[data-label="Personel"],[data-label="İş"],[data-label="İş / Müşteri"],
+    [data-label="Kişi"],[data-label="Kayıt"],[data-label="Kim"],[data-label="Konu"]
+  ){order:-2;flex:1 1 calc(100% - 150px);color:var(--ink)}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:is([data-label="Müşteri"],[data-label="Belge"],[data-label="Personel"],[data-label="İş"],[data-label="İş / Müşteri"],[data-label="Kişi"],[data-label="Kayıt"],[data-label="Kim"],[data-label="Konu"])>*{display:block}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td .crm-table-title{
+    display:block;max-width:none;color:var(--ink);font-size:15px;font-weight:600;line-height:1.3;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:unset;
+  }
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:is([data-label="Müşteri"],[data-label="Kişi"],[data-label="Personel"]) .crm-table-sub{display:block;margin-top:1px;font-size:12.5px;color:var(--muted)}
+  /* İkinci satırdaki metin hücreleri tek satır kalır. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:not([data-label="Müşteri"],[data-label="Kişi"],[data-label="Personel"]) .crm-table-sub{display:none}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:not([data-label="Müşteri"],[data-label="Belge"],[data-label="Personel"],[data-label="İş"],[data-label="İş / Müşteri"],[data-label="Kişi"],[data-label="Kayıt"],[data-label="Kim"],[data-label="Konu"]) .crm-table-title{display:inline;font-size:12.5px;font-weight:500;color:var(--ink-soft)}
+
+  /* Durum: başlığın sağında. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td[data-label="Durum"]{order:-1;flex:0 1 auto;max-width:150px;margin-left:auto;text-align:right}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td[data-label="Durum"]>.status-pill{display:inline-flex}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td[data-label="Durum"] :is(.crm-liste-sebep,.crm-waiting){display:none}
+
+  /* Numara, ilk hücredeki bağlantı: masaüstündeki negatif boşluklar kalkıyor. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:first-child .crm-row-link{display:inline;margin:0;padding:0;background:none}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td.crm-table-mono{color:var(--muted);font-size:12px;font-weight:500}
+
+  /* Temsilci: baş harf yuvarlağı küçük. */
+  .os-root .panel-content .talep-tablo .crm-rep{display:inline-flex;gap:5px;font-size:12.5px;color:var(--ink-soft)}
+  .os-root .panel-content .talep-tablo .crm-last-contact-who{display:none}
+
+  /* Yalnızca ok olan eylem hücresi gizli (satırın tamamı dokunulabilir);
+     düğmesi olan hücre en alta, tam genişlikte. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td.crm-table-actions:has(>.crm-row-chevron:only-child){display:none}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td.crm-table-actions{order:5;flex:1 1 100%;display:flex;gap:8px;margin-top:6px;padding:0}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td.crm-table-actions::before{content:none}
+}
+
+@media (max-width:760px){
+  /* Liste satırının ince ayarları: eski kart kurallarının sağa yaslama
+     ve satır kırma artıkları; boş alanlar satırda yer kaplamaz. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td *{text-align:left}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td[data-label="Durum"] *{text-align:right}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td>:is(.crm-table-sub,.crm-waiting,.crm-liste-sebep){flex-basis:auto}
+  .os-root .panel-content .talep-tablo .crm-rep>i{display:none}
+  .os-root .panel-content .talep-tablo .crm-rep>span{max-width:none;white-space:nowrap}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:is([data-bos],.crm-col-contact:has(.crm-last-contact-none)){display:none}
+}
+
+@media (max-width:760px){
+  /* kayit-detay.css'teki kart kuralları (alt satır sağda, ilk hücrede iç
+     boşluk) aynı ağırlıkta ve sonra yükleniyor: burada bir sınıf fazlası. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td>:is(.crm-table-sub,.crm-waiting,.crm-liste-sebep,.crm-table-title){text-align:left}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:first-child,
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:last-child{padding:0}
+}
+
+@media (max-width:760px){
+  /* İş listesinde başlık işin adı; müşteri ayrıntı satırına iner (adı yeter). */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr:has(>td[data-label="İş"]) td[data-label="Müşteri"]{order:0;flex:none;color:var(--ink-soft)}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr:has(>td[data-label="İş"]) td[data-label="Müşteri"]>*{display:inline}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr:has(>td[data-label="İş"]) td[data-label="Müşteri"] .crm-table-title{font-size:12.5px;font-weight:500;color:var(--ink-soft)}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr:has(>td[data-label="İş"]) td[data-label="Müşteri"] .crm-table-sub{display:none}
+  /* Görsel çubuklar satırda yer kaplamaz; yüzdesi yazıyla kalır. */
+  .os-root .panel-content .talep-tablo :is(.ops-progress-mini,.cari-oran-cubuk){display:none}
+  /* Hücre içindeki küçük not ("16 gün kaldı", "vadesi gelmedi") aynı satırda. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:not([data-label="Durum"])>:is(small,.crm-waiting){display:inline;margin:0 0 0 4px;font-size:inherit}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:not([data-label="Durum"])>:is(small,.crm-waiting)::before{content:"· "}
+  /* Olağan öncelik ("Normal") yazılmaz; yüksek/acil rozetle kalır. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td[data-label="Öncelik"]:has(.status-pill[data-tone="neutral"]){display:none}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:not([data-label="Durum"]) .status-pill{min-height:0;padding:0 6px;font-size:11px}
+  /* Eylem hücresi: düğme kendi boyunda, ok gizli. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td.crm-table-actions .crm-row-chevron{display:none}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td.crm-table-actions :is(button,.panel-secondary,.panel-primary){width:auto;min-height:34px;padding:0 14px;font-size:13px}
+}
+
+@media (max-width:760px){
+  /* Durum hücresi olmayan listede (cari, ekip) başlık satırın tamamını alır:
+     yoksa ilk ayrıntı başlığın yanına çıkıyordu. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr:not(:has(>td[data-label="Durum"])) td:is(
+    [data-label="Müşteri"],[data-label="Belge"],[data-label="Personel"],[data-label="İş"],[data-label="İş / Müşteri"],
+    [data-label="Kişi"],[data-label="Kayıt"],[data-label="Kim"],[data-label="Konu"]
+  ){flex-basis:100%}
+  .os-root .panel-content .talep-tablo .crm-data-table tbody tr:has(>td[data-label="İş"]) td[data-label="Müşteri"]{flex-basis:auto}
+}
+
+@media (max-width:760px){
+  /* Ayrıntı hücreleri tek satır ve içerik genişliğinde: masaüstü sütun
+     genişlikleri (ör. ilerleme 47px) etiketle değeri alt alta kırıyordu. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td:not(
+    [data-label="Müşteri"],[data-label="Belge"],[data-label="Personel"],[data-label="İş"],[data-label="İş / Müşteri"],
+    [data-label="Kişi"],[data-label="Kayıt"],[data-label="Kim"],[data-label="Konu"],.crm-table-actions
+  ){width:max-content;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
+@media (max-width:760px){
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td::before{display:inline}
+}
+@media (max-width:760px){
+  /* Yukarıdaki "td>* inline" kuralından ağır: çubuk gerçekten gizlensin. */
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td>:is(.ops-progress-mini,.cari-oran-cubuk),
+  .os-root .panel-content .talep-tablo .crm-data-table tbody td .musteri-tahsil>.cari-oran-cubuk{display:none}
+}
+
+/* ---------- ALT SEKME ÇUBUĞU ----------
+   Eskiden telefonda masaüstü dock'u küçültülmüş hâliyle duruyordu:
+   yüzen, yazısız ikonlar, sığmayanlar yana kayıyordu (dokuz uygulamanın
+   üçü ekran dışındaydı). Telefon uygulamalarındaki gibi ekranın altına
+   yapışık, beş sekme, ikonun altında adı: Ana ekran, ilk üç uygulama ve
+   "Uygulamalar" (gerisi orada). Güvenli alan (ana ekran çubuğu)
+   boşluğu çubuğun içinde. Bölüm menüsü (ikinci dock) çubuğun hemen
+   üstünde açılır; konumu os-dock.tsx çubuğun üst kenarından hesaplıyor. */
+@media (max-width:760px){
+  .os-root{--os-tab-h:58px;--os-dock-space:calc(var(--os-tab-h) + 20px)}
+  .os-root .os-dock{
+    left:0;right:0;bottom:0;transform:none;max-width:none;
+    display:flex;justify-content:space-around;align-items:stretch;gap:0;
+    padding:4px 4px env(safe-area-inset-bottom);overflow:hidden;
+    border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;
+    background:color-mix(in srgb,var(--surface) 94%,transparent);
+  }
+  .os-root .os-dock-sep{display:none}
+  /* Ana ekran + ilk üç uygulama + Uygulamalar düğmesi (son çocuk). */
+  .os-root .os-dock>.os-dock-item:nth-child(n+6):not(:last-child){display:none}
+  .os-root .os-dock-item{
+    flex:1 1 0;min-width:0;width:auto;height:var(--os-tab-h);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    border-radius:var(--r-md);background:none;color:var(--muted);transform:none;
+  }
+  .os-root .os-dock-item:hover{transform:none;background:none}
+  .os-root .os-dock-item:active{background:var(--surface-2)}
+  .os-root .os-dock-item.is-active{background:none;color:var(--primary)}
+  .os-root .os-dock-item.is-active::after{display:none}
+  .os-root .os-dock-item.is-sub-open{background:var(--surface-2)}
+  .os-root .os-dock-label{
+    position:static;transform:none;opacity:1;padding:0;border-radius:0;background:none;color:inherit;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:11px;font-weight:var(--fw-medium);pointer-events:none;
+  }
+  .os-root .os-dock-item.is-sub-open .os-dock-label{display:block}
+  .os-root .os-dock-badge{top:4px;right:calc(50% - 22px)}
+
+  /* Uygulamalar penceresi alttan açılan sayfa. */
+  .os-root .os-launcher{
+    width:100%;max-width:none;max-height:85dvh;margin:auto 0 0;
+    border-radius:var(--r-xl) var(--r-xl) 0 0;padding-bottom:env(safe-area-inset-bottom);
+  }
+  .os-root .os-launcher-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--sp-4) var(--sp-2);padding:var(--sp-3) var(--sp-4) var(--sp-5)}
+  .os-root .os-launcher-app{font-size:12px}
+  .os-root .os-launcher-head{padding:var(--sp-5) var(--sp-4) var(--sp-1)}
+}
+
+/* ---------- UYGULAMA DAVRANIŞI ----------
+   Dokununca çıkan gri vurgu yok, çift dokunma yakınlaştırmıyor (düğmeye
+   art arda basmak sayfayı büyütüyordu), çubuklarda metin seçilmiyor. */
+@media (max-width:760px){
+  .os-root :is(a,button,summary,label,select,[role="button"]){-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  .os-root :is(.os-dock,.os-bar,.os-subdock){-webkit-user-select:none;user-select:none}
+  .os-root .os-bar{padding-left:max(var(--sp-3),env(safe-area-inset-left));padding-right:max(var(--sp-3),env(safe-area-inset-right))}
+
+  /* PANO: süzgeçler iki sütun (üç seçim alt alta ekranın yarısını
+     kaplıyordu), sütunlar ekran genişliğinde ve parmakla tek tek kayar. */
+  .os-root .panel-content .pano-suzgec{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-2)}
+  .os-root .panel-content .pano-suzgec>*{min-width:0;width:100%}
+  .os-root .panel-content .pano-suzgec>:last-child:nth-child(odd){grid-column:1/-1}
+  .os-root .panel-content .ops-pano{scroll-snap-type:x mandatory;scroll-padding-left:0;gap:var(--sp-3)}
+  .os-root .panel-content .ops-pano-kolon{flex:0 0 calc(100% - 40px);scroll-snap-align:start}
+}
+
+@media (max-width:760px){
+  /* Mesajlar araması: genel alan kuralı içteki kutuya ikinci bir çerçeve
+     ve zemin veriyordu; arama çubuğunun kendisi zaten çerçeveli. */
+  /* !important bilerek: genel alan kuralı (panel-ui.css) zincirli :not()
+     seçicileriyle (0,8,1) ağırlığında; yalnızca bu tek arama kutusu için. */
+  .os-root .panel-content .msg-search input{min-width:0;height:36px !important;min-height:0 !important;margin:0;padding:0 !important;border:0 !important;border-radius:0 !important;background:transparent !important;box-shadow:none !important;font-size:16px}
+}
+
+/* ---------- GERİ DÜĞMESİ (os-geri.tsx) ----------
+   Yalnızca telefonda ve alt sayfalarda; görünürken marka logosu yer
+   açmak için gizlenir (ekranın üstünde sayfanın adı zaten başlıkta). */
+.os-geri{display:none}
+@media (max-width:760px){
+  .os-root .os-geri{
+    display:inline-flex;align-items:center;gap:2px;flex:none;height:40px;margin-left:-6px;padding:0 10px 0 4px;
+    border:0;border-radius:var(--r-md);background:none;color:var(--primary);font:inherit;font-size:16px;font-weight:var(--fw-medium);cursor:pointer;
+  }
+  .os-root .os-geri:active{background:var(--surface-2)}
+  .os-root .os-bar:has(>.os-geri) .os-brand{display:none}
+}
+
+/* ---------- BÖLÜM ŞERİDİ (os-bolum-seridi.tsx) ----------
+   Açık uygulamanın bölümleri üst çubuğun altında, yana kayan sekmeler;
+   sayfa kayarken üstte kalır. Masaüstünde gizli. */
+.os-bolum-serit{display:none}
+@media (max-width:760px){
+  .os-root .os-bolum-serit{
+    position:sticky;top:var(--os-bar-h);z-index:50;
+    display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain;
+    padding:6px var(--sp-3);border-bottom:1px solid var(--line);
+    background:color-mix(in srgb,var(--surface) 94%,transparent);
+    -webkit-backdrop-filter:saturate(1.6) blur(16px);backdrop-filter:saturate(1.6) blur(16px);
+  }
+  .os-root .os-bolum-serit::-webkit-scrollbar{display:none}
+  .os-root .os-bolum-serit a{
+    flex:none;display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:999px;
+    color:var(--muted);font-size:14px;font-weight:var(--fw-medium);text-decoration:none;white-space:nowrap;
+  }
+  .os-root .os-bolum-serit a:active{background:var(--surface-2)}
+  .os-root .os-bolum-serit a.is-active{background:var(--primary-soft);color:var(--primary);font-weight:var(--fw-semibold)}
+  /* Ara menü telefonda hiç açılmaz; açık kalmışsa (ekran döndürme) görünmesin. */
+  .os-root .os-subdock{display:none}
+  /* Basılan sekmenin "açık" görünümü telefonda yok (yazı kayıyordu). */
+  .os-root .os-dock-item.is-sub-open{background:none}
+}
+@media (max-width:760px){
+  /* Masaüstünün "üstüne gelince ipucu" kuralı yazıyı translateX(-50%) ile
+     sola kaydırıyordu: basılan sekmenin adı ikonun soluna kayıyordu. */
+  .os-root .os-dock .os-dock-item:is(:hover,:focus,:active,.is-sub-open) .os-dock-label{transform:none;opacity:1}
+}
+
+/* ---------- LİSTE ÜSTÜ: özet ve süzgeç daha az yer ----------
+   Talepler'de ilk kayıt ekranın ortasından (485px) başlıyordu: özet
+   sayıları iki satır (138px), temsilci seçimi ile arama alt alta (96px).
+   Özet tek satırda yana kayar; seçim(ler) ve arama yan yana. */
+@media (max-width:760px){
+  /*
+    ŞERİT SARIYOR, YANA KAYMIYOR (16.10.2026).
+
+    Buradaki kurallar tek SIRA bir yatay kaydırıcı varsayıyordu: her
+    kutuya sol ayraç, yalnızca BİRİNCİ kutuda ayraç yok. Oysa
+    kayit-detay.css aynı genişlikte şeridi iki sütunlu ızgaraya
+    çeviriyor (15.10) ve `display:grid` oradan geliyor. İki dosya aynı
+    şeride karşıt düzen yazınca ortaya şu çıkıyordu:
+
+      · sol sütunun İLK kutusu x=29'da, altındakiler x=44'te —
+        yani ikinci satırdan itibaren sola hizasız,
+      · satır başında, hiçbir şeyi ayırmayan dikey bir çizgi,
+      · sütunlar arasında boşluk sıfır (gap:0 buradan geliyordu).
+
+    Kurucu konsolunun şeridi aynı sorunu yaşayıp çözmüştü: ayracı
+    satır başına denk gelen kutulardan kaldırmak (nth-child(odd)).
+    Panel şeridi de artık o reçeteyi kullanıyor.
+  */
+  .os-root .panel-content .kayit-serit{padding:10px 0;border-radius:var(--r-lg)}
+  .os-root .panel-content .kayit-serit>dl{
+    flex-wrap:wrap;overflow-x:visible;gap:var(--sp-3) 0;
+    padding:0 var(--sp-4);
+  }
+  .os-root .panel-content .kayit-serit>dl>div{flex:none;padding:0 14px;border-left:1px solid var(--line-soft)}
+  .os-root .panel-content .kayit-serit>dl>div:nth-child(odd){padding-left:0;border-left:0}
+  .os-root .panel-content .kayit-serit dt{white-space:nowrap}
+  .os-root .panel-content .kayit-serit dd{white-space:nowrap}
+
+  /*
+    KONSOLDA ŞERİT SARILIR, YANA KAYMAZ.
+
+    Panelin liste şeritleri kısa süzgeç etiketleri taşıyor ve tek satırda
+    yana kaymak dikey yer kazandırıyor. Kurucu konsolunun şeritleri ise
+    sayının altında bir not satırı da taşıyor ("2 kullanımda", "Kurulum
+    hatası ya da kapalı erişim"); maddeler iki üç kat geniş oluyor ve
+    dördüncüsü telefonda kırpılıyordu — üstelik kaydırma çubuğu gizli
+    olduğu için devamı olduğu hiç belli olmuyordu. Kırpılan da genellikle
+    "Dikkat gerektiren" oluyordu, yani en çok görülmesi gereken sayı
+    (14.10.2026).
+
+    Bedeli bir satır yükseklik; karşılığı dört sayının da görünmesi.
+  */
+  /*
+    KENAR BOŞLUĞU GERİ (15.10.2026, kurum sahibi: "sayfaların başı
+    yakışmıyor").
+
+    Kayan şeritte yan boşluğu KARTIN değil, dl'nin dolgusu veriyor
+    (yukarıda: kart `padding:10px 0`, dl `padding:0 var(--sp-4)`) —
+    böylece kayan maddeler kenara kadar akarken ilk ve son madde yine
+    boşluklu duruyor. Sarmalı varyanta geçerken o dolgu sıfırlandı ve
+    kartın yan boşluğunu verecek başka bir kural olmadığı için yazı
+    kenar çizgisine 1 piksel kalıyordu: "Ürün" ve "4" çerçeveye
+    yapışıyor, sağ sütun ise ayıracın sağında 14 piksel nefes alıyordu.
+    İki yan artık eşit (ölçüldü: metin 13 → 29, sağ kenar 362 → 346;
+    kart kenarları 12 ve 363).
+
+    Satır arası da sp-2'den sp-3'e çıktı: her hücre üç satır taşıyor
+    (etiket, sayı, not) ve 8 pikselde iki sıra birbirine yapışıyordu.
+  */
+  .os-konsol .panel-content .kayit-serit>dl{
+    flex-wrap:wrap;overflow-x:visible;gap:var(--sp-3) 0;padding:0 var(--sp-4);
+  }
+  .os-konsol .panel-content .kayit-serit>dl>div{min-width:calc(50% - 1px)}
+  .os-konsol .panel-content .kayit-serit>dl>div:nth-child(odd){padding-left:0;border-left:0}
+  /* Not satırı sarabilir: kırpmak yerine iki satıra insin. */
+  .os-konsol .panel-content .kayit-serit small{white-space:normal}
+
+  .os-root .panel-content .talep-ara:has(>select){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-2);width:100%}
+  .os-root .panel-content .talep-ara:has(>select)>*{min-width:0;width:100%;margin:0}
+  .os-root .panel-content .talep-ara:has(>select)>:nth-child(odd):last-child{grid-column:1/-1}
+}
+
+/* ---------- ORTA PENCERELER alttan açılan sayfa (panel-modal) ----------
+   Cari hesap, prim hesabı, yetkiler… telefonda dört yanı 24px boşluklu
+   yüzen bir kutuydu; ekranın kenarları boşa gidiyordu ve kayıt
+   formlarıyla (çekmece, zaten alttan açılıyor) farklı davranıyordu. */
+@media (max-width:760px){
+  .os-root .panel-modal-root,.panel-root .panel-modal-root{align-items:flex-end;padding:0}
+  .os-root .panel-modal,.panel-root .panel-modal{
+    width:100%;max-width:none;max-height:calc(100dvh - 12px - env(safe-area-inset-top));margin:0;
+    border-width:1px 0 0;border-radius:var(--r-xl) var(--r-xl) 0 0;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .panel-root .panel-modal-root[data-boy] .panel-modal{max-height:calc(100dvh - 12px - env(safe-area-inset-top))}
+  .panel-root .panel-modal-header{padding:18px 64px 14px 18px}
+  .panel-root .panel-modal-close{top:14px;right:14px;width:36px;height:36px;border-radius:50%}
+  .panel-root .panel-modal-body{padding:16px 16px 20px}
+  /* Pencere içindeki özet de tek satırda yana kayar (liste üstüyle aynı). */
+  .panel-root .panel-modal .kayit-serit{padding:10px 0}
+  .panel-root .panel-modal .kayit-serit>dl{flex-wrap:nowrap;gap:0;overflow-x:auto;scrollbar-width:none;padding:0 var(--sp-4)}
+  .panel-root .panel-modal .kayit-serit>dl::-webkit-scrollbar{display:none}
+  .panel-root .panel-modal .kayit-serit>dl>div{flex:none;padding:0 14px;border-left:1px solid var(--line-soft)}
+  .panel-root .panel-modal .kayit-serit>dl>div:first-child{padding-left:0;border-left:0}
+  .panel-root .panel-modal .kayit-serit :is(dt,dd){white-space:nowrap}
+}
+@media (max-width:760px){
+  /* Boy seçenekleri (ör. "ekran": padding 16px) aynı ağırlıkta ve sonra
+     yükleniyor; telefonda boy farkı yok, hepsi alttan tam genişlik. */
+  .panel-root .panel-modal-root[data-boy]{align-items:flex-end;padding:0}
+}
+
+/* Arama paleti: telefonda klavye yok; "Esc", "↑↓ gez · Enter aç" ipuçları
+   yer kaplıyor ve yanlış şey söylüyordu. Palet ekranın üst yarısında. */
+@media (max-width:760px){
+  .os-root .os-palette kbd,.os-root .os-palette-foot{display:none}
+  .os-root .os-palette{margin-top:calc(8px + env(safe-area-inset-top))}
+}
+
+/* ---------- UYGULAMA KABUĞU BANDI (os-uygulama-kabugu.tsx) ----------
+   "Yeni sürüm hazır · Yenile" ve "Ana ekrana ekle" önerisi. Telefonda alt
+   sekme çubuğunun hemen üstünde; masaüstünde dock'un üstünde ortada. */
+.os-kabuk-bant{
+  position:fixed;z-index:70;left:50%;bottom:calc(var(--os-dock-space,104px) + 8px);transform:translateX(-50%);
+  display:flex;align-items:center;gap:var(--sp-3);width:min(560px,calc(100vw - 24px));
+  padding:12px 12px 12px 16px;border:1px solid var(--line);border-radius:var(--r-lg);
+  background:var(--surface);box-shadow:var(--shadow-lg);color:var(--ink);font-size:var(--fs-sm);line-height:1.4;
+}
+.os-kabuk-bant>span{flex:1;min-width:0}
+.os-kabuk-bant .panel-primary{flex:none;min-height:40px;padding:0 16px}
+.os-kabuk-kapat{flex:none;width:36px;height:36px;border:0;border-radius:50%;background:var(--surface-2);color:var(--muted);font-size:20px;line-height:1;cursor:pointer}
+@media (max-width:760px){
+  .os-root .os-kabuk-bant,.os-kabuk-bant{bottom:calc(var(--os-tab-h,58px) + env(safe-area-inset-bottom) + 10px)}
+}

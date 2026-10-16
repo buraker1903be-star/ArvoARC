@@ -1,33 +1,44 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { signOut } from "@/app/auth/actions";
 import { requireTenant } from "@/lib/tenant";
 import { ActivityDrawer } from "@/components/panel/activity-drawer";
-import { Icon } from "@/components/panel/icons";
-import { MobileNav } from "@/components/panel/mobile-nav";
 import { NavProgress } from "@/components/panel/nav-progress";
-import { PanelBreadcrumb } from "@/components/panel/panel-breadcrumb";
-import { PanelNavigation } from "@/components/panel/panel-navigation";
-import { SidebarToggle } from "@/components/panel/sidebar-toggle";
 import { SkipLink } from "@/components/panel/skip-link";
 import { ThemeToggle } from "@/components/panel/theme-toggle";
-import { TopbarSearch } from "@/components/panel/topbar-search";
-import { KomutPaleti } from "@/components/panel/komut-paleti";
-import { Suspense } from "react";
+import { arcUygulamalari } from "@/components/os/os-apps";
+import { OsDock } from "@/components/os/os-dock";
+import { OsGeri } from "@/components/os/os-geri";
+import { OsBolumSeridi } from "@/components/os/os-bolum-seridi";
+import { OsSaat, OsUygulamaAdi } from "@/components/os/os-status";
+import { OsAramaDugmesi, OsKomutPaleti } from "@/components/os/os-command-palette";
+import { OsKullaniciMenusu } from "@/components/os/os-user-menu";
+import { OsMenuKapat } from "@/components/os/os-menu-kapat";
+import { GlobalActionFeedback } from "@/components/os/global-action-feedback";
 import { activityUnread } from "./activity-actions";
 import "./panel-tokens.css";
+import "@/components/os/os-tokens.css";
 import "./design.css";
 import "./panel.css";
 import "./dashboard.css";
 import "./activity.css";
+import "@/components/os/os-shell.css";
+// Telefonda uygulama gibi: yalnızca ≤760px kuralları (masaüstüne dokunmaz).
+import "@/components/os/mobil-uygulama.css";
 
 /*
-  Panel kabuğu artık ortak yerleşim.
+  ŞİRKET İŞLETİM SİSTEMİ KABUĞU (16.10.2026, kurum sahibinin isteği:
+  "ArvoARC panelini ArvoOS kalitesinde ve aynı özelliklerle yeniden
+  yaratalım; dock ve pencere sistemi de gelsin").
 
-  Öncesinde her sayfa kendi <Shell> bileşenini çiziyordu: sayfa
-  değişince menü ve üst çubuk da yeniden çiziliyor, yükleme ekranı
-  tüm pencereyi (menü dahil) kaplıyordu. Yerleşimde durunca menü
-  yerinde kalır, yalnızca içerik alanı yenilenir — ArvoOS'teki gibi.
+  Eskiden: koyu sol kenar menüsü + breadcrumb'lı üst çubuk, telefonda
+  ayrı bir alt sekme çubuğu ve ayrı bir çekmece menü — üç ayrı gezinme
+  listesi. Şimdi ArvoOS'un kabuğu: üstte durum çubuğu (mağaza, açık
+  uygulama, Ctrl+K araması, saat, bildirimler, tema, hesap), altta
+  uygulama dock'u; fareyle bir uygulamanın üstüne gelince bölümleri
+  ikinci dock olarak açılır. Telefonda dock alt sekme çubuğu, bölümler
+  üstte şerit. Hepsi tek listeden: components/os/os-apps.ts.
+
+  Bileşenler ArvoOS/app/panel/os/*'ın kopyası (her dosyada kaynak yazılı).
 
   requireTenant React cache() ile sarılı: yerleşim ve sayfa aynı
   istekte çağırdığında veritabanına bir kez gidilir.
@@ -40,79 +51,62 @@ const roleNames: Record<string, string> = {
   member: "Ekip Üyesi",
 };
 
-function initialsOf(name: string) {
-  return name.split(/\s+/).filter(Boolean).map((word) => word[0]).join("").slice(0, 2).toLocaleUpperCase("tr-TR") || "A";
+function basHarf(ad: string) {
+  return (ad.trim()[0] ?? "A").toLocaleUpperCase("tr-TR");
 }
 
 export default async function PanelLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [{ organization, membership }, cookieStore, unread] = await Promise.all([requireTenant(), cookies(), activityUnread()]);
-  const navCollapsed = cookieStore.get("arc_nav")?.value === "collapsed";
-  const initials = initialsOf(organization.name);
+  const [{ supabase, organization, membership }, unread] = await Promise.all([requireTenant(), activityUnread()]);
+  /* Ad JWT'den (yerel çözümleme, ağ turu yok): kim olarak oturum açıldığı
+     eskiden hiçbir yerde yazmıyordu. */
+  const { data: kimlik } = await supabase.auth.getClaims();
+  const iddia = (kimlik?.claims ?? {}) as { email?: string; user_metadata?: { full_name?: string; name?: string } };
   const roleName = roleNames[membership.role] ?? "Ekip Üyesi";
+  const ad = iddia.user_metadata?.full_name || iddia.user_metadata?.name || iddia.email?.split("@")[0] || roleName;
+  const magazaAdi = String(organization.name ?? "Mağaza");
   const plan = String(organization.plan_code ?? "").toLocaleUpperCase("tr-TR");
+  const uygulamalar = arcUygulamalari();
 
   return (
-    <div className={navCollapsed ? "panel-root is-nav-collapsed" : "panel-root"}>
-      <SkipLink />
-      <NavProgress />
-      {/*
-        Komut paleti (⌘K / Ctrl+K / "/"). Yerleşimde duruyor ki her
-        sayfadan açılabilsin ve sayfa değişince kapanıp yeniden
-        kurulmasın.
-      */}
-      <KomutPaleti />
-
-      <aside id="panel-sidebar" className="panel-sidebar">
-        <Link prefetch={false} className="panel-brand" href="/" aria-label="ArvoARC — Genel Bakış">
-          <i>A</i>
-          <span><b>ArvoARC</b><small>ADAPTIVE RETAIL CORE</small></span>
-        </Link>
-
-        <div className="panel-org" title={organization.name}>
-          <span>{initials}</span>
-          <div><b>{organization.name}</b><small>{plan} · MAĞAZA</small></div>
-        </div>
-
-        <PanelNavigation />
-
-        <div className="panel-sidebar-footer">
-          <SidebarToggle initialCollapsed={navCollapsed} />
-          <div className="panel-security">
-            <i><Icon name="shield" size={14} /></i>
-            <span><b>Güvenli oturum</b><small>ArvoOS altyapısı</small></span>
-          </div>
-          <form className="panel-logout" action={signOut}>
-            <button type="submit" title="Çıkış yap"><Icon name="logout" size={16} /><span>Çıkış yap</span></button>
-          </form>
-        </div>
-      </aside>
-
-      <section className="panel-workspace">
-        <header className="panel-topbar">
-          <PanelBreadcrumb tenantName={organization.name} />
-          <Suspense fallback={<div className="panel-search" aria-hidden="true" />}><TopbarSearch /></Suspense>
-          <div className="panel-top-actions">
-            <div className="panel-quick-actions" aria-label="Hızlı erişim">
-              <a className="panel-quick-action" href="/magaza" target="_blank" rel="noreferrer">
-                <span className="panel-quick-icon"><Icon name="external" size={14} /></span><b>Mağazayı görüntüle</b>
-              </a>
-              <Link prefetch={false} className="panel-quick-action" href="/urunler?yeni=1#yeni-urun">
-                <span className="panel-quick-icon"><Icon name="plus" size={14} /></span><b>Yeni ürün</b>
-              </Link>
+    <div className="panel-root os-root">
+      <main className="panel-frame os-frame">
+        <SkipLink />
+        <NavProgress />
+        <GlobalActionFeedback />
+        <header className="os-bar">
+          {/* Telefonda alt sayfalarda geri (ana ekrana eklenen uygulamada tarayıcının geri tuşu yok). */}
+          <OsGeri uygulamalar={uygulamalar} />
+          <Link prefetch={false} className="os-brand" href="/" aria-label={`${magazaAdi} ana ekran`}>
+            <i aria-hidden="true">{basHarf(magazaAdi)}</i>
+            <span><b>{magazaAdi}</b><OsUygulamaAdi uygulamalar={uygulamalar} /></span>
+          </Link>
+          <OsAramaDugmesi />
+          <div className="os-bar-right">
+            <OsSaat />
+            <div className="os-bar-actions">
+              <ActivityDrawer initialUnread={unread} />
+              <ThemeToggle />
             </div>
-            <ActivityDrawer initialUnread={unread} />
-            <ThemeToggle />
-            <div className="panel-user">
-              <span>{initials}</span>
-              <p><b>{roleName}</b><small>{plan}</small></p>
-            </div>
+            <OsMenuKapat />
+            <OsKullaniciMenusu ad={ad} rol={roleName} kurum={magazaAdi} paket={plan} cikis={signOut} />
           </div>
         </header>
-        {/* Ekran okuyucuların "ana içerik" bölgesi; tabIndex, bağlantı odağı buraya taşıyabilsin diye. */}
-        <main id="icerik" className="panel-content" tabIndex={-1}>{children}</main>
-      </section>
-
-      <MobileNav tenantName={organization.name} tenantInitials={initials} roleName={roleName} />
+        {/* Telefonda açık uygulamanın bölümleri (masaüstünde gizli; orada dock'un ikinci katı). */}
+        <OsBolumSeridi uygulamalar={uygulamalar} />
+        <section className="os-workspace">
+          {/* Ekran okuyucuların "ana içerik" bölgesi; tabIndex, bağlantı odağı buraya taşıyabilsin diye. */}
+          <div id="icerik" className="panel-content" tabIndex={-1}>{children}</div>
+        </section>
+        <OsDock
+          uygulamalar={uygulamalar}
+          digerUygulamalar={[{ kod: "arvoos", ad: "ArvoOS", href: "https://app.arvo-os.com/panel", ayniSekme: false }]}
+        />
+        <OsKomutPaleti
+          uygulamalar={uygulamalar}
+          cikis={signOut}
+          kayitAramasi={{ etiket: "için sipariş, ürün ve müşteri ara", ipucu: "Arama", adresOneki: "/ara?q=" }}
+        />
+      </main>
     </div>
   );
 }

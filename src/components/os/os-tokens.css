@@ -1,0 +1,193 @@
+/* ============================================================
+   ArvoOS Panel — Design Tokens
+   Tek kaynak: tüm modüller bu değişkenleri kullanır.
+   Dark mode: <html data-theme="dark"> ile aktifleşir.
+
+   Görsel dil (2026-10, "sade, kurum renkli"): nötr gri-beyaz zemin, beyaz
+   kartlar, tek vurgu rengi KURUMUN marka rengi. Kurum renk seçmediyse
+   vurgu gece mavisidir. Şampanya altını paleti belgeler ve geriye dönük
+   modül stilleri için duruyor; panelin varsayılan vurgusu değil.
+   (2026-09'daki "gece mavisi ve şampanya" dilinde vurgu altındı ve kurum
+   rengini birincil düğmeler hiç almıyordu.)
+
+   BURADA OLMAYAN BİR DEĞERİ MODÜL CSS'İNE YAZMAYIN. Yeni bir ihtiyaç
+   varsa önce buraya token olarak ekleyin. `npm run check:css` semantik
+   token'ların başka dosyada yeniden tanımlanmasını yakalar.
+   ============================================================ */
+
+.panel-root{
+  /* ==========================================================
+     PALET — tek kaynak. Panelde geçen HER renk buradan gelir.
+     Modül CSS'lerine sabit hex yazmayın; çok kiracılı temada kırılır.
+     ========================================================== */
+
+  /* --- brand (gece mavisi) --- */
+  --brand-50:#eef1f6;  --brand-100:#d9dfea; --brand-200:#b3bfd3; --brand-300:#8497b5;
+  --brand-400:#536b91; --brand-500:#2c4368; --brand-600:#1b3050; --brand-700:#13243f;
+  --brand-800:#0b1b2e; --brand-900:#08142a; --brand-950:#050c1a;
+
+  /* --- accent (şampanya altını) — kiracı markası bunu ezer ---
+     500 dekoratif altın; metin ve düğmede AA kontrast için 600+ kullanılır. */
+  --accent-50:#fbf8f1;  --accent-100:#f5eddb; --accent-200:#eadbb8; --accent-300:#dcc28c;
+  --accent-400:#c9a66a; --accent-500:#b28a49; --accent-600:#8e6d33; --accent-700:#74582a;
+  --accent-800:#5a4421; --accent-900:#3f3017;
+
+  /* --- neutral (serin gri; mürekkep neredeyse siyah) ---
+     2026-10: önceki iOS grileri (#f2f2f7…) ile 900'ün gece mavisi
+     (#0b1b2e) arasında ton kopukluğu vardı; ölçek tek tona çekildi. */
+  --n-0:#ffffff;   --n-50:#f9fafb;  --n-100:#f2f4f7; --n-200:#e4e7ec; --n-300:#d0d5dd;
+  --n-400:#98a2b3; --n-500:#667085; --n-600:#475467; --n-700:#344054; --n-800:#1d2939;
+  --n-900:#101828;
+
+  /* --- surfaces & text (light defaults) --- */
+  --bg:#f6f7f9;
+  --surface:#ffffff;
+  --surface-2:#f9fafb;
+  --surface-raised:#ffffff;
+  --sidebar-from:#0e2139; --sidebar-to:#050c1a; --sidebar-glow:#2c4368;
+  --ink:#101828; --muted:#667085; --dim:#98a2b3; --ink-soft:#344054;
+  --line:#e4e7ec; --line-soft:#f2f4f7;
+
+  /* ==========================================================
+     ÇOK KİRACILI MARKA
+     Panel kabuğu .panel-root üzerine --tenant-accent basar
+     (lib/tenant-theme.ts); aşağıdaki alias'lar tüm panele o rengi
+     taşır. Kurum renk seçmediyse gece mavisine düşer.
+     --primary: birincil düğme, aktif menü, seçili sekme, odak halkası.
+     --accent: geriye dönük ad; artık --primary ile aynı rengi taşır.
+     ========================================================== */
+  --primary:        var(--tenant-accent,        var(--brand-600));
+  --primary-strong: var(--tenant-accent-strong, var(--brand-800));
+  --primary-soft:   var(--tenant-accent-soft,   var(--brand-50));
+  --primary-on:     var(--tenant-accent-on,     #ffffff);
+  --accent:        var(--primary);
+  --accent-strong: var(--primary-strong);
+  --accent-soft:   var(--primary-soft);
+  --accent-on:     var(--primary-on);
+  /* koyu zeminlerde (menü, koyu kartlar) parlayan vurgu */
+  --accent-bright: var(--tenant-accent,        var(--brand-300));
+  --focus:color-mix(in srgb,var(--primary) 32%,transparent);
+
+  /* semantic */
+  /*
+    DURUM RENKLERİ KENDİ YUMUŞAK ZEMİNİNE GÖRE SEÇİLDİ. Bu ikililer
+    panelde 48'den fazla yerde "rozet" olarak birlikte kullanılıyor
+    (öncelik, talep durumu, satın alma durumu…) ve yazı 11–12,5px.
+    02.10.2026'da ölçüldü: success 4.40, warning 3.58 — ikisi de AA
+    eşiğinin (4.5) altındaydı; en kötüsü uyarı rengiydi, yani en çok
+    okunması gereken rozet en az okunanıydı. danger (4.76) ve info
+    (5.58) zaten geçiyordu, onlara dokunulmadı.
+    Yeni değerler: success 4.69, warning 4.62. Koyu temanın ikilileri
+    (6.31 / 6.79 / 5.87) zaten geçiyor.
+  */
+  --success:#2d7854; --success-soft:#e7f3ec;
+  --warning:#906418; --warning-soft:#faf0dc;
+  --danger:#b83c3c; --danger-soft:#f9e9e7;
+  --info:#2f5f9e; --info-soft:#e8eff8;
+
+  /* elevation — sade: kartı kenarlık ayırır, gölge yalnızca ipucu */
+  --shadow-xs:0 1px 2px rgba(16,24,40,.05);
+  --shadow-sm:0 1px 3px rgba(16,24,40,.08), 0 1px 2px rgba(16,24,40,.04);
+  --shadow-md:0 4px 8px -2px rgba(16,24,40,.08), 0 2px 4px -2px rgba(16,24,40,.04);
+  --shadow-lg:0 20px 24px -4px rgba(16,24,40,.10), 0 8px 8px -4px rgba(16,24,40,.04);
+  --shadow-glow:0 0 0 4px var(--focus);
+
+  /* radius — 2026-10'a kadar panel-premium.css bunları 10/14/18/24 diye
+     sessizce eziyordu; tek kaynak burası */
+  --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-pill:999px;
+
+  /* spacing — 4px ızgara */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px;
+  --sp-8:32px; --sp-10:40px; --sp-12:48px;
+
+  /* hareket */
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --dur-fast:.12s; --dur:.2s;
+
+  /* --- typography ---
+     ÖNEMLİ: --font-body ve --font-heading hiçbir yerde tanımlı değildi.
+     Tanımsız var() yüzünden `font:` kısayolu geçersiz sayılıyor ve tüm
+     panel varsayılan tarayıcı fontuna düşüyordu.
+     Tek yazı tipi (2026-09): Apple cihazlarında SF Pro, diğerlerinde Inter.
+     Yığın app/globals.css'te (body --font-system). --font-display artık
+     ayrı bir serif değil; başlık ağırlık ve aralıkları panel-premium.css'te. */
+  --font-body:var(--font-system,-apple-system,BlinkMacSystemFont,"Inter",system-ui,"Segoe UI",Roboto,sans-serif);
+  --font-heading:var(--font-body);
+  --font-display:var(--font-body);
+
+  /* type scale — 2026-10: gövde 13px'ten 14px'e çıktı; 11–12,5px'lik
+     yarım adımlar (11.5, 12.5, 13.5…) bu ölçeğe toplanacak */
+  --fs-micro:12px;   /* etiket / kicker / rozet */
+  --fs-sm:13px;      /* yardımcı metin, tablo başlığı */
+  --fs-base:14px;    /* gövde, tablo, nav */
+  --fs-md:16px;      /* kart başlığı */
+  --fs-lg:20px;      /* bölüm başlığı */
+  --fs-xl:24px;      /* sayfa başlığı */
+  --fs-2xl:30px;     /* istatistik rakamı */
+  --lh-tight:1.25; --lh-base:1.5;
+  --fw-medium:500; --fw-semibold:600; --fw-bold:700;
+
+  /* legacy aliases kept for backward-compat with module CSS files */
+  --navy:var(--brand-800); --green:var(--accent); --green-soft:var(--accent-soft);
+  --ink-legacy:var(--ink); --paper:var(--surface);
+  /* eski modül CSS'lerinin (crm/audit/team/work/structure) kullandığı ama
+     hiç tanımlanmamış olan kısa adlar */
+  --pline:var(--line); --pn:var(--ink); --pm:var(--muted); --pg:var(--accent);
+  --panel-border:var(--line); --panel-muted:var(--muted); --panel-text:var(--ink);
+  --panel-surface:var(--surface); --panel-soft:var(--surface-2);
+  --ux-bg:var(--bg); --ux-surface:var(--surface); --ux-ink:var(--ink); --ux-muted:var(--muted);
+  --ux-line:var(--line); --ux-primary:var(--primary); --ux-accent:var(--accent); --ux-soft:var(--accent-soft);
+
+  background:var(--bg);
+  font-size:var(--fs-base);
+  line-height:var(--lh-base);
+  color-scheme:light;
+  transition:background-color .25s ease, color .25s ease;
+}
+
+html[data-theme="dark"] .panel-root{
+  /* 2026-10: fildişi mürekkep + lacivert zemin yerine nötr koyu gri.
+     Eskiden panel-premium.css burada ikinci bir koyu palet tanımlıyor ve
+     --ink'i fildişinden griye çeviriyordu; hangisinin geçerli olduğu
+     import sırasına kalmıştı. */
+  --bg:#0c0e12;
+  --surface:#13161c;
+  --surface-2:#0f1217;
+  --surface-raised:#191d25;
+  --sidebar-from:#08142a; --sidebar-to:#03070f; --sidebar-glow:#1b3050;
+  --ink:#f2f4f7; --muted:#98a2b3; --dim:#667085;
+  /* --ink-soft koyu temada tanımsızdı: açık temanın koyu grisi koyu zeminde
+     okunmuyordu (ikincil metinler, ana sayfa, İK, finans). */
+  --ink-soft:#d0d5dd;
+  --line:#262b35; --line-soft:#1b1f27;
+
+  --success:#5bbf8a; --success-soft:#12301f;
+  --warning:#e0b056; --warning-soft:#3a2c10;
+  --danger:#f07a6f; --danger-soft:#3a1716;
+  --info:#7ea8e6; --info-soft:#132844;
+
+  /*
+    --accent-50 koyu temada TANIMSIZDI ve açık temanın kremi (#fbf8f1)
+    olduğu gibi kalıyordu: onu zemin olarak kullanan her katman (uygulama
+    ızgarası hücresi, pano sürükleme hedefi, hızlı bakıştaki güncel aşama)
+    koyu panelin ortasında bembeyaz bir kutuya dönüşüyor, üstündeki açık
+    renkli marka logosu ve metin okunmaz oluyordu.
+  */
+  --accent-50:#1d1710;
+  --accent-100:#2a2215;
+  /* koyu zeminde koyu lacivert okunmuyor: varsayılan vurgu açık tona geçer.
+     Kurum rengi olduğu gibi kalır (tenant-theme çok koyu rengi zaten açmaz;
+     bkz. lib/tenant-theme.ts). */
+  --primary:        var(--tenant-accent,        var(--brand-300));
+  --primary-strong: var(--tenant-accent-strong, var(--brand-200));
+  --primary-soft:   color-mix(in srgb,var(--primary) 16%,transparent);
+  --primary-on:     var(--tenant-accent-on,     var(--brand-950));
+  --shadow-xs:0 1px 2px rgba(0,0,0,.3);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.4);
+  --shadow-md:0 4px 12px rgba(0,0,0,.45);
+  --shadow-lg:0 20px 40px rgba(0,0,0,.55);
+
+  color-scheme:dark;
+}
+
+html[data-theme="dark"] .panel-root{ --paper:var(--surface); }

@@ -1,0 +1,433 @@
+/* ============================================================
+   ŞİRKET İŞLETİM SİSTEMİ KABUĞU (2026-10)
+   Durum çubuğu (üst) + dock (alt) + başlatıcı + Ctrl+K paleti.
+   Yalnızca panel-tokens.css değerleri kullanılır; kurum rengi --primary.
+   Sınıflar os- önekli: eski kabuğun (.panel-sidebar, .panel-topbar)
+   kurallarıyla çakışmasın diye. Kurucu konsolu eski kabukta kalıyor.
+   ============================================================ */
+
+.os-root{--os-bar-h:60px;--os-dock-space:104px}
+.os-root .os-frame{display:block;min-height:100dvh}
+
+/* ---------- Durum çubuğu ---------- */
+.os-bar{
+  position:sticky;top:0;z-index:60;
+  display:flex;align-items:center;gap:var(--sp-3);
+  /* Yükseklik SABİT ve dikey boşluk yok: eskiden min-height + 8px boşluk + 44px içerik +
+     1px çizgi 61px ediyordu; sayfalar çubuğu 60px (--os-bar-h) sayıp ekranı doldurduğu için
+     bütün liste sayfaları 1px taşıyordu (2026-10). İçerik align-items ile ortalanıyor. */
+  height:var(--os-bar-h);padding:0 var(--sp-5);box-sizing:border-box;
+  background:color-mix(in srgb,var(--surface) 86%,transparent);
+  border-bottom:1px solid var(--line);
+  -webkit-backdrop-filter:saturate(1.6) blur(14px);backdrop-filter:saturate(1.6) blur(14px);
+}
+.os-brand{display:flex;align-items:center;gap:var(--sp-3);min-height:44px;min-width:0;color:var(--ink);text-decoration:none}
+.os-brand>i,.os-brand>img{flex:none;width:34px;height:34px;border-radius:var(--r-md);object-fit:cover}
+.os-brand>i{display:grid;place-items:center;background:var(--primary);color:var(--primary-on);font-style:normal;font-weight:var(--fw-bold);font-size:var(--fs-base)}
+.os-brand>span{display:flex;flex-direction:column;min-width:0;line-height:var(--lh-tight)}
+.os-brand b{font-size:var(--fs-base);font-weight:var(--fw-semibold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.os-brand-app{font-size:var(--fs-micro);color:var(--muted);white-space:nowrap}
+
+.os-search{
+  flex:1 1 320px;max-width:520px;margin-inline:auto;
+  display:flex;align-items:center;gap:var(--sp-3);
+  height:40px;padding:0 var(--sp-3);
+  border:1px solid var(--line);border-radius:var(--r-md);
+  background:var(--surface-2);color:var(--muted);font:inherit;font-size:var(--fs-sm);text-align:left;cursor:pointer;
+  transition:border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);
+}
+.os-search:hover{border-color:color-mix(in srgb,var(--primary) 40%,var(--line));background:var(--surface)}
+.os-search:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
+.os-search-text{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.os-root kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:var(--fs-micro);padding:1px 6px;border:1px solid var(--line);border-radius:var(--r-xs);background:var(--surface);color:var(--ink-soft)}
+
+.os-bar-right{display:flex;align-items:center;gap:var(--sp-2);margin-left:auto}
+.os-bar-actions{display:flex;align-items:center;gap:var(--sp-1)}
+/* Eski kabuk telefonda .panel-icon-button'ı gizliyordu (panel.css); durum
+   çubuğunda tema, mesaj ve bildirim düğmeleri her ekranda kalır. */
+.os-bar .panel-icon-button{display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:var(--r-md);background:transparent;color:var(--ink-soft)}
+.os-bar .panel-icon-button:hover{background:var(--surface-2);color:var(--ink)}
+.os-clock{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:var(--fs-sm);color:var(--ink-soft);min-width:44px;text-align:center}
+
+.os-live{display:flex;align-items:center;gap:var(--sp-2)}
+.os-live-pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:var(--r-pill);font-size:var(--fs-micro);font-weight:var(--fw-semibold);white-space:nowrap}
+.os-live-pill>i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.os-live-pill.is-canli{background:var(--success-soft);color:var(--success)}
+.os-live-pill.is-canli>i{animation:os-nabiz 2s ease-in-out infinite}
+.os-live-pill.is-baglaniyor{background:var(--surface-2);color:var(--muted)}
+.os-live-pill.is-kopuk{background:var(--danger-soft);color:var(--danger)}
+@keyframes os-nabiz{0%,100%{opacity:1}50%{opacity:.35}}
+
+.os-avatar{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:50%;background:var(--ink);color:var(--surface);font-size:var(--fs-micro);font-weight:var(--fw-semibold);letter-spacing:.02em}
+.os-avatar--sm{width:28px;height:28px;border:2px solid var(--surface);background:var(--primary-soft);color:var(--primary-strong)}
+.os-avatar--sm+.os-avatar--sm{margin-left:-8px}
+.os-avatar--more{background:var(--surface-2);color:var(--ink-soft)}
+.os-avatar--lg{width:44px;height:44px;font-size:var(--fs-sm)}
+.os-online{display:flex;align-items:center}
+
+/* ---------- Kullanıcı menüsü ---------- */
+.os-user{position:relative}
+.os-user>summary{list-style:none;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;cursor:pointer}
+.os-user>summary::-webkit-details-marker{display:none}
+.os-user>summary:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
+.os-user-menu{
+  position:absolute;right:0;top:calc(100% + 8px);z-index:70;width:300px;max-width:calc(100vw - 24px);
+  padding:var(--sp-2);box-sizing:border-box;
+  border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface-raised);box-shadow:var(--shadow-lg);
+}
+.os-user-head{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3)}
+.os-user-head b{display:block;font-weight:var(--fw-semibold)}
+.os-user-head small{display:block;color:var(--muted);font-size:var(--fs-sm)}
+.os-user-section{padding:var(--sp-2) var(--sp-3);border-top:1px solid var(--line-soft)}
+.os-user-links{display:flex;flex-direction:column;padding:var(--sp-1) 0;border-top:1px solid var(--line-soft)}
+.os-user-links a,.os-user-logout button{
+  display:flex;align-items:center;gap:var(--sp-3);min-height:40px;padding:0 var(--sp-3);
+  border:0;border-radius:var(--r-sm);background:transparent;color:var(--ink);font:inherit;text-decoration:none;cursor:pointer;width:100%;text-align:left
+}
+.os-user-links a:hover,.os-user-logout button:hover{background:var(--surface-2)}
+.os-user-logout{padding-top:var(--sp-1);border-top:1px solid var(--line-soft)}
+.os-user-logout button{color:var(--danger)}
+/* --muted: --dim metin olarak AA altında kalıyor (dashboard.css'teki
+   not). Burası hesap menüsünün alt satırı, yani okunması gereken metin. */
+.os-user-foot{margin:var(--sp-1) var(--sp-3) var(--sp-2);font-size:var(--fs-micro);color:var(--muted)}
+
+/* ---------- Çalışma alanı ---------- */
+.os-workspace{min-width:0}
+.os-root .panel-content{
+  /* Panel genişliğinde (kurum sahibinin isteği, 2026-10): eskiden 1360px. */
+  max-width:none;margin:0;box-sizing:border-box;
+  padding:var(--sp-6) var(--sp-6) calc(var(--os-dock-space) + env(safe-area-inset-bottom));
+}
+
+/* ---------- Dock ---------- */
+.os-dock{
+  position:fixed;left:50%;bottom:max(var(--sp-4),env(safe-area-inset-bottom));transform:translateX(-50%);z-index:55;
+  display:flex;align-items:center;gap:var(--sp-1);
+  max-width:calc(100vw - var(--sp-6));padding:var(--sp-2);box-sizing:border-box;overflow-x:auto;scrollbar-width:none;
+  border:1px solid var(--line);border-radius:var(--r-xl);
+  background:color-mix(in srgb,var(--surface) 88%,transparent);
+  -webkit-backdrop-filter:saturate(1.6) blur(16px);backdrop-filter:saturate(1.6) blur(16px);
+  box-shadow:var(--shadow-lg);
+}
+.os-dock::-webkit-scrollbar{display:none}
+.os-dock-sep{flex:none;width:1px;height:28px;margin:0 var(--sp-1);background:var(--line)}
+.os-dock-item{
+  position:relative;flex:none;display:grid;place-items:center;width:48px;height:48px;
+  border:0;border-radius:var(--r-md);background:transparent;color:var(--ink-soft);cursor:pointer;text-decoration:none;
+  transition:transform var(--dur) var(--ease),background-color var(--dur) var(--ease),color var(--dur) var(--ease);
+}
+.os-dock-item:hover{background:var(--surface-2);color:var(--ink);transform:translateY(-3px)}
+.os-dock-item:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
+.os-dock-item.is-active{background:var(--primary-soft);color:var(--primary)}
+.os-dock-item.is-active::after{content:"";position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:var(--primary)}
+/* Ad, fareyle üstüne gelince ipucu olarak; ekran okuyucu aria-label'ı okur. */
+.os-dock-label{
+  position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) translateY(4px);
+  padding:4px 8px;border-radius:var(--r-xs);background:var(--ink);color:var(--surface);
+  font-size:var(--fs-micro);font-weight:var(--fw-medium);white-space:nowrap;pointer-events:none;opacity:0;
+  transition:opacity var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease);
+}
+@media(hover:hover){.os-dock-item:hover .os-dock-label{opacity:1;transform:translateX(-50%)}}
+.os-dock-badge{position:absolute;top:4px;right:4px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:var(--r-pill);background:var(--danger);color:var(--n-0);font-size:11px;font-weight:var(--fw-semibold);line-height:16px;text-align:center}
+
+/* ---------- Başlatıcı ve Ctrl+K: ortak pencere ---------- */
+.os-launcher,.os-palette{
+  /* margin:auto açıkça: genel bir sıfırlama tarayıcının modal pencereyi
+     ortalayan margin:auto değerini 0 yapıyordu; Uygulamalar ve Ctrl+K sol
+     üst köşede açılıyordu. */
+  margin:auto;border:1px solid var(--line);border-radius:var(--r-xl);padding:0;
+  background:var(--surface-raised);color:var(--ink);box-shadow:var(--shadow-lg);
+}
+.os-launcher::backdrop,.os-palette::backdrop{background:color-mix(in srgb,var(--n-900) 35%,transparent);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.os-launcher[open],.os-palette[open]{animation:os-ac .22s var(--ease)}
+@keyframes os-ac{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+
+.os-launcher{width:min(760px,calc(100vw - 32px));max-height:calc(100dvh - 64px);overflow:auto}
+.os-launcher-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4);padding:var(--sp-6) var(--sp-6) var(--sp-2)}
+.os-launcher-head h2{margin:0;font-size:var(--fs-lg);font-weight:var(--fw-semibold)}
+.os-launcher-head p{margin:var(--sp-1) 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-launcher-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:var(--sp-6) var(--sp-3);padding:var(--sp-4) var(--sp-6) var(--sp-6)}
+.os-launcher-app{display:flex;flex-direction:column;align-items:center;gap:var(--sp-2);color:var(--ink);text-decoration:none;font-size:var(--fs-sm);font-weight:var(--fw-medium);text-align:center}
+.os-launcher-app>span:last-child{display:inline-flex;align-items:center;gap:4px}
+.os-app-tile{
+  display:grid;place-items:center;width:64px;height:64px;border-radius:18px;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);box-shadow:var(--shadow-xs);
+  transition:transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
+}
+.os-launcher-app:hover .os-app-tile{transform:translateY(-3px);box-shadow:var(--shadow-md)}
+.os-launcher-app:focus-visible{outline:none}
+.os-launcher-app:focus-visible .os-app-tile{box-shadow:var(--shadow-glow)}
+.os-app-tile.is-active{background:var(--primary);border-color:var(--primary);color:var(--primary-on)}
+.os-app-tile--product{padding:10px;box-sizing:border-box}
+.os-app-tile--product img{width:100%;height:auto}
+.os-app-tile--product>i{font-style:normal;font-weight:var(--fw-bold);font-size:var(--fs-lg)}
+.os-launcher-products{border-top:1px solid var(--line-soft)}
+.os-launcher-products h3{margin:0;padding:var(--sp-5) var(--sp-6) 0;font-size:var(--fs-sm);font-weight:var(--fw-semibold);color:var(--muted)}
+.os-launcher .marka-koyu{display:none}
+html[data-theme="dark"] .os-launcher .marka-acik{display:none}
+html[data-theme="dark"] .os-launcher .marka-koyu{display:block}
+.os-icon-btn{display:grid;place-items:center;flex:none;width:40px;height:40px;border:0;border-radius:var(--r-md);background:transparent;color:var(--muted);cursor:pointer}
+.os-icon-btn:hover{background:var(--surface-2);color:var(--ink)}
+/* Telefonda 44: tek kullanıldığı yer uygulama çekmecesinin kapatma
+   düğmesi ve orası alttan açılan bir yaprak — parmakla kapatılıyor. */
+@media (max-width:760px){.os-icon-btn{width:44px;height:44px}}
+
+/* Ctrl+K */
+.os-palette{width:min(640px,calc(100vw - 32px));margin-top:12vh;overflow:hidden}
+.os-palette-input{display:flex;align-items:center;gap:var(--sp-3);padding:0 var(--sp-4);border-bottom:1px solid var(--line);color:var(--muted)}
+.os-palette-input input{flex:1;min-width:0;height:56px;border:0;outline:none;background:transparent;color:var(--ink);font:inherit;font-size:var(--fs-md)}
+.os-palette-list{list-style:none;margin:0;padding:var(--sp-2);max-height:min(420px,60dvh);overflow:auto}
+.os-palette-group{padding:var(--sp-2) var(--sp-2) var(--sp-1);font-size:var(--fs-micro);font-weight:var(--fw-semibold);color:var(--muted)}
+.os-palette-item{display:flex;align-items:center;gap:var(--sp-3);width:100%;min-height:44px;padding:0 var(--sp-2);border:0;border-radius:var(--r-sm);background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.os-palette-item.is-active{background:var(--primary-soft)}
+.os-palette-item.is-active .os-palette-icon{background:var(--primary);color:var(--primary-on)}
+.os-palette-icon{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink-soft)}
+.os-palette-label{flex:1}
+.os-palette-item small{font-size:var(--fs-micro);color:var(--muted)}
+.os-palette-empty{padding:var(--sp-6) var(--sp-2);text-align:center;color:var(--muted)}
+.os-palette-foot{display:flex;gap:var(--sp-4);padding:var(--sp-2) var(--sp-4);border-top:1px solid var(--line);background:var(--surface-2);font-size:var(--fs-micro);color:var(--muted)}
+
+/* ---------- Dar ekran ---------- */
+@media (max-width:900px){
+  .os-root{--os-bar-h:56px;--os-dock-space:96px}
+  .os-bar{padding:0 var(--sp-3);gap:var(--sp-2)}
+  .os-brand-app,.os-clock,.os-online,.os-search-text,.os-search kbd{display:none}
+  .os-search{flex:0 0 40px;width:40px;margin:0 0 0 auto;padding:0;justify-content:center;border-color:transparent;background:transparent}
+  .os-bar-right{margin-left:0}
+  .os-live-pill{padding:0 8px}
+  .os-root .panel-content{padding:var(--sp-4) var(--sp-3) calc(var(--os-dock-space) + env(safe-area-inset-bottom))}
+  .os-dock{left:var(--sp-3);right:var(--sp-3);transform:none;max-width:none;justify-content:flex-start;border-radius:var(--r-lg)}
+  .os-dock-item{width:46px;height:46px}
+}
+@media (max-width:520px){
+  .os-brand>span{display:none}
+  .os-live-pill{font-size:0;gap:0;width:28px;padding:0;justify-content:center}
+  .os-bar .panel-theme-toggle{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .os-dock-item,.os-app-tile,.os-launcher[open],.os-palette[open]{transition:none;animation:none}
+  .os-live-pill.is-canli>i{animation:none}
+}
+
+/* Marka kutusu kare simge (13.10.2026): eskiden burada yatay kelime logosu
+   basılıyor ve kurum adı gizleniyordu. Artık kurumun kare simgesi (favicon)
+   34px kutuda, yanında ad ve açık uygulama — ArvoOS'taki "A" kutusu gibi. */
+.os-brand>img{background:var(--surface-2)}
+
+/* Mesaj ve bildirim çekmecelerinin tetikleyicileri (eski üst çubuktan):
+   durum çubuğunda yalnızca ikon + rozet. */
+.os-bar .panel-quick-action{
+  position:relative;display:grid;place-items:center;width:40px;height:40px;min-height:40px;padding:0;
+  border:0;border-radius:var(--r-md);background:transparent;color:var(--ink-soft);box-shadow:none
+}
+.os-bar .panel-quick-action:hover{background:var(--surface-2);color:var(--ink)}
+.os-bar .panel-quick-action>b{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.os-bar .panel-quick-icon{width:auto;height:auto;background:transparent;color:inherit;border-radius:0}
+.os-bar .panel-unread-badge{position:absolute;top:4px;right:4px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:var(--r-pill);background:var(--danger);color:var(--n-0);font-size:11px;font-weight:var(--fw-semibold);line-height:16px;text-align:center}
+.os-live-pill.is-taze{background:var(--primary-soft);color:var(--primary)}
+/* Saat ve üstünde tarih ("8 Ekim Perşembe"), sağa hizalı iki satır. */
+.os-clock{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;min-width:44px;line-height:1.2;font-family:inherit}
+.os-clock-date{font-size:var(--fs-micro);color:var(--muted);white-space:nowrap}
+.os-clock time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:var(--fs-sm);color:var(--ink);font-weight:var(--fw-medium)}
+
+/* Hesap menüsünde çalışma alanları listesi */
+.os-user-label{display:block;padding:0 var(--sp-1) var(--sp-1);font-size:var(--fs-micro);font-weight:var(--fw-semibold);color:var(--muted)}
+.os-ws-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto}
+.os-ws-item{display:flex;align-items:center;gap:var(--sp-3);min-height:44px;padding:var(--sp-1) var(--sp-2);border-radius:var(--r-sm);color:var(--ink);text-decoration:none}
+a.os-ws-item:hover{background:var(--surface-2)}
+a.os-ws-item:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
+.os-ws-item.is-active{background:var(--primary-soft)}
+.os-ws-mark{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink-soft);font-size:var(--fs-sm);font-weight:var(--fw-bold)}
+.os-ws-item.is-active .os-ws-mark{background:var(--primary);color:var(--primary-on)}
+.os-ws-text{flex:1;min-width:0;display:flex;flex-direction:column;line-height:var(--lh-tight)}
+.os-ws-text b{font-size:var(--fs-sm);font-weight:var(--fw-semibold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.os-ws-text small{font-size:var(--fs-micro);color:var(--muted);text-transform:capitalize}
+.os-ws-check{flex:none;color:var(--primary);font-weight:var(--fw-bold)}
+/* Saatin iki satırlı stili yukarıdaki dar ekran kuralından sonra geldiği
+   için onu eziyordu; telefonda saat ve tarih yine gizli (yer yok). */
+@media (max-width:900px){.os-clock{display:none}}
+
+/* ---------- İkinci dock (uygulamanın bölümleri) ----------
+   Fareyle dock'taki bir uygulamanın üstüne gelince hemen üstünde açılır.
+   Ana dock'la aynı cam dil; açık bölüm kurum renginde. Yatay konum
+   ikonun ortası, ekran kenarına taşmaz (os-dock.tsx). */
+.os-subdock{
+  position:fixed;z-index:56;transform:translateX(-50%);
+  display:flex;align-items:center;gap:2px;max-width:calc(100vw - var(--sp-6));
+  padding:var(--sp-1);box-sizing:border-box;overflow-x:auto;scrollbar-width:none;
+  border:1px solid var(--line);border-radius:var(--r-lg);
+  background:color-mix(in srgb,var(--surface) 92%,transparent);
+  -webkit-backdrop-filter:saturate(1.6) blur(16px);backdrop-filter:saturate(1.6) blur(16px);
+  box-shadow:var(--shadow-lg);
+  animation:os-alt-ac .16s var(--ease);
+}
+.os-subdock::-webkit-scrollbar{display:none}
+/* İkon ile şerit arasındaki boşlukta imleç düşmesin diye görünmez köprü */
+.os-subdock::after{content:"";position:absolute;left:0;right:0;top:100%;height:12px}
+@keyframes os-alt-ac{from{opacity:0;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%)}}
+.os-subdock-title{flex:none;padding:0 var(--sp-3) 0 var(--sp-2);font-size:var(--fs-micro);font-weight:var(--fw-semibold);color:var(--muted);border-right:1px solid var(--line);margin-right:var(--sp-1);white-space:nowrap}
+.os-subdock a{
+  flex:none;display:flex;align-items:center;min-height:36px;padding:0 var(--sp-3);
+  border-radius:var(--r-md);color:var(--ink-soft);font-size:var(--fs-sm);font-weight:var(--fw-medium);text-decoration:none;white-space:nowrap;
+  transition:background-color var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease);
+}
+.os-subdock a:hover{background:var(--surface-2);color:var(--ink)}
+.os-subdock a:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
+.os-subdock a.is-active{background:var(--primary-soft);color:var(--primary);font-weight:var(--fw-semibold)}
+/* İkinci dock açıkken o ikonun ad ipucu gizli (üst üste binmesin) */
+.os-dock-item.is-sub-open .os-dock-label{display:none}
+.os-dock-item.is-sub-open{background:var(--surface-2);color:var(--ink)}
+.os-dock-item.is-sub-open.is-active{background:var(--primary-soft);color:var(--primary)}
+@media (prefers-reduced-motion:reduce){.os-subdock{animation:none}}
+/* Telefonda ikinci dock ekran genişliğinde, bölümler sığmazsa alt satıra
+   iner: altı bölümlü CRM şeridi 375px'te ekrandan taşıyordu. Yatay konum
+   satır içi stilde (ikonun ortası); burada ezilir. */
+@media (max-width:900px){
+  .os-subdock{left:var(--sp-3) !important;right:var(--sp-3);transform:none;max-width:none;flex-wrap:wrap;justify-content:flex-start;overflow:visible;animation:os-alt-ac-dar .16s var(--ease)}
+  .os-subdock-title{flex-basis:100%;border-right:0;margin:0;padding:var(--sp-1) var(--sp-2)}
+  .os-subdock a{min-height:40px}
+}
+@keyframes os-alt-ac-dar{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------- Liste sayfaları: sayfa sabit, satırlar tablonun içinde kayar ----------
+
+   Talepler, teklifler, sözleşmeler, işler, ekip ve finans listelerinde alttaki
+   satırlara ulaşılamıyordu. Kartın yüksekliği sabit bir sayıyla veriliyordu
+   (100dvh - 350px); o sayı kayıt detayına göre ölçülmüş, liste sayfalarının
+   üst bölümü ise daha uzun. Kartın alt kenarı ekranın altından taşıyor, taşan
+   kısımdaki satırlara da kartın kaydırma çubuğuna da erişilemiyordu.
+
+   ÜÇ BAĞIMLILIK BİLEREK KULLANILMIYOR, çünkü iki denemede de sorun sürdü ve
+   ikisi de Safari'de doğrulanamadı:
+
+     - `:has()` seçicisi: sayfa artık kendi sınıfını taşıyor (.liste-sayfa),
+       kural neyin liste olduğunu tahmin etmiyor.
+     - Izgara öğesinin esneyip uzaması: kaydırma ızgara öğesinde (kart) değil,
+       onun içindeki TABLO SARMALAYICISINDA. Zincirin her halkası düz flex ve
+       her birinde min-height:0 var — Safari'nin taşmayı kısaltmayı reddettiği
+       klasik durum bu kuralla kapanır.
+     - Sihirli sayı: yükseklik --os-bar-h, --sp-6 ve --os-dock-space'ten
+       türüyor, yani üst çubuk ya da dock değişirse kendiliğinden uyar.
+
+   Kaydırmanın tabloda olmasının ikinci bir faydası: süzgeç satırı yerinde
+   kalıyor, yalnızca satırlar kayıyor. */
+.os-root main.liste-sayfa{
+  display:flex;flex-direction:column;
+  height:calc(100dvh - var(--os-bar-h) - var(--sp-6) - var(--os-dock-space) - env(safe-area-inset-bottom));
+  /* Çok kısa pencerede liste okunamayacak kadar incelmesin; orada sayfa kayar. */
+  min-height:420px;
+}
+/*
+  Başlık ve şerit KENDİ boylarında kalır, yalnızca liste esner. Flex
+  öğeleri varsayılan olarak kısalabiliyor; sabit yükseklikli bir sütunda
+  bu, uzun başlığın kırpılması ve bir sonraki bloğun üstüne binmesi
+  demekti (08.10.2026, iş maliyetleri ekranı: açıklama satırı özet
+  şeridinin altında kaldı).
+*/
+.os-root main.liste-sayfa>:not(.talep-izgara):not(.talep-bilgi){flex:0 0 auto}
+/*
+  TEK SÜTUNLU LİSTE SAYFASI (15.10.2026). Kurallar yalnızca ızgaranın
+  içindeki karta yazılıydı; sağdaki istatistik sütunu kaldırılan sayfada
+  (Faturalama ve Tahsilat) liste kartı main'in DOĞRUDAN çocuğu oldu ve
+  `:not(.talep-izgara)` yüzünden flex:0 0 auto alıp esnemeyi bıraktı.
+  Sonuç, sayfa ekran yüksekliğine sabitken kartın içerik boyunda
+  büyümesi: liste uzayınca alt satırlar ekranın altına taşıyor ve sayfa
+  da kaymadığı için onlara ERİŞİLEMİYOR — bu dosyanın yukarıdaki yorumu
+  tam olarak bu hatayı anlatıyor, kural bir yerde eksik kalmış.
+  Tahsilat bugün boş olduğu için görünmüyordu.
+*/
+.os-root main.liste-sayfa>.talep-bilgi{
+  display:flex;flex-direction:column;flex:1 1 auto;
+  min-height:0;max-height:none;overflow:hidden;
+}
+.os-root main.liste-sayfa>.talep-izgara{flex:1 1 auto;min-height:0;align-items:stretch;grid-template-rows:minmax(0,1fr)}
+.os-root main.liste-sayfa>.talep-izgara>.talep-bilgi{
+  display:flex;flex-direction:column;align-self:stretch;
+  min-height:0;max-height:none;overflow:hidden;
+}
+/* Asıl kaydırma alanı. Negatif alt kenar boşluğu kaldırılıyor: kart artık
+   taşmayı gizlediği için o boşluk son satırı kırpıyordu. */
+.os-root main.liste-sayfa .talep-bilgi>.talep-tablo{
+  flex:1 1 auto;min-height:0;margin-bottom:0;overflow:auto;
+  scrollbar-width:thin;scrollbar-color:var(--n-300) transparent;
+}
+/*
+  Yapışkan başlık liste sayfasında sıfırdan yapışıyor. kayit-detay.css
+  onu kartın iç boşluğu kadar yukarı çekiyor (top:-20px); orada kayan
+  şey KARTIN kendisi. Liste sayfasında kayan şey tablonun kendi kutusu,
+  negatif değer başlığı 20px dışarı taşıyor ve kaydırırken satırlar
+  başlığın üstünden geçiyordu.
+*/
+.os-root main.liste-sayfa .talep-tablo .crm-data-table thead th{top:0}
+.os-root main.liste-sayfa .talep-bilgi>.talep-tablo::-webkit-scrollbar{width:9px}
+.os-root main.liste-sayfa .talep-bilgi>.talep-tablo::-webkit-scrollbar-thumb{border-radius:9px;background:var(--n-300)}
+/* Yan sütun kendi boyunda kalır, taşarsa kendi içinde kayar. */
+.os-root main.liste-sayfa>.talep-izgara>:not(.talep-bilgi){align-self:start;max-height:100%;overflow:auto}
+
+@media (max-width:1200px){
+  /* Tek sütuna düşen dar ekranda iki ayrı kaydırma alanı birbirine giriyor:
+     orada sayfa kayar, tablo değil. */
+  /* Flex KALIR, yalnızca yükseklik serbest: eskiden display:block'tu ve
+     .talep'in blok arası boşluğu (gap) da gidiyordu — özet şeridi ile
+     liste kartı birbirine yapışıyordu (13.10.2026, bütün listeler). */
+  .os-root main.liste-sayfa{display:flex;height:auto;min-height:0}
+  .os-root main.liste-sayfa>.talep-izgara>.talep-bilgi{display:block;overflow:visible}
+  .os-root main.liste-sayfa .talep-bilgi>.talep-tablo{overflow:visible}
+}
+
+/* Üst çubuktaki sayaç rozeti (posta). Dock rozetiyle birebir aynı ölçü:
+   iki ayrı rozet dili panelde iki ayrı ürün gibi görünüyordu. */
+.os-posta-dugmesi{position:relative}
+.os-bar-badge{
+  position:absolute;top:4px;right:4px;z-index:1;
+  min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;
+  border-radius:var(--r-pill);background:var(--danger);color:var(--n-0);
+  font-size:11px;font-weight:var(--fw-semibold);line-height:16px;text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+
+/*
+  YENİ POSTA UYARISI (os-posta-uyarisi.tsx): üst çubuktaki rozetin
+  altında, sağ üstte. Sabit konumlu çünkü üst çubuk sayfa kaydıkça
+  yerinde duruyor ve uyarı da onunla kalmalı; çubuğun içinde akan bir
+  kutu, dar ekranda saat ve kullanıcı menüsünü dışarı itiyordu.
+*/
+.os-root .os-posta-uyari{
+  position:fixed;top:calc(var(--os-bar-h) + var(--sp-2));right:var(--sp-4);z-index:70;
+  display:flex;align-items:flex-start;gap:var(--sp-2);max-width:340px;
+  padding:var(--sp-3);border:1px solid var(--line);border-radius:var(--r-md);
+  background:var(--surface);box-shadow:var(--shadow-lg,0 12px 32px rgba(16,24,40,.16));
+  animation:os-posta-uyari-gir .18s ease}
+.os-root .os-posta-uyari a{display:flex;flex-direction:column;gap:2px;min-width:0;color:inherit;text-decoration:none}
+.os-root .os-posta-uyari b{font-size:var(--fs-sm);color:var(--ink)}
+.os-root .os-posta-uyari span{color:var(--muted);font-size:var(--fs-sm);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.os-root .os-posta-uyari a:hover b{color:var(--primary)}
+.os-root .os-posta-uyari button{flex:none;border:0;background:transparent;color:var(--muted);font-size:16px;line-height:1;cursor:pointer}
+.os-root .os-posta-uyari button:hover{color:var(--ink)}
+@keyframes os-posta-uyari-gir{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.os-root .os-posta-uyari{animation:none}}
+@media (max-width:760px){.os-root .os-posta-uyari{left:var(--sp-3);right:var(--sp-3);max-width:none}}
+
+/* Kullanıcı menüsünde ekibe görünürlük anahtarı: çıkış düğmesinin
+   üstünde, aynı satır düzeninde. Altındaki küçük yazı ne olduğunu
+   söylüyor — "çevrimdışı görün" kaydın silindiği anlamına gelmiyor. */
+/*
+  GÖRÜNÜRLÜK DÜĞMESİ MENÜNÜN RİTMİNE UYUYOR (15.10.2026).
+
+  Hesap menüsünün dört öğesinden üçü 40 piksel yüksekliğinde
+  (Ayarlar, Bildirimler, Çıkış yap); görünürlük düğmesinin ise
+  min-height'i yoktu ve metin kadar, 20 piksel kalıyordu. Aynı menüde
+  yarı boy tek öğe göze çarpıyor, üstelik parmakla en zor vurulanı o —
+  oysa yaptığı iş hafif değil: ekibe çevrimdışı görünmek.
+
+  Yatay dolgu da formdaydı, düğmede değil: metinler aynı hizadaydı ama
+  düğmenin KUTUSU 12 piksel içeriden başlıyordu, yani üzerine gelince
+  beliren vurgu komşularından dar çiziliyordu. Dolgu düğmeye ve
+  açıklama satırına taşındı; dördünün kutusu artık birebir aynı.
+*/
+.os-root .os-user-gorunurluk{display:flex;flex-direction:column;gap:2px;padding:var(--sp-2) 0;border-top:1px solid var(--line-soft)}
+.os-root .os-user-gorunurluk button{display:flex;align-items:center;gap:var(--sp-2);width:100%;min-height:40px;padding:0 var(--sp-3);border:0;background:transparent;color:var(--ink);font:inherit;font-size:var(--fs-sm);font-weight:var(--fw-medium);text-align:left;cursor:pointer}
+.os-root .os-user-gorunurluk button:hover{color:var(--primary)}
+.os-root .os-user-gorunurluk small{display:block;padding:0 var(--sp-3);color:var(--muted);font-size:var(--fs-micro);line-height:1.4}
+.os-root .os-gorunurluk-nokta{flex:none;width:8px;height:8px;border-radius:50%;background:var(--success)}
+.os-root .os-gorunurluk-nokta.is-gizli{background:var(--n-400)}
