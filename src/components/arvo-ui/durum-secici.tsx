@@ -27,6 +27,7 @@ import "./durum-secici.css";
   gibi çalışmaya devam eder. Manuel sipariş penceresinde seçenek
   sayısı 243'tü; tarayıcının <select>'i hiç değilse yazarak atlamaya
   izin veriyordu, aramasız bir liste onun GERİSİNE düşerdi.
+  ArvoOS'a taşınırken lib/arama-metni.ts de gider.
 */
 
 export type DurumSecenegi = { deger: string; etiket: string; ton?: string };
@@ -238,8 +239,13 @@ export function DurumSecici({
             value={sorgu}
             autoFocus
             placeholder="Ara…"
+            role="combobox"
             aria-label={`${etiket} ara`}
+            aria-expanded="true"
             aria-controls={liste}
+            /* Odak arama kutusunda: gezilen satırı ekran okuyucuya
+               bildiren alan da burası olmalı. */
+            aria-activedescendant={`${liste}-${etkin}`}
             onChange={(olay) => {
               setSorgu(olay.target.value);
               setEtkin(0);
