@@ -230,7 +230,9 @@ export default async function Customers({ searchParams }: { searchParams: Promis
         ]}
         gruplar={[
           {
-            baslik: istatistik.ilkBesPayi === null ? "En çok harcayan" : `En çok harcayan · cironun %${istatistik.ilkBesPayi}'i ilk beşte`,
+            /* Ek sayının OKUNUŞUNA bağlı ("%82'si" ama "%80'i", "%3'ü"):
+               eki kurmak yerine cümle ekten kaçacak biçimde yazıldı. */
+            baslik: istatistik.ilkBesPayi === null ? "En çok harcayan" : `En çok harcayan · ciroda ilk beşin payı %${istatistik.ilkBesPayi}`,
             satirlar: istatistik.enCokHarcayan.map((m) => ({ ad: m.ad, adet: m.harcama, etiket: kisaPara(m.harcama) })),
           },
         ]}
