@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
-import { PanelBildirimi } from "@/components/panel/bildirim";
-import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
+import { KKart, KListe, KOge } from "@/components/arvo-ui/k-ui";
+import { Pencere } from "@/components/os/pencere";
 import { createDiscount,deleteDiscount,toggleDiscount } from "./actions";
 import "../catalog.css";
+// Satır içi silme onayı (confirm-inline) ve form ızgarası (discount-form-grid) hâlâ orada.
 import "../modules.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./indirimler.css";
 
 const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"});
 const dateTime=new Intl.DateTimeFormat("tr-TR",{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/Istanbul"});
@@ -20,7 +23,8 @@ function ruleType(type:string){
   return type==="percentage"?"Sepette yüzde indirim":type==="fixed_amount"?"Sepette tutar indirimi":"Ücretsiz kargo";
 }
 
-export default async function DiscountsPage(){
+export default async function DiscountsPage({searchParams}:{searchParams:Promise<{pencere?:string}>}){
+  const {pencere:pencereParametresi}=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const [{data:products,error:productError},{data:variants,error:variantError},{data:rules,error:rulesError}]=await Promise.all([
     supabase.from("arc_products").select("id,name,status,metadata").is("supplier",null).limit(500).eq("organization_id",organization.id),
@@ -45,29 +49,98 @@ export default async function DiscountsPage(){
   const allRules=rules??[];
   const activeRules=allRules.filter(rule=>rule.status==="active");
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <h1>İndirimler</h1>
-        <p>Ürün indirimi, kupon ve kargo kuralları.</p>
-      </div>
-      {canManage?<div className="ac-bar-actions"><a className="ac-btn ac-btn-primary" href="#yeni-indirim">+ Yeni indirim paketi</a></div>:null}
-    </section>
+  const pencere=canManage&&pencereParametresi==="yeni";
+  const DURUM:Record<string,{etiket:string;ton:string}>={active:{etiket:"Aktif",ton:"success"},paused:{etiket:"Duraklatıldı",ton:"warning"},draft:{etiket:"Taslak",ton:"neutral"}};
 
-    <div className="ac-stack">
-      {/* Sonuç ÇEREZDEN geliyor; adres satırı artık okunmuyor. */}
-      <PanelBildirimi />
+  /* ArvoOS kalıbı (16.10.2026): başlık, özet şeridi, iOS listeleri; yeni indirim pencerede. */
+  return (
+    <main className="talep liste-sayfa indirim-sayfasi">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker">Katalog</small>
+          <h1>İndirimler</h1>
+          <p className="talep-bas-alt">Ürün indirimi, kupon ve kargo kuralları.</p>
+        </div>
+        {canManage?<div className="talep-bas-eylem"><Link prefetch={false} scroll={false} className="panel-primary" href="/indirimler?pencere=yeni">+ Yeni indirim paketi</Link></div>:null}
+      </header>
 
-      <section className="ac-metrics" aria-label="İndirim özeti">
-        <article className="ac-metric"><span>Aktif kural</span><strong>{activeRules.length}</strong><small>Sepet ve kargo</small></article>
-        <article className="ac-metric"><span>Kupon kodu</span><strong>{activeRules.filter(rule=>rule.code).length}</strong><small>Müşteri tarafından girilir</small></article>
-        <article className="ac-metric"><span>Otomatik kampanya</span><strong>{activeRules.filter(rule=>!rule.code).length}</strong><small>Koşul sağlanınca uygulanır</small></article>
-        <article className="ac-metric"><span>Ürün indirimi</span><strong>{productDiscounts.length}</strong><small>Karşılaştırma fiyatından</small></article>
-      </section>
+      <nav className="kayit-serit talep-serit" aria-label="İndirim özeti">
+        <dl>
+          <div><dt>Aktif kural</dt><dd>{activeRules.length}</dd><small>sepet ve kargo</small></div>
+          <div><dt>Kupon kodu</dt><dd>{activeRules.filter(rule=>rule.code).length}</dd><small>müşteri girer</small></div>
+          <div><dt>Otomatik kampanya</dt><dd>{activeRules.filter(rule=>!rule.code).length}</dd><small>koşul sağlanınca</small></div>
+          <div><dt>Ürün indirimi</dt><dd>{productDiscounts.length}</dd><small>karşılaştırma fiyatından</small></div>
+        </dl>
+      </nav>
 
-      {canManage?(
-        <details className="ac ac-pad catalog-details" id="yeni-indirim">
-          <summary><span><b>Yeni indirim paketi oluştur</b><small>Kupon kodunu boş bırakırsanız kural sepette otomatik uygulanır</small></span></summary>
+      <KKart baslik="Sepet ve kargo kuralları" aciklama={`${allRules.length} indirim paketi`}>
+        {allRules.length?(
+          <KListe>
+            {allRules.map(rule=>(
+              <KOge
+                key={rule.id}
+                simge={rule.code||"Otomatik"}
+                baslik={rule.name}
+                alt={[rule.code?`Kod: ${rule.code}`:"Otomatik",ruleType(rule.discount_type),rule.minimum_subtotal>0?`${money.format(rule.minimum_subtotal/100)} üzeri`:"alt limitsiz",rule.usage_limit?`${rule.usage_count}/${rule.usage_limit} kullanım`:`${rule.usage_count??0} kullanım`,rule.ends_at?`${dateTime.format(new Date(rule.ends_at))} biter`:null].filter(Boolean).join(" · ")}
+                durum={DURUM[rule.status]??{etiket:rule.status,ton:"neutral"}}
+                deger={ruleValue(rule)}
+                degerAlt={rule.combinable?"birleşebilir":"tek başına"}
+                sonu={canManage?(
+                  <span className="indirim-eylem">
+                    <form action={toggleDiscount}><input type="hidden" name="id" value={rule.id}/><input type="hidden" name="next_status" value={rule.status==="active"?"paused":"active"}/><button className="panel-secondary" type="submit">{rule.status==="active"?"Duraklat":"Etkinleştir"}</button></form>
+                    {/* Silme geri alınamaz: tek tıkla değil, satır içi onayla. */}
+                    <details className="confirm-inline">
+                      <summary className="panel-danger">Sil</summary>
+                      <form action={deleteDiscount} className="confirm-inline-body">
+                        <input type="hidden" name="id" value={rule.id}/>
+                        <span>“{rule.name}” kalıcı olarak silinsin mi?</span>
+                        <button className="panel-danger" type="submit">Evet, sil</button>
+                      </form>
+                    </details>
+                  </span>
+                ):undefined}
+              />
+            ))}
+          </KListe>
+        ):(
+          <div className="crm-empty-state talep-bos-kutu">
+            <h2>Henüz indirim paketi yok</h2>
+            <p>Kupon kodlu ya da sepette kendiliğinden uygulanan bir kampanya oluşturabilirsiniz.</p>
+            {canManage?<div className="crm-empty-actions"><Link prefetch={false} className="panel-primary" href="/indirimler?pencere=yeni">İlk indirimi oluştur</Link></div>:null}
+          </div>
+        )}
+      </KKart>
+
+      <KKart baslik="Ürün bazlı indirimler" aciklama={`${productDiscounts.length} varyant · karşılaştırma fiyatı satış fiyatından yüksek olanlar`} sag={<Link prefetch={false} className="panel-secondary" href="/urunler">Ürünler</Link>}>
+        {productDiscounts.length?(
+          <KListe>
+            {productDiscounts.map(item=>{
+              const meta=(item.product?.metadata??{}) as Meta;
+              return (
+                <KOge
+                  key={item.id}
+                  href={`/urunler/${item.product_id}`}
+                  baslik={item.product?.name??"Ürün"}
+                  alt={`${item.title||"Tek varyant"} · ${item.sku}`}
+                  durum={{etiket:meta.badge||"Otomatik",ton:meta.badge?"success":"neutral"}}
+                  deger={money.format(item.price/100)}
+                  degerAlt={<><s>{money.format((item.compare_at_price??0)/100)}</s> · −%{item.discountRate}</>}
+                />
+              );
+            })}
+          </KListe>
+        ):(
+          <div className="crm-empty-state talep-bos-kutu">
+            <h2>Aktif ürün indirimi yok</h2>
+            <p>Bir varyanta satış fiyatından yüksek karşılaştırma fiyatı girdiğinizde vitrinde üstü çizili fiyat ve indirim rozeti görünür.</p>
+            <div className="crm-empty-actions"><Link prefetch={false} className="panel-secondary" href="/urunler">Ürünlere git</Link></div>
+          </div>
+        )}
+      </KKart>
+
+      {pencere?(
+        <Pencere key="yeni" ust="Katalog" baslik="Yeni indirim paketi" kapatAdresi="/indirimler">
+          <p className="indirim-pencere-alt">Kupon kodunu boş bırakırsanız kural sepette otomatik uygulanır.</p>
           <form action={createDiscount}>
             <div className="discount-form-grid">
               <label className="wide">Kampanya adı<input name="name" required maxLength={160} placeholder="Örn. 2.000 TL Üzeri Ücretsiz Kargo"/></label>
@@ -84,60 +157,8 @@ export default async function DiscountsPage(){
             </div>
             <div className="product-editor-actions"><span>Kural sepet hesaplama motorunda saklanır; vitrin ve ödeme aynı kuralı uygular.</span><button className="ac-btn ac-btn-primary" type="submit">İndirim paketini oluştur</button></div>
           </form>
-        </details>
+        </Pencere>
       ):null}
-
-      <section>
-        <div className="section-title"><div><small>SEPET VE KARGO KURALLARI</small><h3>{allRules.length} indirim paketi</h3></div></div>
-        {allRules.length?<div className="discount-package-grid">{allRules.map(rule=><article className={`discount-package ${rule.status}`} key={rule.id}>
-          <div className="discount-package-top"><span>{rule.code?<b>{rule.code}</b>:<b>OTOMATİK</b>}<small>{ruleType(rule.discount_type)}</small></span><em>{rule.status==="active"?"Aktif":rule.status==="paused"?"Duraklatıldı":"Taslak"}</em></div>
-          <div className="discount-package-value"><strong>{ruleValue(rule)}</strong><span>{rule.minimum_subtotal>0?`${money.format(rule.minimum_subtotal/100)} üzeri`:"Alt limitsiz"}</span></div>
-          <h3>{rule.name}</h3>
-          <ul>
-            <li>{rule.combinable?"Diğer indirimlerle birleşebilir":"Tek başına uygulanır"}</li>
-            <li>{rule.usage_limit?`${rule.usage_count}/${rule.usage_limit} kullanım`:`${rule.usage_count??0} kullanım · limitsiz`}</li>
-            <li>{rule.per_customer_limit?`Müşteri başına ${rule.per_customer_limit} kez`:"Müşteri limiti yok"}</li>
-            <li>{rule.ends_at?`${dateTime.format(new Date(rule.ends_at))} tarihinde biter`:"Süresiz kampanya"}</li>
-          </ul>
-          {canManage?<div className="discount-package-actions">
-            <form action={toggleDiscount}><input type="hidden" name="id" value={rule.id}/><input type="hidden" name="next_status" value={rule.status==="active"?"paused":"active"}/><button className="ac-btn" type="submit">{rule.status==="active"?"Duraklat":"Aktif et"}</button></form>
-            {/* Silme geri alınamaz: tek tıkla değil, satır içi onayla. */}
-            <details className="confirm-inline">
-              <summary className="ac-btn ac-btn-danger">Sil</summary>
-              <form action={deleteDiscount} className="confirm-inline-body">
-                <input type="hidden" name="id" value={rule.id}/>
-                <span>“{rule.name}” kalıcı olarak silinsin mi?</span>
-                <button className="ac-btn ac-btn-danger" type="submit">Evet, sil</button>
-              </form>
-            </details>
-          </div>:null}
-        </article>)}</div>:<section className="ac">
-          <ListeBos baslik="Henüz indirim paketi yok." aciklama="Kupon kodlu ya da sepette kendiliğinden uygulanan bir kampanya oluşturabilirsiniz.">
-            {canManage?<ListeBosEylem href="#yeni-indirim" birincil>İlk indirimi oluştur</ListeBosEylem>:null}
-          </ListeBos>
-        </section>}
-      </section>
-
-      <section className="ac table list-table discount-product-list">
-        <div className="ac-head ac-pad-sm list-table-head"><div><h3>Ürün bazlı indirimler</h3><p>{productDiscounts.length} varyant · karşılaştırma fiyatı satış fiyatından yüksek olanlar</p></div><Link prefetch={false} href="/urunler">Ürünleri yönet →</Link></div>
-        {productDiscounts.length?<>
-          <div className="list-row th"><span className="dl-name">ÜRÜN / VARYANT</span><span className="dl-old">ESKİ FİYAT</span><span className="dl-new">YENİ FİYAT</span><span className="dl-rate">İNDİRİM</span><span className="dl-badge">ROZET</span><span className="dl-edit"/></div>
-          {productDiscounts.map(item=>{
-            const meta=(item.product?.metadata??{}) as Meta;
-            return <div className="list-row" key={item.id}>
-              {/* title: satır metni üç nokta ile kırpılıyor. */}
-              <span className="dl-name"><b title={item.product?.name}>{item.product?.name}</b><small title={`${item.title||"Default"} · ${item.sku}`}>{item.title||"Default"} · {item.sku}</small></span>
-              <span className="dl-old"><s>{money.format((item.compare_at_price??0)/100)}</s></span>
-              <span className="dl-new"><b>{money.format(item.price/100)}</b><small>{money.format(item.discountAmount/100)} avantaj</small></span>
-              <span className="dl-rate"><em>−%{item.discountRate}</em></span>
-              <span className="dl-badge"><em className="ac-tag" data-tone={meta.badge?"good":"muted"}>{meta.badge||"Otomatik"}</em></span>
-              <span className="dl-edit"><Link prefetch={false} href={`/urunler/${item.product_id}`}>Düzenle →</Link></span>
-            </div>;
-          })}
-        </>:<ListeBos baslik="Aktif ürün indirimi bulunmuyor." aciklama="Bir varyanta satış fiyatından yüksek karşılaştırma fiyatı girdiğinizde vitrinde üstü çizili fiyat ve indirim rozeti görünür.">
-          <ListeBosEylem href="/urunler">Ürünlere git</ListeBosEylem>
-        </ListeBos>}
-      </section>
-    </div>
-  </>;
+    </main>
+  );
 }

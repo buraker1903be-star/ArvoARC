@@ -4,8 +4,8 @@ import { requireTenant } from "@/lib/tenant";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel } from "@/lib/commerce-labels";
 import { terimiTemizle } from "@/lib/panel-arama";
-import { ListeBos, ListeBosEylem } from "@/components/panel/liste-bos";
 import "./medya.css";
+import "@/components/arvo-ui/kayit-detay.css";
 
 /*
   MEDYA KİTAPLIĞI.
@@ -75,25 +75,25 @@ export default async function Medya({ searchParams }: { searchParams: Promise<Pa
     return metin ? `/medya?${metin}` : "/medya";
   };
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <h1>Medya</h1>
-        <p>{toplam.toLocaleString("tr-TR")} görsel{arama ? ` · “${arama}”` : ""} · ürün sayfalarında kullanılan tüm fotoğraflar</p>
-      </div>
-    </section>
+  /* ArvoOS liste kalıbı (16.10.2026): başlık, arama ve ızgara tek kartta; sayfalayıcı ArvoOS'unki. */
+  return (
+    <main className="talep liste-sayfa medya-sayfasi">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker">Katalog</small>
+          <h1>Medya</h1>
+          <p className="talep-bas-alt">{toplam.toLocaleString("tr-TR")} görsel{arama ? ` · “${arama}”` : ""} · ürün sayfalarında kullanılan tüm fotoğraflar</p>
+        </div>
+      </header>
 
-    <div className="ac-stack">
-      <section className="ac ac-pad-sm list-toolbar">
-        <form className="ac-filter medya-ara" role="search">
-          <input name="q" defaultValue={arama} placeholder="Ürün adına göre ara" aria-label="Görsellerde ara" />
-          <button className="ac-btn ac-btn-primary" type="submit">Ara</button>
-          {arama ? <Link prefetch={false} className="ac-btn" href={yol({ q: "", page: 1 })}>Temizle</Link> : null}
-        </form>
-      </section>
-
-      {satirlar.length ? (
-        <section className="ac ac-pad medya-kap" aria-label="Görseller">
+      <section className="panel-card talep-bilgi" aria-label="Görseller">
+        <div className="ekip-suzgec talep-suzgec">
+          <form className="talep-ara" role="search">
+            <input name="q" defaultValue={arama} placeholder="Ürün adına göre ara" aria-label="Görsellerde ara" />
+          </form>
+        </div>
+        {satirlar.length ? (
+          <>
           <div className="medya-izgara">
             {satirlar.map((satir) => {
               const kaynak = adres(satir.yol);
@@ -111,29 +111,28 @@ export default async function Medya({ searchParams }: { searchParams: Promise<Pa
               );
             })}
           </div>
-          {sayfaSayisi > 1 ? (
-            <div className="list-pagination">
-              <span>{(baslangic + 1).toLocaleString("tr-TR")}–{(baslangic + satirlar.length).toLocaleString("tr-TR")} / {toplam.toLocaleString("tr-TR")} görsel</span>
-              <div>
-                {sayfa > 1 ? <Link prefetch={false} className="ac-btn" href={yol({ page: sayfa - 1 })}>← Önceki</Link> : <span className="ac-btn" aria-disabled="true">← Önceki</span>}
-                <span className="order-page-number">{sayfa} / {sayfaSayisi}</span>
-                {sayfa < sayfaSayisi ? <Link prefetch={false} className="ac-btn" href={yol({ page: sayfa + 1 })}>Sonraki →</Link> : <span className="ac-btn" aria-disabled="true">Sonraki →</span>}
-              </div>
+            {sayfaSayisi > 1 ? (
+              <nav className="liste-sayfalar" aria-label="Sayfalar">
+                {sayfa > 1 ? <Link prefetch={false} href={yol({ page: sayfa - 1 })}>← Önceki</Link> : <span aria-disabled="true">← Önceki</span>}
+                <b>{sayfa} / {sayfaSayisi} · {toplam.toLocaleString("tr-TR")} görsel</b>
+                {sayfa < sayfaSayisi ? <Link prefetch={false} href={yol({ page: sayfa + 1 })}>Sonraki →</Link> : <span aria-disabled="true">Sonraki →</span>}
+              </nav>
+            ) : null}
+          </>
+        ) : (
+          <div className="crm-empty-state talep-bos-kutu">
+            <h2>{arama ? "Bu aramayla eşleşen görsel yok" : "Henüz görsel yok"}</h2>
+            <p>{arama
+              ? "Arama ürün adında geçiyor; farklı bir ad deneyin."
+              : "Görseller ürün sayfasından yükleniyor ve burada toplanıyor. Kapak görseli olmayan ürün vitrinde boş bir kutu gösterir."}</p>
+            <div className="crm-empty-actions">
+              {arama
+                ? <Link prefetch={false} className="panel-secondary" href="/medya">Aramayı temizle</Link>
+                : <Link prefetch={false} className="panel-primary" href="/urunler">Ürünlere git</Link>}
             </div>
-          ) : null}
-        </section>
-      ) : (
-        <ListeBos
-          baslik={arama ? "Bu aramayla eşleşen görsel yok." : "Henüz görsel yok."}
-          aciklama={arama
-            ? "Arama ürün adında geçiyor; farklı bir ad deneyin."
-            : "Görseller ürün sayfasından yükleniyor ve burada toplanıyor. Kapak görseli olmayan ürün vitrinde boş bir kutu gösterir."}
-        >
-          {arama
-            ? <ListeBosEylem href="/medya">Aramayı temizle</ListeBosEylem>
-            : <ListeBosEylem href="/urunler" birincil>Ürünlere git</ListeBosEylem>}
-        </ListeBos>
-      )}
-    </div>
-  </>;
+          </div>
+        )}
+      </section>
+    </main>
+  );
 }

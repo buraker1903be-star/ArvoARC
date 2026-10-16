@@ -1,0 +1,8 @@
+/* İndirimler: ArvoOS kalıbı (16.10.2026). */
+.os-root .indirim-sayfasi{display:grid;gap:var(--sp-4)}
+.os-root .indirim-sayfasi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .indirim-sayfasi .kayit-serit small{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro)}
+.os-root .indirim-eylem{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.os-root .indirim-eylem form{margin:0}
+.os-root .indirim-eylem :is(button,summary){min-height:30px;padding:4px 10px;font-size:var(--fs-sm)}
+.indirim-pencere-alt{margin:0;color:var(--muted);font-size:var(--fs-sm)}
