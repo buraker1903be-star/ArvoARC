@@ -4,8 +4,9 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { countsAsRevenue, refundedAmount, revenueAmount } from "@/lib/order-flow";
 import { DAY, TR_OFFSET as TR, trDayStart } from "@/lib/tr-time";
 import { orderStatusOptions, sourceLabel } from "@/lib/commerce-labels";
-import { Notice } from "@/components/panel/notice";
+import { KNot } from "@/components/arvo-ui/k-ui";
 import "./analytics.css";
+import "@/components/arvo-ui/kayit-detay.css";
 
 /* Gün ve ay sınırları Türkiye saatine göre (bkz. lib/tr-time). */
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
@@ -159,34 +160,42 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
     { label: "İade", value: money.format(refunded / 100), change: delta(refunded, refundedTotal(previous)), note: "iade edilen tutar", inverse: true },
   ];
 
-  return <>
-    <section className="ac-bar">
-      <div>
-        <h1>Satış Analitiği</h1>
-        <p>{periodLabel} · önceki eşit dönemle karşılaştırmalı · iptal ve iadeler ciroya dâhil değil</p>
+  /*
+    ArvoOS kalıbı (16.10.2026): başlık + dönem süzgeci, özet şeridi,
+    panel kartları. Grafik ve dağılım çubukları (an-*) bu sayfanın kendi
+    dili ve aynen kaldı.
+  */
+  return <main className="talep analiz-sayfasi">
+    <header className="talep-bas">
+      <div className="talep-bas-metin">
+        <small className="panel-kicker">Analiz</small>
+        <h1>Satış analitiği</h1>
+        <p className="talep-bas-alt">{periodLabel} · önceki eşit dönemle karşılaştırmalı · iptal ve iadeler ciroya dâhil değil</p>
       </div>
-      <nav className="ac-filter" aria-label="Dönem">
+      <nav className="ekip-suzgec talep-suzgec" aria-label="Dönem">
         {PERIODS.map(([key, label]) => (
-          <Link prefetch={false} key={key} className="ac-btn" href={key === "30" ? "/analitik" : `/analitik?p=${key}`} aria-current={period === key ? "page" : undefined}>{label}</Link>
+          <Link prefetch={false} key={key} href={key === "30" ? "/analitik" : `/analitik?p=${key}`} className={period === key ? "is-active" : undefined} aria-current={period === key ? "page" : undefined}>{label}</Link>
         ))}
       </nav>
-    </section>
+    </header>
 
     <div className="ac-stack">
-      {truncated ? <Notice tone="warn" title="Rakamlar kısmi">Bu dönemde 20.000’den fazla sipariş var; hesaplama en yeni 20.000 siparişle yapıldı.</Notice> : null}
+      {truncated ? <KNot ton="uyari">Bu dönemde 20.000’den fazla sipariş var; hesaplama en yeni 20.000 siparişle yapıldı.</KNot> : null}
 
-      <section className="ac-metrics" aria-label="Dönem özeti">
-        {metrics.map((metric) => (
-          <article className="ac-metric" key={metric.label}>
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small><Delta value={metric.change} inverse={metric.inverse} />{metric.note}</small>
-          </article>
-        ))}
-      </section>
+      <nav className="kayit-serit talep-serit" aria-label="Dönem özeti">
+        <dl>
+          {metrics.map((metric) => (
+            <div key={metric.label}>
+              <dt>{metric.label}</dt>
+              <dd>{metric.value}</dd>
+              <small><Delta value={metric.change} inverse={metric.inverse} /> {metric.note}</small>
+            </div>
+          ))}
+        </dl>
+      </nav>
 
       <div className="an-grid">
-        <article className="ac ac-pad an-chart">
+        <article className="panel-card an-kart an-chart">
           <div className="an-head">
             <div><h3>Ciro</h3><p>{bucketKind} · son çubuk içinde bulunulan dönem</p></div>
             <div className="an-stat"><strong>{money.format(revenue / 100)}</strong><span>Günlük ortalama {money.format(revenue / days / 100)}</span></div>
@@ -202,7 +211,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
           </div>
         </article>
 
-        <article className="ac ac-pad">
+        <article className="panel-card an-kart">
           <div className="an-head"><div><h3>Sipariş durumları</h3><p>{current.length.toLocaleString("tr-TR")} sipariş · {periodLabel.toLocaleLowerCase("tr-TR")}</p></div></div>
           <ul className="an-dist">
             {orderStatusOptions.map(([status, label]) => {
@@ -217,7 +226,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
           </ul>
         </article>
 
-        <article className="ac ac-pad an-top">
+        <article className="panel-card an-kart an-top">
           <div className="an-head"><div><h3>En çok satan ürünler</h3><p>Ciroya göre ilk 10 · {periodLabel.toLocaleLowerCase("tr-TR")}</p></div></div>
           {topProducts.length ? (
             <ol className="an-top-list">
@@ -234,7 +243,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
           ) : <p className="an-empty">Bu dönemde satılan ürün yok.</p>}
         </article>
 
-        <article className="ac ac-pad">
+        <article className="panel-card an-kart">
           <div className="an-head"><div><h3>Satış kaynağı</h3><p>Ciroya göre dağılım</p></div></div>
           {sourceList.length ? (
             <ul className="an-dist">
@@ -249,5 +258,5 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
         </article>
       </div>
     </div>
-  </>;
+  </main>;
 }

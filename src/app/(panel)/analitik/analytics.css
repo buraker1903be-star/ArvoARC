@@ -67,3 +67,9 @@ html[data-theme="dark"] .an-bar-fill{background:linear-gradient(180deg,var(--bra
   .an-stat strong{font-size:22px}
 }
 @media(prefers-reduced-motion:reduce){.an-bar-fill,.an-track i{animation:none}}
+
+/* ArvoOS kalıbı (16.10.2026) */
+.os-root .analiz-sayfasi{display:grid;gap:var(--sp-4)}
+.os-root .analiz-sayfasi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .analiz-sayfasi .kayit-serit small{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;color:var(--muted);font-size:var(--fs-micro)}
+.os-root .analiz-sayfasi .an-kart{padding:var(--sp-5)}
