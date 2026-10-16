@@ -521,7 +521,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           dokuz sütunu orta sütuna sığmıyordu; pencerede tam genişlik.
         */}
         <div className="siparis-serit-sag">
-          <PanelModal triggerLabel="Fatura dökümü" boy="genis" kicker={`${order.order_number} · SİPARİŞ DÖKÜMÜ`} title="Fatura dökümü" description="Birim fiyatlar KDV hariç. Kupon ve havale indirimi kalemlere orantılı dağıtılır; KDV oranına göre matrahıyla ayrılır.">
+          <PanelModal triggerLabel="Fatura dökümü" triggerClassName="panel-secondary dugme-kucuk" boy="genis" kicker={`${order.order_number} · SİPARİŞ DÖKÜMÜ`} title="Fatura dökümü" description="Birim fiyatlar KDV hariç. Kupon ve havale indirimi kalemlere orantılı dağıtılır; KDV oranına göre matrahıyla ayrılır.">
             <div className="fatura-pencere">
             <div className="fatura-eylem order-noprint">
               <small>Bilgi amaçlıdır; yasal fatura yerine geçmez.</small>

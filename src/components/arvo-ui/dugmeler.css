@@ -1,79 +1,100 @@
 /*
-  DÜĞME DİSİPLİNİ (16.10.2026, kurum sahibi: "bir düzen ve disiplin
-  içerisinde yok"). Sipariş detayında yan yana duran düğmeler dört ayrı
-  yükseklikte (30/32/36/40), dört ayrı yazı boyunda ve üç ayrı köşede
-  çıkıyordu. Üç kaynak vardı:
-    1. globals.css sınıfsız HER <button>'a eski vitrin düğmesini
-       veriyordu (degrade, altın halka, gölge, üzerine gelince zıplama);
-    2. eski panel düğmeleri (.ac-btn, design.css) ayrı bir dilde;
-    3. tek tek sayfalarda verilmiş ad hoc ölçüler (min-height:30px…).
+  DÜĞMELER (16.10.2026). İki adımda geldi:
 
-  KURAL: İKİ BOY, TEK BİÇİM — ArvoOS'un düğmesi (panel-ui.css).
-    * Standart 40px (--dugme-h): her eylem düğmesi.
-    * Küçük 32px (--dugme-h-kucuk, .dugme-kucuk): yalnızca TEKRAR EDEN
-      satır içi işlemler (kalem satırı, paket kartı). Sayfa ya da kart
-      düzeyinde küçük düğme yazılmaz.
-    * Köşe --r-md, yazı yarı kalın; renkler panel-primary / -secondary /
-      -danger. Yeni bir boy gerekiyorsa buraya değişken olarak eklenir,
-      sayfaya ölçü yazılmaz.
+  1. DİSİPLİN ("bir düzen ve disiplin içerisinde yok"). Sipariş detayında
+     yan yana duran düğmeler dört ayrı yükseklikte (30/32/36/40), dört
+     ayrı yazı boyunda ve üç ayrı köşede çıkıyordu. Üç kaynak vardı:
+     globals.css sınıfsız HER <button>'a eski vitrin düğmesini veriyordu
+     (degrade, altın halka, zıplama); eski panel düğmeleri (.ac-btn,
+     design.css) ayrı bir dildeydi; sayfalara ad hoc ölçüler yazılmıştı.
 
-  Dosya panel düzeninde (app/(panel)/layout.tsx) EN SON yükleniyor ve
-  .os-root önekli: eski kuralları sıradan bağımsız eziyor.
+  2. BİÇİM ("seçicilerime yakışacak, klas ve premium"). Durum seçicisi
+     (durum-secici.css) hap biçiminde, ince tonlu çerçeveli ve yumuşak
+     gölgeli; kurum sahibi onu sevdi ve düğmelerin aynı dilde olmasını
+     istedi. Düğmeler artık hap biçimi; birincilde ışığı yukarıdan alan
+     ince bir degrade ve iç parıltı, ikincilde seçicininkiyle aynı çerçeve.
+     Seçicinin kendisi bu dosyanın DIŞINDA (kendi biçimini koruyor).
+
+  KURAL: İKİ BOY, TEK BİÇİM.
+    * Standart 38px (--dugme-h): her eylem düğmesi.
+    * Küçük 32px (--dugme-h-kucuk, .dugme-kucuk): tekrar eden satır içi
+      işlemler (kalem satırı, paket kartı) ve seçicilerle aynı şeritte
+      duran düğme. Sayfa ya da kart düzeyinde küçük düğme yazılmaz.
+    * Renkler: birincil / ikincil / tehlike. Yeni bir boy ya da renk
+      gerekiyorsa buraya değişken olarak eklenir; sayfaya ölçü yazılmaz.
+
+  Dosya panel düzeninde (app/(panel)/layout.tsx) EN SON yükleniyor ve çift
+  .os-root önekli: sayfa stillerinin önüne geçen özgüllük, !important yerine.
 */
-.os-root{--dugme-h:40px;--dugme-h-kucuk:32px}
+.os-root{
+  --dugme-h:38px;--dugme-h-kucuk:32px;
+  --dugme-golge:0 1px 0 color-mix(in srgb,var(--ink) 5%,transparent);
+  --dugme-halka:0 0 0 3px color-mix(in srgb,var(--primary) 22%,transparent);
+}
 
-/* ArvoOS düğmesinin kendisi (panel-ui.css) yalnızca min-height veriyordu
-   (içinde iki satır olan düğme boyu bozuyordu) ve sayfa stilleri yazı
-   boyunu eziyordu (indirimlerde 13px). Çift .os-root: sayfa stillerinin
-   önüne geçen özgüllük, !important yerine. */
-.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger){height:var(--dugme-h);min-height:var(--dugme-h);font-size:var(--fs-base);border-radius:var(--r-md)}
-
-/* Küçük boy: tekrar eden satır işlemleri. */
-.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger).dugme-kucuk{height:var(--dugme-h-kucuk);min-height:var(--dugme-h-kucuk);padding:0 var(--sp-3);font-size:var(--fs-sm)}
-
-/*
-  ESKİ PANEL DÜĞMELERİ (.ac-btn) ArvoOS biçimine bağlanıyor: işaretlemeye
-  dokunmadan bütün panelde aynı düğme. ac-btn → ikincil, ac-btn-primary →
-  birincil, ac-btn-danger → tehlike.
-*/
-.os-root :is(.ac-btn,.danger-button){
-  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
-  height:var(--dugme-h);min-height:var(--dugme-h);padding:0 var(--sp-4);margin:0;
-  border:1px solid var(--n-300);border-radius:var(--r-md);
-  background:var(--surface);color:var(--ink-soft);box-shadow:var(--shadow-xs);
-  font:inherit;font-size:var(--fs-base);font-weight:var(--fw-semibold);line-height:1;letter-spacing:0;
+/* ---------- Ortak iskelet ----------
+   Sınıfsız düğme (eski formların "Kaydet"i) birincil düğme olur; rolü olan
+   sınıfsız düğme (sekme: role="tab") bu kuralın DIŞINDA — pasif sekme
+   sınıfsız çizildiği için ilk sürümde birincil düğme gibi boyanıyordu. */
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button,.panel-content button:not([class]):not([role])){
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:var(--dugme-h);min-height:var(--dugme-h);margin:0;padding:0 18px;
+  border:1px solid transparent;border-radius:var(--r-pill);
+  font:inherit;font-size:13.5px;font-weight:var(--fw-semibold);line-height:1;letter-spacing:.005em;text-transform:none;
   text-decoration:none;white-space:nowrap;cursor:pointer;filter:none;transform:none;
+  transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,color .16s ease,transform .08s ease;
 }
-.os-root .ac-btn:hover{border-color:var(--n-400);background:var(--surface-2);color:var(--ink);transform:none;box-shadow:var(--shadow-xs)}
-.os-root .ac-btn.ac-btn-primary{border-color:transparent;background:var(--primary);color:var(--primary-on)}
-.os-root .ac-btn.ac-btn-primary:hover{background:var(--primary-strong);color:var(--primary-on)}
-.os-root :is(.ac-btn.ac-btn-danger,.danger-button){border-color:color-mix(in srgb,var(--danger) 30%,var(--line));background:var(--surface);color:var(--danger)}
-.os-root :is(.ac-btn.ac-btn-danger,.danger-button):hover{background:var(--danger-soft);color:var(--danger)}
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button,.panel-content button:not([class]):not([role])):active{transform:translateY(.5px)}
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button,.panel-content button:not([class]):not([role])):focus-visible{outline:none;box-shadow:var(--dugme-halka)}
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn,.danger-button,.panel-content button:not([class]):not([role])):disabled{opacity:.5;cursor:not-allowed;transform:none}
 
-/*
-  SINIFSIZ DÜĞME. globals.css'in vitrin düğmesi panelde istenmiyor;
-  sınıfsız düğme (çoğu eski formların "Kaydet"i) birincil düğme olur.
-  Sınıfı olan düğmelere (dock, sekme, menü, seçici…) dokunulmuyor.
-*/
-.os-root .panel-content button:not([class]){
-  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
-  height:var(--dugme-h);min-height:var(--dugme-h);padding:0 var(--sp-4);
-  border:1px solid transparent;border-radius:var(--r-md);
-  background:var(--primary);color:var(--primary-on);box-shadow:var(--shadow-xs);
-  font:inherit;font-size:var(--fs-base);font-weight:var(--fw-semibold);line-height:1;letter-spacing:0;
-  white-space:nowrap;cursor:pointer;filter:none;transform:none;
+/* ---------- Birincil: koyu, ışığı yukarıdan alan, iç parıltılı ---------- */
+.os-root.os-root :is(.panel-primary,.ac-btn.ac-btn-primary,.panel-content button:not([class]):not([role])){
+  border-color:color-mix(in srgb,var(--primary) 82%,var(--ink));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--primary) 86%,var(--surface)),var(--primary));
+  color:var(--primary-on);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--surface) 16%,transparent),0 1px 2px color-mix(in srgb,var(--ink) 14%,transparent),0 6px 14px -8px color-mix(in srgb,var(--primary) 60%,transparent);
 }
-.os-root .panel-content button:not([class]):hover{background:var(--primary-strong);filter:none;transform:none;box-shadow:var(--shadow-xs)}
-.os-root .panel-content button:not([class]):active{transform:none}
+.os-root.os-root :is(.panel-primary,.ac-btn.ac-btn-primary,.panel-content button:not([class]):not([role])):hover{
+  border-color:var(--primary-strong);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--primary) 78%,var(--surface)),var(--primary-strong));
+  color:var(--primary-on);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--surface) 20%,transparent),0 1px 2px color-mix(in srgb,var(--ink) 16%,transparent),0 10px 20px -10px color-mix(in srgb,var(--primary) 70%,transparent);
+}
 
-/* Odak ve devre dışı: hepsi aynı. */
-.os-root :is(.ac-btn,.danger-button,.panel-content button:not([class])):focus-visible{outline:none;box-shadow:var(--shadow-glow)}
-.os-root :is(.ac-btn,.danger-button,.panel-content button:not([class])):disabled{opacity:.5;cursor:not-allowed}
+/* ---------- İkincil: seçicinin çerçevesi ---------- */
+.os-root.os-root :is(.panel-secondary,.ac-btn:not(.ac-btn-primary):not(.ac-btn-danger)){
+  border-color:color-mix(in srgb,var(--ink) 13%,var(--line));
+  background:var(--surface);color:var(--ink);
+  box-shadow:var(--dugme-golge);
+}
+.os-root.os-root :is(.panel-secondary,.ac-btn:not(.ac-btn-primary):not(.ac-btn-danger)):hover{
+  border-color:color-mix(in srgb,var(--primary) 35%,var(--line));
+  background:color-mix(in srgb,var(--primary) 4%,var(--surface));color:var(--ink);
+}
+
+/* ---------- Tehlike: ince kırmızı ton ---------- */
+.os-root.os-root :is(.panel-danger,.ac-btn.ac-btn-danger,.danger-button){
+  border-color:color-mix(in srgb,var(--danger) 28%,var(--line));
+  background:color-mix(in srgb,var(--danger) 5%,var(--surface));color:var(--danger);
+  box-shadow:var(--dugme-golge);
+}
+.os-root.os-root :is(.panel-danger,.ac-btn.ac-btn-danger,.danger-button):hover{
+  border-color:color-mix(in srgb,var(--danger) 50%,var(--line));
+  background:color-mix(in srgb,var(--danger) 10%,var(--surface));color:var(--danger);
+}
+.os-root.os-root :is(.panel-danger,.ac-btn.ac-btn-danger,.danger-button):focus-visible{box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 22%,transparent)}
+
+/* ---------- Küçük boy ---------- */
+.os-root.os-root :is(.panel-primary,.panel-secondary,.panel-danger,.ac-btn).dugme-kucuk{height:var(--dugme-h-kucuk);min-height:var(--dugme-h-kucuk);padding:0 14px;font-size:12.5px;gap:6px}
+
+/* "⋯" menü düğmesi: yuvarlak, düğmenin boyunda. */
+.os-root.os-root .os-menu>summary.panel-secondary{width:var(--dugme-h);padding:0;font-size:18px;letter-spacing:.06em}
 
 /* Kayıt detayındaki iletişim düğmeleri (Ara / E-posta) ArvoOS'ta 36px; burada standart boy. */
-.os-root.os-root .talep-iletisim>:is(a,button){height:var(--dugme-h);min-height:var(--dugme-h);font-size:var(--fs-base)}
+.os-root.os-root .talep-iletisim>:is(a,button){height:var(--dugme-h);min-height:var(--dugme-h)}
 
-/* Telefon: parmakla dokunulduğu için hepsi 44px (panel-ui.css ile aynı). */
+/* Telefon: parmakla dokunulduğu için büyür (panel-ui.css ile aynı eşik). */
 @media (max-width:900px){
   .os-root{--dugme-h:44px;--dugme-h-kucuk:36px}
 }
