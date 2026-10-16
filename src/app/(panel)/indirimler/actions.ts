@@ -60,14 +60,15 @@ export async function createDiscount(formData:FormData){
   revalidatePath("/indirimler");return await bildirimliDonus(geriAdresi(formData),{basari:basariMetni("created")});
 }
 
+/*
+  Form yoluyla durum değiştirme (kampanya detayı, JavaScript kapalıyken
+  liste). Çekirdek ortak: eskiden burada ayrı bir update vardı ve
+  SONUCUNA BAKMIYORDU — silinmiş ya da başka mağazanın kaydında da
+  "İndirim durumu güncellendi." diyordu.
+*/
 export async function toggleDiscount(formData:FormData){
-  const {supabase,organization,membership}=await requireTenant();
-  const id=clean(formData,"id",80);
-  if(!allowedRoles.has(membership.role))return await bildirimliDonus(geriAdresi(formData),{hata:hataMetni("forbidden")});
-  const nextStatus=clean(formData,"next_status",20)==="active"?"active":"paused";
-  const {error}=await supabase.from("arc_discounts").update({status:nextStatus,updated_at:new Date().toISOString()}).eq("id",id).eq("organization_id",organization.id);
-  if(error)return await bildirimliDonus(geriAdresi(formData),{hata:hataMetni(error.code??error.message)});
-  revalidatePath("/indirimler");return await bildirimliDonus(geriAdresi(formData),{basari:basariMetni("status")});
+  const sonuc=await durumuYaz([clean(formData,"id",80)],clean(formData,"next_status",20));
+  return await bildirimliDonus(geriAdresi(formData),sonuc);
 }
 
 export async function deleteDiscount(formData:FormData){
