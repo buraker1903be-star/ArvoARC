@@ -66,7 +66,14 @@ export default async function KampanyaDetayi({ params }: { params: Promise<{ id:
   const { count: siparisSayisi, error: siparisHatasi } = kural.code
     ? await supabase.from("arc_orders").select("id", { count: "exact", head: true })
         .eq("organization_id", organization.id)
-        .eq("metadata->>coupon_code", kural.code)
+        /*
+          BÜYÜK/küçük harf duyarsız: sayacı artıran tetikleyici
+          upper(metadata->>'coupon_code') ile upper(d.code)'u
+          karşılaştırıyor, yani sipariş "arvo10" ile kaydedilmiş olsa
+          da sayaç artıyor. Burada eq kullanmak, sayaç 12 derken
+          listede 0 sipariş göstermek olurdu.
+        */
+        .ilike("metadata->>coupon_code", kural.code)
     : { count: null, error: null };
   /* Sayım düşerse sıfır GÖSTERİLMİYOR: "hiç kullanılmadı" demek,
      kampanyayı kapatma kararını yanlış bilgiyle verdirir. */
