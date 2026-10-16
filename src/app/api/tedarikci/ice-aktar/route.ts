@@ -560,6 +560,24 @@ async function runSync(mode: "tam" | "stok") {
     }
 
     /*
+      Ürün sayfası adresleri: ödeme anındaki canlı doğrulama
+      (lib/supplier/tarzyeri-dogrulama) bu adresten okuyor. Fonksiyon
+      yalnızca değişen adresi yazıyor; her turda çağırmak ucuz.
+    */
+    const baglantilar = products
+      .filter((p) => p.productCode && p.link)
+      .map((p) => ({ code: p.productCode, link: p.link }));
+    if (baglantilar.length) {
+      const { error: baglantiHatasi } = await supabase.rpc("arc_set_supplier_links", {
+        p_organization_id: orgId,
+        p_supplier: "tarzyeri",
+        p_rows: baglantilar,
+      });
+      // Stok yazıldı; adres yazılamaması stok sonucunu bozmuyor ama ödemede doğrulamayı kapatır.
+      if (baglantiHatasi) console.error("Tarzyeri ürün adresleri yazılamadı:", baglantiHatasi.message);
+    }
+
+    /*
       AKIŞTAN DÜŞEN ÜRÜN SATIŞA KAPANIR. Tarzyeri kapattığı ürünü XML'den
       çıkarıyor; yukarıdaki güncelleme yalnızca akışta gelen SKU'lara
       dokunduğu için çıkarılan ürün bizde açık kalıyordu (16.10.2026: iki

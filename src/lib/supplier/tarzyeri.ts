@@ -35,6 +35,8 @@ export type SupplierProduct = {
   images: string[];
   variants: SupplierVariant[];
   active: boolean;
+  /** Tarzyeri ürün sayfası: ödeme anında canlı stok buradan okunur. */
+  link: string;
 };
 
 const parser = new XMLParser({
@@ -177,6 +179,7 @@ export async function fetchTarzyeri(url: string): Promise<SupplierProduct[]> {
       images,
       variants,
       active: text(row.active) === "1",
+      link: text(row.link),
     };
   });
 }

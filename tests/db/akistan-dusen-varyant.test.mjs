@@ -74,3 +74,48 @@ describe("akıştan düşen tedarikçi varyantı", () => {
     }
   });
 });
+
+// Canlı stok (20261016080231): ödemede öğrenilen sayı ve ürün sayfası adresi.
+describe("canlı stok yazımı", () => {
+  test("yalnızca stok yazılır, maliyet ve fiyat korunur; başka mağazaya dokunulmaz", async () => {
+    await islem(db, async () => {
+      await rol(db, "service_role");
+      const { rows } = await db.query(
+        `select public.arc_set_supplier_variant_stock($1, 'tarzyeri', '[{"sku":"AKISTA","stock":0},{"sku":"DUSTU","stock":-3}]'::jsonb) as n`, [KURUM]);
+      assert.equal(rows[0].n, 2);
+      await rol(db, "postgres");
+      assert.equal(await stok(KURUM, "AKISTA"), 0);
+      assert.equal(await stok(KURUM, "DUSTU"), 0, "eksi sayı sıfıra çekilir");
+      assert.equal(await stok(BASKA, "DUSTU"), 55);
+      const { rows: f } = await db.query(`select price from public.arc_product_variants where organization_id = $1 and sku = 'AKISTA'`, [KURUM]);
+      assert.equal(Number(f[0].price), 100);
+    });
+  });
+
+  test("ürün sayfası adresi metadata'ya yazılır, diğer alanlar korunur", async () => {
+    await islem(db, async () => {
+      await rol(db, "postgres");
+      await db.exec(`update public.arc_products set supplier = 'tarzyeri', supplier_product_code = 'TR-1', metadata = '{"vendor":"X"}' where id = '${URUN}'`);
+      await rol(db, "service_role");
+      const satir = `[{"code":"TR-1","link":"https://www.tarzyeri.com/urun"},{"code":"TR-1","link":"https://www.tarzyeri.com/urun"},{"code":"TR-2","link":"javascript:x"}]`;
+      const { rows } = await db.query(`select public.arc_set_supplier_links($1, 'tarzyeri', $2::jsonb) as n`, [KURUM, satir]);
+      assert.equal(rows[0].n, 1);
+      const { rows: ikinci } = await db.query(`select public.arc_set_supplier_links($1, 'tarzyeri', $2::jsonb) as n`, [KURUM, satir]);
+      assert.equal(ikinci[0].n, 0, "değişmeyen adres yeniden yazılmaz");
+      await rol(db, "postgres");
+      const { rows: m } = await db.query(`select metadata from public.arc_products where id = '${URUN}'`);
+      assert.deepEqual(m[0].metadata, { vendor: "X", supplier_link: "https://www.tarzyeri.com/urun" });
+    });
+  });
+
+  test("vitrin ve panel çağıramaz", async () => {
+    for (const r of ["anon", "authenticated"]) {
+      for (const fn of ["arc_set_supplier_variant_stock", "arc_set_supplier_links"]) {
+        await islem(db, async () => {
+          await rol(db, r);
+          await reddedilir(db, `select public.${fn}($1, 'tarzyeri', '[]'::jsonb)`, [KURUM], /permission denied/);
+        });
+      }
+    }
+  });
+});

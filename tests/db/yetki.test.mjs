@@ -111,6 +111,8 @@ const SUNUCU_OLMALI = [
   "public.create_arvoculture_storefront_order",
   "public.arc_bulk_update_supplier_stock",
   "public.arc_close_missing_supplier_variants",
+  "public.arc_set_supplier_links",
+  "public.arc_set_supplier_variant_stock",
   "public.arc_reprice_supplier",
   "public.arc_categorize_supplier_products",
   "public.arc_aktarim_yukle",

@@ -5,6 +5,7 @@ import { saglayiciSirasi, type Saglayici } from "@/lib/odeme/secim";
 import { garantiAyariCoz, GARANTI_ALANLARI, type GarantiAyari } from "@/lib/odeme/garanti/ayar";
 import { formAlanlari } from "@/lib/odeme/garanti/istek";
 import { recordOrderEvent } from "@/lib/siparis-olayi";
+import { tarzyeriSepetiniDogrula } from "@/lib/supplier/tarzyeri-dogrulama";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { resolveStore, storefrontCorsHeaders } from "@/lib/storefront-origin";
 import { getStoreBrand } from "@/lib/store-brand";
@@ -329,6 +330,19 @@ export async function POST(request: Request) {
         { status: 503, headers },
       );
     }
+  }
+
+  /*
+    Tarzyeri ürünleri sipariş açılmadan önce tedarikçinin CANLI stoğundan
+    doğrulanıyor (lib/supplier/tarzyeri-dogrulama). On dakikalık tarama
+    arasında tükenen ürün satılıyordu (16.10.2026).
+  */
+  const canliStok = await tarzyeriSepetiniDogrula(supabase, organizationId, items);
+  if (!canliStok.ok) {
+    return NextResponse.json(
+      { error: canliStok.error, message: canliStok.message },
+      { status: canliStok.status, headers },
+    );
   }
 
   // --- 1. Sipariş oluştur (tutar sunucuda hesaplanır) --------
