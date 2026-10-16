@@ -298,7 +298,8 @@ export default async function Products({ searchParams }: { searchParams: Promise
               <div className="crm-empty-actions">
                 {filtreli ? <Link prefetch={false} className="panel-secondary" href="/urunler">Süzgeci temizle</Link> : null}
                 {katalogBos && canManage ? <>
-                  <Link prefetch={false} className="panel-primary" href={pencereAdresi("yeni")}>Ürün ekle</Link>
+                  {/* Kurulum rehberinin "ürün ekle" adımıyla AYNI adres (tests/kurulum-adimlari). */}
+                  <Link prefetch={false} className="panel-primary" href="/urunler?pencere=yeni">Ürün ekle</Link>
                   <Link prefetch={false} className="panel-secondary" href="/veri-aktarimi">Toplu aktar</Link>
                   <Link prefetch={false} className="panel-secondary" href="/tedarikci">Tedarikçiden çek</Link>
                 </> : null}

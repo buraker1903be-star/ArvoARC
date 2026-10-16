@@ -52,7 +52,8 @@ export function kurulumAdimlari(olgular: KurulumOlgulari): KurulumAdimi[] {
       anahtar: "urun",
       baslik: "İlk ürününü ekle",
       aciklama: "Satılacak bir şey olmadan mağaza açılmış sayılmaz. Tek varyantla başlayabilirsin.",
-      yol: "/urunler?yeni=1#yeni-urun",
+      /* Yeni ürün formu 16.10.2026'dan beri pencerede (eski ?yeni=1 de açıyor). */
+      yol: "/urunler?pencere=yeni",
       eylem: "Ürün ekle",
       tamam: olgular.urunSayisi > 0,
     },

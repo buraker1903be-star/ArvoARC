@@ -141,7 +141,8 @@ test("boş katalogun birincil eylemi, rehberin ürün adımıyla aynı yere gidi
   const { readFileSync } = await import("node:fs");
   const { resolve } = await import("node:path");
   const tablo = readFileSync(
-    resolve(import.meta.dirname, "../src/app/(panel)/urunler/product-table.tsx"),
+    /* Boş katalog ekranı 16.10.2026'dan beri sayfada (ArvoOS liste kalıbı). */
+    resolve(import.meta.dirname, "../src/app/(panel)/urunler/page.tsx"),
     "utf8",
   );
   const urunAdimi = kurulumAdimlari({
@@ -151,7 +152,7 @@ test("boş katalogun birincil eylemi, rehberin ürün adımıyla aynı yere gidi
 
   assert.ok(urunAdimi, "ürün adımı kayboldu");
   assert.ok(
-    tablo.includes(`href="${urunAdimi.yol}" birincil`),
+    tablo.includes(`className="panel-primary" href="${urunAdimi.yol}"`),
     `boş katalogun birincil düğmesi ${urunAdimi.yol} adresine gitmeli`,
   );
 });
