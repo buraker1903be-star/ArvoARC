@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent as KlavyeOlayi } from "react";
+import { aramaSadesi } from "@/lib/arama-metni";
 import "./durum-secici.css";
 
 /*
@@ -66,6 +67,10 @@ export function DurumSecici({
   const [acik, setAcik] = useState(false);
   const [etkin, setEtkin] = useState(0);
   const [sorgu, setSorgu] = useState("");
+  /* Liste aşağı açılıyor ve pencerenin dibindeki seçicide ekranın
+     ALTINDAN TAŞIYORDU (canlıda ölçüldü: 941px, pencere 860px).
+     Altta yer yoksa yukarı açılır. */
+  const [yon, setYon] = useState<"alt" | "ust">("alt");
   const kok = useRef<HTMLDivElement>(null);
   const dugme = useRef<HTMLButtonElement>(null);
   const girdi = useRef<HTMLInputElement>(null);
@@ -80,9 +85,12 @@ export function DurumSecici({
 
   const mevcut = secenekler.find((s) => s.deger === secili) ?? secenekler[0];
 
-  /* Arama Türkçe küçük harfle: "İ" ve "I" aynı kutuda yazılıyor. */
-  const sade = (metin: string) => metin.toLocaleLowerCase("tr-TR");
-  const gorunen = aranabilir && sorgu.trim() ? secenekler.filter((s) => sade(s.etiket).includes(sade(sorgu.trim()))) : secenekler;
+  /* Arama i/ı ve şapka ayrımını yok sayar (lib/arama-metni): Türkçe
+     küçük harf kuralı "VIA"yı "vıa" yapıyordu ve kullanıcının yazdığı
+     "via" hiçbir ürünü bulamıyordu. */
+  const gorunen = aranabilir && sorgu.trim()
+    ? secenekler.filter((s) => aramaSadesi(s.etiket).includes(aramaSadesi(sorgu.trim())))
+    : secenekler;
 
   /*
     React 19 eylemden sonra formu sıfırlıyor ve gizli alan İLK çizimdeki
@@ -114,6 +122,11 @@ export function DurumSecici({
   const ac = () => {
     if (disabled) return;
     setSorgu("");
+    const kutu = dugme.current?.getBoundingClientRect();
+    if (kutu) {
+      const altBosluk = window.innerHeight - kutu.bottom;
+      setYon(altBosluk < 320 && kutu.top > altBosluk ? "ust" : "alt");
+    }
     setEtkin(Math.max(0, secenekler.findIndex((s) => s.deger === secili)));
     setAcik(true);
   };
@@ -147,7 +160,7 @@ export function DurumSecici({
   };
 
   return (
-    <div className="durum-secici" ref={kok} data-bicim={bicim} data-acik={acik ? "" : undefined}>
+    <div className="durum-secici" ref={kok} data-bicim={bicim} data-yon={yon} data-acik={acik ? "" : undefined}>
       <input ref={girdi} type="hidden" name={name} defaultValue={deger} />
       <button
         ref={dugme}

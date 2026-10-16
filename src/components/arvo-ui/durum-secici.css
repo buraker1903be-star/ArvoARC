@@ -115,3 +115,6 @@
   flex:1;min-width:0;overflow:hidden;text-align:left;text-overflow:ellipsis;white-space:nowrap
 }
 @media (prefers-reduced-motion:reduce){.durum-secici-kutu{animation:none}}
+/* Altta yer yoksa yukarı: pencerenin dibindeki seçicide liste ekranın
+   altından taşıyordu (16.10.2026, canlıda ölçüldü). */
+.durum-secici[data-yon="ust"] :is(.durum-secici-kutu,.durum-secici-liste){top:auto;bottom:calc(100% + 6px)}

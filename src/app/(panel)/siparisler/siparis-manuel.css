@@ -35,6 +35,9 @@
 .os-root .siparis-manuel .panel-form-actions{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4)}
 .os-root .siparis-manuel .panel-form-actions>span{color:var(--muted);font-size:var(--fs-sm)}
 .os-root .siparis-manuel .panel-form-actions>span b{color:var(--ink);font-size:var(--fs-base);font-variant-numeric:tabular-nums}
+/* Düğme içeriği kadar: şerit flex ve düğme boşluğu yutup 735px'e
+   uzuyordu (canlıda ölçüldü). Özet solda, düğme sağda. */
+.os-root .siparis-manuel .panel-form-actions>button{flex:none}
 @media(min-width:621px){
   /* Satırın kendi etiketleri DURUYOR (ekran okuyucu okuyor), yalnızca
      görünmez: başlıklar üstte bir kez yazılı. globals.css alanlara
