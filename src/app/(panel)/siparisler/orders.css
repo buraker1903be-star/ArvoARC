@@ -72,60 +72,11 @@
   .order-profit{display:none}
 }
 
-/*
-  MANUEL SİPARİŞ PENCERESİ (order-form.tsx, 16.10.2026).
-
-  Eski kurallar tek sütunluk bir yığındı ve listenin dibindeki açılır
-  karttan kalmıştı (order-create); kart çekmeceye taşınalı o sınıfın
-  karşılığı bile yoktu.
-
-  Sütunlar BAŞLIK SATIRIYLA AYNI IZGARADAN: satır içi etiketler her
-  kalemde tekrarlanmak yerine bir kez yazılıyor, hizayı tek kural
-  tutuyor.
-*/
-.os-root .siparis-manuel-musteri{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-4)}
-.os-root .siparis-manuel-musteri small{display:block;margin-top:6px;color:var(--muted);font-size:var(--fs-micro)}
-.os-root :is(.siparis-manuel-basliklar,.siparis-manuel-satir){
-  display:grid;grid-template-columns:minmax(0,1fr) 92px 132px 62px;gap:var(--sp-3);align-items:center
-}
-.os-root .siparis-manuel-basliklar{
-  padding-bottom:var(--sp-2);color:var(--muted);
-  font-size:var(--fs-micro);font-weight:var(--fw-semibold);letter-spacing:.06em;text-transform:uppercase
-}
-.os-root .siparis-manuel-kalemler{display:grid;gap:var(--sp-3)}
-.os-root .siparis-manuel-satir>label{display:block;margin:0}
-.os-root .siparis-manuel-tutar{
-  display:flex;flex-direction:column;align-items:flex-end;gap:1px;
-  text-align:right;font-variant-numeric:tabular-nums
-}
-.os-root .siparis-manuel-tutar b{color:var(--ink);font-size:var(--fs-base);font-weight:var(--fw-semibold)}
-.os-root .siparis-manuel-tutar small{color:var(--muted);font-size:var(--fs-micro)}
-/* Stok yetmiyor: fonksiyon zaten reddediyor, uyarı gönderimden önce. */
-.os-root .siparis-manuel-satir[data-uyari] .siparis-manuel-tutar small{color:var(--warning);font-weight:var(--fw-semibold)}
-.os-root .siparis-manuel-ekle{justify-self:start;margin-top:var(--sp-3)}
-/* Kaydet çubuğu: solda özet (ya da gönderimi engelleyen sebep), sağda düğme. */
-.os-root .siparis-manuel .panel-form-actions{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4)}
-.os-root .siparis-manuel .panel-form-actions>span{color:var(--muted);font-size:var(--fs-sm)}
-.os-root .siparis-manuel .panel-form-actions>span b{color:var(--ink);font-size:var(--fs-base);font-variant-numeric:tabular-nums}
-@media(min-width:621px){
-  /* Satırın kendi etiketleri DURUYOR (ekran okuyucu okuyor), yalnızca
-     görünmez: başlıklar üstte bir kez yazılı. globals.css alanlara
-     etiket boşluğu olarak 7px veriyor; etiket görünmezken o boşluk
-     alanı başlık satırının hizasından aşağı kaydırırdı. */
-  .os-root .siparis-manuel-satir .satir-etiket{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-  .os-root .siparis-manuel-satir :is(input,.durum-secici[data-bicim="alan"]){margin-top:0}
-}
-@media(max-width:620px){
-  /* Telefonda başlık satırı düşüyor, etiketler görünür hâle geliyor:
-     ürün kendi satırında, altında adet · tutar · sil. */
-  .os-root .siparis-manuel-basliklar{display:none}
-  .os-root .siparis-manuel-musteri{grid-template-columns:1fr}
-  .os-root .siparis-manuel-satir{grid-template-columns:92px minmax(0,1fr) auto;align-items:end;padding-bottom:var(--sp-3);border-bottom:1px solid var(--line-soft)}
-  .os-root .siparis-manuel-satir>label:first-child{grid-column:1/-1}
-  .os-root .siparis-manuel-satir:last-child{padding-bottom:0;border-bottom:0}
-  .os-root .siparis-manuel-satir .satir-etiket{color:var(--ink-soft);font-size:var(--fs-micro);font-weight:var(--fw-semibold)}
-  .os-root .siparis-manuel-tutar{align-self:center}
-}
+/* Manuel sipariş penceresinin biçimi siparis-manuel.css'te ve onu
+   order-form.tsx kendisi getiriyor: bu dosyayı YALNIZCA sipariş
+   DETAYI yüklüyor, pencere ise LİSTEDE açılıyor — eski .order-manual-*
+   kuralları bu yüzden hiç uygulanmıyordu (alanlar tek sütun, ızgara
+   yok). Bileşenin yanındaki dosya, yüklendiği yerle birlikte gelir. */
 
 /* ---------- Detay ---------- */
 .order-back{display:inline-flex;align-items:center;gap:4px;margin-bottom:8px;color:var(--muted);font-size:13px;font-weight:600;text-decoration:none}

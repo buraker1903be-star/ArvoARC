@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { liraYaz } from "@/lib/lira";
 import { createOrder } from "./actions";
+import "./siparis-manuel.css";
 
 /*
   MANUEL SİPARİŞ FORMU (16.10.2026 yeniden yazıldı).
