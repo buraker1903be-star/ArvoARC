@@ -94,7 +94,9 @@ export default async function IadeDetayi({ params }: { params: Promise<{ id: str
       kalemIdleri: (satir.arc_shipment_items ?? []).map((k) => k.order_item_id),
     }));
 
-  const kalemler = (talep.items ?? []) as Kalem[];
+  /* `items` jsonb ve müşterinin tarayıcısından gelen listeyi taşıyor;
+     dizi değilse boş sayılıyor, yoksa `.reduce` sayfayı çökertir. */
+  const kalemler = (Array.isArray(talep.items) ? talep.items : []) as Kalem[];
   const kalemToplami = kalemler.reduce((toplam, kalem) => toplam + Number(kalem.total ?? 0), 0);
   /* Tutar sunucudakiyle AYNI fonksiyondan: ekranda yazan ile gönderilen ayrışmasın. */
   const hesap = calculateRefund({
@@ -272,7 +274,20 @@ export default async function IadeDetayi({ params }: { params: Promise<{ id: str
             <p className="list-hint">İade kararını kurum sahibi ve yöneticiler verir.</p>
           ) : null}
 
-          {canResolve && bekliyor ? (
+          {/*
+            Siparişi silinmiş talepte karar FORMU GÖSTERİLMİYOR: tutar
+            kargo bedeli ve ödeme durumu o kayıttan geliyor ve işlem
+            zaten "talep bulunamadı" ile dönüyordu — düğmeyi gösterip
+            hata vermek, sebebini söylemeyen bir ekran olurdu.
+          */}
+          {canResolve && !siparis ? (
+            <KNot ton="tehlike">
+              <b>Talebin siparişi bulunamadı.</b>{" "}
+              Sipariş silinmiş görünüyor; karar verilemez. Kaydı kurucu konsolundan araştırabilirsiniz.
+            </KNot>
+          ) : null}
+
+          {canResolve && siparis && bekliyor ? (
             <>
               <hr className="ac-divider" />
               <form action={resolveReturn} className="order-form-grid is-narrow iade-karar">
@@ -301,7 +316,7 @@ export default async function IadeDetayi({ params }: { params: Promise<{ id: str
             </>
           ) : null}
 
-          {canResolve && urunBekleniyor ? (
+          {canResolve && siparis && urunBekleniyor ? (
             <>
               <hr className="ac-divider" />
               <form action={resolveReturn} className="order-form-grid is-narrow iade-karar">

@@ -283,7 +283,13 @@ export default async function IadelerSayfasi({ searchParams }: { searchParams: P
   const an = simdi();
   const satirlar: IadeSatiri[] = talepler.map((talep) => {
     const siparis = siparisById.get(talep.order_id) ?? null;
-    const kalemler = (talep.items ?? []) as Array<{ name?: string; sku?: string; quantity?: number; total?: number }>;
+    /*
+      KALEMLER DİZİ Mİ? `items` jsonb ve müşterinin tarayıcısından gelen
+      bir listeyi taşıyor; nesne ya da metin geldiğinde `.reduce`
+      sayfanın tamamını çökertirdi. Boş dizi saymak doğru: tutar sıfır
+      görünür ama ekran açılır ve talep sonuçlandırılabilir.
+    */
+    const kalemler = (Array.isArray(talep.items) ? talep.items : []) as Array<{ name?: string; sku?: string; quantity?: number; total?: number }>;
     const kalemToplami = kalemler.reduce((sum, kalem) => sum + Number(kalem.total ?? 0), 0);
     /* Tutar sunucudakiyle AYNI fonksiyondan: ekranda yazan ile gönderilen ayrışmasın. */
     const hesap = calculateRefund({
@@ -306,7 +312,11 @@ export default async function IadelerSayfasi({ searchParams }: { searchParams: P
       musteri: formatPersonName(siparis?.customer_name) || siparis?.customer_email || "Misafir müşteri",
       eposta: siparis?.customer_name ? siparis?.customer_email ?? "" : "",
       tarih: dateFormat.format(new Date(talep.created_at)),
-      kalemAdedi: kalemler.reduce((sum, kalem) => sum + Math.max(1, Number(kalem.quantity ?? 1)), 0),
+      /* Adet eksik ya da bozuksa bir sayılıyor: kalem var, adedi bilinmiyor. */
+      kalemAdedi: kalemler.reduce((toplam, kalem) => {
+        const adet = Number(kalem.quantity);
+        return toplam + (Number.isFinite(adet) && adet > 0 ? adet : 1);
+      }, 0),
       kalemOzeti: kalemler.map((kalem) => kalem.name ?? kalem.sku ?? "Ürün").join(" · ") || "Kalem bilgisi yok",
       /* Tamamlanan talepte GÖNDERİLEN tutar, ötekinde hesaplanan. */
       tutar: money.format((tamamlandi ? Number(talep.refund_amount ?? 0) : hesap.amount) / 100),
