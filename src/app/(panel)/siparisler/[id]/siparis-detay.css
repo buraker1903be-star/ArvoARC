@@ -291,3 +291,22 @@
 .siparis-detay .kargo-iptaller li{display:flex;flex-wrap:wrap;gap:4px 10px;padding:6px 10px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--muted);font-size:12px}
 .siparis-detay .kargo-iptaller code{font-size:11.5px}
 .siparis-detay .kargo-iptaller small{flex-basis:100%}
+
+/* Operasyon notu: sol sütunda, yerinde düzenleniyor (16.10.2026). */
+.siparis-detay .siparis-ic-not h3 small{margin-left:6px;color:var(--muted);font-size:11px;font-weight:var(--fw-medium)}
+.siparis-detay .siparis-ic-not .siparis-not{padding:8px 10px;border-left:3px solid color-mix(in srgb,var(--warning) 55%,var(--line));border-radius:var(--r-xs);background:color-mix(in srgb,var(--warning) 6%,var(--surface))}
+.siparis-detay .siparis-not-duzenle{margin-top:6px}
+.siparis-detay .siparis-not-duzenle>summary{display:inline-flex;color:var(--accent);font-size:12.5px;font-weight:var(--fw-medium);list-style:none;cursor:pointer}
+.siparis-detay .siparis-not-duzenle>summary::-webkit-details-marker{display:none}
+.os-root .siparis-detay .siparis-not-duzenle>summary::after{content:none}
+.siparis-detay .siparis-not-duzenle[open]>summary{color:var(--muted)}
+.siparis-detay .siparis-not-duzenle form{display:grid;gap:8px;margin:8px 0 0}
+.os-root .siparis-detay .siparis-not-duzenle textarea{width:100%;min-height:76px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:13px;resize:vertical}
+.os-root .siparis-detay .siparis-not-duzenle textarea:focus{outline:none;border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
+.siparis-detay .siparis-not-duzenle .panel-primary{justify-self:end;min-height:32px;padding:0 14px;font-size:12.5px}
+
+/* Paket sisteminden önceki tek takip numarası (kargo özetinde). */
+.siparis-detay .kargo-eski-takip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0;color:var(--ink);font-size:12.5px}
+.siparis-detay .kargo-eski-takip span{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.siparis-detay .kargo-eski-takip code{padding:1px 6px;border-radius:var(--r-xs);background:var(--surface);font-size:12px}
+.siparis-detay .kargo-eski-takip a{margin-left:auto;color:var(--accent);font-size:12px;text-decoration:none}

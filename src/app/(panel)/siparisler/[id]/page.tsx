@@ -370,8 +370,14 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   const adimSirasi=teslimEdildi||order.status==="fulfilled"?adimlar.length-1:reachedIndex;
   const iadeAcik=["paid","partially_refunded"].includes(order.payment_status)&&refundable>0&&!(meta.refunded_at&&refundedSoFar<=0)&&!isBankTransfer(meta)&&["owner","admin"].includes(membership.role);
   /* Kargo ilk sekme: gönderi hazırlamak bu sayfanın en sık işi (16.10.2026). */
-  const sekmeler=["Kargo",`Geçmiş (${timeline.length})`,"Operasyon notu",...(iadeAcik?["İade"]:[])];
-  const ilkSekme=query.pencere==="gecmis"?1:query.pencere==="durum"?2:query.pencere==="iade"&&iadeAcik?3:0;
+  /*
+    "Operasyon notu" sekmesi kalktı (16.10.2026, kurum sahibi): not sol
+    sütunda gösterildiği yerde düzenleniyor, eski tek takip numarası
+    alanlarının yerini Kargo sekmesindeki paketler aldı. Eski
+    ?pencere=durum bağlantıları Kargo'ya açılır.
+  */
+  const sekmeler=["Kargo",`Geçmiş (${timeline.length})`,...(iadeAcik?["İade"]:[])];
+  const ilkSekme=query.pencere==="gecmis"?1:query.pencere==="iade"&&iadeAcik?2:0;
   const musteriAdi:string=formatPersonName(order.customer_name)||order.customer_email||"Misafir müşteri";
   const telefon:string|null=meta.shipping_address?.phone??meta.billing?.phone??null;
   const basHarfler=musteriAdi.split(/\s+/).filter(Boolean).slice(0,2).map((p)=>p.charAt(0).toLocaleUpperCase("tr-TR")).join("")||"?";
@@ -603,10 +609,30 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
               <p className="siparis-not">{meta.notes}</p>
             </div>
           ):null}
-          {meta.internal_note?(
-            <div className="talep-gecmis">
-              <h3>Operasyon notu</h3>
-              <p className="siparis-not">{meta.internal_note}</p>
+          {/*
+            OPERASYON NOTU gösterildiği yerde düzenleniyor (16.10.2026).
+            Eskiden okuma burada, yazma sağdaki ayrı bir sekmedeydi.
+            İşlem (updateFulfillmentDetails) eski tek takip alanlarını da
+            yazıyor: boş gitselerdi kayıtlı numara silinirdi, bu yüzden
+            mevcut değerler gizli taşınıyor.
+          */}
+          {meta.internal_note||canManage?(
+            <div className="talep-gecmis siparis-ic-not">
+              <h3>Operasyon notu <small>yalnızca ekip görür</small></h3>
+              {meta.internal_note?<p className="siparis-not">{meta.internal_note}</p>:null}
+              {canManage?(
+                <details className="siparis-not-duzenle order-noprint">
+                  <summary>{meta.internal_note?"Düzenle":"+ Not ekle"}</summary>
+                  <form action={updateFulfillmentDetails}>
+                    <input type="hidden" name="order_id" value={order.id}/>
+                    <input type="hidden" name="shipping_carrier" value={meta.shipping_carrier??""}/>
+                    <input type="hidden" name="tracking_number" value={meta.tracking_number??""}/>
+                    <input type="hidden" name="tracking_url" value={meta.tracking_url??""}/>
+                    <textarea name="internal_note" defaultValue={meta.internal_note??""} maxLength={1000} rows={3} placeholder="Ör. Müşteri kapıda ödeme istedi, kargo cumartesi teslim alınmayacak…" aria-label="Operasyon notu"/>
+                    <button className="panel-primary" type="submit">Notu kaydet</button>
+                  </form>
+                </details>
+              ):null}
             </div>
           ):null}
           <p className="opd-zaman">Oluşturuldu {when(order.created_at)} · güncellendi {when(order.updated_at)}</p>
@@ -763,6 +789,14 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                   {kargoAdet.sorunlu?<li data-tur="sorunlu">{kargoAdet.sorunlu} sorunlu</li>:null}
                   {kargoAdet.bekliyor?<li data-tur="bekliyor">{kargoAdet.bekliyor} bekliyor</li>:null}
                 </ul>
+                {!acikGonderiler.length&&meta.tracking_number?(
+                  /* Paket sisteminden önce girilmiş tek takip numarası: kaybolmasın. */
+                  <p className="kargo-eski-takip">
+                    <span>Takip</span>
+                    {meta.shipping_carrier||"Kargo"} · <code>{meta.tracking_number}</code>
+                    {meta.tracking_url?<a href={meta.tracking_url} target="_blank" rel="noreferrer">Takip ↗</a>:null}
+                  </p>
+                ):null}
                 <p className="kargo-adres">
                   <span>Teslimat</span>
                   {[formatPersonName(teslimatAdresi.name),[teslimatAdresi.province,teslimatAdresi.city].filter(Boolean).join(" / ")].filter(Boolean).join(" · ")||"Adres yok"}
@@ -941,32 +975,6 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                 </li>
               ))}
             </ol>
-          </div>
-          <div className="siparis-sekme">
-            <p className="siparis-pencere-alt">{gonderiler.length?"Takip numaraları Gönderiler bölümünde, paket başına tutuluyor.":"Takip numarası girildiğinde müşteriye e-posta gider."}</p>
-            {canManage?(
-              <form action={updateFulfillmentDetails} className="order-form-grid">
-                <input type="hidden" name="order_id" value={order.id}/>
-                {gonderiler.length?(
-                  <>
-                    {/* Var olan değerler korunuyor: alan gizlendiği için
-                        boş gönderilirse kayıtlı numara silinirdi. */}
-                    <input type="hidden" name="shipping_carrier" value={meta.shipping_carrier??""}/>
-                    <input type="hidden" name="tracking_number" value={meta.tracking_number??""}/>
-                    <input type="hidden" name="tracking_url" value={meta.tracking_url??""}/>
-                  </>
-                ):(
-                  <>
-                    <label>Kargo firması<input name="shipping_carrier" defaultValue={meta.shipping_carrier??""} maxLength={100} className="ac-input"/></label>
-                    <label>Takip numarası<input name="tracking_number" defaultValue={meta.tracking_number??""} maxLength={160} className="ac-input"/></label>
-                    <label>Takip bağlantısı<input name="tracking_url" type="url" defaultValue={meta.tracking_url??""} placeholder="https://..." className="ac-input"/></label>
-                  </>
-                )}
-                <label>İç operasyon notu<textarea name="internal_note" defaultValue={meta.internal_note??""} maxLength={1000} rows={3} className="ac-input"/></label>
-                <button className="ac-btn ac-btn-primary" type="submit">{gonderiler.length?"Notu kaydet":"Kargo bilgilerini kaydet"}</button>
-              </form>
-            ):<p className="list-hint">{meta.shipping_carrier||"Kargo firması yok"} · {meta.tracking_number||"Takip numarası yok"}</p>}
-            {meta.tracking_url&&!gonderiler.length?<p className="order-track"><a className="ac-btn" href={meta.tracking_url} target="_blank" rel="noreferrer"><Icon name="external" size={16}/>Kargo takibini aç</a></p>:null}
           </div>
           {iadeAcik?(
             <div className="siparis-sekme">
