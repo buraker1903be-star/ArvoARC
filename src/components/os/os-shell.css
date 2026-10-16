@@ -431,3 +431,8 @@ a.os-ws-item:focus-visible{outline:none;box-shadow:var(--shadow-glow)}
 .os-root .os-user-gorunurluk small{display:block;padding:0 var(--sp-3);color:var(--muted);font-size:var(--fs-micro);line-height:1.4}
 .os-root .os-gorunurluk-nokta{flex:none;width:8px;height:8px;border-radius:50%;background:var(--success)}
 .os-root .os-gorunurluk-nokta.is-gizli{background:var(--n-400)}
+
+/* ---------- ArvoARC uyarlaması (16.10.2026) ----------
+   globals.css bütün <summary>'lere "+" işareti ekliyor (eski açılır
+   kartlar için); hesap menüsünün avatarında da çıkıyordu. */
+.os-root .os-user>summary::after{content:none}

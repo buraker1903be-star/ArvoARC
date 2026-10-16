@@ -59,11 +59,18 @@ export default async function PanelLayout({ children }: Readonly<{ children: Rea
   const [{ supabase, organization, membership }, unread] = await Promise.all([requireTenant(), activityUnread()]);
   /* Ad JWT'den (yerel çözümleme, ağ turu yok): kim olarak oturum açıldığı
      eskiden hiçbir yerde yazmıyordu. */
-  const { data: kimlik } = await supabase.auth.getClaims();
+  const [{ data: kimlik }, { data: magaza, error: magazaHatasi }] = await Promise.all([
+    supabase.auth.getClaims(),
+    supabase.from("arc_store_settings").select("store_name").eq("organization_id", organization.id).maybeSingle(),
+  ]);
+  // hata-tamam: yalnızca çubuktaki ad; okunamazsa kurum adına düşer, sayfa açılmaya devam eder.
+  if (magazaHatasi) console.error("[kabuk] mağaza adı okunamadı:", magazaHatasi.message);
   const iddia = (kimlik?.claims ?? {}) as { email?: string; user_metadata?: { full_name?: string; name?: string } };
   const roleName = roleNames[membership.role] ?? "Ekip Üyesi";
   const ad = iddia.user_metadata?.full_name || iddia.user_metadata?.name || iddia.email?.split("@")[0] || roleName;
-  const magazaAdi = String(organization.name ?? "Mağaza");
+  /* Çubukta vitrin adı (ArvoCulture), yasal unvan değil: ArvoOS'ta da
+     tabela adı yazıyor; "ARVOCULTURE GROUP … LTD.ŞTİ." çubuğa sığmıyordu. */
+  const magazaAdi = String(magaza?.store_name || organization.name || "Mağaza").trim();
   const plan = String(organization.plan_code ?? "").toLocaleUpperCase("tr-TR");
   const uygulamalar = arcUygulamalari();
 
