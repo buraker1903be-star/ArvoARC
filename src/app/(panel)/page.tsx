@@ -1,33 +1,31 @@
-import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { countsAsRevenue, revenueAmount } from "@/lib/order-flow";
 import { DAY, trDayStart } from "@/lib/tr-time";
 import { TRANSFER_STALE_HOURS } from "@/lib/payment-method";
 import { orderBadge, productStatusLabel } from "@/lib/commerce-labels";
-import { Icon, type IconName } from "@/components/panel/icons";
 import { Notice } from "@/components/panel/notice";
 import { KurulumRehberi } from "@/components/panel/kurulum-rehberi";
 import { ayarlardanOlgular, kurulumDurumu } from "@/lib/kurulum-adimlari";
-// Eski ana ekran dili (dash-*); sayfa yeni kalıba geçince kalkacak. Yerleşimde dururken ArvoOS'un genel bakış CSS'iyle (aynı sınıf adları) çakışıyordu.
-import "./dashboard.css";
+import { GenelBakis, ListeIzgarasi, ListeKarti, ListeSatiri, SeriKarti, yeniMi } from "@/components/arvo-ui/genel-bakis";
+import { gunlukSeri } from "@/lib/gunluk-seri";
+import { liraYaz } from "@/lib/lira";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });
-const shortDate = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", timeZone: "Europe/Istanbul" });
-const dayOfMonth = new Intl.DateTimeFormat("tr-TR", { day: "numeric", timeZone: "Europe/Istanbul" });
-const longDate = new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Istanbul" });
+const saatTr = new Intl.DateTimeFormat("tr-TR", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Istanbul" });
 
-function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toLocaleUpperCase("tr-TR") || "M";
-}
+/* Rozet tonu: eski etiketlerin tonları (commerce-labels) ArvoOS rozetinin tonlarına. */
+const ROZET_TONU: Record<string, string> = { bad: "danger", warn: "warning", muted: "neutral", info: "info", good: "success" };
+const shortDate = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", timeZone: "Europe/Istanbul" });
+const longDate = new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Istanbul" });
 
 /* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
 function currentTime() {
   return Date.now();
 }
 
-type Tone = "gold" | "info" | "brand" | "success" | "warning" | "danger" | "muted";
+type Tone = "success" | "warning" | "danger" | "neutral";
 type OrderRow = { id: string; order_number: string; customer_name: string | null; status: string; payment_status: string; total: number; currency: string; refunded_amount: unknown; created_at: string };
 
 export default async function Dashboard() {
@@ -103,59 +101,50 @@ export default async function Dashboard() {
   const openOrderCount = openOrderCountResult.count ?? 0;
   const recentOrders = orders.slice(0, 6);
 
-  const chartStart = trDayStart(now) - 13 * DAY;
-  const dailySales = Array<number>(14).fill(0);
-  for (const order of paidOrders) {
-    const day = Math.floor((Date.parse(order.created_at) - chartStart) / DAY);
-    if (day >= 0 && day < 14) dailySales[day] += revenueAmount(order);
-  }
-  const maxDailySales = Math.max(...dailySales, 1);
-  const chartTotal = dailySales.reduce((sum, value) => sum + value, 0);
-  const chartDays = dailySales.map((value, index) => {
-    /* Günün ortası: biçimlendirici Türkiye saatinde doğru günü yazsın. */
-    const date = new Date(chartStart + index * DAY + DAY / 2);
-    return { value, day: dayOfMonth.format(date), label: shortDate.format(date) };
-  });
+  /*
+    Grafik ArvoOS'un genel bakış şablonunda (SeriKarti): son 14 gün ve
+    önceki 14 güne göre değişim. Ağırlık siparişin net tutarı; gün sınırı
+    Türkiye saatiyle (lib/gunluk-seri).
+  */
+  const satisSerisi = gunlukSeri(paidOrders.map((order) => order.created_at), now, 14, paidOrders.map((order) => revenueAmount(order)));
 
-  const widgets: { label: string; value: string; note: string; href: string; icon: IconName; tone: Tone }[] = [
-    { label: "Net satış", value: money.format(sales / 100), note: "Son 30 gün · iptal ve iadeler hariç", href: "/analitik?p=30", icon: "lira", tone: "gold" },
-    { label: "Sipariş", value: orders.length.toLocaleString("tr-TR"), note: "Son 30 gün", href: "/siparisler", icon: "box", tone: "info" },
-    { label: "Ürün", value: (productCountResult.count ?? 0).toLocaleString("tr-TR"), note: `${(activeProductCountResult.count ?? 0).toLocaleString("tr-TR")} aktif`, href: "/urunler", icon: "tag", tone: "brand" },
-    { label: "Stok", value: stock === null ? "—" : stock.toLocaleString("tr-TR"), note: stock === null ? "Toplam okunamadı" : `${variantCount.toLocaleString("tr-TR")} varyant`, href: "/stok", icon: "archive", tone: "success" },
+  /* Grafik başlığındaki özet: eski dört kutu yer kaplıyordu; ArvoOS'ta da rakamlar grafiğin başlığında. */
+  const ozet = [
+    { ad: "Net satış · 30 gün", deger: money.format(sales / 100), href: "/analitik?p=30" },
+    { ad: "Sipariş · 30 gün", deger: orders.length.toLocaleString("tr-TR"), href: "/siparisler" },
+    { ad: "Aktif ürün", deger: (activeProductCountResult.count ?? 0).toLocaleString("tr-TR"), href: "/urunler" },
+    { ad: `Stok · ${compact.format(variantCount)} varyant`, deger: stock === null ? "—" : compact.format(stock), href: "/stok" },
   ];
 
   /*
     Aksiyon özeti. Renk anlam taşıyor: sıfır olan sayaç nötr,
     dikkat gerektiren sarı, sorunlu kırmızı.
   */
-  const actionItems: { label: string; value: number; detail: string; href: string; icon: IconName; tone: Tone }[] = [
+  const actionItems: { label: string; value: number; detail: string; href: string; tone: Tone }[] = [
     {
       label: "İşlem bekleyen sipariş",
       value: openOrderCount,
       detail: openOrderCount ? "Onay ve hazırlık akışını tamamlayın" : "Sipariş akışı güncel",
       href: "/operasyon",
-      icon: "box",
-      tone: openOrderCount ? "warning" : "muted",
+      tone: openOrderCount ? "warning" : "neutral",
     },
     {
       label: "Kritik stok",
       value: negativeStockCount,
       detail: negativeStockCount ? "Eksi stokları hemen düzeltin" : "Eksi stok bulunmuyor",
       href: "/stok?filter=negative",
-      icon: "alert",
-      tone: negativeStockCount ? "danger" : "muted",
+      tone: negativeStockCount ? "danger" : "neutral",
     },
     {
       label: "Azalan stok",
       value: lowStockCount,
       detail: lowStockCount ? "5 ve altındaki varyantları inceleyin" : "Stok seviyeleri sağlıklı",
       href: "/stok?filter=low",
-      icon: "archive",
-      tone: lowStockCount ? "warning" : "muted",
+      tone: lowStockCount ? "warning" : "neutral",
     },
     /* Yalnızca varsa gösterilir: Operasyon'dan onaylanır ya da iptal edilir. */
     ...((staleTransferResult.count ?? 0) > 0
-      ? [{ label: "Süresi geçen havale", value: staleTransferResult.count ?? 0, detail: `${TRANSFER_STALE_HOURS} saattir ödenmemiş; onaylayın ya da iptal edin`, href: "/operasyon", icon: "lira" as IconName, tone: "danger" as Tone }]
+      ? [{ label: "Süresi geçen havale", value: staleTransferResult.count ?? 0, detail: `${TRANSFER_STALE_HOURS} saattir ödenmemiş; onaylayın ya da iptal edin`, href: "/operasyon", tone: "danger" as Tone }]
       : []),
   ];
 
@@ -180,140 +169,79 @@ export default async function Dashboard() {
       }))
     : null;
 
-  return (
-    <div className="dash">
-      <section className="dash-hero">
-        <div>
-          <span className="panel-kicker">{longDate.format(new Date(now)).toLocaleUpperCase("tr-TR")}</span>
-          <h1>Genel Bakış</h1>
-          <p>{organization.name} mağazasının satış, sipariş ve stok durumu.</p>
-        </div>
-      </section>
+  const saat = Number(saatTr.format(new Date(now)));
+  const selam = saat < 5 ? "İyi geceler" : saat < 12 ? "Günaydın" : saat < 18 ? "İyi günler" : saat < 23 ? "İyi akşamlar" : "İyi geceler";
 
+  /*
+    ANA EKRAN = ArvoOS'UN GENEL BAKIŞ ŞABLONU (16.10.2026): selamlama ·
+    tam genişlikte grafik (başlığında özet rakamlar) · altında yan yana
+    liste kartları, her biri en fazla altı satır ve kendi sayfasına
+    bağlantı. Eskiden dört büyük sayı kutusu, grafik ve dört kart ayrı
+    bir tasarım dilindeydi (dash-*).
+  */
+  return (
+    <GenelBakis ust={<span className="dash-tarih">{longDate.format(new Date(now))}</span>} baslik={selam}>
       {kurulum ? <KurulumRehberi durum={kurulum} /> : null}
 
       {truncated ? (
         <Notice tone="warn" title="Özet kısmi">Son 30 günde 20.000’den fazla sipariş var; rakamlar en yeni 20.000 siparişten hesaplandı.</Notice>
       ) : null}
 
-      <section className="dash-widgets" aria-label="Özet">
-        {widgets.map((widget) => (
-          <Link prefetch={false} className="dash-widget" data-tone={widget.tone} href={widget.href} key={widget.label}>
-            <span className="dash-widget-icon"><Icon name={widget.icon} size={18} /></span>
-            <small>{widget.label}</small>
-            <strong>{widget.value}</strong>
-            <span className="dash-widget-note">{widget.note}</span>
-          </Link>
-        ))}
-      </section>
+      <SeriKarti
+        baslik="Satış"
+        alt="Son 14 gün · iptal ve iadeler hariç"
+        seri={satisSerisi}
+        birim={(kurus) => money.format(kurus / 100)}
+        adet=""
+        href="/analitik"
+        ozet={ozet}
+        bos="Son 14 günde satış yok. İlk sipariş geldiğinde günlük dağılım burada çizilir."
+      />
 
-      <div className="dash-grid">
-        <article className="dash-card dash-chart" data-tone="gold">
-          <div className="dash-card-head">
-            <div>
-              <h2>Son 14 gün</h2>
-              <p>Günlük satış, bugün altın renkte.</p>
-            </div>
-            <div className="dash-stat">
-              <strong>{money.format(chartTotal / 100)}</strong>
-              <span>{paidOrders.length ? "İptal ve iadeler hariç" : "Henüz satış yok"}</span>
-            </div>
-          </div>
-          <div className="dash-bars" role="img" aria-label="Son 14 günlük satış grafiği">
-            {chartDays.map((day, index) => (
-              <div className={`dash-bar${day.value ? "" : " is-empty"}${index === 13 ? " is-today" : ""}`} key={day.label} title={`${day.label}: ${money.format(day.value / 100)}`}>
-                <span className="dash-bar-value">{day.value ? compact.format(day.value / 100) : ""}</span>
-                <span className="dash-bar-fill" style={{ "--h": `${Math.max(3, Math.round((day.value / maxDailySales) * 100))}%` } as React.CSSProperties} />
-                <small>{index === 13 ? "Bugün" : day.day}</small>
-              </div>
-            ))}
-          </div>
-        </article>
+      <ListeIzgarasi>
+        <ListeKarti baslik="Aksiyon bekleyenler" alt="Bugün ilgilenilmesi gerekenler" bos="Bekleyen iş yok." href="/operasyon" hrefEtiket="Operasyon merkezi" sayi={actionItems.length}>
+          {actionItems.map((item) => (
+            <ListeSatiri
+              key={item.label}
+              href={item.href}
+              baslik={item.label}
+              alt={item.detail}
+              sag={<span className="status-pill" data-tone={item.tone}>{item.value.toLocaleString("tr-TR")}</span>}
+            />
+          ))}
+        </ListeKarti>
 
-        <article className="dash-card">
-          <div className="dash-card-head">
-            <div>
-              <h2>Aksiyon bekleyenler</h2>
-              <p>Bugün ilgilenilmesi gereken kayıtlar.</p>
-            </div>
-          </div>
-          <div className="dash-list">
-            {actionItems.map((item) => (
-              <Link prefetch={false} className="dash-row" data-tone={item.tone} href={item.href} key={item.label}>
-                <span className="dash-row-icon"><Icon name={item.icon} size={16} /></span>
-                <span className="dash-row-label"><span>{item.label}</span><small>{item.detail}</small></span>
-                <span className={item.value ? "dash-row-count" : "dash-row-count is-zero"}>{item.value.toLocaleString("tr-TR")}</span>
-                <span className="dash-chevron"><Icon name="chevron" size={16} /></span>
-              </Link>
-            ))}
-          </div>
-          <Link prefetch={false} className="dash-card-link" href="/operasyon">Operasyon merkezi <Icon name="chevron" size={16} /></Link>
-        </article>
+        <ListeKarti baslik="Son siparişler" alt="Son 30 günde gelenler" bos="Henüz sipariş yok. İlk sipariş geldiğinde burada görünecek." href="/siparisler" hrefEtiket="Tüm siparişler" sayi={recentOrders.length}>
+          {recentOrders.map((order) => {
+            const badge = orderBadge(order.status, order.payment_status);
+            return (
+              <ListeSatiri
+                key={order.id}
+                href={`/siparisler/${order.id}`}
+                baslik={order.customer_name || "Misafir müşteri"}
+                alt={`${order.order_number} · ${liraYaz(order.total)} · ${shortDate.format(new Date(order.created_at))}`}
+                sag={<span className="status-pill" data-tone={ROZET_TONU[badge.tone] ?? "neutral"}>{badge.label}</span>}
+                yeni={yeniMi(order.created_at)}
+              />
+            );
+          })}
+        </ListeKarti>
 
-        <article className="dash-card dash-activity">
-          <div className="dash-card-head">
-            <div>
-              <h2>Son siparişler</h2>
-              <p>Son 30 günde gelen siparişler.</p>
-            </div>
-            <Link prefetch={false} className="dash-card-link" href="/siparisler">Tümünü gör <Icon name="chevron" size={16} /></Link>
-          </div>
-          {recentOrders.length ? (
-            <ul className="dash-activity-list">
-              {recentOrders.map((order) => {
-                const badge = orderBadge(order.status, order.payment_status);
-                const customer = order.customer_name || "Misafir müşteri";
-                return (
-                  <li key={order.id}>
-                    <Link prefetch={false} className="dash-activity-row" href={`/siparisler/${order.id}`}>
-                      <span className="dash-avatar">{initials(customer)}</span>
-                      <span className="dash-activity-body">
-                        <b>{order.order_number} · {customer}</b>
-                        <small>{shortDate.format(new Date(order.created_at))}</small>
-                      </span>
-                      <span className="dash-activity-side">
-                        <strong>{money.format(order.total / 100)}</strong>
-                        <em className="ac-tag" data-tone={badge.tone}>{badge.label}</em>
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : <p className="dash-empty">Henüz sipariş yok. İlk sipariş geldiğinde burada görünecek.</p>}
-        </article>
-
-        <article className="dash-card">
-          <div className="dash-card-head">
-            <div>
-              <h2>Son ürünler</h2>
-              <p>Kataloğa en son eklenenler.</p>
-            </div>
-            <Link prefetch={false} className="dash-card-link" href="/urunler">Ürünler <Icon name="chevron" size={16} /></Link>
-          </div>
-          {products.length ? (
-            <ul className="dash-activity-list">
-              {products.map((product) => {
-                const variant = variantByProduct.get(product.id);
-                return (
-                  <li key={product.id}>
-                    <Link prefetch={false} className="dash-activity-row" href={`/urunler/${product.id}`}>
-                      <span className="dash-avatar is-product">{initials(product.name)}</span>
-                      <span className="dash-activity-body">
-                        <b>{product.name}</b>
-                        <small>{variant ? `${variant.sku} · stok ${variant.stock}` : "Varyant yok"} · {productStatusLabel(product.status)}</small>
-                      </span>
-                      <span className="dash-activity-side">
-                        <strong>{variant ? money.format(variant.price / 100) : "—"}</strong>
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : <p className="dash-empty">Henüz ürün yok. İlk ürününü ekleyerek başlayabilirsin.</p>}
-        </article>
-      </div>
-    </div>
+        <ListeKarti baslik="Son ürünler" alt="Kataloğa en son eklenenler" bos="Henüz ürün yok. İlk ürününü ekleyerek başlayabilirsin." href="/urunler" hrefEtiket="Ürünler" sayi={products.length}>
+          {products.map((product) => {
+            const variant = variantByProduct.get(product.id);
+            return (
+              <ListeSatiri
+                key={product.id}
+                href={`/urunler/${product.id}`}
+                baslik={product.name}
+                baslikIpucu={product.name}
+                alt={`${variant ? `${liraYaz(variant.price)} · stok ${variant.stock}` : "Varyant yok"} · ${productStatusLabel(product.status)}`}
+              />
+            );
+          })}
+        </ListeKarti>
+      </ListeIzgarasi>
+    </GenelBakis>
   );
 }

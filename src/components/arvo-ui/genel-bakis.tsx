@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import type { GunlukSeri } from "@/lib/gunluk-seri";
-import "../dashboard.css";
+import "./genel-bakis.css";
 
 /*
   GENEL BAKIŞ ŞABLONU (2026-10).
