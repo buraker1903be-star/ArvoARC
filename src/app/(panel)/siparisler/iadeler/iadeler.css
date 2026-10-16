@@ -1,0 +1,5 @@
+/* İade talepleri: ArvoOS liste kalıbına uyarlama (16.10.2026). Kartın iç biçimi ../orders.css. */
+.os-root .iade-listesi{display:grid;gap:var(--sp-4)}
+.os-root .iade-listesi .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .iade-listesi .return-card{padding:var(--sp-5)}
+.os-root .iade-listesi .kayit-serit .is-uyari dd a{color:var(--warning)}

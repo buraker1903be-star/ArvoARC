@@ -2,9 +2,12 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { resolveReturn } from "./actions";
 import { calculateRefund } from "@/lib/refund";
-import { PanelBildirimi } from "@/components/panel/bildirim";
-import { OrdersTabs } from "../orders-tabs";
+import { rozetTonu } from "@/lib/rozet-tonu";
+// İade kartlarının iç biçimi (return-*) hâlâ orada; liste düzeni ArvoOS kalıbı.
 import "../orders.css";
+import "@/components/arvo-ui/k-ui";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./iadeler.css";
 import { iadeTedarikcileri, iadeYonu, type GonderiEslesme, type SiparisKalemiEslesme } from "@/lib/iade-yonlendirme";
 
 export const dynamic = "force-dynamic";
@@ -110,41 +113,37 @@ export default async function ReturnsPage({
 
   const counts = Object.fromEntries(TABS.map(([key], index) => [key, countResults[index]?.count ?? 0])) as Record<TabKey, number>;
 
+  /*
+    ArvoOS'un liste kalıbı (16.10.2026): başlık + durum şeridi. Eskiden
+    başlık "Siparişler" diyordu ve iki sekme (Siparişler / İade talepleri)
+    ile ayrı bir durum çipi şeridi vardı; bölüm artık ikinci dock'ta.
+  */
   return (
-    <>
-      <section className="ac-bar">
-        <div>
-          <h1>Siparişler</h1>
-          <p>{counts.beklemede} iade talebi karar bekliyor.</p>
+    <main className="talep liste-sayfa iade-listesi">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker">Satış</small>
+          <h1>İade talepleri</h1>
+          <p className="talep-bas-alt">{counts.beklemede ? `${counts.beklemede} talep karar bekliyor.` : "Karar bekleyen talep yok."}</p>
         </div>
-        <OrdersTabs active="returns" pendingReturns={counts.beklemede} />
-      </section>
+      </header>
 
-      <div className="ac-stack">
-        {/*
-          Durum filtreleri ayrı şeritte: sekmelerle aynı satıra
-          sıkıştırıldığında düğmeler alt alta diziliyor ve
-          okunmuyordu.
-        */}
-        <nav className="ac-filter" aria-label="İade durumu">
+      <nav className="kayit-serit talep-serit" aria-label="Duruma göre süz">
+        <dl>
           {TABS.map(([key, label]) => (
-            <Link prefetch={false} key={key} className="ac-btn" href={`/siparisler/iadeler?filter=${key}`} aria-current={filter === key ? "page" : undefined}>
-              {label}
-              <span className="ac-count" data-tone={key === "beklemede" && counts[key] ? "warn" : undefined}>{counts[key]}</span>
-            </Link>
+            <div key={key} className={[filter === key ? "is-active" : "", key === "beklemede" && counts[key] ? "is-uyari" : ""].filter(Boolean).join(" ") || undefined}>
+              <dt>{label}</dt>
+              <dd><Link prefetch={false} href={`/siparisler/iadeler?filter=${key}`} aria-current={filter === key ? "page" : undefined}>{counts[key]}</Link></dd>
+            </div>
           ))}
-        </nav>
-
-        {/* Sonuç ÇEREZDEN geliyor; adres satırındaki ?error= artık
-            okunmuyor: dışarıdan gönderilen bağlantı uydurma mesaj
-            gösterebiliyordu (lib/panel-bildirim.ts). */}
-        <PanelBildirimi />
+        </dl>
+      </nav>
 
         {(requests ?? []).length === 0 ? (
-          <section className="ac list-empty">
-            <b>Bu durumda talep bulunmuyor.</b>
-            <p>Müşteriler iade talebini mağazadaki sipariş sayfasından oluşturur; yeni talepler “Bekleyenler” sekmesine düşer.</p>
-          </section>
+          <div className="panel-card crm-empty-state talep-bos-kutu">
+            <h2>Bu durumda talep yok</h2>
+            <p>Müşteriler iade talebini mağazadaki sipariş sayfasından oluşturur; yeni talepler “Bekleyenler”e düşer.</p>
+          </div>
         ) : null}
 
         {(requests ?? []).map((request) => {
@@ -183,7 +182,7 @@ export default async function ReturnsPage({
           const tedarikciler = iadeTedarikcileri(yonler);
 
           return (
-            <section className="ac ac-pad return-card" key={request.id}>
+            <section className="panel-card return-card" key={request.id}>
               <div className="ac-head">
                 <div>
                   <h3>
@@ -193,7 +192,7 @@ export default async function ReturnsPage({
                     {order?.customer_name || order?.customer_email || "Müşteri"} · {dateTime.format(new Date(request.created_at))}
                   </p>
                 </div>
-                <em className="ac-tag" data-tone={state.tone}>{state.label}</em>
+                <span className="status-pill" data-tone={rozetTonu(state.tone)}>{state.label}</span>
               </div>
 
               <p className="return-reason">
@@ -350,7 +349,6 @@ export default async function ReturnsPage({
             </section>
           );
         })}
-      </div>
-    </>
+    </main>
   );
 }
