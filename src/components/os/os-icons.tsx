@@ -14,6 +14,7 @@ const YOLLAR: Record<OsIkon | YardimciSimge, React.ReactNode> = {
   home: <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
   satis: <><path d="M5 8h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></>,
   katalog: <><path d="M21 7.5 12 3 3 7.5v9L12 21l9-4.5z" /><path d="M3 7.5 12 12l9-4.5M12 12v9" /></>,
+  musteri: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5" /><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.4 3.5 5.2" /></>,
   /* İade: geri dönen ok; indirim: yüzdeli etiket; finans: ArvoOS'un finans kartı. */
   iade: <><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></>,
   indirim: <><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" /><path d="m9.5 13.5 4-4" /><circle cx="9.5" cy="9.5" r=".8" fill="currentColor" stroke="none" /><circle cx="13.5" cy="13.5" r=".8" fill="currentColor" stroke="none" /></>,

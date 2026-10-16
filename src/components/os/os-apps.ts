@@ -15,7 +15,7 @@
 */
 
 export type OsIkon =
-  | "home" | "satis" | "iade" | "indirim" | "finans" | "katalog" | "analiz" | "tedarik" | "settings" | "apps" | "magaza";
+  | "home" | "satis" | "musteri" | "iade" | "indirim" | "finans" | "katalog" | "analiz" | "tedarik" | "settings" | "apps" | "magaza";
 
 /** altYollar: bölümün kendi yolu dışında onu etkin sayan yollar. */
 export type Bolum = { key: string; href: string; label: string; altYollar?: string[] };
@@ -45,8 +45,7 @@ export const ANA_SAYFA = "/";
   Ayarlar · Tüm Uygulamalar. İlk taslakta Satış (siparişler, iadeler,
   müşteriler, operasyon) tek uygulamaydı; günlük işin ilk üçü ayrı
   simgelere çıktı. Alt menüler (bölümler) kurum sahibinin gözden
-  geçirmesini bekliyor: Operasyon merkezi ve Müşteriler şimdilik
-  Siparişler'in, satış analitiği Finans'ın altında.
+  geçirmesini bekliyor; satış analitiği şimdilik Finans'ın altında.
 
   Yol öneklerinde UZUNLUK önemli: "/siparisler/iadeler" İadeler'e,
   "/siparisler/<id>" Siparişler'e düşer (etkinUygulama en uzun eşleşeni seçer).
@@ -56,15 +55,16 @@ export function arcUygulamalari(rozet?: { operasyon?: number; iade?: number }): 
   const iade = Math.max(0, Math.round(rozet?.iade ?? 0));
   return [
     { key: "home", label: "Ana Sayfa", href: ANA_SAYFA, ikon: "home", yollar: [] },
+    /*
+      ALT MENÜSÜZ (16.10.2026, kurum sahibi: "butona basınca siparişler
+      açılsın yeter"). Operasyon merkezi ve Müşteriler Siparişler'in
+      bölümüydü; dock'tan kalktılar ama ulaşılamaz olmasınlar diye
+      başlatıcıda ve Ctrl+K'da (yalnizBaslatici) duruyorlar.
+    */
     {
       key: "siparisler", label: "Siparişler", href: "/siparisler", ikon: "satis",
-      yollar: ["/siparisler", "/operasyon", "/musteriler"],
+      yollar: ["/siparisler"],
       ...(operasyon ? { rozet: operasyon } : {}),
-      bolumler: [
-        { key: "siparisler", href: "/siparisler", label: "Siparişler" },
-        { key: "operasyon", href: "/operasyon", label: "Operasyon merkezi" },
-        { key: "musteriler", href: "/musteriler", label: "Müşteriler" },
-      ],
     },
     {
       key: "iadeler", label: "İadeler", href: "/siparisler/iadeler", ikon: "iade",
@@ -97,6 +97,8 @@ export function arcUygulamalari(rozet?: { operasyon?: number; iade?: number }): 
         { key: "veri-aktarimi", href: "/veri-aktarimi", label: "Veri aktarımı" },
       ],
     },
+    { key: "operasyon", label: "Operasyon merkezi", href: "/operasyon", ikon: "satis", yollar: ["/operasyon"], yalnizBaslatici: true },
+    { key: "musteriler", label: "Müşteriler", href: "/musteriler", ikon: "musteri", yollar: ["/musteriler"], yalnizBaslatici: true },
     {
       key: "settings", label: "Ayarlar", href: "/ayarlar", ikon: "settings",
       yollar: ["/ayarlar", "/tema"],
