@@ -125,7 +125,7 @@ export default async function IadeDetayi({ params }: { params: Promise<{ id: str
     : null;
 
   return (
-    <main className="crm-page-stack talep opd opd-v3 iade-detay">
+    <main className="crm-page-stack talep opd opd-v3 tek-ekran iade-detay">
       <header className="talep-bas">
         <div className="talep-bas-metin">
           <small className="panel-kicker">İADE TALEBİ · {when(talep.created_at)}</small>

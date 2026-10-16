@@ -91,7 +91,7 @@ export default async function KampanyaDetayi({ params }: { params: Promise<{ id:
   const adres = `/indirimler/${kural.id}`;
 
   return (
-    <main className="crm-page-stack talep opd opd-v3 indirim-detay">
+    <main className="crm-page-stack talep opd opd-v3 tek-ekran indirim-detay">
       <header className="talep-bas">
         <div className="talep-bas-metin">
           <small className="panel-kicker">KAMPANYA · {kural.code ? `KOD ${kural.code}` : "OTOMATİK"}</small>
