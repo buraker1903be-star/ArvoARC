@@ -401,7 +401,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   const odemeSecenekleri=paymentStatusOptions.map(([deger,etiket])=>({deger,etiket,ton:statusTone(deger)}));
 
   return (
-    <main className="crm-page-stack talep opd opd-v3 siparis-detay">
+    <main className="crm-page-stack talep opd opd-v3 tek-ekran siparis-detay">
       <AnindaYedek />
       <header className="talep-bas">
         <div className="talep-bas-metin">

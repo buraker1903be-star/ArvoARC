@@ -142,7 +142,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
       ızgara kendi sınıfını taşıyordu, yani kurala hiç girmiyordu —
       sihirli sayıyı kopyalamak yerine kancaları kullanıyoruz.
     */
-    <main className="crm-page-stack talep musteri-detay">
+    <main className="crm-page-stack talep tek-ekran musteri-detay">
       <header className="talep-bas">
         <div className="talep-bas-metin">
           <small className="panel-kicker"><Link prefetch={false} href="/musteriler">Müşteriler</Link></small>

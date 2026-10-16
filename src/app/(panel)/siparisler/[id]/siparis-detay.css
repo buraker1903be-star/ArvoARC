@@ -88,26 +88,11 @@
 .os-root .siparis-detay .opd-ff-etiket{margin:0;line-height:1}
 
 /*
-  TEK EKRAN (16.10.2026, kurum sahibi: "aşağıya kaydırmak istemiyorum").
-  Sütunların boyu sabit bir sayıyla veriliyordu (100dvh - 330px); havale
-  uyarısı çıkan siparişte ızgara 340px'ten başlıyor ve sütunların altı
-  dock'un arkasına, ekranın dışına taşıyordu — sayfa yine kayıyordu.
-  Artık liste sayfalarıyla aynı yöntem (os-shell.css → main.liste-sayfa):
-  sayfa ekran boyuna sabit, üst bloklar kendi boylarında, ızgara kalan
-  yeri dolduruyor ve her sütun KENDİ İÇİNDE kayıyor. Yükseklik üst
-  çubuk ve dock değişkenlerinden türüyor, sihirli sayı yok.
-  Yalnızca üç sütunlu genişlikte: daha darda sütunlar alt alta ve sayfa
-  kaymak zorunda.
+  TEK EKRAN kuralı ORTAK dosyada (components/arvo-ui/kayit-detay.css →
+  main.tek-ekran): formül burada ve müşteri detayında iki kopya olarak
+  duruyordu. Aşağıda yalnızca bu sayfaya özgü olan kaldı.
 */
 @media (min-width:1201px){
-  .os-root main.siparis-detay{
-    display:flex;flex-direction:column;
-    height:calc(100dvh - var(--os-bar-h) - var(--sp-6) - var(--os-dock-space) - env(safe-area-inset-bottom));
-    min-height:420px;
-  }
-  .os-root main.siparis-detay>:not(.talep-izgara){flex:0 0 auto}
-  .os-root main.siparis-detay>.talep-izgara{flex:1 1 auto;min-height:0;align-items:stretch;grid-template-rows:minmax(0,1fr)}
-  .os-root .siparis-detay .talep-izgara>:is(.talep-bilgi,.talep-musteri){max-height:none;min-height:0;overflow:auto}
   .os-root .siparis-detay .talep-izgara>.talep-akis{display:flex;flex-direction:column;min-height:0;align-self:stretch}
   .os-root .siparis-detay .talep-akis-panel{flex:1 1 auto;min-height:0;max-height:none}
   /* Havale uyarısı ve düğmesi tek satırda: iki satır, sütunlardan 60px yiyordu. */
