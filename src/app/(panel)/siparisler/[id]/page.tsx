@@ -17,10 +17,14 @@ import { isOrderClosed, orderBadge, orderStatusLabel, orderStatusOptions, paymen
 import { nextOrderStep, orderFlow } from "@/lib/order-flow";
 import { describeOrderEvent } from "@/lib/order-events";
 import { Icon } from "@/components/panel/icons";
-import { Notice } from "@/components/panel/notice";
-import { PanelBildirimi } from "@/components/panel/bildirim";
 import { PrintButton } from "@/components/panel/print-button";
+import { KKart, KNot } from "@/components/arvo-ui/k-ui";
+import { Pencere } from "@/components/os/pencere";
+import { rozetTonu } from "@/lib/rozet-tonu";
+// Kalem dökümü ve gönderi kartlarının kendi sınıfları (ac-lines, shipment-*) hâlâ orada.
 import "../orders.css";
+import "@/components/arvo-ui/kayit-detay.css";
+import "./siparis-detay.css";
 
 const money=(value:number,currency:string)=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:currency||"TRY"}).format(value/100);
 /* Sunucu UTC'de çalışıyor; saat Türkiye saatine göre gösterilir. */
@@ -34,10 +38,10 @@ type OrderMeta={discount?:number;coupon_code?:string;refunded_at?:string;refunde
 
 function AddressCard({title,address}:{title:string;address?:Address}){
   const lines=[address?.name,address?.address1,address?.address2,[address?.zip,address?.city].filter(Boolean).join(" "),address?.province,address?.country,address?.phone].filter(Boolean);
-  return <article className="ac order-party"><small>{title}</small>{lines.length?lines.map((line,index)=><p key={index}>{line}</p>):<p className="is-empty">Bilgi bulunmuyor.</p>}</article>;
+  return <article className="panel-card order-party"><small>{title}</small>{lines.length?lines.map((line,index)=><p key={index}>{line}</p>):<p className="is-empty">Bilgi bulunmuyor.</p>}</article>;
 }
 
-export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{agirlik?:string;en?:string;boy?:string;yuk?:string}>}){
+export default async function OrderDetail({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{agirlik?:string;en?:string;boy?:string;yuk?:string;pencere?:string}>}){
   const {id}=await params;const query=await searchParams;
   const {supabase,organization,membership}=await requireTenant();
   const [{data:order,error},{data:items,error:itemsError},{data:events,error:eventsError},{data:shipments}]=await Promise.all([
@@ -269,81 +273,81 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   const waitedLabel=waitedHours<24?`${waitedHours} saattir`:`${Math.floor(waitedHours/24)} gündür`;
   const transferStale=transferPending&&waitedHours>=TRANSFER_STALE_HOURS;
 
-  return <>
-    <section className="ac-bar order-detail-bar">
-      <div>
-        <Link prefetch={false} className="order-back order-noprint" href="/siparisler">← Siparişler</Link>
-        <h1>{order.order_number}</h1>
-        <p>{when(order.created_at)} · {order.customer_name||order.customer_email||"Misafir müşteri"} · {sourceLabel(order.source)}</p>
-      </div>
-      <div className="order-head-actions">
-        {/* Rozet listeyle aynı yerden üretiliyor: iki ekran
-            aynı siparişe farklı isim vermesin. */}
-        <em className="ac-tag" data-tone={badge.tone}>{badge.label}</em>
-        <span className="order-noprint"><PrintButton /></span>
-        {/*
-          BÖLÜM ATLAMA ŞERİDİ. Sayfa 4.600px, yani beş ekran boyu
-          (canlıda ölçüldü, 27.09.2026) ve en çok kullanılan bölüm —
-          Gönderiler — ortada kalıyor.
+  /*
+    PENCERELER (16.10.2026, ArvoOS'un kayıt detayı gibi). Durum, not,
+    iade ve geçmiş sayfanın dibine alt alta diziliyordu — sayfa 4.600
+    piksel, beş ekran boyuydu ve en sık kullanılan iş (gönderi) ortada
+    kalıyordu. Şimdi başlıktaki düğmeler aynı sayfada bir pencere açıyor.
+    Pencere ADRESTE (?pencere=durum): kaydettikten sonra sayfa yeniden
+    çizildiğinde açık kalıyor; geri tuşu kapatıyor.
+  */
+  const adres=`/siparisler/${order.id}`;
+  const iadeAcik=["paid","partially_refunded"].includes(order.payment_status)&&refundable>0&&!(meta.refunded_at&&refundedSoFar<=0)&&!isBankTransfer(meta)&&["owner","admin"].includes(membership.role);
+  const PENCERELER=[
+    {kod:"durum",ad:"Durum ve operasyon notu",gorunur:true},
+    {kod:"iade",ad:"İade",gorunur:iadeAcik},
+    {kod:"gecmis",ad:`İşlem geçmişi (${timeline.length})`,gorunur:true},
+  ] as const;
+  const pencere=PENCERELER.find((p)=>p.kod===query.pencere&&p.gorunur)?.kod??null;
 
-          Sekme değil ÇAPA kullanılıyor: bu sayfadaki her form bir sunucu
-          işlemi ve kaydettikten sonra sayfaya geri yönlendiriyor. Sekme
-          olsaydı her kayıttan sonra ilk sekmeye dönerdi; ayrıca yazdırma
-          ve sayfa içi arama (Ctrl+F) gizli sekmeleri bulamazdı.
-        */}
-        <nav className="order-jump order-noprint" aria-label="Bölümler">
-          <a href="#kalemler">Kalemler</a>
-          <a href="#gonderiler">Gönderiler</a>
-          <a href="#durum">Durum</a>
-          <a href="#gecmis">Geçmiş</a>
-        </nav>
-        {canManage&&next?(
-          <form action={quickStatus} className="order-noprint">
-            <input type="hidden" name="order_id" value={order.id}/>
-            <input type="hidden" name="status" value={next.key}/>
-            <input type="hidden" name="back" value={`/siparisler/${order.id}`}/>
-            <button className="ac-btn ac-btn-primary" type="submit">{next.label} →</button>
-          </form>
-        ):null}
-      </div>
-    </section>
+  return (
+    <main className="talep siparis-detay">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker"><Link prefetch={false} href="/siparisler" className="order-noprint">Siparişler</Link></small>
+          <h1>{order.order_number} <span className="status-pill" data-tone={rozetTonu(badge.tone)}>{badge.label}</span></h1>
+          <p className="talep-bas-alt">{when(order.created_at)} · {order.customer_name||order.customer_email||"Misafir müşteri"} · {sourceLabel(order.source)}</p>
+        </div>
+        <div className="talep-bas-eylem order-noprint">
+          {PENCERELER.filter((p)=>p.gorunur).map((p)=>(
+            <Link key={p.kod} prefetch={false} scroll={false} className="panel-secondary" href={`${adres}?pencere=${p.kod}`} aria-current={pencere===p.kod?"page":undefined}>{p.ad}</Link>
+          ))}
+          <PrintButton />
+          {canManage&&next?(
+            <form action={quickStatus}>
+              <input type="hidden" name="order_id" value={order.id}/>
+              <input type="hidden" name="status" value={next.key}/>
+              <input type="hidden" name="back" value={adres}/>
+              <button className="panel-primary" type="submit">{next.label} →</button>
+            </form>
+          ):null}
+        </div>
+      </header>
 
-    <div className="ac-stack">
-      {/* İşlem sonucu ÇEREZDEN geliyor. Adres satırındaki ?error= artık
-          okunmuyor: dışarıdan gönderilen bir bağlantı kullanıcıya uydurma
-          bir mesaj gösterebiliyordu (lib/panel-bildirim.ts). */}
-      <PanelBildirimi />
       {transferPending?(
-        <div className="order-transfer">
-          <Notice tone={transferStale?"error":"warn"} title={transferStale?`Havale ${waitedLabel} ödenmedi · süresi geçti`:`Havale ödemesi bekleniyor · ${waitedLabel}`}>
-            Ödeme hesabınıza ulaştıysa onaylayın; müşteriye “Ödemeniz alındı” e-postası gider.{transferStale?" Ödeme gelmeyecekse siparişi iptal edebilirsiniz.":""}
-          </Notice>
+        <div className="siparis-havale">
+        <KNot ton={transferStale?"tehlike":"uyari"}>
+          <b>{transferStale?`Havale ${waitedLabel} ödenmedi · süresi geçti.`:`Havale ödemesi bekleniyor · ${waitedLabel}.`}</b>{" "}
+          Ödeme hesabınıza ulaştıysa onaylayın; müşteriye “Ödemeniz alındı” e-postası gider.{transferStale?" Ödeme gelmeyecekse siparişi iptal edebilirsiniz.":""}
+        </KNot>
+        {/* Düğmeler notun DIŞINDA: not bir paragraf, içindeki form tarayıcıda paragrafı bölüyordu. */}
           {canManage?(
-            <div className="order-transfer-actions order-noprint">
+            <span className="siparis-not-eylem order-noprint">
               <form action={confirmTransferPayment}>
                 <input type="hidden" name="order_id" value={order.id}/>
-                <input type="hidden" name="back" value={`/siparisler/${order.id}`}/>
-                <ConfirmSubmit className="ac-btn ac-btn-primary" message={`${order.order_number} için ${money(order.total,order.currency)} havale ödemesi alındı olarak işaretlensin mi? Müşteriye “Ödemeniz alındı” e-postası gönderilir.`}>Ödeme alındı</ConfirmSubmit>
+                <input type="hidden" name="back" value={adres}/>
+                <ConfirmSubmit className="panel-primary" message={`${order.order_number} için ${money(order.total,order.currency)} havale ödemesi alındı olarak işaretlensin mi? Müşteriye “Ödemeniz alındı” e-postası gönderilir.`}>Ödeme alındı</ConfirmSubmit>
               </form>
               {transferStale?(
                 <form action={cancelTransferOrder}>
                   <input type="hidden" name="order_id" value={order.id}/>
-                  <input type="hidden" name="back" value={`/siparisler/${order.id}`}/>
-                  <ConfirmSubmit className="ac-btn ac-btn-danger" message={`${order.order_number} ${waitedLabel} ödenmedi. Sipariş iptal edilsin mi? Müşteriye “Siparişiniz iptal edildi” e-postası gönderilir.`}>İptal et</ConfirmSubmit>
+                  <input type="hidden" name="back" value={adres}/>
+                  <ConfirmSubmit className="panel-danger" message={`${order.order_number} ${waitedLabel} ödenmedi. Sipariş iptal edilsin mi? Müşteriye “Siparişiniz iptal edildi” e-postası gönderilir.`}>İptal et</ConfirmSubmit>
                 </form>
               ):null}
-            </div>
+            </span>
           ):null}
         </div>
       ):null}
       {closed?(
-        <Notice tone="error" title={`Sipariş kapandı · ${badge.label}`}>
+        <KNot ton="tehlike">
+          <b>Sipariş kapandı · {badge.label}.</b>{" "}
           {meta.refunded_at?`${money(Number(meta.refunded_amount??0),order.currency)} iade edildi · ${when(String(meta.refunded_at))}. `:""}
           Kapanmış sipariş akışta ilerletilemez.
-        </Notice>
+        </KNot>
       ):null}
 
-      <section className="ac ac-pad order-noprint" aria-label="Sipariş akışı">
+      <section className="panel-card siparis-akis order-noprint" aria-label="Sipariş akışı">
         <ol className="order-steps" data-closed={closed?"":undefined}>
           {orderFlow.map((step,index)=>{
             const done=index<reachedIndex||(index===reachedIndex&&(closed||index===lastIndex));
@@ -358,37 +362,35 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         </ol>
       </section>
 
-      <section className="ac-metrics order-facts" aria-label="Sipariş özeti">
-        <article className="ac-metric"><span>Toplam</span><strong>{money(order.total,order.currency)}</strong><small>{discount>0?`${money(discount,order.currency)} indirim uygulandı`:"KDV dâhil"}</small></article>
-        <article className="ac-metric" data-tone={order.payment_status==="paid"?"good":["pending","authorized"].includes(order.payment_status)?"warn":["failed","refunded","partially_refunded"].includes(order.payment_status)?"bad":undefined}><span>Ödeme</span><strong>{paymentStatusLabel(order.payment_status)}</strong><small>{meta.payment_method??"Kredi kartı"}</small></article>
-        {/*
-          KARGO KUTUSU GÖNDERİLERDEN OKUYOR. Önceden siparişin eski tek
-          numaralı alanına (metadata.tracking_number) bakıyordu ve
-          bölünmüş kargoda üç paket yoldayken bile "Takip numarası
-          girilmedi" yazıyordu — özet şeridi, ekranın en çok bakılan
-          yeri, yanlış bilgi veriyordu.
-        */}
-        <article className="ac-metric" data-tone={kargoDurumuOzet==="teslim"?"good":kargoDurumuOzet==="kismi"?"warn":undefined}>
-          <span>Kargo</span>
-          <strong>{acikGonderiler.length?(acikGonderiler.length>1?`${acikGonderiler.length} paket`:acikGonderiler[0].carrier_name||"1 paket"):meta.shipping_carrier||"—"}</strong>
-          <small>{
-            acikGonderiler.length
-              ? (takipliGonderiSayisi
-                  ? `${takipliGonderiSayisi} takip numarası · ${
-                      kargoDurumuOzet==="teslim"?"tamamı teslim edildi"
-                      :kargoDurumuOzet==="tamam"?"tüm ürünler kargoda"
-                      :"bir kısmı kargoda"}`
-                  : "takip numarası bekleniyor")
-              : meta.tracking_number?`Takip: ${meta.tracking_number}`:"Henüz kargoya verilmedi"
-          }</small>
-        </article>
-        <article className="ac-metric"><span>Kalemler</span><strong>{itemCount} adet</strong><small>{items?.length??0} kalem</small></article>
-      </section>
+      {/* Özet: ArvoOS'un kayıt şeridi (eskiden dört büyük kutu). Kargo
+          gönderilerden okunuyor, eski tek numaralı alandan değil. */}
+      <nav className="kayit-serit talep-serit" aria-label="Sipariş özeti">
+        <dl>
+          <div><dt>Toplam</dt><dd>{money(order.total,order.currency)}</dd><small>{discount>0?`${money(discount,order.currency)} indirim`:"KDV dâhil"}</small></div>
+          <div className={order.payment_status==="paid"?undefined:["pending","authorized"].includes(order.payment_status)?"is-uyari":["failed","refunded","partially_refunded"].includes(order.payment_status)?"is-tehlike":undefined}>
+            <dt>Ödeme</dt><dd>{paymentStatusLabel(order.payment_status)}</dd><small>{meta.payment_method??"Kredi kartı"}</small>
+          </div>
+          <div className={kargoDurumuOzet==="kismi"?"is-uyari":undefined}>
+            <dt>Kargo</dt>
+            <dd>{acikGonderiler.length?(acikGonderiler.length>1?`${acikGonderiler.length} paket`:acikGonderiler[0].carrier_name||"1 paket"):meta.shipping_carrier||"—"}</dd>
+            <small>{
+              acikGonderiler.length
+                ? (takipliGonderiSayisi
+                    ? `${takipliGonderiSayisi} takip no · ${
+                        kargoDurumuOzet==="teslim"?"teslim edildi"
+                        :kargoDurumuOzet==="tamam"?"tamamı kargoda"
+                        :"bir kısmı kargoda"}`
+                    : "takip no bekleniyor")
+                : meta.tracking_number?`Takip: ${meta.tracking_number}`:"henüz kargoya verilmedi"
+            }</small>
+          </div>
+          <div><dt>Kalemler</dt><dd>{itemCount} adet</dd><small>{items?.length??0} kalem</small></div>
+        </dl>
+      </nav>
 
-      {/* Müşteri, fatura ve teslimat bilgileri en başta: siparişi
-          hazırlarken ilk bakılan yer burası. */}
-      <section className="order-parties">
-        <article className="ac order-party">
+      {/* Müşteri, fatura ve teslimat en başta: siparişi hazırlarken ilk bakılan yer. */}
+      <section className="siparis-taraflar">
+        <article className="panel-card order-party">
           <small>MÜŞTERİ</small>
           <p><b>{order.customer_name||"İsimsiz müşteri"}</b></p>
           {order.customer_email?<p><a href={`mailto:${order.customer_email}`}>{order.customer_email}</a></p>:<p className="is-empty">E-posta yok</p>}
@@ -398,10 +400,7 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         <AddressCard title="TESLİMAT ADRESİ" address={meta.shipping_address}/>
       </section>
 
-      {/* Sipariş kalemleri tam genişlikte: dokuz sütunlu fatura
-          dökümü yan panelle birlikte sığmıyordu. */}
-      <section id="kalemler" className="ac ac-pad">
-        <div className="ac-head"><div><h3>Sipariş kalemleri</h3><p>{items?.length??0} kalem · birim fiyatlar KDV hariç</p></div></div>
+      <KKart id="kalemler" baslik="Sipariş kalemleri" aciklama={`${items?.length??0} kalem · birim fiyatlar KDV hariç`} sinif="siparis-kart">
         {/*
           Fatura düzeni. Her satırda birim fiyat, indirim, KDV
           oranı ve tutarı ayrı ayrı; fatura keserken doğrudan
@@ -449,19 +448,9 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           <span>Ödeme türü <b>{meta.payment_method??"Kredi kartı"}</b></span>
           {meta.coupon_code?<span>İndirim kodu <b>{meta.coupon_code}</b></span>:null}
         </div>
-      </section>
+      </KKart>
 
-      {/*
-        GÖNDERİLER. Bir siparişin kalemleri farklı tedarikçilerden çıkıyor
-        (Tarzyeri, LR) ve ayrı depolardan sevk edildiği için tek gönderi
-        fiziksel olarak mümkün değil; her parçanın kendi firması ve takip
-        numarası oluyor.
-
-        Bu bölüm şimdilik TEDARİKÇİNİN KENDİ GÖNDERDİĞİ kayıtları alıyor:
-        elimize yalnızca takip numarası geliyor, OTO devreye girmiyor ve
-        bakiye harcanmıyor. tryOTO ile etiket üretme ayrı bir tur.
-      */}
-      <section id="gonderiler" className="ac ac-pad order-noprint">
+      <section id="gonderiler" className="panel-card siparis-kart order-noprint">
         <div className="ac-head">
           <div><h3>Gönderiler</h3><p>{acikGonderiler.length?`${acikGonderiler.length} gönderi · ${
             kargoDurumuOzet==="teslim"?"tamamı teslim edildi"
@@ -674,14 +663,10 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
         </div>:canManage?<p className="list-hint">Siparişteki bütün ürünler kargoya verilmiş.</p>:null}
       </section>
 
-      {/*
-        Yönetim ve kargo yan yana iki kart. Öncesinde tek sütunda
-        alt alta dizilmişti ve takip numarası girmek için en aşağı
-        inmek gerekiyordu.
-      */}
-      <section id="durum" className="ac-split-even order-noprint">
-        <div className="ac ac-pad">
-          <div className="ac-head"><div><h3>Sipariş durumu</h3><p>Akıştaki konumu ve ödeme durumu.</p></div></div>
+      {pencere==="durum"?(
+        <Pencere key="durum" ust={order.order_number} baslik="Durum ve operasyon notu" kapatAdresi={adres} genis={false}>
+          <section className="siparis-pencere-bolum">
+            <h3>Sipariş durumu</h3>
           {canManage?(
             <form action={updateOrderStatus} className="order-form-grid">
               <input type="hidden" name="order_id" value={order.id}/>
@@ -691,8 +676,8 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
               <button className="ac-btn ac-btn-primary" type="submit">Durumu kaydet</button>
             </form>
           ):<p className="list-hint">{orderStatusLabel(order.status)} · {paymentStatusLabel(order.payment_status)}</p>}
-        </div>
-
+          </section>
+          <section className="siparis-pencere-bolum">
         {/*
           ESKİ TEK NUMARALI KARGO ALANI.
 
@@ -705,7 +690,6 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
           Bu yüzden gönderi varken yalnızca DAHİLİ NOT kalıyor; takip
           alanları gönderisi olmayan siparişler için duruyor.
         */}
-        <div className="ac ac-pad">
           <div className="ac-head"><div><h3>{gonderiler.length?"Operasyon notu":"Kargo ve operasyon"}</h3><p>{gonderiler.length?"Takip numaraları Gönderiler bölümünde, paket başına tutuluyor.":"Takip numarası girildiğinde müşteriye e-posta gider."}</p></div></div>
           {canManage?(
             <form action={updateFulfillmentDetails} className="order-form-grid">
@@ -730,30 +714,21 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             </form>
           ):<p className="list-hint">{meta.shipping_carrier||"Kargo firması yok"} · {meta.tracking_number||"Takip numarası yok"}</p>}
           {meta.tracking_url&&!gonderiler.length?<p className="order-track"><a className="ac-btn" href={meta.tracking_url} target="_blank" rel="noreferrer"><Icon name="external" size={16}/>Kargo takibini aç</a></p>:null}
-        </div>
-      </section>
+          </section>
+        </Pencere>
+      ):null}
 
-      {/*
-        İade. Ayrı bir kartta ve yalnızca ödenmiş siparişte
-        görünüyor: parasal işlem, yanlışlıkla tıklanmamalı.
-      */}
-      {["paid","partially_refunded"].includes(order.payment_status)&&refundable>0&&!(meta.refunded_at&&refundedSoFar<=0)&&!isBankTransfer(meta)&&["owner","admin"].includes(membership.role)?(
-        <section className="ac ac-pad order-noprint">
-          <div className="ac-head">
-            <div>
-              <h3>İade</h3>
-              <p>
-                Tutar PayTR üzerinden müşterinin kartına iade edilir.
-                {refundedSoFar>0?<> Daha önce <strong>{money(refundedSoFar,order.currency)}</strong> iade edildi.</>:null}
-              </p>
-            </div>
-          </div>
-
+      {pencere==="iade"?(
+        <Pencere key="iade" ust={order.order_number} baslik="İade" kapatAdresi={adres} genis={false}>
+          <p className="siparis-pencere-alt">
+            Tutar PayTR üzerinden müşterinin kartına iade edilir.
+            {refundedSoFar>0?<> Daha önce <strong>{money(refundedSoFar,order.currency)}</strong> iade edildi.</>:null}
+          </p>
           <form action={refundOrder} className="order-form-grid is-narrow">
             <input type="hidden" name="order_id" value={order.id}/>
             <label>
               İade tutarı (₺)
-              <input name="amount" type="number" min="0" step="0.01" max={(refundable/100).toFixed(2)} placeholder={`${refundedSoFar>0?"Kalanın tamamı":"Tamamı"}: ${(refundable/100).toFixed(2)}`} className="ac-input"/>
+              <input name="amount" type="text" inputMode="decimal" autoComplete="off" placeholder={`${refundedSoFar>0?"Kalanın tamamı":"Tamamı"}: ${money(refundable,order.currency)}`} className="ac-input"/>
             </label>
             <p className="list-hint">
               Boş bırakırsanız {refundedSoFar>0?"kalan tutarın":"siparişin"} tamamı iade edilir ve sipariş kapanır. Bu işlem geri
@@ -764,11 +739,11 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             </p>
             <button className="ac-btn ac-btn-danger" type="submit">İadeyi başlat</button>
           </form>
-        </section>
+        </Pencere>
       ):null}
 
-      <section id="gecmis" className="ac ac-pad order-noprint">
-        <div className="ac-head"><div><h3>İşlem geçmişi</h3><p>Bu siparişte yapılan değişiklikler.</p></div><span className="ac-count">{timeline.length}</span></div>
+      {pencere==="gecmis"?(
+        <Pencere key="gecmis" ust={order.order_number} baslik="İşlem geçmişi" kapatAdresi={adres} genis={false}>
         <ol className="order-timeline">
           {timeline.map(item=>(
             <li key={item.id}>
@@ -778,7 +753,8 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
             </li>
           ))}
         </ol>
-      </section>
-    </div>
-  </>;
+        </Pencere>
+      ):null}
+    </main>
+  );
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { parseMoneyToCents } from "@/lib/money";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { bildirimBirak, bildirimliDonus } from "@/lib/panel-bildirim";
@@ -232,12 +233,20 @@ export async function refundOrder(formData: FormData) {
     sanırken siparişin tamamı iade edilebiliyordu.
   */
   /* Yalnızca boş alan "tamamı" demek; "0", eksi ya da sayı olmayan girdi reddedilir (önceden tam iadeye düşüyordu). */
+  /*
+    TÜRKÇE YAZIM (16.10.2026). Tutar `Number(x.replace(",", "."))` ile
+    okunuyordu: "1.500" (bin beş yüz) 1,50 ₺, "1.234,56" NaN oluyordu —
+    yani müşteriye istenenin binde biri iade ediliyordu. Kutu da
+    type="number" idi ve Chrome tr-TR'de "1.500" yazılınca değer yine
+    1,5 geliyordu. Artık metin kutusu ve parseMoneyToCents (bin ayırıcı
+    ve ondalık virgülü tanıyor). Okunamayan ya da sıfır tutar reddedilir.
+  */
   const rawAmount = String(formData.get("amount") ?? "").trim();
-  const requested = Number(rawAmount.replace(",", "."));
-  if (rawAmount && (!Number.isFinite(requested) || requested <= 0)) {
+  const requestedKurus = rawAmount ? parseMoneyToCents(rawAmount) : 0;
+  if (rawAmount && requestedKurus <= 0) {
     return await siparise(orderId,{hata:"invalid-amount"});
   }
-  const amountKurus = rawAmount ? Math.round(requested * 100) : remaining;
+  const amountKurus = rawAmount ? requestedKurus : remaining;
 
   if (amountKurus <= 0 || amountKurus > remaining) {
     return await siparise(orderId,{hata:"invalid-amount"});

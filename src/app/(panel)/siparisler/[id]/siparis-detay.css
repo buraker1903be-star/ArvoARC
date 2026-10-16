@@ -1,0 +1,34 @@
+/*
+  Sipariş detayının ArvoOS kalıbına uyarlaması (16.10.2026). Kalem dökümü
+  ve gönderi kartlarının iç biçimi hâlâ ../orders.css'te; burası yalnızca
+  yeni düzen: kartlar, taraflar ızgarası, pencere içi bölümler.
+*/
+.os-root .siparis-detay{display:grid;gap:var(--sp-4)}
+.os-root .siparis-detay .talep-bas h1{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+.os-root .siparis-detay .talep-bas h1 .status-pill{font-size:var(--fs-sm)}
+.os-root .siparis-detay .talep-bas-alt{margin:4px 0 0;color:var(--muted);font-size:var(--fs-sm)}
+.os-root .siparis-detay .talep-bas-eylem{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+.os-root .siparis-detay .talep-bas-eylem form{margin:0}
+.os-root .siparis-detay .kayit-serit small{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro)}
+.os-root .siparis-detay .kayit-serit .is-uyari dd{color:var(--warning)}
+.os-root .siparis-detay .kayit-serit .is-tehlike dd{color:var(--danger)}
+
+.os-root .siparis-kart,.os-root .siparis-akis{padding:var(--sp-5)}
+.os-root .siparis-taraflar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-3)}
+.os-root .siparis-taraflar .order-party{padding:var(--sp-4)}
+.os-root .siparis-not-eylem{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-top:var(--sp-2)}
+.os-root .siparis-not-eylem form{margin:0}
+
+/* Pencere içi bölümler: durum formu ve not alt alta, ince çizgiyle ayrık. */
+.siparis-pencere-bolum{display:grid;gap:var(--sp-3)}
+.siparis-pencere-bolum+.siparis-pencere-bolum{padding-top:var(--sp-4);border-top:1px solid var(--line-soft)}
+.siparis-pencere-bolum h3{margin:0;font-size:var(--fs-base);font-weight:var(--fw-semibold)}
+.siparis-pencere-alt{margin:0;color:var(--muted);font-size:var(--fs-sm)}
+
+@media (max-width:900px){.os-root .siparis-taraflar{grid-template-columns:1fr}}
+/* Yazdırırken kabuk ve pencereler görünmesin: belge yalnızca sipariş. */
+@media print{
+  .os-bar,.os-dock,.os-bolum-seridi,.order-noprint{display:none!important}
+}
+.os-root .siparis-havale{display:grid;gap:var(--sp-2)}
+.os-root .siparis-havale .siparis-not-eylem{margin-top:0}
