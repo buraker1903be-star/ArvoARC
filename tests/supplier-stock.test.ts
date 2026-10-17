@@ -61,3 +61,20 @@ test("tanımsız tedarikçide varsayılan tampon 5", () => {
   assert.equal(varyantSatilabilirMi({ stock: 5, supplier: "YOK" }, bos), true);
   assert.equal(varyantSatilabilirMi({ stock: 4, supplier: "YOK" }, bos), false);
 });
+
+/*
+  ARVOCULTURE · TARZYERİ EŞİĞİ 11 (17.10.2026, kurum sahibinin kararı).
+
+  İstenen davranış "stok 10'a düşünce satış kapansın". Alanın anlamı
+  "bu değerin ALTINA düşerse kapanır" olduğu için eşik 11; 10 yazılsa
+  stok 10 iken ürün hâlâ satılabilirdi. Eşiğin kendisi veri (panelden
+  değişir) ama ARİTMETİĞİ koddadır ve iki yönü de burada sabitleniyor.
+*/
+test("tampon 11: tedarikçide 10 adet kalan varyant satışa kapanıyor", () => {
+  assert.equal(sellableStock(10, 11), 0, "10 adet 0 yazılmalı: panelde de tükendi görünür");
+  assert.equal(sellableStock(11, 11), 11, "11 adet satılabilir kalmalı");
+  assert.equal(varyantSatilabilirMi({ stock: 0, supplier: "tarzyeri" }, new Map([["tarzyeri", 11]])), false);
+  assert.equal(varyantSatilabilirMi({ stock: 11, supplier: "tarzyeri" }, new Map([["tarzyeri", 11]])), true);
+  /* Ara değer içe aktarımdan çıkmaz ama elle girilirse de kapalı. */
+  assert.equal(varyantSatilabilirMi({ stock: 10, supplier: "tarzyeri" }, new Map([["tarzyeri", 11]])), false);
+});

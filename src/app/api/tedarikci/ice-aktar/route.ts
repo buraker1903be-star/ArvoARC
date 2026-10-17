@@ -131,7 +131,7 @@ async function runSync(mode: "tam" | "stok") {
     süresini mağaza sayısıyla birlikte büyütür, er geç zaman aşımına sokar.
 
     Sıra: yarım kalmış aktarım (sync_cursor > 0) önce bitirilir, yoksa en uzun
-    süredir güncellenmemiş mağaza seçilir. 10 dakikada bir çalıştığı için
+    süredir güncellenmemiş mağaza seçilir. Beş dakikada bir çalıştığı için
     mağazalar kendiliğinden sırayla dolaşılır.
   */
   const { data: suppliers, error: supplierError } = await supabase
@@ -218,6 +218,9 @@ async function runSync(mode: "tam" | "stok") {
     3.273 ürün 500'lük parçalarla 7 turda bitiyor; 10 dakikada
     bir tetiklemeyle katalog yaklaşık 70 dakikada tam turluyor.
     Öncesinde bu süre 5 saatti.
+    (Parçalı tur 16.10.2026'da kaldırıldı; bu not neden böyle
+    olduğunu anlatmak için duruyor. Tetikleme 17.10.2026'da beş
+    dakikaya çekildi.)
   */
   /*
     STOK TURU ARTIK PARÇALI DEĞİL (16.10.2026). XML her turda zaten
@@ -606,7 +609,7 @@ async function runSync(mode: "tam" | "stok") {
     }
   }
 
-  // Yeni ürün yalnızca tam aktarımda gelir; stok turunda (artık her on dakikada bir) kategorilemek boşa iş.
+  // Yeni ürün yalnızca tam aktarımda gelir; stok turunda (artık her beş dakikada bir) kategorilemek boşa iş.
   if (bitti && mode === "tam") {
     const { error: catError } = await supabase.rpc(
       "arc_categorize_supplier_products",

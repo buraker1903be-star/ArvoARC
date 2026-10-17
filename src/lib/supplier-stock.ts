@@ -37,7 +37,7 @@ export function sellableStock(supplierQuantity: number, stockBuffer: number | nu
   Bu yüzden kapatma ancak akış, bir önceki tam turdaki ürün sayısının
   büyük kısmını taşıyorsa yapılır. Tedarikçi bir seferde çok sayıda ürünü
   gerçekten kaldırdıysa bu tur kapatma atlanır ve sayı yeni değerine
-  oturur; sonraki tur (on dakika sonra) kapatır.
+  oturur; sonraki tur (beş dakika sonra) kapatır.
 */
 export const AKIS_TAMLIK_ESIGI = 0.9;
 
