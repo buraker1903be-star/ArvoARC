@@ -6,3 +6,38 @@
 .os-root .ayarlar-sayfasi .settings-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-4)}
 /* Telefonda bölümler üstteki şeritte (os-bolum-seridi); sayfadaki süzgeç aynı listenin tekrarı olurdu. */
 @media (max-width:760px){.os-root .ayarlar-bolumleri{display:none}}
+
+/*
+  E-POSTA ŞABLONLARI. Her şablon kendi formu: tek büyük form olsaydı
+  bir alandaki hata bütün şablonların kaydını engellerdi ve kullanıcı
+  hangisini düzelteceğini bilemezdi.
+*/
+.eposta-sablon {
+  padding-top: var(--s4, 16px);
+  border-top: 1px solid var(--line);
+}
+
+.eposta-sablon-bas {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s4, 16px);
+}
+
+.eposta-sablon-bas h4 {
+  margin: 0;
+}
+
+/* Önizleme, gidecek metnin kendisi: kutular boşken varsayılanı gösterir. */
+.eposta-onizleme {
+  padding: var(--s3, 12px);
+  border-radius: var(--r-sm);
+  background: var(--panel-soft, rgba(0, 0, 0, 0.03));
+}
+
+.eposta-sablon-eylem {
+  display: flex;
+  align-items: center;
+  gap: var(--s4, 16px);
+  flex-wrap: wrap;
+}

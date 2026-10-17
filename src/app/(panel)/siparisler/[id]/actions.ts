@@ -16,6 +16,7 @@ import { requireTenant } from "@/lib/tenant";
 import { getStoreBrand } from "@/lib/store-brand";
 import { siparisTelefonu, waSiparisBildirimi } from "@/lib/whatsapp/bildirim";
 import { durumWaAnahtari } from "@/lib/whatsapp/durum-anahtari";
+import { magazaSablonu,sablonAnahtari } from "@/lib/eposta-sablonu-oku";
 import { tarzyeriSepetiniDogrula } from "@/lib/supplier/tarzyeri-dogrulama";
 
 /*
@@ -73,7 +74,15 @@ export async function updateOrderStatus(formData:FormData){
       const trackingSent=Boolean((order?.metadata as {tracking_number?:string}|null)?.tracking_number);
       /* Ödenmemiş siparişin iptalinde iade vaadi yerine "tutar alınmadı" yazılır. */
       const unpaid=!["paid","partially_refunded","refunded"].includes(paymentStatus);
-      const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz",await getStoreBrand(supabase,organization.id),{trackingSent,unpaid,publicToken:order?.public_token});
+      const marka=await getStoreBrand(supabase,organization.id);
+      /* Mağazanın kendi metni; tablo boşsa koddaki varsayılan. */
+      const sablonAdi=sablonAnahtari(status,unpaid);
+      const sablon=sablonAdi?await magazaSablonu(supabase,organization.id,sablonAdi,{
+        musteri:order?.customer_name||"değerli müşterimiz",
+        siparis_no:order?.order_number??"",
+        magaza:marka.name,
+      }):null;
+      const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz",marka,{trackingSent,unpaid,publicToken:order?.public_token,sablon});
       if(order?.customer_email&&mail){
         await sendEmail({to:order.customer_email,...mail});
       }

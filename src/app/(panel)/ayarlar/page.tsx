@@ -1,8 +1,9 @@
 import { requireTenant } from "@/lib/tenant";
 import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { ALT_ALAN_SONEKI, altAlanAdresi, magazaAdresi } from "@/lib/magaza-adresi";
-import { removeBrandAsset,removeWhatsappNumber,saveWhatsappNumber,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain,verifyWhatsappNumber } from "./actions";
+import { removeBrandAsset,removeWhatsappNumber,saveEmailTemplate,saveWhatsappNumber,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain,verifyWhatsappNumber } from "./actions";
 import { whatsappDurumu,whatsappKapisiVar } from "@/lib/whatsapp-hesap";
+import { DEGISKENLER,SABLON_KAYDI,sablonuCoz } from "@/lib/eposta-sablonu";
 import { baglantiyiSina } from "@/lib/tryoto/ayar";
 import Link from "next/link";
 // Ayar formlarının iç biçimi (settings-*, payment-*, domain-*) hâlâ eski dosyalarda.
@@ -25,6 +26,7 @@ export const AYAR_BOLUMLERI = [
   ["kargo", "Kargo"],
   ["odeme", "Ödeme"],
   ["entegrasyon", "Entegrasyonlar"],
+  ["eposta", "E-posta şablonları"],
 ] as const;
 type AyarBolumu = (typeof AYAR_BOLUMLERI)[number][0];
 import { yetkiYok } from "@/lib/yetki-metni";
@@ -54,6 +56,11 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
   const whatsapp=canManagePayments&&bolum==="entegrasyon"&&whatsappKapisiVar()
     ?await whatsappDurumu(organization.id,user.id)
     :null;
+  /* Şablonlar yalnızca o bölüm açıkken okunur. */
+  const sablonSatirlari=bolum==="eposta"
+    ?(await supabase.from("arc_email_templates").select("template_key,subject,body").eq("organization_id",organization.id)).data??[]
+    :[];
+  const sablonKayitlari=new Map(sablonSatirlari.map((s)=>[s.template_key as string,{baslik:s.subject as string,govde:s.body as string}]));
   const kargoBaglantisi=canManagePayments&&bolum==="kargo"
     ?await baglantiyiSina(organization.id,settings)
     :{durum:"kapali" as const};
@@ -448,6 +455,57 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
                 <button className="panel-primary payment-save" type="submit">WhatsApp numarasını kaydet</button>
               </form>
             </>}
+    </section>
+    </>:null}
+
+    {bolum==="eposta"?<>
+    {/*
+      E-POSTA ŞABLONLARI.
+
+      Metinler kodda sabitti; çok kiracılı bir sistemde bu yetmiyor —
+      bir mağaza "Siparişiniz kargoya verildi" derken öteki kendi ses
+      tonunu kurmak istiyor ve bunun için dağıtım gerekiyordu.
+
+      KİRACI METNİ DÜZENLER, HTML'İ DÜZENLEMEZ: zarf (logo, renk,
+      buton, altbilgi) kodda kalıyor, buradan gelen metin kaçırılarak
+      basılıyor. Serbest HTML bir yazım hatasıyla postayı bozar ve
+      müşteriye giden bir yüzeye kod enjekte etme kapısı açardı.
+
+      BOŞ BIRAKMAK = VARSAYILAN. Kutular boşken koddaki metin gidiyor;
+      tablo boş olan her mağaza bugünkü postaları almaya devam ediyor.
+    */}
+    <section className="panel-card settings-section">
+      <div className="head"><div><small>MÜŞTERİ POSTALARI</small><h3>E-posta şablonları</h3><p>Boş bıraktığınız alanlarda varsayılan metin kullanılır. Logo, renk ve buton gibi görsel düzen değişmez.</p></div><span>MAĞAZAYA ÖZEL</span></div>
+      {canManage?<>
+        <p className="list-hint">
+          Kullanabileceğiniz değişkenler:{" "}
+          {Object.entries(DEGISKENLER).map(([ad,aciklama],i)=>
+            <span key={ad}>{i>0?" · ":""}<code>{`{${ad}}`}</code> {aciklama}</span>)}
+        </p>
+        {Object.entries(SABLON_KAYDI).map(([anahtar,tanim])=>{
+          const kayit=sablonKayitlari.get(anahtar)??null;
+          /* Önizleme: kiracının yazdığı metin yoksa varsayılan görünür,
+             böylece "ne gidecek" sorusu kutular boşken de yanıtlı. */
+          const etkin=sablonuCoz(anahtar,kayit)!;
+          const ozel=Boolean((kayit?.baslik??"").trim()||(kayit?.govde??"").trim());
+          return <form key={anahtar} action={saveEmailTemplate} className="settings-form eposta-sablon">
+            <input type="hidden" name="template_key" value={anahtar}/>
+            <div className="eposta-sablon-bas">
+              <div><h4>{tanim.ad}</h4><p className="list-hint">{tanim.aciklama}</p></div>
+              <span className="list-hint">{ozel?"Özel metin":"Varsayılan"}</span>
+            </div>
+            <label>Konu<input name="subject" defaultValue={kayit?.baslik??""} placeholder={tanim.varsayilan.baslik} maxLength={200}/></label>
+            <label>Gövde<textarea name="body" rows={3} defaultValue={kayit?.govde??""} placeholder={tanim.varsayilan.govde} maxLength={2000}/></label>
+            <p className="list-hint eposta-onizleme"><b>{etkin.baslik}</b><br/>{etkin.govde}</p>
+            <div className="eposta-sablon-eylem">
+              <button className="panel-primary" type="submit">Kaydet</button>
+              {/* Boş kaydetmek varsayılana döndürüyor; ayrı bir "sıfırla"
+                  düğmesi yerine kutuları boşaltmak yeterli ve açık. */}
+              <span className="list-hint">Varsayılana dönmek için alanları boşaltıp kaydedin.</span>
+            </div>
+          </form>;
+        })}
+      </>:<p className="list-hint">{yetkiYok("e-posta şablonları", "yonetim")}</p>}
     </section>
     </>:null}
     </div>

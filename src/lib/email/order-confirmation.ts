@@ -506,9 +506,26 @@ export function statusUpdateEmail(
     unpaid?: boolean;
     /** Siparişin paylaşım anahtarı; düğme giriş istemeyen sayfaya gitsin. */
     publicToken?: string | null;
+    /**
+     * Mağazanın kendi metni (lib/eposta-sablonu-oku).
+     *
+     * Verilmezse buradaki varsayılan kullanılıyor: tablo boş olan
+     * mağazalar ve okuma düştüğü an için. Metni okuyamamak,
+     * müşteriye siparişinin durumunu hiç söylememek için yeterli bir
+     * sebep değil.
+     */
+    sablon?: { baslik: string; govde: string } | null;
   } = {},
 ) {
-  const message = status === "cancelled" && options.unpaid ? UNPAID_CANCELLED : STATUS_MESSAGES[status];
+  const varsayilan = status === "cancelled" && options.unpaid ? UNPAID_CANCELLED : STATUS_MESSAGES[status];
+  /*
+    Mağazanın metni varsayılanın YERİNE geçiyor ama varsayılanın VARLIĞI
+    hâlâ karar veriyor: bildirim gerektirmeyen bir durumda mağazanın
+    tabloya yazdığı metin, o durumda posta göndermek anlamına gelmemeli.
+  */
+  const message = varsayilan && options.sablon
+    ? { title: options.sablon.baslik, body: options.sablon.govde }
+    : varsayilan;
   // Bildirim gerektirmeyen durumda e-posta üretilmez.
   if (!message) return null;
   // Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti; ikincisi gürültü.

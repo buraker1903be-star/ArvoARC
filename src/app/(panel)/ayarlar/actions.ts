@@ -11,6 +11,7 @@ import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/verce
 import { encryptSecret,paymentCredentialsConfigured } from "@/lib/payment-credentials";
 import { jetonlariUnut } from "@/lib/tryoto/istemci";
 import { whatsappNumarasiniKaldir,whatsappNumarasiniKaydet,whatsappNumarasiniSina } from "@/lib/whatsapp-hesap";
+import { SABLON_ANAHTARLARI,taninmayanDegiskenler } from "@/lib/eposta-sablonu";
 
 const roles=new Set(["owner","admin","manager"]);
 /*
@@ -473,4 +474,54 @@ export async function removeWhatsappNumber(){
   revalidatePath("/ayarlar");
   return await bildirimliDonus("/ayarlar?bolum=entegrasyon",
     sonuc.tamam?{basari:"WhatsApp bağlantısı kaldırıldı."}:{hata:sonuc.hata});
+}
+
+/*
+  E-POSTA ŞABLONLARI.
+
+  Kiracı METNİ düzenler, HTML'i düzenlemez: zarf (logo, renk, buton,
+  altbilgi) kodda kalıyor ve buradan gelen metin kaçırılarak basılıyor.
+  Serbest HTML bir yazım hatasıyla postayı bozar ve müşteriye giden bir
+  yüzeye kod enjekte etme kapısı açardı.
+
+  BOŞ KAYDETMEK = VARSAYILANA DÖNMEK. Satır silinmiyor, boş yazılıyor
+  ve sablonuCoz boş alanı varsayılanla dolduruyor; böylece "bir şey
+  yazmıştım, sildim" ile "hiç yazmadım" aynı sonucu veriyor.
+*/
+export async function saveEmailTemplate(formData:FormData){
+  const {supabase,organization,membership,user}=await requireTenant();
+  if(!roles.has(membership.role))return await bildirimliDonus("/ayarlar?bolum=eposta",{hata:hataMetni("forbidden")});
+
+  const anahtar=String(formData.get("template_key")??"");
+  if(!SABLON_ANAHTARLARI.includes(anahtar)){
+    return await bildirimliDonus("/ayarlar?bolum=eposta",{hata:"Tanınmayan şablon."});
+  }
+
+  const baslik=String(formData.get("subject")??"").trim().slice(0,200);
+  const govde=String(formData.get("body")??"").trim().slice(0,2000);
+
+  /*
+    Tanınmayan değişken SESSİZCE GEÇMİYOR: {musteri_adi} yazan kiracı
+    müşteriye o metni olduğu gibi gönderir ve sebebini anlamaz.
+  */
+  const taninmayan=taninmayanDegiskenler(anahtar,{baslik,govde});
+  if(taninmayan.length){
+    return await bildirimliDonus("/ayarlar?bolum=eposta",
+      {hata:`Tanınmayan değişken: ${taninmayan.map((d)=>`{${d}}`).join(", ")}`});
+  }
+
+  const {error}=await supabase.from("arc_email_templates").upsert({
+    organization_id:organization.id,
+    template_key:anahtar,
+    subject:baslik,
+    body:govde,
+    updated_by:user.id,
+    updated_at:new Date().toISOString(),
+  },{onConflict:"organization_id,template_key"});
+  if(error)return await bildirimliDonus("/ayarlar?bolum=eposta",{hata:error.message});
+
+  revalidatePath("/ayarlar");
+  const bos=!baslik&&!govde;
+  return await bildirimliDonus("/ayarlar?bolum=eposta",
+    {basari:bos?"Şablon varsayılana döndürüldü.":"Şablon kaydedildi."});
 }

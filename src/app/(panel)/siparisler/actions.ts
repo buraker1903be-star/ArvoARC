@@ -9,6 +9,8 @@ import { sendEmail } from "@/lib/email/resend";
 import { statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { siparisTelefonu, waSiparisBildirimi } from "@/lib/whatsapp/bildirim";
 import { durumWaAnahtari } from "@/lib/whatsapp/durum-anahtari";
+import { magazaSablonu,sablonAnahtari } from "@/lib/eposta-sablonu-oku";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { isOrderClosed } from "@/lib/commerce-labels";
 import { ARSIVLENEBILIR_DURUMLAR, nextOrderStep } from "@/lib/order-flow";
 import { backUrl } from "@/lib/back-url";
@@ -120,16 +122,28 @@ async function notifyStatus(
   status: string,
   brand: StoreBrand,
   organizationId?: string,
+  /* Mağazanın posta metnini okumak için; verilmezse varsayılan metin. */
+  supabase?: SupabaseClient,
 ) {
   try {
     /* Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti. */
     const trackingSent = Boolean((order.metadata as { tracking_number?: string } | null)?.tracking_number);
     /* Ödenmemiş siparişin iptalinde iade vaadi yerine "tutar alınmadı" yazılır. */
     const unpaid = Boolean(order.payment_status) && !["paid", "partially_refunded", "refunded"].includes(order.payment_status ?? "");
+    /* Mağazanın kendi metni; tablo boşsa koddaki varsayılan. */
+    const sablonAdi = sablonAnahtari(status, unpaid);
+    const sablon = sablonAdi && organizationId && supabase
+      ? await magazaSablonu(supabase, organizationId, sablonAdi, {
+          musteri: order.customer_name || "değerli müşterimiz",
+          siparis_no: order.order_number,
+          magaza: brand.name,
+        })
+      : null;
     const mail = statusUpdateEmail(status, order.order_number, order.customer_name || "değerli müşterimiz", brand, {
       trackingSent,
       unpaid,
       publicToken: order.public_token,
+      sablon,
     });
     /* E-posta adresi olmayan sipariş olabiliyor; WhatsApp yine denensin. */
     if (mail && order.customer_email) await sendEmail({ to: order.customer_email, ...mail });
@@ -226,7 +240,7 @@ async function durumIlerlet(orderId: string, status: string): Promise<IslemSonuc
 
   if (error) return { hata: hataMetni("save-failed") };
 
-  await notifyStatus(order, status, await getStoreBrand(supabase, membership.organization_id), membership.organization_id);
+  await notifyStatus(order, status, await getStoreBrand(supabase, membership.organization_id), membership.organization_id, supabase);
 
   revalidatePath("/");
   revalidatePath("/siparisler");
@@ -368,7 +382,7 @@ async function havaleIptal(orderId: string): Promise<IslemSonucu> {
   });
   if (error) return { hata: hataMetni("save-failed") };
 
-  await notifyStatus(order, "cancelled", await getStoreBrand(supabase, membership.organization_id), membership.organization_id);
+  await notifyStatus(order, "cancelled", await getStoreBrand(supabase, membership.organization_id), membership.organization_id, supabase);
 
   revalidatePath("/");
   revalidatePath("/operasyon");
@@ -440,7 +454,7 @@ async function topluDurumCekirdek(rawIds: string[], status: string): Promise<Isl
   }
 
   const toplu = await getStoreBrand(supabase, membership.organization_id);
-  await Promise.all(updated.map((order) => notifyStatus(order, status, toplu, membership.organization_id)));
+  await Promise.all(updated.map((order) => notifyStatus(order, status, toplu, membership.organization_id, supabase)));
 
   revalidatePath("/");
   revalidatePath("/siparisler");
