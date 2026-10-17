@@ -13,6 +13,7 @@ import { getStoreBrand } from "@/lib/store-brand";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email/resend";
 import { transferOrderEmail } from "@/lib/email/order-confirmation";
+import { arvoosBildirimi, bildirimTutari } from "@/lib/arvoos-bildirim";
 
 /*
   Havale siparişi e-postası. PayTR bildirimi gelmediği için onay
@@ -494,6 +495,22 @@ export async function POST(request: Request) {
         console.error("Havale e-postası gönderilemedi:", order.order_number, mailError);
       }
     }
+
+    /*
+      ArvoOS paneline de haber. Havale siparişi ödeme onayından
+      GEÇMİYOR (sendOrderConfirmation kartlı akışta çalışıyor), yani
+      burada bildirilmezse kurum sahibi yalnızca kartla ödeyen
+      müşterilerin siparişini görürdü — havale bekleyen sipariş tam
+      da harekete geçilmesi gereken sipariş.
+    */
+    await arvoosBildirimi({
+      organizationId,
+      kategori: "arc_siparis",
+      baslik: "Yeni sipariş · havale bekliyor",
+      metin: `${order.order_number} · ${name || "Müşteri"} · ${bildirimTutari(payable)}`,
+      tekrarAnahtari: order.order_id,
+      ekBilgi: { order_id: order.order_id, order_number: order.order_number, odeme: "havale" },
+    });
 
     return NextResponse.json(
       {

@@ -4,6 +4,7 @@ import { getStoreBrand } from "@/lib/store-brand";
 import { orderConfirmationHtml } from "@/lib/email/order-confirmation";
 import { sendEmail } from "@/lib/email/resend";
 import { siparisTelefonu, waSiparisBildirimi, waTutar } from "@/lib/whatsapp/bildirim";
+import { arvoosBildirimi, bildirimTutari } from "@/lib/arvoos-bildirim";
 
 /*
   SİPARİŞ ONAY E-POSTASI. PayTR bildirim ucunun içinden çıkarıldı:
@@ -93,6 +94,25 @@ export async function sendOrderConfirmation(
       tutar: waTutar(order.total ?? 0),
     },
     paylasimAnahtari: order.public_token,
+  });
+
+  /*
+    KURUM SAHİBİNİN PANELİNE. ArvoARC'ın kendi çekmecesi siparişi
+    zaten sayıyor; bu satır ArvoOS panelini de haberdar ediyor —
+    iki ürünü birlikte kullanan kiracı tek yere bakabilsin.
+
+    Tekrar anahtarı sipariş kimliği: ödeme sağlayıcısı bildirimi
+    yanıt alana kadar TEKRARLIYOR ve bu akış her tekrarda yeniden
+    çalışabiliyor. Anahtarsız bırakılsa aynı sipariş için üç
+    bildirim görünürdü.
+  */
+  await arvoosBildirimi({
+    organizationId: order.organization_id,
+    kategori: "arc_siparis",
+    baslik: "Yeni sipariş",
+    metin: `${order.order_number} · ${order.customer_name || "Müşteri"} · ${bildirimTutari(order.total ?? 0)}`,
+    tekrarAnahtari: orderId,
+    ekBilgi: { order_id: orderId, order_number: order.order_number },
   });
 }
 
