@@ -110,3 +110,16 @@ test("en çok satan ürünler ciroya göre, yalnızca geçerli siparişlerden", 
   assert.deepEqual(o.enCokSatan.map((u) => u.sku), ["K-1"]);
   assert.equal(o.satilanAdet, 2, "iptal siparişin adedi satışa girmiyor");
 });
+
+test("ödeme türü: boş alan kredi kartı sayılıyor, ciroya göre sıralı", () => {
+  const o = raporOzeti(
+    [siparis({ id: "a", payment_method: "Nakit", total: 5_000 }),
+     siparis({ id: "b", payment_method: "Banka havalesi / EFT", total: 30_000 }),
+     siparis({ id: "c", total: 10_000 })],
+    [], [], DONEM, AYLAR,
+  );
+  assert.deepEqual(o.odemeTurleri.map((t) => [t.etiket, t.adet]), [
+    ["Banka havalesi / EFT", 1], ["Kredi kartı", 1], ["Nakit", 1],
+  ]);
+  assert.equal(o.odemeTurleri[0].ciro, 30_000);
+});

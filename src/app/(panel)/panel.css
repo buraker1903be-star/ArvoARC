@@ -675,6 +675,11 @@ html[data-theme="dark"] .panel-root .product-card-badges .catalog-badge.navy{bac
 
 /* Yazdırma / PDF: kabuk gizlenir, yalnızca içerik kalır. */
 @media print{
+  /* OS kabuğu da gizleniyor (17.10.2026): kural eski panel kabuğuna
+     göre yazılmıştı, panel ArvoOS kabuğuna geçince üst çubuk, dock ve
+     bölüm şeridi yazdırılan raporun üstünde duruyordu. */
+  .os-bar,.os-dock,.os-bolum-serit,.os-launcher,.act-root,.panel-toast{display:none!important}
+  .os-root .panel-content{padding:0!important}
   .panel-sidebar,.panel-topbar,.mobile-bottom-nav,.mobile-drawer,.mobile-drawer-backdrop,.nav-progress,.global-progress{display:none!important}
   .panel-workspace{margin:0!important}
   .panel-content{max-width:none!important;padding:0!important}

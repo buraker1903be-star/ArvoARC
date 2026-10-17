@@ -67,3 +67,31 @@ export function sonAltiAy(simdi: number = Date.now()) {
     return { bas, son: ayinSonGunu(y, a), ad: AYLAR[a - 1].slice(0, 3), simdiki: sira === 5 };
   });
 }
+
+/*
+  ÖNCEKİ DÖNEM (17.10.2026). Rapor tek başına "iyi mi kötü mü"
+  söylemiyor: ₺1.817 ciro, geçen ay ₺6.548 ise başka bir cümledir.
+  Karşılaştırma dönemi aynı uzunlukta ve hemen öncesinde:
+  ay → önceki ay, yıl → önceki yıl, özel aralık → aynı gün sayısı.
+
+  Pencerenin DIŞINDA kalabilir (okuma altı ayla sınırlı); o zaman
+  sayfa karşılaştırmayı hiç göstermiyor — yarım bir karşılaştırma,
+  karşılaştırma olmamasından yanıltıcı.
+*/
+const GUN_MS = 86_400_000;
+const anahtarMs = (gun: string) => Date.parse(`${gun}T00:00:00Z`);
+const msAnahtar = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+export function oncekiDonem(donem: Donem): Donem {
+  const [yil, ay] = donem.bas.split("-").map(Number);
+  if (donem.anahtar === "bu_ay" || donem.anahtar === "gecen_ay") {
+    const bas = ayBasiAnahtari(yil, ay - 1);
+    const [y, a] = bas.split("-").map(Number);
+    return { bas, son: ayinSonGunu(y, a), anahtar: donem.anahtar, etiket: `${AYLAR[a - 1]} ${y}` };
+  }
+  if (donem.anahtar === "bu_yil") return { bas: `${yil - 1}-01-01`, son: `${yil - 1}-12-31`, anahtar: "bu_yil", etiket: `${yil - 1}` };
+  const uzunluk = Math.round((anahtarMs(donem.son) - anahtarMs(donem.bas)) / GUN_MS) + 1;
+  const son = msAnahtar(anahtarMs(donem.bas) - GUN_MS);
+  const bas = msAnahtar(anahtarMs(son) - (uzunluk - 1) * GUN_MS);
+  return { bas, son, anahtar: "ozel", etiket: `${gunYazisi(bas)} – ${gunYazisi(son)}` };
+}

@@ -111,7 +111,7 @@ export default async function Dashboard() {
 
   /* Grafik başlığındaki özet: eski dört kutu yer kaplıyordu; ArvoOS'ta da rakamlar grafiğin başlığında. */
   const ozet = [
-    { ad: "Net satış · 30 gün", deger: money.format(sales / 100), href: "/analitik?p=30" },
+    { ad: "Net satış · 30 gün", deger: money.format(sales / 100), href: "/analitik" },
     { ad: "Sipariş · 30 gün", deger: orders.length.toLocaleString("tr-TR"), href: "/siparisler" },
     { ad: "Aktif ürün", deger: (activeProductCountResult.count ?? 0).toLocaleString("tr-TR"), href: "/urunler" },
     { ad: `Stok · ${compact.format(variantCount)} varyant`, deger: stock === null ? "—" : compact.format(stock), href: "/stok" },

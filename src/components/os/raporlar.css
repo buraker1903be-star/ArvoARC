@@ -299,3 +299,8 @@ html[data-theme="dark"] .rpt-trend-bars .is-lead,html[data-theme="dark"] .rpt-le
   .rpt-urun-iz{grid-column:2/-1}
   .rpt-urun-adet{grid-column:2}
 }
+/* Karşılaştırma oku: kartın notunun içinde, kendi rengiyle. Yön
+   renklendirilmiyor — iadenin artması "yeşil" olmamalı. */
+.rpt-delta{display:inline-flex;align-items:center;gap:2px;color:var(--ink-soft);font-weight:700;font-variant-numeric:tabular-nums}
+.rpt-delta[data-dir="up"]{color:var(--success)}
+.rpt-delta[data-dir="down"]{color:var(--danger)}

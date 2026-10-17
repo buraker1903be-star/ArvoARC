@@ -32,7 +32,9 @@ export type Grafik =
   | { tur: "gosterge"; oran: number }
   | { tur: "yigin"; parcalar: { ad: string; deger: number; ton: Ton }[] }
   | { tur: "selale"; adimlar: { ad: string; deger: number; ton: Ton }[] };
-export type Gosterge = { etiket: string; deger: string; not: string; simge: string; ton: Ton; tonlu?: boolean; grafik: Grafik };
+/* `not` düz metin değil ReactNode: karşılaştırma oku (↑%12) kendi
+   rengini taşıyor ve cümlenin içinde duruyor. */
+export type Gosterge = { etiket: string; deger: string; not: ReactNode; simge: string; ton: Ton; tonlu?: boolean; grafik: Grafik };
 export type DefterSatiri = { etiket: string; ipucu: string; tutar: string; pay: number | null; ton: Ton };
 
 const simgeYollari: Record<string, ReactNode> = {

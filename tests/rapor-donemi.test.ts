@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ayinSonGunu, okumaBasi, raporDonemi, sonAltiAy } from "@/lib/rapor-donemi";
+import { ayinSonGunu, okumaBasi, oncekiDonem, raporDonemi, sonAltiAy } from "@/lib/rapor-donemi";
 
 /* 17 Ekim 2026, 01:30 Türkiye (= 16 Ekim 22:30 UTC). */
 const GECE = Date.parse("2026-10-16T22:30:00Z");
@@ -48,4 +48,19 @@ test("şubat ve yıl sınırı", () => {
   assert.equal(ayinSonGunu(2026, 2), "2026-02-28");
   const ocak = Date.parse("2026-01-05T09:00:00Z");
   assert.equal(raporDonemi("gecen_ay", undefined, undefined, ocak).bas, "2025-12-01");
+});
+
+test("önceki dönem aynı uzunlukta ve hemen öncesinde", () => {
+  const buAy = oncekiDonem(raporDonemi(undefined, undefined, undefined, GECE));
+  assert.deepEqual([buAy.bas, buAy.son, buAy.etiket], ["2026-09-01", "2026-09-30", "Eylül 2026"]);
+  const yil = oncekiDonem(raporDonemi("bu_yil", undefined, undefined, GECE));
+  assert.deepEqual([yil.bas, yil.son], ["2025-01-01", "2025-12-31"]);
+  /* 7 günlük özel aralığın öncesi yine 7 gün. */
+  const ozel = oncekiDonem(raporDonemi("ozel", "2026-10-08", "2026-10-14", GECE));
+  assert.deepEqual([ozel.bas, ozel.son], ["2026-10-01", "2026-10-07"]);
+  /* 31 günlük ocak aralığının öncesi 31 günlük aralık: 1–31 Aralık. */
+  assert.deepEqual(
+    (({ bas, son }) => ({ bas, son }))(oncekiDonem(raporDonemi("ozel", "2026-01-01", "2026-01-31", GECE))),
+    { bas: "2025-12-01", son: "2025-12-31" },
+  );
 });

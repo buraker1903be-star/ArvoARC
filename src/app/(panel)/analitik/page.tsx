@@ -1,9 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { trLocalToIso } from "@/lib/tr-time";
 import { KNot } from "@/components/arvo-ui/k-ui";
-import { gunYazisi, okumaBasi, raporDonemi, sonAltiAy } from "@/lib/rapor-donemi";
+import { gunYazisi, okumaBasi, oncekiDonem, raporDonemi, sonAltiAy } from "@/lib/rapor-donemi";
 import { gunAnahtari, raporOzeti, type RaporIadesi, type RaporKalemi, type RaporSiparisi } from "@/lib/rapor-istatistik";
 import {
   Defter, GostergeKarti, Simge, cssDegisken, dusum, oranSinirla, paraYaz, payi, yuzde,
@@ -27,6 +28,17 @@ import "@/components/os/raporlar.css";
   lib/rapor-istatistik'te hesaplanıyor ve test ediliyor; bu dosya
   yalnızca okuyup çiziyor.
 */
+
+export const metadata: Metadata = { title: "Raporlar" };
+
+const fark = (simdi: number, once: number) => (once ? Math.round(((simdi - once) / once) * 100) : null);
+
+/* Karşılaştırma oku: artış iyi, azalış kötü diye RENKLENDİRİLMİYOR —
+   iade tutarının artması iyi değil. Yön okunur, yorumu kartın notunda. */
+function Fark({ deger }: { deger: number | null }) {
+  if (deger === null) return null;
+  return <b className="rpt-delta" data-dir={deger > 0 ? "up" : deger < 0 ? "down" : undefined}>{deger > 0 ? "↑" : deger < 0 ? "↓" : "→"} %{Math.abs(deger)}</b>;
+}
 
 /* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
 function suAn() {
@@ -53,7 +65,7 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
   const [siparisSonucu, iadeSonucu] = await Promise.all([
     fetchAllRows<RaporSiparisi>((bas, son) =>
       supabase.from("arc_orders")
-        .select("id,status,payment_status,total,subtotal,shipping,source,discount:metadata->discount,transfer_discount:metadata->transfer_discount,refunded_amount:metadata->refunded_amount,created_at")
+        .select("id,status,payment_status,total,subtotal,shipping,source,payment_method:metadata->>payment_method,discount:metadata->discount,transfer_discount:metadata->transfer_discount,refunded_amount:metadata->refunded_amount,created_at")
         .eq("organization_id", organization.id)
         .gte("created_at", pencere)
         .order("created_at", { ascending: false })
@@ -88,6 +100,18 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
   const kalemler = kalemParcalari.flatMap((p) => p.rows);
 
   const o = raporOzeti(siparisSonucu.rows, kalemler, iadeSonucu.rows, donem, aylar);
+  /*
+    KARŞILAŞTIRMA yalnızca önceki dönem OKUMA PENCERESİNİN İÇİNDEYSE:
+    pencere altı ayla sınırlı ve dışarıda kalan bir dönemi "sıfır"
+    saymak, ciroyu sonsuz artmış gösterirdi. Kalem verilmiyor; buradan
+    yalnızca sipariş adedi ve net ciro okunuyor.
+  */
+  const onceki = oncekiDonem(donem);
+  const karsilastirilabilir = onceki.bas >= okumaBasi(donem, simdi);
+  const oncekiOzet = karsilastirilabilir ? raporOzeti(siparisSonucu.rows, [], [], onceki, aylar) : null;
+  const karsilastirmaAdi = donem.anahtar === "bu_yil" ? "Geçen yıla göre" : donem.anahtar === "ozel" ? "Önceki eşit döneme göre" : "Geçen aya göre";
+  const karsilastirma = (simdiki: number, oncekiDeger: number | undefined) =>
+    oncekiOzet ? <>{karsilastirmaAdi} <Fark deger={fark(simdiki, oncekiDeger ?? 0)} /> · </> : null;
   const kesildi = siparisSonucu.truncated || iadeSonucu.truncated || kalemParcalari.some((p) => p.truncated);
 
   /* --- Sunum: yukarıdaki özetten türetiliyor, yeni hesap yok --- */
@@ -95,22 +119,22 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
     o.egilim.map((ay) => ({ ad: ay.ad, deger: sec(ay), etiket: bicim(sec(ay)), simdiki: ay.simdiki }));
 
   const satisKartlari: Gosterge[] = [
-    { etiket: "Sipariş", deger: adet(o.gecerliAdet), not: `${adet(o.siparisAdedi)} kayıt · ${adet(o.iptalAdet)} iptal/iade · son 6 ay`, simge: "kutu", ton: "brand", grafik: { tur: "cubuk", seri: seri((ay) => ay.adet, adet) } },
-    { etiket: "Net ciro", deger: paraYaz(o.netCiro), not: "İptal ve iadeler düşülmüş · son 6 ay", simge: "para", ton: "success", grafik: { tur: "cubuk", seri: seri((ay) => ay.ciro, paraYaz) } },
+    { etiket: "Sipariş", deger: adet(o.gecerliAdet), not: <>{karsilastirma(o.gecerliAdet, oncekiOzet?.gecerliAdet)}{adet(o.iptalAdet)} iptal/iade · son 6 ay</>, simge: "kutu", ton: "brand", grafik: { tur: "cubuk", seri: seri((ay) => ay.adet, adet) } },
+    { etiket: "Net ciro", deger: paraYaz(o.netCiro), not: <>{karsilastirma(o.netCiro, oncekiOzet?.netCiro)}iptal ve iadeler düşülmüş · son 6 ay</>, simge: "para", ton: "success", grafik: { tur: "cubuk", seri: seri((ay) => ay.ciro, paraYaz) } },
     { etiket: "Ortalama sepet", deger: paraYaz(o.ortalamaSepet), not: `${adet(o.gecerliAdet)} geçerli siparişin ortalaması`, simge: "sepet", ton: "info", grafik: { tur: "halka", oran: o.siparisAdedi ? (o.gecerliAdet / o.siparisAdedi) * 100 : null, altyazi: "geçerli sipariş oranı" } },
     /* Halka bir ORAN gösteriyor: "sipariş başına adet" yüzde değil,
        3 ürün/1 sipariş %300 çıkıp halkayı doldururdu. Yerine en çok
        satanın kalem cirosundaki payı — kartın sorusuyla aynı konu. */
     { etiket: "Satılan adet", deger: adet(o.satilanAdet), not: `Geçerli siparişlerde toplam ürün · sipariş başına ${(o.gecerliAdet ? o.satilanAdet / o.gecerliAdet : 0).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`, simge: "etiket", ton: "gold", grafik: { tur: "halka", oran: o.kalemCirosu && o.enCokSatan[0] ? (o.enCokSatan[0].ciro / o.kalemCirosu) * 100 : null, altyazi: "en çok satanın payı" } },
-    { etiket: "İade", deger: paraYaz(o.iadeTutari), not: `${adet(o.iadeAdedi)} talep açıldı`, simge: "geri", ton: o.iadeTutari ? "warning" : "success", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.iadeTutari / o.brutCiro) * 100 : 0 } },
+    { etiket: "İade", deger: paraYaz(o.iadeTutari), not: `${adet(o.iadeAdedi)} talep · brüt cironun ${yuzde(o.brutCiro ? (o.iadeTutari / o.brutCiro) * 100 : 0)}'i`, simge: "geri", ton: o.iadeTutari ? "warning" : "success", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.iadeTutari / o.brutCiro) * 100 : 0 } },
   ];
 
   const karVar = o.kar !== null && o.maliyet !== null;
   const karlilikKartlari: Gosterge[] = [
     { etiket: "Brüt kâr", deger: karVar ? paraYaz(o.kar!) : "—", not: karVar ? `${adet(o.karliSiparis)} siparişte hesaplanabildi` : "Kalemlerin alış fiyatı girilmemiş", simge: "grafik", ton: !karVar ? "info" : o.kar! >= 0 ? "success" : "danger", tonlu: karVar, grafik: { tur: "yigin", parcalar: [{ ad: "Maliyet", deger: o.maliyet ?? 0, ton: "warning" }, { ad: "Kâr", deger: Math.max(0, o.kar ?? 0), ton: "success" }] } },
     { etiket: "Kâr marjı", deger: o.marj === null ? "—" : yuzde(o.marj), not: "Hesaplanabilen siparişlerin kalem gelirine oranı", simge: "kivilcim", ton: "gold", grafik: { tur: "gosterge", oran: o.marj ?? 0 } },
-    { etiket: "Kargo geliri", deger: paraYaz(o.kargo), not: "Siparişlerde tahsil edilen kargo bedeli", simge: "kargo", ton: "info", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.kargo / o.brutCiro) * 100 : 0 } },
-    { etiket: "İndirim", deger: paraYaz(o.indirim), not: "Kupon ve havale indirimi", simge: "etiket", ton: "warning", grafik: { tur: "gosterge", oran: o.urunToplami ? (o.indirim / o.urunToplami) * 100 : 0 } },
+    { etiket: "Kargo geliri", deger: paraYaz(o.kargo), not: `Tahsil edilen kargo bedeli · cironun ${yuzde(o.brutCiro ? (o.kargo / o.brutCiro) * 100 : 0)}'i`, simge: "kargo", ton: "info", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.kargo / o.brutCiro) * 100 : 0 } },
+    { etiket: "İndirim", deger: paraYaz(o.indirim), not: `Kupon ve havale · ürün toplamının ${yuzde(o.urunToplami ? (o.indirim / o.urunToplami) * 100 : 0)}'i`, simge: "etiket", ton: "warning", grafik: { tur: "gosterge", oran: o.urunToplami ? (o.indirim / o.urunToplami) * 100 : 0 } },
     { etiket: "Dönem akışı", deger: paraYaz(o.netCiro), not: "Ürün + kargo − indirim − iade", simge: "para", ton: "brand", grafik: { tur: "selale", adimlar: [{ ad: "Ürün", deger: o.urunToplami, ton: "brand" }, { ad: "Kargo", deger: o.kargo, ton: "info" }, { ad: "İndirim", deger: -o.indirim, ton: "warning" }, { ad: "İade", deger: -o.iadeTutari, ton: "warning" }, { ad: "Net", deger: o.netCiro, ton: "success" }] } },
   ];
 
@@ -189,7 +213,7 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
             const zayif = Boolean(gecis && o.enZayifGecis && gecis.nereden === o.enZayifGecis.nereden && o.siparisAdedi > 0);
             return <li key={adim.anahtar} className={sira === o.huni.length - 1 ? "is-final" : undefined}>
               <div className="rpt-funnel-row">
-                <div className="rpt-funnel-label"><b>{adim.etiket}</b><span>{o.siparisAdedi ? yuzde((adim.adet / o.siparisAdedi) * 100) : "—"} · dönemin tamamı</span></div>
+                <div className="rpt-funnel-label"><b>{adim.etiket}</b><span>Dönemdeki siparişlerin {o.siparisAdedi ? yuzde((adim.adet / o.siparisAdedi) * 100) : "—"}'i</span></div>
                 <div className="rpt-funnel-track"><i style={cssDegisken("--w", `${Math.max(4, (adim.adet / enBuyukHuni) * 100)}%`)} /></div>
                 <strong>{adet(adim.adet)}</strong>
               </div>
@@ -273,12 +297,26 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
         </ol> : <p className="rpt-empty-note">Bu dönemde satılan ürün yok.</p>}
       </section>
 
-      <section className="rpt-card rpt-span-full">
-        <header className="rpt-card-head"><div><h2>Satış kaynağı</h2><p>Net ciroya göre dağılım · {gunYazisi(donem.bas)} – {gunYazisi(donem.son)}</p></div></header>
+      <section className="rpt-card">
+        <header className="rpt-card-head"><div><h2>Satış kaynağı</h2><p>Net ciroya göre · {gunYazisi(donem.bas)} – {gunYazisi(donem.son)}</p></div></header>
         {o.kaynaklar.length ? <ul className="rpt-kaynaklar">
           {o.kaynaklar.map((kaynak) => <li key={kaynak.etiket}>
             <div className="rpt-lost-top"><b>{kaynak.etiket}</b><span>{adet(kaynak.adet)} sipariş · {paraYaz(kaynak.ciro)}</span></div>
             <div className="rpt-lost-track"><i style={cssDegisken("--w", `${o.netCiro ? (kaynak.ciro / o.netCiro) * 100 : 0}%`)} /></div>
+          </li>)}
+        </ul> : <p className="rpt-empty-note">Bu dönemde geçerli sipariş yok.</p>}
+      </section>
+
+      {/* Ödeme türü manuel siparişte seçiliyor, vitrinde ödeme akışından
+          geliyor; boş olan "Kredi kartı" sayılıyor (sipariş detayıyla
+          aynı varsayım). Havale ve nakitte para kasaya elden giriyor,
+          dağılım o yüzden nakit planlamasının girdisi. */}
+      <section className="rpt-card">
+        <header className="rpt-card-head"><div><h2>Ödeme türü</h2><p>Net ciroya göre dağılım</p></div></header>
+        {o.odemeTurleri.length ? <ul className="rpt-kaynaklar">
+          {o.odemeTurleri.map((tur) => <li key={tur.etiket}>
+            <div className="rpt-lost-top"><b>{tur.etiket}</b><span>{adet(tur.adet)} sipariş · {paraYaz(tur.ciro)}</span></div>
+            <div className="rpt-lost-track"><i style={cssDegisken("--w", `${o.netCiro ? (tur.ciro / o.netCiro) * 100 : 0}%`)} /></div>
           </li>)}
         </ul> : <p className="rpt-empty-note">Bu dönemde geçerli sipariş yok.</p>}
       </section>

@@ -25,6 +25,9 @@ export type RaporSiparisi = {
   subtotal: number | null;
   shipping: number | null;
   source: string | null;
+  /* metadata.payment_method: serbest metin, boşsa kart (sipariş
+     detayı da öyle gösteriyor). */
+  payment_method?: string | null;
   /* Kupon indirimi (metadata.discount) ve havale indirimi ayrı
      alanlarda duruyor; sipariş detayı da ikisini toplayarak gösteriyor. */
   discount?: unknown;
@@ -146,6 +149,22 @@ export function raporOzeti(
   }
   const kaynakListesi = [...kaynaklar.entries()].map(([etiket, deger]) => ({ etiket, ...deger })).sort((a, b) => b.ciro - a.ciro);
 
+  /*
+    ÖDEME TÜRÜ: metadata'da serbest metin ve boş olabiliyor — ekran
+    boş olanı "Kredi kartı" sayıyor (sipariş detayıyla aynı varsayım),
+    rapor da aynı cümleyi kurmalı. Havale siparişinde paranın ne zaman
+    geldiği ayrı bir soru; burada yalnızca dağılım var.
+  */
+  const odemeler = new Map<string, { ciro: number; adet: number }>();
+  for (const siparis of gecerli) {
+    const etiket = (siparis.payment_method ?? "").trim() || "Kredi kartı";
+    const kayit = odemeler.get(etiket) ?? { ciro: 0, adet: 0 };
+    kayit.ciro += revenueAmount(siparis);
+    kayit.adet += 1;
+    odemeler.set(etiket, kayit);
+  }
+  const odemeListesi = [...odemeler.entries()].map(([etiket, deger]) => ({ etiket, ...deger })).sort((a, b) => b.ciro - a.ciro);
+
   /* İade sebepleri: dönemde AÇILAN talepler (karar sonraki aya kayabilir). */
   const donemIadeleri = iadeler.filter((i) => araliktaMi(i.created_at));
   const sebepSayaci = new Map<string, number>();
@@ -188,6 +207,7 @@ export function raporOzeti(
     enCokSatan,
     kalemCirosu,
     kaynaklar: kaynakListesi,
+    odemeTurleri: odemeListesi,
     sebepler,
     egilim,
   };
