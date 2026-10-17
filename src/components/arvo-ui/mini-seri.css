@@ -4,9 +4,12 @@
 */
 .mini-seri{display:flex;align-items:stretch;gap:3px;height:34px;margin-top:var(--sp-2)}
 .mini-seri>span{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px}
+/* ÇUBUK GENİŞLİĞİ SINIRLI. Kolonun tamamı kadar geniş olunca 3px'lik
+   boş ay çubuğu bir ALT ÇİZGİ gibi okunuyordu (canlıda görüldü);
+   16px'lik çubuk dar kutuda da çubuk gibi duruyor. */
 .mini-seri i{
-  display:block;width:100%;height:var(--h,4%);max-height:calc(100% - 12px);
-  border-radius:3px 3px 1px 1px;background:var(--primary);opacity:.3
+  display:block;width:min(100%,16px);height:var(--h,4%);max-height:calc(100% - 12px);
+  border-radius:3px 3px 1px 1px;background:var(--primary);opacity:.32
 }
 .mini-seri .is-simdiki i{opacity:1}
 .mini-seri small{color:var(--muted);font-size:9.5px;line-height:1}
