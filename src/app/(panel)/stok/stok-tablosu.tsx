@@ -30,6 +30,10 @@ export type StokSatiri = {
   sku: string;
   stok: number;
   stoksuzSatis: boolean;
+  /* Tedarikçi varyantı: stok bizim değil, akıştan geliyor ve
+     satılabilirliği tedarikçi tamponu belirliyor. "Stok zorunlu"
+     yazmak doğru ama eksikti — mağaza bu adedi elle düzeltemez. */
+  tedarikci: boolean;
 };
 
 /** Adet rozetinin tonu; eşik mağaza ayarından geliyor. */
@@ -129,7 +133,7 @@ export function StokTablosu({
                     </td>
                     <td className="crm-table-mono" data-label="SKU">{satir.sku}</td>
                     <td className="crm-col-amount" data-label="Stok"><span className="status-pill" data-tone={stokTonu}>{stok.toLocaleString("tr-TR")}</span></td>
-                    <td data-label="Politika"><span className="crm-cell-sub">{satir.stoksuzSatis ? "Stoksuz satış açık" : "Stok zorunlu"}</span></td>
+                    <td data-label="Politika"><span className="crm-cell-sub">{satir.tedarikci ? "Tedarikçi stoğu" : satir.stoksuzSatis ? "Stoksuz satış açık" : "Stok zorunlu"}</span></td>
                     {canManage ? (
                       <td className="liste-eylem">
                         {/*
@@ -163,7 +167,7 @@ export function StokTablosu({
                       baslik={satir.urunAdi}
                       durum={{ etiket: `${stok.toLocaleString("tr-TR")} adet`, ton: stokTonu }}
                       alt={[satir.varyantAdi, satir.sku]}
-                      isaretler={[satir.stoksuzSatis ? { metin: "Stoksuz satış açık", ton: "bilgi" } : null]}
+                      isaretler={[satir.tedarikci ? { metin: "Tedarikçi stoğu", ton: "bilgi" } : satir.stoksuzSatis ? { metin: "Stoksuz satış açık", ton: "bilgi" } : null]}
                     />
                   </tr>
                 );

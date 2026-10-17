@@ -85,3 +85,28 @@ export function varyantSatilabilirMi(
   const tampon = Number(bul(varyant.supplier) ?? varsayilanTampon);
   return stok > 0 && stok >= (Number.isFinite(tampon) ? tampon : varsayilanTampon);
 }
+
+/*
+  PANELDE "SATILAMAZ VARYANT" SÜZGECİ (17.10.2026).
+
+  Üç ekran da şu süzgeci kullanıyordu: `stock <= 0 and
+  allow_backorder = false`. Tedarikçi varyantında bu süzgeç HİÇ
+  eşleşmiyor, çünkü arc_product_variants.allow_backorder sütununun
+  varsayılanı `true` ve tedarikçi içe aktarımı bu alanı hiç
+  yazmıyor — yani 15.000'den fazla tedarikçi varyantının hepsinde
+  "stoksuz satış açık" duruyor.
+
+  Ama arc_variant_available tedarikçi varyantında allow_backorder'a
+  BAKMIYOR: kural yalnızca tampon. Yani stoğu 0 olan tedarikçi
+  varyantı vitrinde satılamaz hâldeydi, panelin "satışa kapalı"
+  sayacı ise onu görmüyordu. Operasyon merkezinin başlıca sayısı
+  kataloğun büyük kısmına kördü.
+
+  Süzgeç artık: stok sıfır ya da altında VE (tedarikçi ürünü ya da
+  stoksuz satış kapalı).
+
+  Tamponun 0 ile stok arasındaki bandı burada aranmıyor: içe aktarım
+  tamponun altındaki miktarı 0 yazıyor (`sellableStock`), bu yüzden
+  tedarikçi varyantının stoğu ya 0 ya tamponun üstündedir.
+*/
+export const SATILAMAZ_SUZGECI = "supplier.not.is.null,allow_backorder.is.false";

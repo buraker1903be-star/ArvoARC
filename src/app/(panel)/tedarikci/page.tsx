@@ -42,8 +42,15 @@ export default async function SuppliersPage() {
     tedarikUrunu(),
     tedarikUrunu().eq("status", "active"),
     tedarikVaryanti(),
-    /* Satılamaz: stoğu bitmiş VE stoksuz satışı kapalı. */
-    tedarikVaryanti().lte("stock", 0).eq("allow_backorder", false),
+    /*
+      Satılamaz: stoğu bitmiş tedarikçi varyantı. "VE stoksuz satışı
+      kapalı" koşulu KALDIRILDI (17.10.2026): sütunun varsayılanı true
+      ve içe aktarım bu alanı hiç yazmıyor, yani koşul tedarikçi
+      varyantında hiç eşleşmiyor ve sayaç her zaman 0 gösteriyordu.
+      arc_variant_available da tedarikçi varyantında bu alana bakmıyor;
+      kural yalnızca tampon.
+    */
+    tedarikVaryanti().lte("stock", 0),
     tedarikVaryanti().is("cost_price", null),
   ]);
   if (error) throw new Error(error.message);

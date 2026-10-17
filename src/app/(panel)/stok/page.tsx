@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { adjustInventory } from "./actions";
 import { inventoryKindLabel } from "@/lib/commerce-labels";
+import { SATILAMAZ_SUZGECI } from "@/lib/supplier-stock";
 import { KKart, KNot } from "@/components/arvo-ui/k-ui";
 import { Pencere } from "@/components/os/pencere";
 import { DurumSecici } from "@/components/arvo-ui/durum-secici";
@@ -69,7 +70,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
 
   /* Sorgu oluşturucunun genel türü burada çok derin açılıyor
      (TS2589); filtre yalnızca bu dar arayüz üzerinden uygulanır. */
-  type Narrowable = { lt(column: string, value: number): Narrowable; eq(column: string, value: number | boolean): Narrowable; gt(column: string, value: number): Narrowable; lte(column: string, value: number): Narrowable; or(filters: string): Narrowable };
+  type Narrowable = { lt(column: string, value: number): Narrowable; eq(column: string, value: number | boolean): Narrowable; gt(column: string, value: number): Narrowable; lte(column: string, value: number): Narrowable; or(filters: string): Narrowable; is(column: string, value: null): Narrowable };
   const narrowed = <T,>(query: T, filter: FilterKey): T => {
     let next = query as unknown as Narrowable;
     if (search) next = next.or([`sku.ilike.%${search}%`, ...(nameProductIds.length ? [`product_id.in.(${nameProductIds.join(",")})`] : [])].join(","));
@@ -77,7 +78,12 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
     if (filter === "zero") next = next.eq("stock", 0);
     if (filter === "low") next = next.gt("stock", 0).lte("stock", lowStockThreshold);
     if (filter === "available") next = next.gt("stock", 0);
-    if (filter === "backorder") next = next.eq("allow_backorder", true);
+    /* Stoksuz satış yalnızca KENDİ ürünümüzde bir anlam taşıyor:
+       tedarikçi varyantında sütunun varsayılanı true ve
+       arc_variant_available bu alana bakmıyor. Süzgeç tedarikçi
+       varyantlarını içeriyordu, yani 15.000 satırlık bir "stoksuz
+       satış açık" listesi çıkıyordu. */
+    if (filter === "backorder") next = next.eq("allow_backorder", true).is("supplier", null);
     return next as unknown as T;
   };
   const countQuery = (filter: FilterKey) =>
@@ -85,12 +91,15 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
   const from = (page - 1) * PAGE_SIZE;
 
   const [listResult, movementsResult, unavailableResult, stockSumResult, varyantSayimi, ...countResults] = await Promise.all([
-    narrowed(supabase.from("arc_product_variants").select("id,product_id,sku,title,stock,allow_backorder", { count: "exact" }).eq("organization_id", organization.id), stockFilter)
+    narrowed(supabase.from("arc_product_variants").select("id,product_id,sku,title,stock,allow_backorder,supplier", { count: "exact" }).eq("organization_id", organization.id), stockFilter)
       .order("stock", { ascending: true })
       .order("sku", { ascending: true })
       .range(from, from + PAGE_SIZE - 1),
     supabase.from("arc_inventory_movements").select("id,variant_id,kind,quantity,note,created_at").eq("organization_id", organization.id).order("created_at", { ascending: false }).limit(20),
-    supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).lte("stock", 0).eq("allow_backorder", false),
+    /* Satılamaz varyant süzgeci lib/supplier-stock.ts'te: tedarikçi
+       varyantında allow_backorder'ın varsayılanı true olduğu için
+       eski süzgeç onları hiç saymıyordu. */
+    supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).lte("stock", 0).or(SATILAMAZ_SUZGECI),
     /* Toplam adet veritabanında toplanıyor; tüm varyantlar belleğe alınamaz. */
     supabase.rpc("arc_total_stock_units"),
     /*
@@ -159,7 +168,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
       {counts.negative + unavailable > 0 ? (
         <KNot ton="uyari">
           <b>{(counts.negative + unavailable).toLocaleString("tr-TR")} varyantta stok aksiyonu gerekiyor.</b>{" "}
-          {counts.negative.toLocaleString("tr-TR")} varyant negatif stokta; {unavailable.toLocaleString("tr-TR")} varyantta stok yok ve stoksuz satış kapalı (mağazada satın alınamıyor).
+          {counts.negative.toLocaleString("tr-TR")} varyant negatif stokta; {unavailable.toLocaleString("tr-TR")} varyant stoğu bittiği için mağazada satın alınamıyor (tedarikçi ürününde stoksuz satış ayarı kuralı değiştirmiyor; kural tampon).
         </KNot>
       ) : null}
 
@@ -194,7 +203,11 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
             varyantAdi: variant.title && variant.title !== "Default" ? variant.title : "Tek varyant",
             sku: variant.sku,
             stok: variant.stock,
-            stoksuzSatis: variant.allow_backorder,
+            /* Tedarikçi varyantında bu ayarın hükmü yok: kural tampon
+               (arc_variant_available). "Stoksuz satış açık" yazmak
+               satılabileceğini söylemek olurdu. */
+            stoksuzSatis: !variant.supplier && variant.allow_backorder,
+            tedarikci: Boolean(variant.supplier),
           }))}
           canManage={canManage}
           back={back}

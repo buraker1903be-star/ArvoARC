@@ -15,6 +15,7 @@ function waitingFor(createdAt:string,now:number){
 }
 import "./operasyon.css";
 import { formatPersonName } from "@/lib/format-name";
+import { SATILAMAZ_SUZGECI } from "@/lib/supplier-stock";
 
 
 type ProductMeta={image_paths?:string[];images?:string[];images_migrated?:boolean};
@@ -59,9 +60,14 @@ export default async function Operations(){
     supabase.from("arc_orders").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).in("status",OPEN),
     supabase.from("arc_orders").select("id,order_number,status,payment_status,customer_name,total,created_at,metadata").eq("organization_id",organization.id).in("payment_status",PAYMENT).not("status","in","(cancelled,refunded)").order("created_at",{ascending:false}).limit(8),
     supabase.from("arc_orders").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).in("payment_status",PAYMENT).not("status","in","(cancelled,refunded)"),
-    // Kritik: stok sıfır ya da eksi ve stoksuz satış kapalı (mağazada satın alınamıyor).
-    supabase.from("arc_product_variants").select("id,product_id,sku,stock,allow_backorder").eq("organization_id",organization.id).lte("stock",0).eq("allow_backorder",false).order("stock",{ascending:true}).limit(8),
-    supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).lte("stock",0).eq("allow_backorder",false),
+    /*
+      Kritik: mağazada satın alınamayan varyantlar. Süzgeç
+      lib/supplier-stock.ts'te; eskiden burada "allow_backorder =
+      false" yazılıydı ve tedarikçi varyantlarının hepsi (sütunun
+      varsayılanı true) bu sayının DIŞINDA kalıyordu.
+    */
+    supabase.from("arc_product_variants").select("id,product_id,sku,stock,allow_backorder,supplier").eq("organization_id",organization.id).lte("stock",0).or(SATILAMAZ_SUZGECI).order("stock",{ascending:true}).limit(8),
+    supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).lte("stock",0).or(SATILAMAZ_SUZGECI),
     supabase.from("arc_product_variants").select("id,product_id,sku,stock,allow_backorder").eq("organization_id",organization.id).gt("stock",0).lte("stock",threshold).order("stock",{ascending:true}).limit(8),
     supabase.from("arc_product_variants").select("id",{count:"exact",head:true}).eq("organization_id",organization.id).gt("stock",0).lte("stock",threshold),
   ]);
