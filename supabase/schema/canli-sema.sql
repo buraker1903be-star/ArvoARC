@@ -3012,6 +3012,22 @@ AS $function$
     join public.organizations o
       on o.id = p.organization_id and o.id = public.arc_storefront_org(p_host)
     where p.status = 'active'
+      /*
+        VARYANTI OLMAYAN ÜRÜN SAYILMIYOR (17.10.2026).
+
+        Raf sorgusu varyant tablosuna INNER JOIN ile bağlı, yani
+        varyantı olmayan ürünü hiç göstermiyor; bu sayaç ise onları
+        da sayıyordu. Sonuç, süzgeç yokken bile "3.225 / 3.228 ürün"
+        gibi bir başlıktı — müşteriye bir süzgecin listeyi
+        daralttığını söylüyor, oysa daraltan bir şey yok. Canlıda
+        ölçüldü: giyimde 3, kadında 2, çocukta 1 ürün.
+      */
+      and exists (
+        select 1
+        from public.arc_product_variants v
+        where v.product_id = p.id
+          and v.organization_id = p.organization_id
+      )
       and exists (
         select 1
         from public.arc_collection_products cp
@@ -4535,6 +4551,22 @@ AS $function$
     join public.organizations o
       on o.id = p.organization_id and o.slug = 'arvoculture'
     where p.status = 'active'
+      /*
+        VARYANTI OLMAYAN ÜRÜN SAYILMIYOR (17.10.2026).
+
+        Raf sorgusu varyant tablosuna INNER JOIN ile bağlı, yani
+        varyantı olmayan ürünü hiç göstermiyor; bu sayaç ise onları
+        da sayıyordu. Sonuç, süzgeç yokken bile "3.225 / 3.228 ürün"
+        gibi bir başlıktı — müşteriye bir süzgecin listeyi
+        daralttığını söylüyor, oysa daraltan bir şey yok. Canlıda
+        ölçüldü: giyimde 3, kadında 2, çocukta 1 ürün.
+      */
+      and exists (
+        select 1
+        from public.arc_product_variants v
+        where v.product_id = p.id
+          and v.organization_id = p.organization_id
+      )
       and exists (
         select 1
         from public.arc_collection_products cp

@@ -47,8 +47,8 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   vitrinde uygunluğun tek kurala bağlanması, kiracı vitrininin
   sayfalaması, tedarikçi tamponunun eşik olarak uygulanması,
   sitemap'in yalnızca indekslenebilir ürünü listelemesi ve koleksiyon
-  rafının üç adımı (sayfalama, hızlandırma, ikiye ayrılma). İmleç
-  sonuncunun (20261017133904) bir ardında; döküm yenilendiğinde aynı
+  rafının dört adımı (sayfalama, hızlandırma, ikiye ayrılma, süzgeçsiz
+  toplamın eşitlenmesi). İmleç sonuncunun (20261017134855) bir ardında; döküm yenilendiğinde aynı
   şekilde ileri alın.
 
   İMLEÇ GERİDE KALIRSA NE OLUR: harness, görüntüde ZATEN olan bir
@@ -63,7 +63,7 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   yanıtlanıyor (her migration'ı dosya yerinde ve yerinden alınmış
   hâlde koşturarak).
 */
-const ILK_UYGULANAN = "20261017133905";
+const ILK_UYGULANAN = "20261017134856";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;
