@@ -193,7 +193,6 @@ export function MaliyetAktarimi() {
         <label className="fiyat-indirim">
           LR fiyatının altında kalınacak tutar (₺)
           <input
-            className="ac-input"
             inputMode="decimal"
             value={indirim}
             onChange={(olay) => { setIndirim(olay.target.value); sifirla(); }}
@@ -283,8 +282,7 @@ export function MaliyetAktarimi() {
             </details>
             <div className="toplayici-kod">
               <input
-                className="ac-input"
-                readOnly
+                    readOnly
                 value={yerImi.kod}
                 onFocus={(olay) => olay.currentTarget.select()}
                 aria-label="Yer imi kodu"
@@ -354,7 +352,7 @@ export function MaliyetAktarimi() {
       <label className="wide">
         Yapıştırılan satırlar
         <textarea
-          className="ac-input maliyet-giris"
+          className="maliyet-giris"
           rows={8}
           value={metin}
           onChange={(olay) => setMetin(olay.target.value)}

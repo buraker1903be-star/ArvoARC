@@ -724,12 +724,23 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                       <input type="hidden" name="item_id" value={kalem.id}/>
                       {urunSecenekleri.length>1?(
                         <label>Varyant
-                          <select name="variant_id" defaultValue={kalem.variant_id??""} className="ac-input">
-                            {urunSecenekleri.map(v=>{
-                              const uygun=satilabilir(v)||v.id===kalem.variant_id;
-                              return <option key={v.id} value={v.id} disabled={!uygun}>{v.title||v.sku} · {money(v.price,order.currency)} · {v.id===kalem.variant_id?"şu anki":satilabilir(v)?(v.supplier||!v.allow_backorder?`stok ${v.stock}`:"stoksuz satış"):"tükendi"}</option>;
-                            })}
-                          </select>
+                          {/* Panelin seçicisi; tükenmiş varyant PASİF
+                              (seçilemez), tıpkı <select>'in disabled
+                              option'ı gibi. Liste uzayabildiği için
+                              aranabilir. */}
+                          <DurumSecici
+                            name="variant_id"
+                            etiket="Varyant"
+                            bicim="alan"
+                            aranabilir
+                            gonder={false}
+                            deger={kalem.variant_id??""}
+                            secenekler={urunSecenekleri.map(v=>({
+                              deger:v.id,
+                              etiket:`${v.title||v.sku} · ${money(v.price,order.currency)} · ${v.id===kalem.variant_id?"şu anki":satilabilir(v)?(v.supplier||!v.allow_backorder?`stok ${v.stock}`:"stoksuz satış"):"tükendi"}`,
+                              pasif:!(satilabilir(v)||v.id===kalem.variant_id),
+                            }))}
+                          />
                         </label>
                       ):null}
                       <label>Adet<input name="adet" type="number" min={1} max={999} defaultValue={kalem.quantity} className="ac-input"/></label>
@@ -864,10 +875,16 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
                         <details className="kargo-takip-gir">
                           <summary className="panel-secondary">Takip no ile kaydet</summary>
                           <div className="kargo-takip-alanlar">
-                            <label>Kargo firması<select name="carrier_code" defaultValue="">
-                              <option value="" disabled>Seçin</option>
-                              {KARGO_FIRMALARI.map(firma=><option key={firma.kod} value={firma.kod}>{firma.ad}</option>)}
-                            </select></label>
+                            <label>Kargo firması
+                              <DurumSecici
+                                name="carrier_code"
+                                etiket="Kargo firması"
+                                bicim="alan"
+                                gonder={false}
+                                deger=""
+                                secenekler={[{deger:"",etiket:"Seçin",pasif:true},...KARGO_FIRMALARI.map(firma=>({deger:firma.kod,etiket:firma.ad}))]}
+                              />
+                            </label>
                             <label>Takip numarası<input name="tracking_number" placeholder="Tedarikçiden gelen numara" autoComplete="off"/></label>
                             <label className="wide">Takip adresi (isteğe bağlı)<input name="tracking_url" placeholder="Boşsa firmanın sorgu sayfası" autoComplete="off"/></label>
                             <button type="submit" className="panel-primary wide">Paketi kaydet</button>

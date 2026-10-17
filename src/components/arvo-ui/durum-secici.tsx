@@ -30,7 +30,10 @@ import "./durum-secici.css";
   ArvoOS'a taşınırken lib/arama-metni.ts de gider.
 */
 
-export type DurumSecenegi = { deger: string; etiket: string; ton?: string };
+/* `pasif`: seçilemez seçenek (tükenmiş varyant gibi). Tarayıcının
+   <select>'indeki disabled option'ın karşılığı — onsuz seçici, o
+   seçeneği engelleyen ekranların yerine geçemezdi. */
+export type DurumSecenegi = { deger: string; etiket: string; ton?: string; pasif?: boolean };
 
 export function DurumSecici({
   name,
@@ -206,6 +209,9 @@ export function DurumSecici({
   };
 
   const sec = (yeni: string) => {
+    /* Pasif seçenek seçilmiyor; liste açık kalıyor ki kullanıcı başka
+       bir satıra geçebilsin. */
+    if (secenekler.find((s) => s.deger === yeni)?.pasif) return;
     setAcik(false);
     dugme.current?.focus();
     if (yeni === secili) return;
@@ -272,6 +278,8 @@ export function DurumSecici({
               role="option"
               aria-selected={secenek.deger === secili}
               data-tone={secenek.ton ?? "neutral"}
+              data-pasif={secenek.pasif ? "" : undefined}
+              aria-disabled={secenek.pasif ? true : undefined}
               data-etkin={sira === etkin ? "" : undefined}
               onPointerEnter={() => setEtkin(sira)}
               onClick={() => sec(secenek.deger)}

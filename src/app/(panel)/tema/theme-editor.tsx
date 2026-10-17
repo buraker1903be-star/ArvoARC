@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { useFormStatus } from "react-dom";
 import { saveAndPublishTheme, saveThemeDraft, uploadThemeAsset } from "./actions";
 
@@ -234,10 +235,20 @@ export function ThemeEditor({ initial, store }: { initial: Theme; store: string 
             <div className="theme-group">
               <h4>Yazı ve düzen</h4>
               {choiceFields.map((field) => (
+                /* Panelin seçicisi (17.10.2026): tema düzenleyicisi
+                   panelde kalan son tarayıcı <select>'iydi. Değer React
+                   durumunda tutuluyor, seçim onSec ile geri geliyor;
+                   gizli alan forma girmiyor (gonder={false}). */
                 <label key={field.key}>{field.label}
-                  <select value={String(config[field.key] ?? "")} onChange={(event) => update(field.key, event.target.value)}>
-                    {field.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                  </select>
+                  <DurumSecici
+                    name={`tema_${field.key}`}
+                    etiket={field.label}
+                    bicim="alan"
+                    gonder={false}
+                    deger={String(config[field.key] ?? "")}
+                    secenekler={field.options.map(([value, label]) => ({ deger: String(value), etiket: label }))}
+                    onSec={(deger) => update(field.key, deger)}
+                  />
                 </label>
               ))}
             </div>
