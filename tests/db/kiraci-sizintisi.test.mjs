@@ -299,7 +299,7 @@ describe("kiracı sızıntısı", () => {
       for (const sql of [
         `select valid from public.arc_storefront_coupon($1::text, 'AKOD', 100000)`,
         `select order_id from public.arc_storefront_create_order(
-           $1::text, 'm@example.com', 'M', '+905551112233', '{}'::jsonb, '[]'::jsonb)`,
+           $1::text, 'm@example.com', 'Müşteri Adı', '+905551112233', '{}'::jsonb, '[]'::jsonb)`,
       ]) {
         /* Her deneme kendi kaydetme noktasında: ilk hata işlemi
            iptal edince ikinci sorgu "transaction is aborted" derdi
@@ -308,6 +308,69 @@ describe("kiracı sızıntısı", () => {
         await assert.rejects(() => db.query(sql, [A_HOST]), /permission denied/);
         await db.exec("rollback to savepoint deneme");
       }
+    });
+  });
+
+  test("tedarikçi varyantında stoktan fazla adet sipariş edilemiyor", async () => {
+    /*
+      Miktar denetimi "stok yetmiyor VE stoksuz satış kapalı" diyordu
+      ve tedarikçi varyantında ikinci koşul hiç sağlanmıyor:
+      allow_backorder sütununun varsayılanı true, içe aktarım o alanı
+      yazmıyor. Stoğu 3 olan varyanta 5 adet geçiyordu
+      (20261017144835). Kendi ürünümüzde kural değişmedi.
+    */
+    await islem(db, async () => {
+      await tohum();
+      await rol(db, "postgres");
+      await db.exec(`
+        update public.arc_product_variants
+           set stock = 3, allow_backorder = true, supplier = 'LR'
+         where sku = 'A-1' and organization_id = '${A}';
+        insert into public.arc_suppliers
+          (id, organization_id, code, name, active, margin_percent, shipping_markup, round_to_kurus,
+           publish_directly, created_at, updated_at, sync_cursor, sync_total, service_fee, stock_buffer) values
+          (gen_random_uuid(), '${A}', 'LR', 'LR', true, 0, 0, 1, true, now(), now(), 0, 0, 0, 0);
+      `);
+      await rol(db, "service_role");
+      const siparis = (adet) =>
+        db.query(
+          `select order_id from public.arc_storefront_create_order(
+             $1::text, 'm@example.com', 'Müşteri Adı', '+905551112233',
+             '{"line":"Adres","city":"İstanbul","district":"Kadıköy","country":"TR"}'::jsonb,
+             $2::jsonb)`,
+          [A_HOST, JSON.stringify([{ sku: "A-1", quantity: adet, name: "A Ürünü" }])],
+        );
+
+      await db.exec("savepoint fazla");
+      await assert.rejects(() => siparis(5), /Yetersiz stok/);
+      await db.exec("rollback to savepoint fazla");
+
+      /* Stok kadarı geçmeli: kural "fazlası olmaz", "hiç olmaz" değil. */
+      const { rows } = await siparis(3);
+      assert.ok(rows[0].order_id, "stok kadarı sipariş edilebilmeli");
+    });
+  });
+
+  test("kendi ürünümüzde stoksuz satış kuralı korunuyor", async () => {
+    /* Tedarikçisi olmayan varyantta stoksuz satış açıksa stoktan
+       fazlası satılabilir; bu mağazanın bilinçli tercihi. */
+    await islem(db, async () => {
+      await tohum();
+      await rol(db, "postgres");
+      await db.exec(`
+        update public.arc_product_variants
+           set stock = 1, allow_backorder = true, supplier = null
+         where sku = 'A-1' and organization_id = '${A}';
+      `);
+      await rol(db, "service_role");
+      const { rows } = await db.query(
+        `select order_id from public.arc_storefront_create_order(
+           $1::text, 'm@example.com', 'Müşteri Adı', '+905551112233',
+           '{"line":"Adres","city":"İstanbul","district":"Kadıköy","country":"TR"}'::jsonb,
+           '[{"sku":"A-1","quantity":4,"name":"A Ürünü"}]'::jsonb)`,
+        [A_HOST],
+      );
+      assert.ok(rows[0].order_id);
     });
   });
 
