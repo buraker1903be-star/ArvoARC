@@ -10,6 +10,7 @@ import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gor
 import { gorunumleriOku } from "../gorunumler/oku";
 import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
 import { yuzdeEkli } from "@/lib/turkce-ek";
+import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { gorunumSorgusu, URUN_DURUMLARI, URUN_KAYNAKLARI } from "@/lib/kayitli-gorunum";
 import { ProductTable, type ProductRow } from "./product-table";
 // Yeni ürün ve toplu durum formlarının biçimi (catalog-form) hâlâ orada.
@@ -387,17 +388,45 @@ export default async function Products({ searchParams }: { searchParams: Promise
       {pencere === "yeni" ? (
         <Pencere key="yeni" ust="Katalog" baslik="Yeni ürün" kapatAdresi={listHref(state, {})} genis={false}>
           <p className="urun-pencere-alt">Tek varyantla başlar; görsel, açıklama ve SEO sonra düzenleyicide eklenir.</p>
-          <form action={createProduct} className="catalog-form">
-            <label>Ürün adı<input name="name" required maxLength={200} className="ac-input" /></label>
-            <label>SKU<input name="sku" required maxLength={80} className="ac-input" /></label>
-            <label>Satış fiyatı (₺)<input name="price" type="text" inputMode="decimal" autoComplete="off" required className="ac-input" /></label>
-            <label>Karşılaştırma fiyatı (₺)<input name="compare_at_price" type="text" inputMode="decimal" autoComplete="off" placeholder="İndirim yoksa boş" className="ac-input" /></label>
-            <label>Başlangıç stoku<input name="stock" type="number" step="1" required defaultValue="0" className="ac-input" /></label>
-            <label>Durum<select name="status" defaultValue="draft" className="ac-input"><option value="draft">Taslak</option><option value="active">Aktif</option></select></label>
-            <label className="is-wide">Açıklama<textarea name="description" rows={4} className="ac-input" /></label>
-            <div className="catalog-form-actions">
-              <label className="check-inline"><input name="allow_backorder" type="checkbox" defaultChecked /> Stok yokken satışa devam et</label>
-              <button className="ac-btn ac-btn-primary" type="submit">Ürün oluştur</button>
+          {/*
+            ALANLAR PANELİN DİLİNDE (17.10.2026). Pencere eski form
+            kalıbındaydı: ac-input sınıfı, tarayıcının <select>'i ve
+            ac-btn düğmesi — panelin geri kalanı 16.10'da premium alan
+            kuralına geçtiği hâlde katalog pencereleri geride kalmıştı.
+            Sınıf verilmeyen alan ortak kuraldan besleniyor
+            (components/os/panel-ui.css).
+          */}
+          <form action={createProduct} className="catalog-form form-gruplari">
+            <section>
+              <h4>Ürün</h4>
+              <div className="catalog-form-grid">
+                <label className="is-wide">Ürün adı<input name="name" required maxLength={200} autoComplete="off" /></label>
+                <label>SKU<input name="sku" required maxLength={80} autoComplete="off" /></label>
+                <label>Durum
+                  <DurumSecici name="status" etiket="Durum" bicim="alan" gonder={false} deger="draft" secenekler={[{ deger: "draft", etiket: "Taslak" }, { deger: "active", etiket: "Aktif" }]} />
+                </label>
+              </div>
+            </section>
+            <section>
+              <h4>Fiyat ve stok</h4>
+              <div className="catalog-form-grid">
+                <label>Satış fiyatı (₺)<input name="price" type="text" inputMode="decimal" autoComplete="off" required /></label>
+                <label>Karşılaştırma fiyatı (₺)<input name="compare_at_price" type="text" inputMode="decimal" autoComplete="off" placeholder="İndirim yoksa boş" /></label>
+                <label>Başlangıç stoku<input name="stock" type="number" step="1" required defaultValue="0" /></label>
+                <div className="catalog-form-onay">
+                  <label className="check-inline"><input name="allow_backorder" type="checkbox" defaultChecked /><span>Stok yokken satışa devam et</span></label>
+                </div>
+              </div>
+            </section>
+            <section>
+              <h4>Açıklama</h4>
+              <div className="catalog-form-grid">
+                <label className="is-wide">Vitrinde görünen metin<textarea name="description" rows={4} /></label>
+              </div>
+            </section>
+            <div className="kaydet-serit">
+              <span>Tek varyantla oluşur; görsel ve SEO düzenleyicide eklenir.</span>
+              <button className="panel-primary" type="submit">Ürün oluştur</button>
             </div>
           </form>
         </Pencere>
@@ -408,11 +437,22 @@ export default async function Products({ searchParams }: { searchParams: Promise
           <p className="urun-pencere-alt">Bir tedarikçinin veya koleksiyonun tüm ürünlerini tek seferde açıp kapatın.</p>
           <form action={bulkUpdateStatus} className="catalog-form is-narrow">
             <p className="list-hint">Listede seçerek toplu işlem yapabilirsiniz; bu form ise filtreye uyan <b>tüm</b> ürünleri değiştirir. En az bir tedarikçi veya koleksiyon seçilmesi zorunlu: filtresiz işlem tüm kataloğu değiştirir ve geri alması zordur.</p>
-            <label>Tedarikçi<select name="supplier" className="ac-input"><option value="">Seçiniz</option><option value="tarzyeri">Tarzyeri</option></select></label>
-            <label>Koleksiyon (isteğe bağlı, slug)<input name="collection" placeholder="örnek: erkek-t-shirt" className="ac-input" /></label>
-            <label>Yalnızca şu durumdakiler<select name="current_status" className="ac-input"><option value="">Hepsi</option><option value="draft">Taslak</option><option value="active">Yayında</option><option value="archived">Arşiv</option></select></label>
-            <label>Yeni durum<select name="status" required className="ac-input"><option value="active">Yayında</option><option value="draft">Taslak</option><option value="archived">Arşiv</option></select></label>
-            <div className="catalog-form-actions"><button className="ac-btn ac-btn-primary" type="submit">Uygula</button></div>
+            <div className="catalog-form-grid">
+              <label>Tedarikçi
+                <DurumSecici name="supplier" etiket="Tedarikçi" bicim="alan" gonder={false} deger="" secenekler={[{ deger: "", etiket: "Seçiniz" }, { deger: "tarzyeri", etiket: "Tarzyeri" }]} />
+              </label>
+              <label>Koleksiyon (isteğe bağlı, slug)<input name="collection" placeholder="örnek: erkek-t-shirt" autoComplete="off" /></label>
+              <label>Yalnızca şu durumdakiler
+                <DurumSecici name="current_status" etiket="Yalnızca şu durumdakiler" bicim="alan" gonder={false} deger="" secenekler={[{ deger: "", etiket: "Hepsi" }, { deger: "draft", etiket: "Taslak" }, { deger: "active", etiket: "Yayında" }, { deger: "archived", etiket: "Arşiv" }]} />
+              </label>
+              <label>Yeni durum
+                <DurumSecici name="status" etiket="Yeni durum" bicim="alan" gonder={false} deger="active" secenekler={[{ deger: "active", etiket: "Yayında" }, { deger: "draft", etiket: "Taslak" }, { deger: "archived", etiket: "Arşiv" }]} />
+              </label>
+            </div>
+            <div className="kaydet-serit">
+              <span>Filtreye uyan tüm ürünleri değiştirir; geri alması zordur.</span>
+              <button className="panel-primary" type="submit">Uygula</button>
+            </div>
           </form>
         </Pencere>
       ) : null}

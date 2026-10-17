@@ -226,7 +226,7 @@ export default async function KampanyaDetayi({ params }: { params: Promise<{ id:
                 karşılığı olmayan bir kutu. Artık kartın altına yapışık
                 ince bir şerit ve düğme panelin birincil düğmesi.
               */}
-              <div className="indirim-kaydet">
+              <div className="kaydet-serit">
                 <span>Kullanım sayacı bu formdan değişmez; sipariş ödendikçe kendisi artar.</span>
                 <button className="panel-primary" type="submit">Değişiklikleri kaydet</button>
               </div>

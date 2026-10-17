@@ -522,7 +522,7 @@ export default async function IndirimlerSayfasi({ searchParams }: { searchParams
           <form action={createDiscount}>
             <input type="hidden" name="back" value={listHref(durum, {})} />
             <KampanyaAlanlari yeniMi />
-            <div className="indirim-kaydet">
+            <div className="kaydet-serit">
               <span>Kural sepet hesaplama motorunda saklanır; vitrin ve ödeme aynı kuralı uygular.</span>
               <button className="panel-primary" type="submit">Kampanyayı oluştur</button>
             </div>

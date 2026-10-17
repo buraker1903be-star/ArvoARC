@@ -4,6 +4,7 @@ import { adjustInventory } from "./actions";
 import { inventoryKindLabel } from "@/lib/commerce-labels";
 import { KKart, KNot } from "@/components/arvo-ui/k-ui";
 import { Pencere } from "@/components/os/pencere";
+import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { StokTablosu } from "./stok-tablosu";
 // Detaylı hareket formu ve hareket geçmişinin iç biçimi (stock-*) hâlâ orada.
 import "../catalog.css";
@@ -245,13 +246,22 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
       {pencereAcik ? (
         <Pencere key="hareket" ust="Stok" baslik="Detaylı stok hareketi" kapatAdresi={back} genis={false}>
           <p className="stok-pencere-alt">SKU ile giriş, çıkış veya düzeltme; not ile birlikte kaydedilir.</p>
+          {/* Alanlar panelin ortak kuralından; işlem seçimi panelin
+              seçicisinde (17.10.2026, katalog pencereleriyle birlikte). */}
           <form action={adjustInventory} className="stock-detailed-form">
             <input type="hidden" name="back" value={back} />
-            <label>SKU<input name="sku" required maxLength={80} className="ac-input" placeholder="Örn. AC-TS-MNT" autoComplete="off" /></label>
-            <label>İşlem<select name="direction" defaultValue="in" className="ac-input"><option value="in">Stok girişi</option><option value="out">Stok çıkışı</option><option value="adjustment">Pozitif düzeltme</option></select></label>
-            <label>Miktar<input name="quantity" type="number" min="1" step="1" required className="ac-input" /></label>
-            <label>Not<input name="note" maxLength={300} className="ac-input" placeholder="Örn. Tedarikçi teslimatı #123" /></label>
-            <button className="ac-btn ac-btn-primary" type="submit">Hareketi kaydet</button>
+            <div className="catalog-form-grid">
+              <label>SKU<input name="sku" required maxLength={80} placeholder="Örn. AC-TS-MNT" autoComplete="off" /></label>
+              <label>İşlem
+                <DurumSecici name="direction" etiket="İşlem" bicim="alan" gonder={false} deger="in" secenekler={[{ deger: "in", etiket: "Stok girişi" }, { deger: "out", etiket: "Stok çıkışı" }, { deger: "adjustment", etiket: "Pozitif düzeltme" }]} />
+              </label>
+              <label>Miktar<input name="quantity" type="number" min="1" step="1" required /></label>
+              <label>Not<input name="note" maxLength={300} placeholder="Örn. Tedarikçi teslimatı #123" autoComplete="off" /></label>
+            </div>
+            <div className="kaydet-serit">
+              <span>Hareket kütüğe yazılır; stok anında güncellenir.</span>
+              <button className="panel-primary" type="submit">Hareketi kaydet</button>
+            </div>
           </form>
         </Pencere>
       ) : null}

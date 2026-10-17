@@ -78,27 +78,7 @@
   .os-root .indirim-detay .indirim-olcum{grid-column:auto}
 }
 
-/*
-  KAYDET ÇUBUĞU. Eskisi globals.css'ten geliyordu: altın çerçeve, yeşil
-  düğme, 11,5px yazı, 14px köşe — panelin hiçbir yerinde karşılığı
-  olmayan bir kutu. Artık kartın altına yapışık ince bir şerit:
-  solda gerekçe, sağda birincil düğme. Sütun kendi içinde kaydığı için
-  düğme her zaman görünür kalıyor.
-*/
-.os-root .indirim-kaydet{
-  position:sticky;bottom:calc(var(--sp-4) * -1);z-index:2;
-  display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);
-  margin:var(--sp-4) calc(var(--sp-4) * -1) calc(var(--sp-4) * -1);
-  padding:var(--sp-3) var(--sp-4);
-  border-top:1px solid var(--line);
-  background:color-mix(in srgb,var(--surface) 92%,transparent);
-  backdrop-filter:blur(10px);
-}
-.os-root .indirim-kaydet span{color:var(--muted);font-size:var(--fs-sm);line-height:1.4}
-.os-root .indirim-kaydet button{flex:none}
-@media (max-width:620px){
-  .os-root .indirim-kaydet{flex-direction:column;align-items:stretch}
-}
+/* Kaydet şeridi ortak dilden (.kaydet-serit, components/os/panel-ui.css). */
 
 /* Limit çubuğu: sayının yanında doluluk görünür olsun. */
 .os-root .indirim-detay .indirim-cubuk{

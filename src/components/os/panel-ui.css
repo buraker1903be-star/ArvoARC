@@ -134,6 +134,30 @@ html[data-theme="dark"] .os-root :is(.panel-content,.panel-drawer-body){--takvim
 .os-root :is(.panel-content,.panel-drawer-body) label>:is(span,small):first-child{font-weight:var(--fw-medium)}
 
 /*
+  KAYDET ŞERİDİ (17.10.2026). Kartın ya da pencerenin altına yapışık
+  ince bir şerit: solda gerekçe, sağda birincil düğme. Sütun kendi
+  içinde kaydığı için düğme her zaman görünür kalıyor.
+
+  Önce yalnızca kampanya formundaydı (.indirim-kaydet); katalog
+  pencereleri de aynı şeridi isteyince kural buraya taşındı — üç
+  ekranda üç ayrı kaydet düzeni, panelin dilini üçe bölerdi.
+*/
+.os-root .kaydet-serit{
+  position:sticky;bottom:calc(var(--sp-4) * -1);z-index:2;
+  display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);
+  margin:var(--sp-4) calc(var(--sp-4) * -1) calc(var(--sp-4) * -1);
+  padding:var(--sp-3) var(--sp-4);
+  border-top:1px solid var(--line);
+  background:color-mix(in srgb,var(--surface) 92%,transparent);
+  backdrop-filter:blur(10px);
+}
+.os-root .kaydet-serit span{color:var(--muted);font-size:var(--fs-sm);line-height:1.4}
+.os-root .kaydet-serit button{flex:none}
+@media (max-width:620px){
+  .os-root .kaydet-serit{flex-direction:column;align-items:stretch}
+}
+
+/*
   FORM GRUPLARI (16.10.2026). Uzun bir form tek yığın hâlinde duvar
   oluyor; alanlar başlıklı bölümlere ayrılıyor ("Ne veriyor", "Hangi
   koşulla"). Önce yalnızca kampanya formunda vardı (.kampanya-alanlar),

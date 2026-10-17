@@ -34,9 +34,20 @@
 /* Yeni ürün ve toplu işlem formları */
 .catalog-details>summary b{display:block;color:var(--ink);font-size:15px}
 .catalog-details>summary small{display:block;margin-top:2px;color:var(--muted);font-size:12.5px;font-weight:500}
-.catalog-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
-.catalog-form.is-narrow{grid-template-columns:1fr;max-width:520px}
+/*
+  KATALOG PENCERELERİNİN FORMU (17.10.2026 yenilendi). Form artık
+  başlıklı gruplardan oluşuyor (.form-gruplari) ve her grubun kendi
+  ızgarası var; eski tek ızgara on bir kutuyu tek yığın hâlinde
+  diziyordu. Kaydet şeridi ortak (.kaydet-serit).
+*/
+.catalog-form{display:grid;gap:18px;margin-top:18px}
+.catalog-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.catalog-form.is-narrow{max-width:560px}
 .catalog-form .is-wide{grid-column:1/-1}
+/* Onay kutusu kendi satırında: ızgarada alanların yanına sıkışıyordu. */
+.catalog-form-onay{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center}
+.catalog-form-onay .check-inline{display:flex;align-items:center;gap:9px;margin:0;font-size:var(--fs-sm)}
+.catalog-form-onay .check-inline input{margin:0}
 .catalog-form-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 .panel-root .check-inline{display:flex;align-items:center;gap:9px;color:var(--ink-soft);font-size:13.5px;font-weight:600;cursor:pointer}
 .panel-root .check-inline input{width:17px;height:17px;flex:none;margin:0;padding:0;box-shadow:none;accent-color:var(--accent-600)}
@@ -142,7 +153,10 @@
 .sl-adjust{grid-area:adjust;display:flex;align-items:center;justify-content:flex-end;gap:6px}
 .panel-root .sl-adjust input{width:72px;min-height:34px;margin:0;padding:6px 8px;text-align:center}
 .panel-root .sl-adjust .ac-btn{min-height:34px;padding:6px 10px;font-size:12.5px}
-.stock-detailed-form{display:grid;grid-template-columns:minmax(160px,1.2fr) minmax(140px,1fr) 110px minmax(160px,1.5fr) auto;gap:10px;align-items:end;margin-top:14px}
+/* Form artık ortak ızgarayı kullanıyor (.catalog-form-grid) ve altında
+   kaydet şeridi var; beş sütunluk tek satır, seçici ve düğme aynı
+   hizada dururken bile dar pencerede sıkışıyordu. */
+.stock-detailed-form{display:grid;gap:18px;margin-top:14px}
 
 .stock-moves{display:grid;margin:0;padding:0;list-style:none}
 .stock-moves li{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line-soft)}
@@ -203,7 +217,7 @@
   .variant-list[data-manage] .list-row:not(.th){grid-template-columns:1fr 1fr;grid-template-areas:"title title" "sku stock" "price compare" "indirim gorsel" "kar kar" "backorder save";row-gap:8px;padding:14px}
   .variant-list:not([data-manage]) .list-row{grid-template-columns:1fr 1fr;grid-template-areas:"title stock" "sku price" ". compare";row-gap:6px;padding:14px}
   .vl-label{display:block;margin-bottom:4px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.1em}
-  .catalog-form,.stock-detailed-form,.variant-create-grid,.variant-matrix-grid,.variant-matrix-option{grid-template-columns:1fr}
+  .catalog-form-grid,.stock-detailed-form,.variant-create-grid,.variant-matrix-grid,.variant-matrix-option{grid-template-columns:1fr}
   .product-gallery{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 
