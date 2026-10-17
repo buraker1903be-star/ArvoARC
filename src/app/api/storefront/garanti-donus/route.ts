@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/paytr/service-client";
+import { dogrulanamadiSayfasi } from "@/lib/odeme/sonuc-sayfasi";
 import { magazaAdresi } from "@/lib/magaza-adresi";
 import { garantiAyariCoz, GARANTI_ALANLARI } from "@/lib/odeme/garanti/ayar";
 import { donusHashiDogru } from "@/lib/odeme/garanti/imza";
@@ -93,11 +94,31 @@ export async function POST(request: Request) {
   const siparisKimligi = (alanlar.orderid ?? "").trim();
   const supabase = createServiceClient();
 
-  const { data: siparis } = await supabase
+  /*
+    OKUMA HATASI "SİPARİŞ YOK" DEĞİLDİR (17.10.2026). Kayıt
+    okunamadığında da `siparis` null geliyordu ve kod bunu uydurma
+    kimlikle gelen istekle aynı saymış, müşteriyi hiçbir açıklama
+    yapmadan ana sayfaya atıyordu — üstelik kart dönüşünde, yani
+    paranın çekilmiş olabileceği anda. PayTR'de ayrı bir bildirim ucu
+    var, burada yok: bu dönüş siparişi kapatan TEK yol.
+
+    Geçici bir kesinti olabileceği için bir kez daha deneniyor; yine
+    okunamazsa müşteriye ne olduğu yazılıyor (lib/odeme/sonuc-sayfasi).
+  */
+  const siparisiOku = () => supabase
     .from("arc_orders")
     .select("id,organization_id,order_number,total,payment_status")
     .eq("id", siparisKimligi)
     .maybeSingle();
+  let { data: siparis, error: okumaHatasi } = await siparisiOku();
+  if (okumaHatasi) {
+    console.error("[garanti] sipariş okunamadı, yeniden deneniyor", siparisKimligi, okumaHatasi.message);
+    ({ data: siparis, error: okumaHatasi } = await siparisiOku());
+  }
+  if (okumaHatasi) {
+    console.error("[garanti] sipariş okunamadı, ödeme doğrulanamadı", siparisKimligi, okumaHatasi.message);
+    return dogrulanamadiSayfasi(siparisKimligi);
+  }
 
   if (!siparis) {
     /* Uydurma kimlikle gelen istek: hiçbir şey açıklamadan ana sayfaya. */
