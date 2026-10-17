@@ -26,18 +26,40 @@ import type { WaDegerleri } from "@/lib/whatsapp/sablonlar";
      kurulum eksik, numara bozuk — sunucu günlüğüne düşüyor:
      "neden mesaj gitmedi" sorusunun yanıtı yine bir yerde duruyor.
 
-  3. ONAYSIZ GÖNDERİLMEZ. WhatsApp politikası işletmenin başlattığı
-     mesaj için onay istiyor. Onay siparişin kaydında
-     (metadata.whatsapp_onay); vitrindeki ödeme formunda müşteri
-     işaretliyor ve kutucuk İŞARETSİZ başlıyor.
+  3. ONAY VARSAYILAN, RET AÇIK. Sipariş durumu bildirimi sözleşmenin
+     İFASIDIR, pazarlama değil: aynı bilgi zaten e-postayla ayrı bir
+     onay istenmeden gönderiliyor ve Türkiye'de ticari elektronik
+     ileti onayı (İYS) pazarlama mesajları için aranıyor, mevcut
+     siparişin durumunu bildiren mesaj için değil. Müşteriye ödeme
+     adımında bir kutucuk daha işaretletmek, verdiği siparişle zaten
+     kurduğu ilişkiyi ikinci kez imzalatmak olurdu.
+
+     17.10.2026'ya kadar tersiydi: kutucuk İŞARETSİZ başlıyordu ve
+     onaysız siparişe mesaj gitmiyordu. İlk gerçek siparişte
+     (AC261017-F93525) kimse işaretlemediği için hiçbir bildirim
+     gitmedi — kural çalışıyordu ama istenen davranış bu değildi.
+
+     Açık RET saklı: metadata.whatsapp_onay === false ise
+     gönderilmiyor. Pazarlama mesajı bu yoldan GEÇEMEZ; şablonların
+     hepsi Utility ve içlerinde tanıtım yok (lib/whatsapp/sablonlar).
 */
 
 type Durum = "gonderildi" | "basarisiz" | "yapilandirilmadi" | "onay_yok";
 
-/** Siparişin kaydındaki onay işareti. */
+/**
+ * Siparişe WhatsApp bildirimi gönderilebilir mi.
+ *
+ * Kayıtta BİR ŞEY YOKSA gönderilir: sipariş vermek, o siparişin
+ * durumundan haberdar edilmeyi kapsıyor. Yalnızca açık ret
+ * (`whatsapp_onay: false`) gönderimi durduruyor.
+ *
+ * Önceden tersiydi — `true` yoksa gönderilmiyordu — ve ödeme
+ * formundaki kutucuk işaretsiz başladığı için pratikte hiçbir
+ * siparişe mesaj gitmiyordu.
+ */
 export function whatsappOnayiVar(metadata: unknown): boolean {
   const meta = (metadata ?? {}) as Record<string, unknown>;
-  return meta.whatsapp_onay === true || meta.whatsapp_onay === "true";
+  return meta.whatsapp_onay !== false && meta.whatsapp_onay !== "false";
 }
 
 /**
@@ -60,7 +82,7 @@ export async function waSiparisBildirimi(input: {
 
   try {
     if (!whatsappOnayiVar(input.metadata)) {
-      /* Beklenen hâl, kusur değil: müşteri kutucuğu işaretlememiş. */
+      /* Müşteri açıkça istemediğini söylemiş; sessizce geçiliyor. */
       return "onay_yok";
     }
 
