@@ -47,7 +47,19 @@ alter table public.arc_email_templates
   drop constraint if exists arc_email_templates_key_check;
 alter table public.arc_email_templates
   add constraint arc_email_templates_key_check
-  check (template_key in ('fulfilled', 'cancelled', 'cancelled_unpaid', 'refunded'));
+  check (template_key in ('processing', 'fulfilled', 'cancelled', 'cancelled_unpaid', 'refunded'));
+/*
+  'processing' listeye SONRADAN girdi: bu dosya yazıldığında
+  "Hazırlanıyor" durumu e-posta göndermiyordu, aynı gün açıldı.
+  Dosya o sırada henüz uygulanmamıştı, bu yüzden yeni bir migration
+  yerine burası düzeltildi — uygulanmış bir migration'a dokunulmaz.
+
+  ANAHTAR LİSTESİ KODDAKİ KAYITLA AYNI OLMAK ZORUNDA
+  (lib/eposta-sablonu SABLON_KAYDI); birim testi ikisini
+  karşılaştırıyor. Ayrışırsa iki yönde de kusur çıkar: listede olup
+  kodda olmayan anahtar hiç kullanılmaz, kodda olup listede olmayan
+  anahtar panelde kaydedilemez.
+*/
 
 /*
   Uzunluk sınırı: başlık bir e-posta konusu, gövde bir paragraf.

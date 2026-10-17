@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import fs from "node:fs";
+import path from "node:path";
 import {
   DEGISKENLER,
   SABLON_ANAHTARLARI,
@@ -90,4 +92,39 @@ test("her şablonun değişkenleri örnek değer tablosunda var", () => {
 
 test("metindeki değişkenler listelenebiliyor", () => {
   assert.deepEqual(metindekiDegiskenler("{{a_b}} ve {{c}} ve tekrar {{a_b}}"), ["a_b", "c", "a_b"]);
+});
+
+test("şablon kaydı ile migration kısıtı aynı anahtarları taşıyor", () => {
+  /*
+    İKİ YÖNDE DE KUSUR ÇIKAR: listede olup kodda olmayan anahtar hiç
+    kullanılmaz, kodda olup listede olmayan anahtar panelde
+    kaydedilemez (kısıt reddeder) ve kiracı "neden değişmedi" diye
+    sorar.
+
+    17.10.2026'da bu ayrıştı: "Hazırlanıyor" postası aynı gün açıldı
+    ama migration'ın kısıtı eski dört anahtarla yazılmıştı.
+  */
+  const sql = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../supabase/migrations/20261017152720_eposta_sablonlari.sql"),
+    "utf8",
+  );
+  const eslesme = sql.match(/check \(template_key in \(([^)]*)\)\)/);
+  assert.ok(eslesme, "migration'da anahtar kısıtı bulunamadı");
+  const kisittakiler = [...eslesme[1].matchAll(/'([a-z_]+)'/g)].map((e) => e[1]).sort();
+  assert.deepEqual(kisittakiler, Object.keys(SABLON_KAYDI).sort());
+});
+
+test("e-postası giden her durumun şablonu var", () => {
+  /*
+    statusUpdateEmail'in gönderdiği her durum kiracı tarafından
+    düzenlenebilmeli; biri eksik kalırsa o posta herkeste kodda yazan
+    metinle gider ve sebebi hiçbir ekranda görünmez.
+  */
+  const gonderilen = ["processing", "fulfilled", "cancelled", "refunded"];
+  for (const durum of gonderilen) {
+    assert.ok(
+      SABLON_KAYDI[durum],
+      `${durum} e-postası gönderiliyor ama şablonu yok`,
+    );
+  }
 });

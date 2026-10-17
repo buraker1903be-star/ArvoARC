@@ -52,6 +52,15 @@ export const SABLON_KAYDI: Record<
   string,
   { ad: string; aciklama: string; degiskenler: readonly DegiskenAdi[]; varsayilan: SablonMetni }
 > = {
+  processing: {
+    ad: "Hazırlanıyor",
+    aciklama: "Sipariş \"Hazırlanıyor\" durumuna alındığında gider.",
+    degiskenler: ["musteri", "siparis_no", "magaza"],
+    varsayilan: {
+      baslik: "Siparişiniz hazırlanıyor",
+      govde: "Siparişiniz hazırlanmaya başlandı. Kargoya verildiğinde takip bilgileriyle birlikte tekrar bilgilendirileceksiniz.",
+    },
+  },
   fulfilled: {
     ad: "Kargoya verildi",
     aciklama: "Sipariş kargoya verildiğinde, takip numarası girilmediyse gider.",
