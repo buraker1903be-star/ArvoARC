@@ -25,12 +25,12 @@ function denetim(sema: string, kaynak: string) {
 test("politikasız tabloyu invoker fonksiyon okuyorsa hata", () => {
   const { cikis, cikti } = denetim("tests/fixtures/rls/sema.sql", "tests/fixtures/rls/src");
   assert.equal(cikis, 1);
-  assert.match(cikti, /kurum_modulleri.*invoker fonksiyon public\.arc_siparis_olustur/s);
+  assert.match(cikti, /kurum_modulleri[\s\S]*invoker fonksiyon public\.arc_siparis_olustur/);
 });
 
 test("politikasız tabloyu panel kodu okuyorsa da hata", () => {
   const { cikti } = denetim("tests/fixtures/rls/sema.sql", "tests/fixtures/rls/src");
-  assert.match(cikti, /kopya_tablo.*panel kodu/s);
+  assert.match(cikti, /kopya_tablo[\s\S]*panel kodu/);
 });
 
 test("politikalı tablo sorun sayılmıyor", () => {
