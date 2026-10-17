@@ -81,11 +81,17 @@ export function arcUygulamalari(rozet?: { operasyon?: number; iade?: number }): 
       derindi.
     */
     {
-      key: "finans", label: "Finans", href: "/analitik", ikon: "finans",
-      yollar: ["/analitik", "/musteriler"],
+      /*
+        MÜŞTERİLER ÖNDE, "Satış analitiği" ARTIK "Raporlar" (17.10.2026,
+        kurum sahibinin tarifi). Uygulamanın href'i ilk bölümle aynı
+        kalıyor — dock simgesi bütün uygulamalarda ilk bölümü açıyor,
+        Finans'ta ayrıksı davranması menüdeki sırayla çelişirdi.
+      */
+      key: "finans", label: "Finans", href: "/musteriler", ikon: "finans",
+      yollar: ["/musteriler", "/analitik"],
       bolumler: [
-        { key: "analitik", href: "/analitik", label: "Satış analitiği" },
         { key: "musteriler", href: "/musteriler", label: "Müşteriler" },
+        { key: "analitik", href: "/analitik", label: "Raporlar" },
       ],
     },
     {
