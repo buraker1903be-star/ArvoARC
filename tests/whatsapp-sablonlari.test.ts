@@ -83,7 +83,7 @@ test("kayda düşen gövde müşterinin GÖRECEĞİ metin", () => {
   assert.ok("mesaj" in sonuc);
   assert.equal(
     sonuc.mesaj.body,
-    "Merhaba Ayşe, AC-1 numaralı siparişiniz kargoya verildi. Yurtiçi · takip numarası: 999",
+    "Merhaba Ayşe, AC-1 numaralı siparişiniz Yurtiçi ile kargoya verildi. Takip numarası: 999. Kargonuzu kargo firmasının sitesinden takip edebilirsiniz.",
   );
   /* Yerleştirilmemiş {{n}} kalmamalı. */
   assert.ok(!/\{\{\d+\}\}/.test(sonuc.mesaj.body));

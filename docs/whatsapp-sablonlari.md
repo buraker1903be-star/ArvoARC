@@ -62,7 +62,7 @@ girilmişse bu mesaj üretilmiyor.
 **Parametreler:** 1 müşteri adı · 2 sipariş numarası · 3 kargo firması · 4 takip numarası
 
 ```
-Merhaba {{1}}, {{2}} numaralı siparişiniz kargoya verildi. {{3}} · takip numarası: {{4}}
+Merhaba {{1}}, {{2}} numaralı siparişiniz {{3}} ile kargoya verildi. Takip numarası: {{4}}. Kargonuzu kargo firmasının sitesinden takip edebilirsiniz.
 ```
 
 Örnek: Ayşe Yılmaz · AC261017-0042 · Yurtiçi Kargo · 1234567890

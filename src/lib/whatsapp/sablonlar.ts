@@ -83,8 +83,14 @@ export const WA_SABLONLARI: Record<string, WaSablon> = {
     ad: "siparis_kargoda",
     dil: "tr",
     parametreler: ["musteri", "siparis_no", "kargo_firmasi", "takip_no"],
+    /*
+      METİN DEĞİŞKENLE BİTEMEZ. İlk sürüm "… takip numarası: {{4}}"
+      ile bitiyordu ve Meta şablonu reddetti (error_subcode 2388299:
+      "Variables can't be at the start or end of the template").
+      Aynı kural başlangıç için de geçerli.
+    */
     govde:
-      "Merhaba {{1}}, {{2}} numaralı siparişiniz kargoya verildi. {{3}} · takip numarası: {{4}}",
+      "Merhaba {{1}}, {{2}} numaralı siparişiniz {{3}} ile kargoya verildi. Takip numarası: {{4}}. Kargonuzu kargo firmasının sitesinden takip edebilirsiniz.",
     aciklama: "Takip numarası girildiğinde.",
   },
   siparis_iptal: {
