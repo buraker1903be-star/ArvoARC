@@ -37,7 +37,7 @@ const fark = (simdi: number, once: number) => (once ? Math.round(((simdi - once)
    iade tutarının artması iyi değil. Yön okunur, yorumu kartın notunda. */
 function Fark({ deger }: { deger: number | null }) {
   if (deger === null) return null;
-  return <b className="rpt-delta" data-dir={deger > 0 ? "up" : deger < 0 ? "down" : undefined}>{deger > 0 ? "↑" : deger < 0 ? "↓" : "→"} %{Math.abs(deger)}</b>;
+  return <b className="rpt-delta" data-dir={deger > 0 ? "up" : deger < 0 ? "down" : undefined}>{deger > 0 ? "↑" : deger < 0 ? "↓" : "→"}{"\u00A0"}%{Math.abs(deger)}</b>;
 }
 
 /* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */

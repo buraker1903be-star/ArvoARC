@@ -301,6 +301,10 @@ html[data-theme="dark"] .rpt-trend-bars .is-lead,html[data-theme="dark"] .rpt-le
 }
 /* Karşılaştırma oku: kartın notunun içinde, kendi rengiyle. Yön
    renklendirilmiyor — iadenin artması "yeşil" olmamalı. */
-.rpt-delta{display:inline-flex;align-items:center;gap:2px;color:var(--ink-soft);font-weight:700;font-variant-numeric:tabular-nums}
+/* display:inline BİLEREK. inline-flex bir ATOMİK kutu kuruyor ve
+   satır sonu ondan sonra kırılabiliyor: ayıraçtan önceki kırılmaz
+   boşluk işe yaramıyor, "·" yine satır başına düşüyordu (telefonda
+   ölçüldü). Ok ile sayı arasındaki boşluk da kırılmaz. */
+.rpt-delta{display:inline;white-space:nowrap;color:var(--ink-soft);font-weight:700;font-variant-numeric:tabular-nums}
 .rpt-delta[data-dir="up"]{color:var(--success)}
 .rpt-delta[data-dir="down"]{color:var(--danger)}
