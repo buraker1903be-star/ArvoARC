@@ -83,6 +83,39 @@ describe("panelin rolüyle manuel sipariş ve stok", () => {
   /* Yabancı kullanıcı varyantı RLS yüzünden hiç GÖREMİYOR, bu yüzden
      üyelik kuralından önce "Variant not found" ile duruyor: kapalı
      başarısızlık, satır da sızmıyor. */
+  /*
+    SİLİNEN SİPARİŞ ARKASINDA KAYIT BIRAKMIYOR (17.10.2026).
+
+    Canlıda deneme siparişi silindikten sonra stok doğruydu (0) ama
+    stok geçmişinde satış kaydı duruyordu: silme yalnızca
+    reference_type='order_status' olanı süpürüyor, satışı ise
+    arc_create_order 'order' türüyle yazıyor. Vitrin satışı hareket
+    kaydı yazmadığı ve manuel sipariş canlıda hiç oluşturulamadığı
+    için bugüne kadar görünmemiş.
+  */
+  test("sipariş silinince satış hareketi de gidiyor, stok yerine dönüyor", async () => {
+    await islem(db, async () => {
+      await tohum();
+      await rol(db, "authenticated", SAHIP);
+      const { rows } = await db.query(
+        `select * from public.arc_create_order($1, $2, $3::jsonb, 'native')`,
+        ["Silinecek Deneme", "", JSON.stringify([{ variant_id: VARYANT, quantity: 2 }])],
+      );
+      await rol(db, "postgres");
+      assert.equal(await stok(), 1, "satış düştü");
+      await rol(db, "authenticated", SAHIP);
+      await db.query(`select public.arc_delete_order($1)`, [rows[0].order_id]);
+      await rol(db, "postgres");
+      assert.equal(await stok(), 3, "iptal stoğu geri verdi");
+      const kalan = await db.query(
+        `select kind, reference_type from public.arc_inventory_movements where variant_id = $1`, [VARYANT],
+      );
+      assert.deepEqual(kalan.rows, [], "silinen siparişin hareketleri de gitti");
+      const siparis = await db.query(`select id from public.arc_orders where id = $1`, [rows[0].order_id]);
+      assert.equal(siparis.rows.length, 0);
+    });
+  });
+
   test("başka mağazanın kullanıcısı sipariş oluşturamaz", async () => {
     await islem(db, async () => {
       await tohum();
