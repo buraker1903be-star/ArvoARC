@@ -92,6 +92,16 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   kutusuna düşüyor ve personel 24 saatlik pencerede cevap verebiliyor.
   Yeni bir bildirim eklerken şablonu `lib/whatsapp/sablonlar.ts`'e
   yazın, gönderimi `waSiparisBildirimi` üzerinden yapın.
+- **ArvoOS'un veritabanına doğrudan yazılmaz.** Panel bildirimi de
+  WhatsApp gibi kapıdan geçer (`lib/arvoos-bildirim.ts` →
+  `ARVOOS_BRIDGE_URL/api/bridge/bildirim`, aynı
+  `PRODUCT_BRIDGE_SECRET`). Bildirim ikincil iştir: fonksiyon hiçbir
+  zaman fırlatmaz — ödeme kesinleşmesi bildirim yazılamadı diye geri
+  alınamaz — ama sessiz de kalmaz, başarısızlık günlüğe düşer. Yeni
+  bir olay bağlarken TEKRAR ANAHTARI verin ve akışın her dalını
+  gözden geçirin: sipariş bildirimi önce yalnızca kartlı ödemeye
+  bağlanmıştı, havale siparişi ödeme onayından geçmediği için
+  görünmüyordu.
 - **E-postaya giren her kullanıcı metni HTML'e kaçışla girer** (müşteri adı,
   not, adres).
 - **Panel kenar çubuğu HER İKİ TEMADA DA KOYU.** `--sidebar-from` ve
