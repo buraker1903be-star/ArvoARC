@@ -46,6 +46,12 @@ function suAn() {
 }
 
 const adet = (n: number) => n.toLocaleString("tr-TR");
+/*
+  AYIRAÇTAN ÖNCE KIRILMAZ BOŞLUK. Dar kartta (telefonda iki sütun) not
+  satırı sarınca "·" satır başına düşüyor ve cümle bir madde imiyle
+  başlıyormuş gibi görünüyordu. Kırılma noktası artık ayıracın sağı.
+*/
+const AYIRAC = "\u00A0· ";
 
 export default async function Raporlar({ searchParams }: { searchParams: Promise<{ aralik?: string; baslangic?: string; bitis?: string }> }) {
   const params = await searchParams;
@@ -114,7 +120,7 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
      kurulmuyor, yoksa "Önceki eşit döneme göre ·" diye yarım kalıyordu. */
   const karsilastirma = (simdiki: number, oncekiDeger: number | undefined) => {
     const deger = oncekiOzet ? fark(simdiki, oncekiDeger ?? 0) : null;
-    return deger === null ? null : <>{karsilastirmaAdi} <Fark deger={deger} /> · </>;
+    return deger === null ? null : <>{karsilastirmaAdi} <Fark deger={deger} />{AYIRAC}</>;
   };
   const kesildi = siparisSonucu.truncated || iadeSonucu.truncated || kalemParcalari.some((p) => p.truncated);
 
@@ -123,22 +129,22 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
     o.egilim.map((ay) => ({ ad: ay.ad, deger: sec(ay), etiket: bicim(sec(ay)), simdiki: ay.simdiki }));
 
   const satisKartlari: Gosterge[] = [
-    { etiket: "Sipariş", deger: adet(o.gecerliAdet), not: <>{karsilastirma(o.gecerliAdet, oncekiOzet?.gecerliAdet)}{adet(o.iptalAdet)} iptal/iade · son 6 ay</>, simge: "kutu", ton: "brand", grafik: { tur: "cubuk", seri: seri((ay) => ay.adet, adet) } },
-    { etiket: "Net ciro", deger: paraYaz(o.netCiro), not: <>{karsilastirma(o.netCiro, oncekiOzet?.netCiro)}iptal ve iadeler düşülmüş · son 6 ay</>, simge: "para", ton: "success", grafik: { tur: "cubuk", seri: seri((ay) => ay.ciro, paraYaz) } },
+    { etiket: "Sipariş", deger: adet(o.gecerliAdet), not: <>{karsilastirma(o.gecerliAdet, oncekiOzet?.gecerliAdet)}{adet(o.iptalAdet)} iptal/iade{AYIRAC}son 6 ay</>, simge: "kutu", ton: "brand", grafik: { tur: "cubuk", seri: seri((ay) => ay.adet, adet) } },
+    { etiket: "Net ciro", deger: paraYaz(o.netCiro), not: <>{karsilastirma(o.netCiro, oncekiOzet?.netCiro)}iptal ve iadeler düşülmüş{AYIRAC}son 6 ay</>, simge: "para", ton: "success", grafik: { tur: "cubuk", seri: seri((ay) => ay.ciro, paraYaz) } },
     { etiket: "Ortalama sepet", deger: paraYaz(o.ortalamaSepet), not: `${adet(o.gecerliAdet)} geçerli siparişin ortalaması`, simge: "sepet", ton: "info", grafik: { tur: "halka", oran: o.siparisAdedi ? (o.gecerliAdet / o.siparisAdedi) * 100 : null, altyazi: "geçerli sipariş oranı" } },
     /* Halka bir ORAN gösteriyor: "sipariş başına adet" yüzde değil,
        3 ürün/1 sipariş %300 çıkıp halkayı doldururdu. Yerine en çok
        satanın kalem cirosundaki payı — kartın sorusuyla aynı konu. */
-    { etiket: "Satılan adet", deger: adet(o.satilanAdet), not: `Geçerli siparişlerde toplam ürün · sipariş başına ${(o.gecerliAdet ? o.satilanAdet / o.gecerliAdet : 0).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`, simge: "etiket", ton: "gold", grafik: { tur: "halka", oran: o.kalemCirosu && o.enCokSatan[0] ? (o.enCokSatan[0].ciro / o.kalemCirosu) * 100 : null, altyazi: "en çok satanın payı" } },
-    { etiket: "İade", deger: paraYaz(o.iadeTutari), not: `${adet(o.iadeAdedi)} talep · brüt cironun ${yuzde(o.brutCiro ? (o.iadeTutari / o.brutCiro) * 100 : 0)}'i`, simge: "geri", ton: o.iadeTutari ? "warning" : "success", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.iadeTutari / o.brutCiro) * 100 : 0 } },
+    { etiket: "Satılan adet", deger: adet(o.satilanAdet), not: `Geçerli siparişlerde toplam ürün${AYIRAC}sipariş başına ${(o.gecerliAdet ? o.satilanAdet / o.gecerliAdet : 0).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`, simge: "etiket", ton: "gold", grafik: { tur: "halka", oran: o.kalemCirosu && o.enCokSatan[0] ? (o.enCokSatan[0].ciro / o.kalemCirosu) * 100 : null, altyazi: "en çok satanın payı" } },
+    { etiket: "İade", deger: paraYaz(o.iadeTutari), not: `${adet(o.iadeAdedi)} talep${AYIRAC}brüt cironun ${yuzde(o.brutCiro ? (o.iadeTutari / o.brutCiro) * 100 : 0)}'i`, simge: "geri", ton: o.iadeTutari ? "warning" : "success", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.iadeTutari / o.brutCiro) * 100 : 0 } },
   ];
 
   const karVar = o.kar !== null && o.maliyet !== null;
   const karlilikKartlari: Gosterge[] = [
     { etiket: "Brüt kâr", deger: karVar ? paraYaz(o.kar!) : "—", not: karVar ? `${adet(o.karliSiparis)} siparişte hesaplanabildi` : o.gecerliAdet ? "Kalemlerin alış fiyatı girilmemiş" : "Bu dönemde geçerli sipariş yok", simge: "grafik", ton: !karVar ? "info" : o.kar! >= 0 ? "success" : "danger", tonlu: karVar, grafik: { tur: "yigin", parcalar: [{ ad: "Maliyet", deger: o.maliyet ?? 0, ton: "warning" }, { ad: "Kâr", deger: Math.max(0, o.kar ?? 0), ton: "success" }] } },
     { etiket: "Kâr marjı", deger: o.marj === null ? "—" : yuzde(o.marj), not: "Hesaplanabilen siparişlerin kalem gelirine oranı", simge: "kivilcim", ton: "gold", grafik: { tur: "gosterge", oran: o.marj ?? 0 } },
-    { etiket: "Kargo geliri", deger: paraYaz(o.kargo), not: `Tahsil edilen kargo bedeli · cironun ${yuzde(o.brutCiro ? (o.kargo / o.brutCiro) * 100 : 0)}'i`, simge: "kargo", ton: "info", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.kargo / o.brutCiro) * 100 : 0 } },
-    { etiket: "İndirim", deger: paraYaz(o.indirim), not: `Kupon ve havale · ürün toplamının ${yuzde(o.urunToplami ? (o.indirim / o.urunToplami) * 100 : 0)}'i`, simge: "etiket", ton: "warning", grafik: { tur: "gosterge", oran: o.urunToplami ? (o.indirim / o.urunToplami) * 100 : 0 } },
+    { etiket: "Kargo geliri", deger: paraYaz(o.kargo), not: `Tahsil edilen kargo bedeli${AYIRAC}cironun ${yuzde(o.brutCiro ? (o.kargo / o.brutCiro) * 100 : 0)}'i`, simge: "kargo", ton: "info", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.kargo / o.brutCiro) * 100 : 0 } },
+    { etiket: "İndirim", deger: paraYaz(o.indirim), not: `Kupon ve havale${AYIRAC}ürün toplamının ${yuzde(o.urunToplami ? (o.indirim / o.urunToplami) * 100 : 0)}'i`, simge: "etiket", ton: "warning", grafik: { tur: "gosterge", oran: o.urunToplami ? (o.indirim / o.urunToplami) * 100 : 0 } },
     { etiket: "Dönem akışı", deger: paraYaz(o.netCiro), not: "Ürün + kargo − indirim − iade", simge: "para", ton: "brand", grafik: { tur: "selale", adimlar: [{ ad: "Ürün", deger: o.urunToplami, ton: "brand" }, { ad: "Kargo", deger: o.kargo, ton: "info" }, { ad: "İndirim", deger: -o.indirim, ton: "warning" }, { ad: "İade", deger: -o.iadeTutari, ton: "warning" }, { ad: "Net", deger: o.netCiro, ton: "success" }] } },
   ];
 
