@@ -9,6 +9,7 @@ import { Pencere } from "@/components/os/pencere";
 import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
 import { gorunumleriOku } from "../gorunumler/oku";
 import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
+import { yuzdeEkli } from "@/lib/turkce-ek";
 import { gorunumSorgusu, URUN_DURUMLARI, URUN_KAYNAKLARI } from "@/lib/kayitli-gorunum";
 import { ProductTable, type ProductRow } from "./product-table";
 // Yeni ürün ve toplu durum formlarının biçimi (catalog-form) hâlâ orada.
@@ -350,7 +351,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
       <IstatistikKarti
         kapsam="katalogun tamamı · süzgeçten bağımsız"
         kutular={[
-          { ad: "Aktif ürün", deger: counts.active.toLocaleString("tr-TR"), oran: counts.all ? Math.round((counts.active / counts.all) * 100) : null, alt: `${counts.all.toLocaleString("tr-TR")} ürünün %${counts.all ? Math.round((counts.active / counts.all) * 100) : 0}'i yayında` },
+          { ad: "Aktif ürün", deger: counts.active.toLocaleString("tr-TR"), oran: counts.all ? Math.round((counts.active / counts.all) * 100) : null, alt: `${counts.all.toLocaleString("tr-TR")} ürünün ${yuzdeEkli(counts.all ? (counts.active / counts.all) * 100 : 0)} yayında` },
           { ad: "Varyant", deger: sayiYaz(varyantToplam), alt: varyantToplam !== null && counts.all ? `ürün başına ${(varyantToplam / counts.all).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}` : "ürün başına —" },
           {
             /* "Tükendi" = stoğu bitmiş VE stoksuz satışı kapalı varyant:
