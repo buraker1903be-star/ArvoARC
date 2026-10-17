@@ -11,6 +11,9 @@
 .mini-seri .is-simdiki i{opacity:1}
 .mini-seri small{color:var(--muted);font-size:9.5px;line-height:1}
 .mini-seri .is-simdiki small{color:var(--ink);font-weight:var(--fw-semibold)}
+/* Boş ay: ölçülebilir bir kütük, dolu aylarla karışmayan solgunlukta. */
+.mini-seri i.is-bos{height:3px;opacity:.18}
+.os-root .mini-seri-bos{margin:var(--sp-2) 0 0;color:var(--muted);font-size:var(--fs-micro)}
 .mini-olcer{
   display:block;height:4px;margin-top:var(--sp-2);overflow:hidden;
   border-radius:var(--r-pill);background:var(--surface-raised)

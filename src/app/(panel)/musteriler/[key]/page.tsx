@@ -213,8 +213,8 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
           <KKart baslik="Alışveriş alışkanlığı">
             {/* Seyir önce: kartın geri kalanı tek tek gerçekler, bu
                 dördünü bir arada gösteriyor. */}
-            <MiniSeri seri={harcamaSerisi} etiket="Son altı ayın harcaması" />
-            <p className="customer-muted musteri-seri-not">Son 6 ayda {money.format(altiAylikToplam / 100)}{altiAylikToplam ? "" : " · bu dönemde sipariş yok"}</p>
+            <MiniSeri seri={harcamaSerisi} etiket="Son altı ayın harcaması" bos="Son 6 ayda sipariş yok" />
+            {altiAylikToplam ? <p className="customer-muted musteri-seri-not">Son 6 ayda {money.format(altiAylikToplam / 100)}</p> : null}
             <dl className="customer-dl">
               <div><dt>Sipariş sıklığı</dt><dd>{cadence ? `Ortalama ${cadence.toLocaleString("tr-TR")} günde bir` : "Tek sipariş"}</dd></div>
               <div><dt>En yüksek sepet</dt><dd>{money.format(enYuksekSepet / 100)}</dd></div>

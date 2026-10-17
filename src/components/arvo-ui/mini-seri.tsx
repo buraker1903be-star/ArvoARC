@@ -17,15 +17,24 @@ export type SeriNoktasi = { ad: string; deger: number; etiket: string; simdiki?:
 
 const degisken = (ad: string, deger: string) => ({ [ad]: deger }) as CSSProperties;
 
-export function MiniSeri({ seri, etiket }: { seri: SeriNoktasi[]; etiket: string }) {
+export function MiniSeri({ seri, etiket, bos = "Bu dönemde hareket yok" }: { seri: SeriNoktasi[]; etiket: string; bos?: string }) {
   const enBuyuk = Math.max(1, ...seri.map((n) => n.deger));
+  /*
+    HEPSİ SIFIRSA ÇUBUK ÇİZİLMİYOR (canlıda görüldü): 34px'lik alanda
+    altı tane 1,4px'lik çubuk, kolonun tamamı kadar geniş olduğu için
+    grafik değil ALT ÇİZGİ gibi okunuyordu — içinde bulunulan ayınki
+    koyu olduğu için de kalın bir cetvel. Boş seri bir cümleyle
+    anlatılır.
+  */
+  if (!seri.some((nokta) => nokta.deger > 0)) return <p className="mini-seri-bos">{bos}</p>;
   return (
     <div className="mini-seri" role="img" aria-label={`${etiket}: ${seri.map((n) => `${n.ad} ${n.etiket}`).join(", ")}`}>
       {seri.map((nokta) => (
         <span key={nokta.ad} className={nokta.simdiki ? "is-simdiki" : undefined} title={`${nokta.ad}: ${nokta.etiket}`}>
           {/* Boş ay da bir çubuk bırakıyor: aradaki boşluk "veri yok"
-              ile "sıfır" arasındaki farkı siliyordu. */}
-          <i style={degisken("--h", `${nokta.deger ? Math.max(10, (nokta.deger / enBuyuk) * 100) : 4}%`)} />
+              ile "sıfır" arasındaki farkı siliyordu. Kütük 3px, yani
+              çubuk olduğu belli ama dolu aylarla karışmıyor. */}
+          <i className={nokta.deger ? undefined : "is-bos"} style={degisken("--h", `${nokta.deger ? Math.max(12, (nokta.deger / enBuyuk) * 100) : 0}%`)} />
           <small>{nokta.ad}</small>
         </span>
       ))}
