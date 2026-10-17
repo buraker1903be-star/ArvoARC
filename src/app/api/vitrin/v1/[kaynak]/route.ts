@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 import { normalizeHost, resolveStore, storefrontCorsHeaders } from "@/lib/storefront-origin";
-import { KAYNAKLAR, sayfaSiniri, type Kaynak } from "@/lib/vitrin-api";
+import { KAYNAKLAR, gorselleriMutlaklastir, sayfaSiniri, type Kaynak } from "@/lib/vitrin-api";
 
 /*
   VİTRİN VERİ API'Sİ — müşterinin KENDİ sitesi için.
@@ -105,7 +105,13 @@ export async function GET(
   }
 
   return NextResponse.json(
-    { kaynak, sayfa: sayfaSiniri(url.searchParams), veri: data ?? [] },
+    {
+      kaynak,
+      sayfa: sayfaSiniri(url.searchParams),
+      /* Göreli görsel yolları mutlak adrese çevriliyor: API'nin
+         müşterisi bizim depolama düzenimizi bilmek zorunda değil. */
+      veri: gorselleriMutlaklastir(data ?? [], process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""),
+    },
     {
       headers: {
         ...basliklar,

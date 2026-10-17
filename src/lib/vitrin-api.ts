@@ -115,3 +115,41 @@ export const KAYNAKLAR: Record<Kaynak, KaynakTanimi> = {
     parametreler: (_sorgu, konak) => ({ p_host: konak }),
   },
 };
+
+
+/*
+  GÖRSEL YOLLARI MUTLAK ADRESE ÇEVRİLİYOR.
+
+  Veritabanı göreli yol tutuyor ("<kurum>/<urun>/image-01.png")
+  çünkü kova adresi değişebilir ve her satıra gömmek onu taşınmaz
+  kılardı. Ama API'nin müşterisi bizim depolama düzenimizi bilmek
+  ZORUNDA DEĞİL: göreli yol dönersek her geliştirici aynı soruyu
+  sorar ve yanlış birleştiren herkes kırık görsel yayınlar.
+
+  Mutlak adresler `gorseller` / `gorsel` olarak EKLENİYOR, göreli
+  alanlar silinmiyor: biçimi değiştirmek, bugün çalışan bir
+  entegrasyonu kırmak olurdu.
+*/
+const KOVA = "arc-product-images";
+
+export const gorselAdresi = (taban: string, yol: string): string =>
+  yol.startsWith("http") ? yol : `${taban.replace(/\/$/, "")}/storage/v1/object/public/${KOVA}/${yol}`;
+
+export function gorselleriMutlaklastir(veri: unknown, taban: string): unknown {
+  if (Array.isArray(veri)) return veri.map((satir) => gorselleriMutlaklastir(satir, taban));
+  if (!veri || typeof veri !== "object") return veri;
+
+  const satir = { ...(veri as Record<string, unknown>) };
+
+  const yollar = satir.image_paths;
+  if (Array.isArray(yollar)) {
+    satir.gorseller = yollar
+      .filter((y): y is string => typeof y === "string" && y.length > 0)
+      .map((y) => gorselAdresi(taban, y));
+  }
+
+  const yol = satir.image_path;
+  if (typeof yol === "string" && yol.length > 0) satir.gorsel = gorselAdresi(taban, yol);
+
+  return satir;
+}

@@ -42,6 +42,11 @@ sessizce kesilen bir liste demek olurdu; sınır bu yüzden var.
 
 **Tutarlar kuruş.** 1.249,90 ₺ → `124990`.
 
+**Görseller mutlak adres olarak gelir.** Ürün satırında `gorseller`
+(dizi), varyant satırında `gorsel` (tek). Yanıtta görünen
+`image_paths` / `image_path` göreli alanlar geriye dönük uyumluluk
+için duruyor; siz `gorseller`/`gorsel` kullanın.
+
 ---
 
 ## Üç kural

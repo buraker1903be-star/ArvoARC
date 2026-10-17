@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AZAMI_SAYFA, KAYNAKLAR, VARSAYILAN_SAYFA, sayfaSiniri } from "@/lib/vitrin-api";
+import { AZAMI_SAYFA, KAYNAKLAR, VARSAYILAN_SAYFA, gorselleriMutlaklastir, sayfaSiniri } from "@/lib/vitrin-api";
 
 const sorgu = (q: string) => new URLSearchParams(q);
 
@@ -75,4 +75,49 @@ test("her kaynağın açıklaması var", () => {
     assert.ok(tanim.aciklama.length > 20, `${ad} açıklaması yetersiz`);
     assert.ok(tanim.fonksiyon.startsWith("arc_storefront_"), `${ad} vitrin ailesinde değil`);
   }
+});
+
+test("görsel yolları mutlak adrese çevriliyor", () => {
+  /*
+    API'nin müşterisi bizim depolama düzenimizi bilmek zorunda
+    değil. Göreli yol dönersek her geliştirici aynı soruyu sorar ve
+    yanlış birleştiren herkes kırık görsel yayınlar.
+  */
+  const taban = "https://ornek.supabase.co";
+  const cikti = gorselleriMutlaklastir(
+    [{ slug: "krem", image_paths: ["kurum/urun/a.png", "kurum/urun/b.png"] }],
+    taban,
+  ) as Array<Record<string, unknown>>;
+
+  assert.deepEqual(cikti[0].gorseller, [
+    `${taban}/storage/v1/object/public/arc-product-images/kurum/urun/a.png`,
+    `${taban}/storage/v1/object/public/arc-product-images/kurum/urun/b.png`,
+  ]);
+  /* Göreli alan SİLİNMİYOR: biçimi değiştirmek bugün çalışan bir
+     entegrasyonu kırmak olurdu. */
+  assert.deepEqual(cikti[0].image_paths, ["kurum/urun/a.png", "kurum/urun/b.png"]);
+});
+
+test("varyantın tekil görseli de çevriliyor", () => {
+  const cikti = gorselleriMutlaklastir(
+    [{ sku: "A-1", image_path: "kurum/urun/c.png" }],
+    "https://ornek.supabase.co/",
+  ) as Array<Record<string, unknown>>;
+  /* Tabandaki sondaki eğik çizgi çift kalmamalı. */
+  assert.equal(cikti[0].gorsel, "https://ornek.supabase.co/storage/v1/object/public/arc-product-images/kurum/urun/c.png");
+});
+
+test("zaten mutlak olan adres ikinci kez sarılmıyor", () => {
+  const cikti = gorselleriMutlaklastir(
+    [{ image_paths: ["https://cdn.example/a.png"] }],
+    "https://ornek.supabase.co",
+  ) as Array<Record<string, unknown>>;
+  assert.deepEqual(cikti[0].gorseller, ["https://cdn.example/a.png"]);
+});
+
+test("görselsiz satır bozulmuyor", () => {
+  const cikti = gorselleriMutlaklastir([{ slug: "x" }, null, "metin"], "https://o.co") as unknown[];
+  assert.deepEqual(cikti[0], { slug: "x" });
+  assert.equal(cikti[1], null);
+  assert.equal(cikti[2], "metin");
 });
