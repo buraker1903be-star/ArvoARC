@@ -282,7 +282,10 @@ export async function resolveReturn(formData: FormData) {
     ikinci kez yapmaya iterdi.
   */
   let stogaEklenen = 0;
+  /* Kutusu işaretlendiği hâlde hiç eklenemedi mi? Mesajda yazıyor. */
+  let stokIstendi = false;
   if (String(formData.get("stoga_ekle") ?? "") === "on") {
+    stokIstendi = true;
     /*
       SİPARİŞİN GERÇEK KALEMLERİ sınır olarak veriliyor: iade talebinin
       kalemleri müşterinin tarayıcısından geliyor ve RPC onları
@@ -377,10 +380,21 @@ export async function resolveReturn(formData: FormData) {
     revalidatePath("/urunler");
     revalidatePath("/");
   }
+  /*
+    STOK EKLENEMEDİYSE SUSULMUYOR (17.10.2026). Operasyoncu kutuyu
+    işaretliyor, iade tamamlanıyor ve mesaj yalnızca "İade tamamlandı"
+    diyordu; stok yazımı başarısız olduğunda bunu SADECE sunucu
+    günlüğü biliyordu. Canlıda tam bu oldu: organization_modules
+    görünmediği için arc_adjust_inventory her çağrıda reddediyordu.
+    Para iadesi yine geçerli (yukarıdaki gerekçe), ama stoğu elle
+    düzeltmek gerektiği ekranda yazıyor.
+  */
   return await bildirimliDonus(geri, {
     basari: stogaEklenen
       ? `İade tamamlandı · ${stogaEklenen} ürün stoğa geri eklendi.`
-      : "İade tamamlandı.",
+      : stokIstendi
+        ? "İade tamamlandı, ancak ürünler stoğa geri EKLENEMEDİ; stoğu elle düzeltin."
+        : "İade tamamlandı.",
   });
 }
 
