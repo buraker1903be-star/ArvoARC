@@ -166,7 +166,12 @@
 .os-launcher .marka-koyu{display:none}
 html[data-theme="dark"] .os-launcher .marka-acik{display:none}
 html[data-theme="dark"] .os-launcher .marka-koyu{display:block}
-.os-icon-btn{display:grid;place-items:center;flex:none;width:40px;height:40px;border:0;border-radius:var(--r-md);background:transparent;color:var(--muted);cursor:pointer}
+/* DOLGU SIFIR: globals.css'in genel `button` dolgusu (11px 16px) burada
+   da duruyordu ve 40×40 kutunun içerik alanı 8px'e düşüyordu — simge
+   ortadan 5px sağa kayıyor (uygulama menüsünün kapatma düğmesinde
+   ölçüldü, 17.10.2026). Aynı kusurun pencere kapatma düğmesindeki
+   hâli: components/os/panel-page-system.css. */
+.os-icon-btn{display:grid;place-items:center;flex:none;width:40px;height:40px;padding:0;border:0;border-radius:var(--r-md);background:transparent;color:var(--muted);cursor:pointer}
 .os-icon-btn:hover{background:var(--surface-2);color:var(--ink)}
 /* Telefonda 44: tek kullanıldığı yer uygulama çekmecesinin kapatma
    düğmesi ve orası alttan açılan bir yaprak — parmakla kapatılıyor. */
