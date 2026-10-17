@@ -315,10 +315,27 @@ export async function updateStorefrontDomainSettings(formData:FormData){
   if(!customDomain&&!platformSubdomain)return await bildirimliDonus("/ayarlar",{hata:hataMetni("domain-required")});
 
   const token=`arvo-verification=${randomUUID().replace(/-/g,"")}`;
-  const {data:settings}=await supabase.from("arc_store_settings").select("panel_custom_domain").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings}=await supabase.from("arc_store_settings").select("panel_custom_domain,custom_domain,domain_status,domain_verified_at").eq("organization_id",organization.id).maybeSingle();
   if(customDomain&&customDomain===settings?.panel_custom_domain)return await bildirimliDonus("/ayarlar",{hata:hataMetni("panel-storefront-domain-conflict")});
+
+  /*
+    DEĞİŞMEMİŞ VE ZATEN AKTİF ALAN ADI YENİDEN SAĞLANMIYOR.
+
+    Form her kaydedildiğinde Vercel'e gidiliyordu. Alan adı yıllardır
+    aynıysa bu çağrının kazandırdığı bir şey yok, ama kaybettirdiği
+    var: Vercel tarafındaki bir arıza (yanlış proje kimliği, kapsamı
+    değişmiş anahtar) ALAKASIZ bir ayarı — alt alan adını —
+    kaydetmeyi de engelliyordu. 17.10.2026'da tam bu oldu: kimlikler
+    Hobby hesabındaki ölü projeyi gösteriyordu ve kullanıcı yalnızca
+    platform alt alan adı eklemek istiyordu.
+
+    Alan adı DEĞİŞTİYSE ya da henüz aktif değilse yine sağlanıyor;
+    asıl iş orada.
+  */
+  const alanAdiAyni=customDomain&&customDomain===settings?.custom_domain;
+  const zatenAktif=settings?.domain_status==="active"&&Boolean(settings?.domain_verified_at);
   let provision=null;
-  if(customDomain){
+  if(customDomain&&!(alanAdiAyni&&zatenAktif)){
     try{provision=await ensureVercelProjectDomain(customDomain,"storefront");}
     catch(error){return await bildirimliDonus("/ayarlar",{hata:hataMetni(error instanceof Error?error.message:"Vercel alan adı eklenemedi")});}
   }
@@ -327,8 +344,15 @@ export async function updateStorefrontDomainSettings(formData:FormData){
     organization_id:organization.id,
     ...(await magazaAdiTabani(supabase,organization.id,organization.name)),
     custom_domain:customDomain||null,platform_subdomain:platformSubdomain||null,
-    domain_status:customDomain?(provision?.active?"active":"pending_dns"):"active",domain_verification_token:customDomain?token:null,
-    domain_verified_at:customDomain&&provision?.active?new Date().toISOString():customDomain?null:new Date().toISOString(),storefront_url:storefrontUrl,updated_at:new Date().toISOString()
+    /* Sağlama atlandıysa (alan adı aynı ve aktif) mevcut durum korunur;
+       yoksa kaydetme işlemi aktif bir alan adını "DNS bekleniyor"a
+       düşürür ve kullanıcı var olmayan bir sorunu çözmeye çalışırdı. */
+    domain_status:customDomain?(alanAdiAyni&&zatenAktif?"active":provision?.active?"active":"pending_dns"):"active",
+    domain_verification_token:customDomain?token:null,
+    domain_verified_at:customDomain
+      ?(alanAdiAyni&&zatenAktif?settings?.domain_verified_at:provision?.active?new Date().toISOString():null)
+      :new Date().toISOString(),
+    storefront_url:storefrontUrl,updated_at:new Date().toISOString()
   },{onConflict:"organization_id"});
   if(error)return await bildirimliDonus("/ayarlar",{hata:hataMetni(domainErrorCode(error))});
   revalidatePath("/ayarlar");revalidatePath("/magaza");return await bildirimliDonus("/ayarlar",{basari:basariMetni("domain")});
