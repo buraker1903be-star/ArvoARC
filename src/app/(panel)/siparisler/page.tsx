@@ -326,6 +326,9 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
     şeritte duruyor, çünkü çiplerde karşılığı olmayan tek iş o.
   */
   const istatistik = siparisIstatistikleri(istatistikSonucu.rows, istatistikAni);
+  /* Seri kutunun içinde (mini-seri): son eleman içinde bulunulan ay,
+     istatistik modülü ayları eskiden yeniye diziyor. */
+  const siparisSerisi = istatistik.aylik.map((ay, sira) => ({ ad: ay.ad, deger: ay.adet, etiket: `${ay.adet.toLocaleString("tr-TR")} sipariş`, simdiki: sira === istatistik.aylik.length - 1 }));
   const filtreli = Boolean(search) || statusFilter !== "all" || period !== "all" || Boolean(kargo);
 
   return (
@@ -446,10 +449,13 @@ export default async function Orders({ searchParams }: { searchParams: Promise<P
       <IstatistikKarti
         kapsam={istatistikSonucu.truncated ? "son 6 ay · ilk 20.000 sipariş" : "son 6 ay · süzgeçten bağımsız"}
         kutular={[
-          { ad: "Son 30 gün", deger: istatistik.son30.toLocaleString("tr-TR"), alt: degisimYazisi(istatistik.siparisDegisimi) ?? "sipariş", ton: istatistik.siparisDegisimi !== null && istatistik.siparisDegisimi < 0 ? "uyari" : istatistik.siparisDegisimi !== null ? "arti" : undefined },
+          /* Kutunun altındaki çubuk son altı ayın SİPARİŞ ADEDİ:
+             alttaki grup ciroyu çiziyor, adet hiçbir yerde seyir
+             olarak görünmüyordu. */
+          { ad: "Son 30 gün", deger: istatistik.son30.toLocaleString("tr-TR"), seri: siparisSerisi, alt: degisimYazisi(istatistik.siparisDegisimi) ?? "sipariş", ton: istatistik.siparisDegisimi !== null && istatistik.siparisDegisimi < 0 ? "uyari" : istatistik.siparisDegisimi !== null ? "arti" : undefined },
           { ad: "Ciro · 30 gün", deger: tamPara(istatistik.ciro30), alt: degisimYazisi(istatistik.ciroDegisimi) ?? "iptal ve iadeler hariç", ton: istatistik.ciroDegisimi !== null && istatistik.ciroDegisimi < 0 ? "uyari" : istatistik.ciroDegisimi !== null ? "arti" : undefined },
           { ad: "Ortalama sepet", deger: istatistik.ortalamaSepet === null ? "—" : tamPara(istatistik.ortalamaSepet), alt: `${istatistik.ciroyaSayilan30} geçerli sipariş` },
-          { ad: "İptal / iade", deger: istatistik.kapananOrani === null ? "—" : `%${istatistik.kapananOrani}`, alt: `${istatistik.kapanan30}/${istatistik.son30} sipariş · 30 gün`, ton: (istatistik.kapananOrani ?? 0) >= 20 ? "uyari" : undefined },
+          { ad: "İptal / iade", deger: istatistik.kapananOrani === null ? "—" : `%${istatistik.kapananOrani}`, oran: istatistik.kapananOrani, alt: `${istatistik.kapanan30}/${istatistik.son30} sipariş · 30 gün`, ton: (istatistik.kapananOrani ?? 0) >= 20 ? "uyari" : undefined },
         ]}
         gruplar={[
           { baslik: "Son 6 ay · ciro", satirlar: istatistik.aylik.map((ay) => ({ ad: ay.ad, adet: ay.ciro, etiket: `${kisaPara(ay.ciro)} · ${ay.adet}` })) },
