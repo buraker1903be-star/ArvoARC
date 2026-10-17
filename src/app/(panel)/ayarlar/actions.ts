@@ -13,6 +13,7 @@ import { disVitriniDogrula } from "@/lib/dis-vitrin-dogrulama";
 import { jetonlariUnut } from "@/lib/tryoto/istemci";
 import { whatsappNumarasiniKaldir,whatsappNumarasiniKaydet,whatsappNumarasiniSina } from "@/lib/whatsapp-hesap";
 import { SABLON_ANAHTARLARI,taninmayanDegiskenler } from "@/lib/eposta-sablonu";
+import { BASLIK_SINIRI,GOVDE_SINIRI,SAYFA_ANAHTARLARI } from "@/lib/magaza-sayfasi";
 
 const roles=new Set(["owner","admin","manager"]);
 /*
@@ -348,6 +349,35 @@ export async function updateStorefrontDomainSettings(formData:FormData){
     try{provision=await ensureVercelProjectDomain(customDomain,"storefront");}
     catch(error){return await bildirimliDonus("/ayarlar",{hata:hataMetni(error instanceof Error?error.message:"Vercel alan adı eklenemedi")});}
   }
+
+  /*
+    PLATFORM ALT ALAN ADI DA VERCEL'E EKLENİYOR.
+
+    DNS tarafı joker bir CNAME ile çözülüyor (*.shop.arvo-os.com →
+    Vercel), yani yeni mağaza için DNS'e dokunmak gerekmiyor. Ama
+    SERTİFİKA joker kayıtla gelmiyor: Vercel joker sertifikayı
+    yalnızca kendi ad sunucularını kullanan alan adlarına veriyor
+    (dns_pretest_cns_not_using_vercel_ns_error) ve arvo-os.com'un
+    DNS'i dışarıda — taşımak ise bütün bölgeyi, posta kayıtları
+    dahil, yeniden kurmak demek.
+
+    Çözüm: adres joker kayıtla ÇÖZÜLÜYOR, sertifika ise somut alt
+    alan adı projeye eklendiği için çıkıyor. Müşteri açısından fark
+    yok; DNS'e yine dokunulmuyor.
+
+    Hata burada akışı DURDURMUYOR: alt alan adı kaydı yine yazılsın,
+    mağaza panelden yönetilebilsin. Sertifika çıkmadıysa adres
+    açılmaz ama bunun sebebi ayrı bir sorun ve ayarın kendisini
+    kaydetmemek onu çözmüyor.
+  */
+  let altAlanHatasi:string|null=null;
+  if(platformSubdomain&&!disVitrin){
+    try{await ensureVercelProjectDomain(altAlanAdresi(platformSubdomain),"storefront");}
+    catch(error){
+      altAlanHatasi=error instanceof Error?error.message:"Alt alan adı Vercel'e eklenemedi";
+      console.error("[alan-adi] alt alan adı eklenemedi:",altAlanHatasi);
+    }
+  }
   const storefrontUrl=customDomain?`https://${customDomain}`:`https://${altAlanAdresi(platformSubdomain)}`;
   const {error}=await supabase.from("arc_store_settings").upsert({
     organization_id:organization.id,
@@ -373,7 +403,9 @@ export async function updateStorefrontDomainSettings(formData:FormData){
     storefront_url:storefrontUrl,updated_at:new Date().toISOString()
   },{onConflict:"organization_id"});
   if(error)return await bildirimliDonus("/ayarlar",{hata:hataMetni(domainErrorCode(error))});
-  revalidatePath("/ayarlar");revalidatePath("/magaza");return await bildirimliDonus("/ayarlar",{basari:basariMetni("domain")});
+  revalidatePath("/ayarlar");revalidatePath("/magaza");
+  return await bildirimliDonus("/ayarlar",
+    altAlanHatasi?{uyari:`Ayarlar kaydedildi ama alt alan adı yayına alınamadı: ${altAlanHatasi}`}:{basari:basariMetni("domain")});
 }
 
 export async function verifyPanelDomain(){
@@ -579,4 +611,51 @@ export async function saveEmailTemplate(formData:FormData){
   const bos=!baslik&&!govde;
   return await bildirimliDonus("/ayarlar?bolum=eposta",
     {basari:bos?"Şablon varsayılana döndürüldü.":"Şablon kaydedildi."});
+}
+
+/*
+  TANITIM SAYFALARI (Sayfalar bölümü).
+
+  E-posta şablonlarıyla aynı tasarım: kiracı METNİ yazar, sayfanın
+  düzeni kodda kalır ve metin kaçırılarak basılır. Serbest HTML bir
+  yazım hatasıyla sayfayı bozar ve müşteriye giden bir yüzeye kod
+  enjekte etme kapısı açardı.
+
+  BOŞ KAYDETMEK = VARSAYILANA DÖNMEK. Satır siliniyor; vitrin satır
+  bulamayınca kendi varsayılan metnini çiziyor. Boş satır bırakmak da
+  aynı sonucu verirdi ama silmek daha dürüst: "bu mağazanın kendi
+  metni yok" demek.
+*/
+export async function saveStorePage(formData:FormData){
+  const {supabase,organization,membership,user}=await requireTenant();
+  if(!roles.has(membership.role))return await bildirimliDonus("/ayarlar?bolum=sayfalar",{hata:hataMetni("forbidden")});
+
+  const anahtar=String(formData.get("page_key")??"");
+  if(!(SAYFA_ANAHTARLARI as string[]).includes(anahtar)){
+    return await bildirimliDonus("/ayarlar?bolum=sayfalar",{hata:"Tanınmayan sayfa."});
+  }
+
+  const baslik=String(formData.get("title")??"").trim().slice(0,BASLIK_SINIRI);
+  const govde=String(formData.get("body")??"").trim().slice(0,GOVDE_SINIRI);
+
+  if(!baslik&&!govde){
+    const {error}=await supabase.from("arc_store_pages").delete()
+      .eq("organization_id",organization.id).eq("page_key",anahtar);
+    if(error)return await bildirimliDonus("/ayarlar?bolum=sayfalar",{hata:error.message});
+    revalidatePath("/ayarlar");
+    return await bildirimliDonus("/ayarlar?bolum=sayfalar",{basari:"Sayfa varsayılana döndürüldü."});
+  }
+
+  const {error}=await supabase.from("arc_store_pages").upsert({
+    organization_id:organization.id,
+    page_key:anahtar,
+    title:baslik,
+    body:govde,
+    updated_by:user.id,
+    updated_at:new Date().toISOString(),
+  },{onConflict:"organization_id,page_key"});
+  if(error)return await bildirimliDonus("/ayarlar?bolum=sayfalar",{hata:error.message});
+
+  revalidatePath("/ayarlar");
+  return await bildirimliDonus("/ayarlar?bolum=sayfalar",{basari:"Sayfa kaydedildi."});
 }

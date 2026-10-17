@@ -1,9 +1,10 @@
 import { requireTenant } from "@/lib/tenant";
 import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { ALT_ALAN_SONEKI, altAlanAdresi, magazaAdresi } from "@/lib/magaza-adresi";
-import { removeBrandAsset,removeWhatsappNumber,saveEmailTemplate,saveWhatsappNumber,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain,verifyWhatsappNumber } from "./actions";
+import { removeBrandAsset,removeWhatsappNumber,saveEmailTemplate,saveStorePage,saveWhatsappNumber,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain,verifyWhatsappNumber } from "./actions";
 import { whatsappDurumu,whatsappKapisiVar } from "@/lib/whatsapp-hesap";
 import { DEGISKENLER,SABLON_KAYDI,sablonuCoz } from "@/lib/eposta-sablonu";
+import { BASLIK_SINIRI,GOVDE_SINIRI,SAYFA_KAYDI } from "@/lib/magaza-sayfasi";
 import { baglantiyiSina } from "@/lib/tryoto/ayar";
 import Link from "next/link";
 // Ayar formlarının iç biçimi (settings-*, payment-*, domain-*) hâlâ eski dosyalarda.
@@ -27,6 +28,7 @@ export const AYAR_BOLUMLERI = [
   ["odeme", "Ödeme"],
   ["entegrasyon", "Entegrasyonlar"],
   ["eposta", "E-posta şablonları"],
+  ["sayfalar", "Sayfalar"],
 ] as const;
 type AyarBolumu = (typeof AYAR_BOLUMLERI)[number][0];
 import { yetkiYok } from "@/lib/yetki-metni";
@@ -61,6 +63,11 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
   const sablonSatirlari=bolum==="eposta"
     ?(await supabase.from("arc_email_templates").select("template_key,subject,body").eq("organization_id",organization.id)).data??[]
     :[];
+  /* Sayfalar yalnızca o bölüm açıkken okunur. */
+  const sayfaSatirlari=bolum==="sayfalar"
+    ?(await supabase.from("arc_store_pages").select("page_key,title,body").eq("organization_id",organization.id)).data??[]
+    :[];
+  const sayfaKayitlari=new Map(sayfaSatirlari.map((s)=>[s.page_key as string,{baslik:s.title as string,govde:s.body as string}]));
   const sablonKayitlari=new Map(sablonSatirlari.map((s)=>[s.template_key as string,{baslik:s.subject as string,govde:s.body as string}]));
   const kargoBaglantisi=canManagePayments&&bolum==="kargo"
     ?await baglantiyiSina(organization.id,settings)
@@ -540,6 +547,45 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
           </form>;
         })}
       </>:<p className="list-hint">{yetkiYok("e-posta şablonları", "yonetim")}</p>}
+    </section>
+    </>:null}
+
+    {bolum==="sayfalar"?<>
+    {/*
+      TANITIM SAYFALARI.
+
+      Metinler kodda sabitti ve ArvoCulture'ın kendi anlatısıydı.
+      İkinci bir kiracı o sayfalarla yayına GİREMEZ: müşterisine
+      başka bir markanın hikâyesini gösterir.
+
+      VARSAYILAN METİN BURADA GÖSTERİLMİYOR, çünkü elimizde değil —
+      sayfaları çizen yer vitrin ve varsayılan orada duruyor.
+      Buraya kopyalasaydık ikisi ayrışır, paneldeki önizleme ile
+      müşterinin gördüğü sayfa farklı olurdu.
+    */}
+    <section className="panel-card settings-section">
+      <div className="head"><div><small>MAĞAZA VİTRİNİ</small><h3>Sayfalar</h3><p>Hakkımızda, SSS ve iletişim sayfalarının metni. Boş bıraktığınız sayfada genel bir metin görünür.</p></div><span>MAĞAZAYA ÖZEL</span></div>
+      {canManage?<>
+        <p className="list-hint">Sayfanın düzeni, başlıkları ve bağlantıları değişmez; yalnızca metin sizindir. Biçimlendirme etiketi yazmayın, olduğu gibi görünür.</p>
+        {Object.entries(SAYFA_KAYDI).map(([anahtar,tanim])=>{
+          const kayit=sayfaKayitlari.get(anahtar)??null;
+          const ozel=Boolean((kayit?.baslik??"").trim()||(kayit?.govde??"").trim());
+          return <form key={anahtar} action={saveStorePage} className="settings-form eposta-sablon">
+            <input type="hidden" name="page_key" value={anahtar}/>
+            <div className="eposta-sablon-bas">
+              <div><h4>{tanim.ad}</h4><p className="list-hint">{tanim.aciklama}</p></div>
+              <span className="list-hint">{ozel?"Özel metin":"Varsayılan"}</span>
+            </div>
+            <label>Sayfa başlığı<input name="title" defaultValue={kayit?.baslik??""} placeholder={tanim.ad} maxLength={BASLIK_SINIRI}/></label>
+            <label>Metin<textarea name="body" rows={tanim.satir} defaultValue={kayit?.govde??""} maxLength={GOVDE_SINIRI}/></label>
+            {tanim.ipucu&&<p className="list-hint">{tanim.ipucu}</p>}
+            <div className="eposta-sablon-eylem">
+              <button className="panel-primary" type="submit">Kaydet</button>
+              <span className="list-hint">Varsayılana dönmek için alanları boşaltıp kaydedin.</span>
+            </div>
+          </form>;
+        })}
+      </>:<p className="list-hint">{yetkiYok("mağaza sayfaları", "yonetim")}</p>}
     </section>
     </>:null}
     </div>
