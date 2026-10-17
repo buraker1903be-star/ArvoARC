@@ -77,6 +77,7 @@ const PANEL = [
   "public.arc_storefront_return_request",
   /* Medya kitaplığı: panel okuması, anon'a kapalı. */
   "public.arc_medya_listesi",
+  "public.arc_medya_ozeti",
   /*
     Sipariş silme: yalnızca oturumlu kullanıcıya açık, yetkiyi
     fonksiyonun kendisi daraltıyor (private.arvo_is_org_admin ile

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel } from "@/lib/commerce-labels";
+import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
 import { terimiTemizle } from "@/lib/panel-arama";
 import "./medya.css";
 import "@/components/arvo-ui/kayit-detay.css";
@@ -39,6 +40,16 @@ export default async function Medya({ searchParams }: { searchParams: Promise<Pa
   const sayfa = Math.min(1000, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));
   const baslangic = (sayfa - 1) * SAYFA;
 
+  /*
+    ÖZET AYRI SORGUDA (17.10.2026). "Kaç ürünün görseli yok" sayfadan
+    hesaplanamıyor: liste sayfalanıyor ve her satır bir GÖRSEL, ürün
+    değil. Fonksiyon üç sayıyı tek turda veriyor (arc_medya_ozeti).
+
+    HATA YUTULMUYOR AMA SAYFAYI DA DÜŞÜRMÜYOR: migration canlıya
+    uygulanana kadar fonksiyon yok ve medya listesi onsuz da çalışıyor;
+    kart o zaman "—" gösteriyor.
+  */
+  const ozetSozu = supabase.rpc("arc_medya_ozeti", { p_organization_id: organization.id });
   const { data, error } = await supabase.rpc("arc_medya_listesi", {
     p_organization_id: organization.id,
     p_arama: arama || null,
@@ -48,6 +59,14 @@ export default async function Medya({ searchParams }: { searchParams: Promise<Pa
   /* Hata YUTULMUYOR: boş liste "görsel yok" gibi okunur ve kullanıcı
      yüklediklerinin silindiğini sanardı. */
   if (error) throw new Error("Medya kitaplığı okunamadı: " + error.message);
+
+  const { data: ozetSatirlari, error: ozetHatasi } = await ozetSozu;
+  if (ozetHatasi) console.error("[medya] özet okunamadı:", ozetHatasi.message);
+  type Ozet = { urun_toplam: number; gorselli: number; gorsel_toplam: number };
+  const ozet = (Array.isArray(ozetSatirlari) ? (ozetSatirlari[0] as Ozet | undefined) : (ozetSatirlari as Ozet | null) ?? undefined) ?? null;
+  const gorselsiz = ozet ? Math.max(0, Number(ozet.urun_toplam) - Number(ozet.gorselli)) : null;
+  const ozetOrani = (deger: number | null) => (ozet && deger !== null && Number(ozet.urun_toplam) ? Math.round((deger / Number(ozet.urun_toplam)) * 100) : null);
+  const sayiYaz = (deger: number | null | undefined) => (deger === null || deger === undefined ? "—" : Number(deger).toLocaleString("tr-TR"));
 
   const satirlar = (data ?? []) as Satir[];
   const toplam = satirlar.length ? Number(satirlar[0].toplam) : 0;
@@ -86,6 +105,8 @@ export default async function Medya({ searchParams }: { searchParams: Promise<Pa
         </div>
       </header>
 
+      {/* Solda galeri, sağda medya sağlığı: katalogun öteki ekranlarıyla aynı ızgara. */}
+      <div className="talep-izgara personel-iki ekip-izgara">
       <section className="panel-card talep-bilgi" aria-label="Görseller">
         <div className="ekip-suzgec talep-suzgec">
           <form className="talep-ara" role="search">
@@ -133,6 +154,26 @@ export default async function Medya({ searchParams }: { searchParams: Promise<Pa
           </div>
         )}
       </section>
+
+      <IstatistikKarti
+        kapsam={ozet ? "katalogun tamamı · aramadan bağımsız" : "özet okunamadı"}
+        kutular={[
+          { ad: "Görsel", deger: sayiYaz(ozet ? Number(ozet.gorsel_toplam) : null), alt: "ürün galerilerindeki toplam" },
+          { ad: "Görselli ürün", deger: sayiYaz(ozet ? Number(ozet.gorselli) : null), oran: ozetOrani(ozet ? Number(ozet.gorselli) : null), alt: ozet ? `${Number(ozet.urun_toplam).toLocaleString("tr-TR")} üründen` : "—" },
+          {
+            /* Görseli olmayan ürün vitrinde boş bir kutu: fiilen
+               satılamayan stok. */
+            ad: "Görselsiz ürün",
+            deger: sayiYaz(gorselsiz),
+            oran: ozetOrani(gorselsiz),
+            alt: "vitrinde boş kutu gösterir",
+            ton: gorselsiz ? "uyari" : undefined,
+          },
+          { ad: "Ürün başına", deger: ozet && Number(ozet.gorselli) ? (Number(ozet.gorsel_toplam) / Number(ozet.gorselli)).toLocaleString("tr-TR", { maximumFractionDigits: 1 }) : "—", alt: "görselli ürünlerin ortalaması" },
+        ]}
+        gruplar={[]}
+      />
+      </div>
     </main>
   );
 }
