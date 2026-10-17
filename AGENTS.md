@@ -31,6 +31,20 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   düzeyindeki bir ayar veritabanı ayarını ezebilir. Kodda gün anahtarı
   `trToday()` (lib/tr-time). `npm run check:saat-dilimi` CI'da ikisini
   de arıyor; bilerek dilimsizse satıra `dilim-tamam: <sebep>` yazılır.
+- **"Satılabilir mi" sorusunun tek yanıtı `arc_variant_available`**
+  (`stock`, `allow_backorder`, `supplier`). Tedarikçi tamponunu bilen tek
+  yer orası; ham `stock > 0 or allow_backorder` ifadesi altı vitrin
+  fonksiyonunda duruyordu ve tampon 5 / stok 3 olan varyant koleksiyon
+  kartında "Sepete ekle" derken `arc_create_order` aynı varyantı
+  reddediyordu — müşteri adresini girdikten sonra "Insufficient stock"
+  alıyordu (20261017120705). Yeni bir listede stok koşulu yazmayın,
+  bu fonksiyonu çağırın.
+- **Sipariş kalemi SKU ile kurulur.** `arc_create_order` SKU bulamazsa
+  ürün slug'ına düşüp stokta olan HERHANGİ bir varyantı seçiyor
+  (`order by (v.stock > 0) desc`). Yedek yol bilerek duruyor (tek
+  varyantlı ürün) ama vitrin tarafı SKU'yu yazmak zorunda; vitrinin
+  AGENTS.md'sinde "Sepete her zaman varyant SKU'su yazılır" başlığı
+  bunu anlatıyor.
 - **Sırlar sabit zamanlı karşılaştırılır** ve uzunluk farkı önce elenir:
   `timingSafeEqual` farklı uzunlukta istisna fırlatır. Değişken tanımlı
   değilse karşılaştırma `false` döner — kapalı başarısızlık.
