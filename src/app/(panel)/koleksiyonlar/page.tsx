@@ -5,6 +5,7 @@ import { KListe, KOge } from "@/components/arvo-ui/k-ui";
 import { Pencere } from "@/components/os/pencere";
 import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
 import { yuzdeEkli } from "@/lib/turkce-ek";
+import { yuzdeOrani } from "@/lib/oran";
 import { createCollection } from "./actions";
 // Yeni koleksiyon formunun biçimi (catalog-form) hâlâ orada.
 import "../catalog.css";
@@ -58,7 +59,8 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
     .map((item) => ({ ad: item.title, adet: counts.get(item.id) ?? 0 }))
     .sort((a, b) => b.adet - a.adet)
     .slice(0, 6);
-  const oran = (deger: number) => (all.length ? Math.round((deger / all.length) * 100) : null);
+  /* Yuvarlama uçları uydurmasın (lib/oran). */
+  const oran = (deger: number) => yuzdeOrani(deger, all.length);
 
   /* ArvoOS kalıbı (16.10.2026): başlık, durum şeridi, iOS listesi; yeni koleksiyon pencerede. */
   const pencere=canManage&&query.pencere==="yeni";

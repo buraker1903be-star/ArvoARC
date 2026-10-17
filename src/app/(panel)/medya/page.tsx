@@ -4,6 +4,7 @@ import { requireTenant } from "@/lib/tenant";
 import { createProductImageUrls } from "@/lib/product-images";
 import { productStatusLabel } from "@/lib/commerce-labels";
 import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
+import { yuzdeOrani } from "@/lib/oran";
 import { terimiTemizle } from "@/lib/panel-arama";
 import "./medya.css";
 import "@/components/arvo-ui/kayit-detay.css";
@@ -65,7 +66,9 @@ export default async function Medya({ searchParams }: { searchParams: Promise<Pa
   type Ozet = { urun_toplam: number; gorselli: number; gorsel_toplam: number };
   const ozet = (Array.isArray(ozetSatirlari) ? (ozetSatirlari[0] as Ozet | undefined) : (ozetSatirlari as Ozet | null) ?? undefined) ?? null;
   const gorselsiz = ozet ? Math.max(0, Number(ozet.urun_toplam) - Number(ozet.gorselli)) : null;
-  const ozetOrani = (deger: number | null) => (ozet && deger !== null && Number(ozet.urun_toplam) ? Math.round((deger / Number(ozet.urun_toplam)) * 100) : null);
+  /* Yuvarlama uçları uydurmasın (lib/oran): bir ürünün görseli yoksa
+     "görselli ürün %100" yazılmamalı. */
+  const ozetOrani = (deger: number | null) => (ozet && deger !== null ? yuzdeOrani(deger, Number(ozet.urun_toplam)) : null);
   const sayiYaz = (deger: number | null | undefined) => (deger === null || deger === undefined ? "—" : Number(deger).toLocaleString("tr-TR"));
 
   const satirlar = (data ?? []) as Satir[];

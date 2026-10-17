@@ -8,6 +8,7 @@ import { IstatistikKarti, degisimYazisi, kisaPara, tamPara } from "@/components/
 import { aylikYeniMusteri, musteriIstatistikleri } from "@/lib/musteri-istatistik";
 import { sonAltiAy } from "@/lib/rapor-donemi";
 import { yuzdeEkli } from "@/lib/turkce-ek";
+import { yuzdeOrani } from "@/lib/oran";
 import { gorunumSorgusu, MUSTERI_SEGMENTLERI, MUSTERI_SIRALAMALARI } from "@/lib/kayitli-gorunum";
 import { gorunumleriOku } from "../gorunumler/oku";
 import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
@@ -238,8 +239,8 @@ export default async function Customers({ searchParams }: { searchParams: Promis
           {
             ad: "Uzun süredir yok",
             deger: istatistik.riskli.toLocaleString("tr-TR"),
-            oran: istatistik.toplam ? Math.round((istatistik.riskli / istatistik.toplam) * 100) : null,
-            alt: `müşterilerin ${yuzdeEkli(istatistik.toplam ? (istatistik.riskli / istatistik.toplam) * 100 : 0)} · son siparişi ${RISK_DAYS} günden eski`,
+            oran: yuzdeOrani(istatistik.riskli, istatistik.toplam),
+            alt: `müşterilerin ${yuzdeEkli(yuzdeOrani(istatistik.riskli, istatistik.toplam) ?? 0)} · son siparişi ${RISK_DAYS} günden eski`,
             ton: istatistik.riskli ? "uyari" : undefined,
           },
         ]}

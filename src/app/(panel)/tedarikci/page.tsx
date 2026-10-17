@@ -8,6 +8,7 @@ import "./tedarikci.css";
 import { yetkiYok } from "@/lib/yetki-metni";
 import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
 import { yuzdeEkli } from "@/lib/turkce-ek";
+import { yuzdeOrani } from "@/lib/oran";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,8 @@ export default async function SuppliersPage() {
   const tedarikSatilamaz = sayim(satilamazSayimi);
   const tedarikMaliyetsiz = sayim(maliyetsizSayimi);
   const sayiYaz = (deger: number | null) => (deger === null ? "—" : deger.toLocaleString("tr-TR"));
-  const oranYaz = (deger: number | null, taban: number | null) => (deger === null || !taban ? null : Math.round((deger / taban) * 100));
+  /* Yuvarlama uçları uydurmasın (lib/oran): 3.257/3.264 "%100" değil. */
+  const oranYaz = (deger: number | null, taban: number | null) => (deger === null || !taban ? null : yuzdeOrani(deger, taban));
 
   /* ArvoOS kalıbı (16.10.2026): başlık, her tedarikçi bir panel kartı. */
   return (
@@ -190,7 +192,11 @@ export default async function SuppliersPage() {
         ]}
         gruplar={[
           {
-            baslik: "Tedarikçiye göre katalog",
+            /* Bu sayı tedarikçinin SON EŞİTLEMEDE bildirdiği ürün
+               sayısı; üstteki "Tedarik ürünü" ise bizim katalogdaki
+               (akıştan düşmüş eski ürünler de içeride). İkisi farklı
+               şeyi ölçtüğü için başlık da farklı. */
+            baslik: "Son eşitlemede gelen",
             satirlar: (suppliers ?? []).map((supplier) => ({
               ad: supplier.name,
               adet: supplier.sync_total ?? 0,

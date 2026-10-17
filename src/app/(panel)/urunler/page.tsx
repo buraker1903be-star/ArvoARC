@@ -10,6 +10,7 @@ import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gor
 import { gorunumleriOku } from "../gorunumler/oku";
 import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
 import { yuzdeEkli } from "@/lib/turkce-ek";
+import { yuzdeOrani } from "@/lib/oran";
 import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { gorunumSorgusu, URUN_DURUMLARI, URUN_KAYNAKLARI } from "@/lib/kayitli-gorunum";
 import { ProductTable, type ProductRow } from "./product-table";
@@ -155,7 +156,8 @@ export default async function Products({ searchParams }: { searchParams: Promise
   const maliyetsiz = sayim(maliyetsizSayimi);
   const tedarikciUrunu = sayim(tedarikciSayimi);
   const sayiYaz = (deger: number | null) => (deger === null ? "—" : deger.toLocaleString("tr-TR"));
-  const oranYaz = (deger: number | null, taban: number | null) => (deger === null || !taban ? null : Math.round((deger / taban) * 100));
+  /* Yuvarlama uçları uydurmasın (lib/oran). */
+  const oranYaz = (deger: number | null, taban: number | null) => (deger === null || !taban ? null : yuzdeOrani(deger, taban));
   const total = listResult.count ?? counts[statusFilter];
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const products = listResult.data ?? [];
@@ -352,7 +354,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
       <IstatistikKarti
         kapsam="katalogun tamamı · süzgeçten bağımsız"
         kutular={[
-          { ad: "Aktif ürün", deger: counts.active.toLocaleString("tr-TR"), oran: counts.all ? Math.round((counts.active / counts.all) * 100) : null, alt: `${counts.all.toLocaleString("tr-TR")} ürünün ${yuzdeEkli(counts.all ? (counts.active / counts.all) * 100 : 0)} yayında` },
+          { ad: "Aktif ürün", deger: counts.active.toLocaleString("tr-TR"), oran: yuzdeOrani(counts.active, counts.all), alt: `${counts.all.toLocaleString("tr-TR")} ürünün ${yuzdeEkli(yuzdeOrani(counts.active, counts.all) ?? 0)} yayında` },
           { ad: "Varyant", deger: sayiYaz(varyantToplam), alt: varyantToplam !== null && counts.all ? `ürün başına ${(varyantToplam / counts.all).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}` : "ürün başına —" },
           {
             /* "Tükendi" = stoğu bitmiş VE stoksuz satışı kapalı varyant:
