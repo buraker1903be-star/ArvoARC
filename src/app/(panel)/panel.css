@@ -582,7 +582,7 @@ html[data-theme="dark"] .panel-root .product-card-badges .catalog-badge.navy{bac
   /* Yapışkan kaydet çubukları sekme çubuğunun üstünde dursun. */
   /* Kaydet şeridi telefonda alt gezinmenin üstünde durur (ad değişti:
      .product-editor-actions → .kaydet-serit, 17.10.2026). */
-  .panel-root :is(.kaydet-serit,.theme-savebar,.code-save){bottom:calc(66px + env(safe-area-inset-bottom))}
+  .panel-root :is(.kaydet-serit,.code-save){bottom:calc(66px + env(safe-area-inset-bottom))}
   .global-progress{top:calc(64px + env(safe-area-inset-top))}
 
   .mobile-drawer-backdrop{
