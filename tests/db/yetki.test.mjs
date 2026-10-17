@@ -74,6 +74,21 @@ const ANON = [
   */
   "public.arc_storefront_payment_methods",
   "public.arc_storefront_variants",
+  /*
+    Tanıtım sayfalarının metni. Tablonun kendisi anon'a KAPALI
+    (arc_store_pages RLS'i üyelere açık); anon'a açık olan yalnızca
+    "şu adresten görünen metin" sorusu. Metinler zaten herkese açık
+    sayfalarda basılıyor ve tabloda taslak/yayında ayrımı yok.
+  */
+  "public.arc_storefront_pages",
+  /*
+    Satıcı bilgisi ADRESTEN. Mevzuat bu bilgilerin tüketiciye açık
+    sunulmasını arıyor, yani anon'a açık olması zorunlu. Eski
+    get_storefront_seller de listede: kiracı adını SABİT alıyor
+    (ArvoCulture) ve vitrin güncellenip dağıtılana kadar canlıda —
+    silinirse hukuki sayfalar yedek sabitlere düşer.
+  */
+  "public.arc_storefront_seller",
   "public.get_storefront_seller",
 ];
 

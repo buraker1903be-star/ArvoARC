@@ -56,11 +56,21 @@ async function tohum() {
 
     insert into public.arc_store_settings
       (organization_id, store_name, order_prefix, custom_domain, domain_verified_at, shipping_fee,
-       free_shipping_threshold, bank_transfer_enabled, bank_transfer_discount_percent) values
-      ('${A}', 'Mağaza A', 'MA', '${A_HOST}', now(), 11100, 100000, true,  7),
-      ('${B}', 'Mağaza B', 'MB', '${B_HOST}', now(), 22200, 200000, false, 3),
+       free_shipping_threshold, bank_transfer_enabled, bank_transfer_discount_percent,
+       legal_name, contact_email) values
+      ('${A}', 'Mağaza A', 'MA', '${A_HOST}', now(), 11100, 100000, true,  7,
+       'A ŞİRKETİ LİMİTED', 'a@ornek.test'),
+      ('${B}', 'Mağaza B', 'MB', '${B_HOST}', now(), 22200, 200000, false, 3,
+       'B ŞİRKETİ LİMİTED', 'b@ornek.test'),
       -- C alan adını yazmış ama DOĞRULAMAMIŞ: mağazası açılmamalı.
-      ('${C}', 'Mağaza C', 'MC', '${C_HOST}', null,  33300, 300000, true,  5);
+      ('${C}', 'Mağaza C', 'MC', '${C_HOST}', null,  33300, 300000, true,  5,
+       'C ŞİRKETİ LİMİTED', 'c@ornek.test');
+
+    /* Tanıtım sayfası metni: kiracının kendi anlatısı. A'nın
+       "hakkımızda"sı B'nin vitrininde görünmemeli. */
+    insert into public.arc_store_pages (organization_id, page_key, title, body) values
+      ('${A}', 'hakkimizda', 'A Hakkında', 'A mağazasının anlatısı.'),
+      ('${B}', 'hakkimizda', 'B Hakkında', 'B mağazasının anlatısı.');
 
     insert into public.arc_products (organization_id, name, slug, status, source, metadata) values
       ('${A}', 'A Ürünü', 'a-urun', 'active', 'native', '{"vendor":"A MARKA","product_type":"Tişört","badge":"A rozeti"}'::jsonb),
@@ -164,6 +174,21 @@ const PLAN = [
   */
   { ad: "arc_storefront_coupon", kip: "deger", alan: "valid", rol: "service_role",
     sql: "select valid from public.arc_storefront_coupon($1::text, 'AKOD', 100000)", a: true, b: false },
+  /*
+    Tanıtım sayfası metni: A'nın "hakkımızda"sı B'nin vitrininde
+    görünürse müşteriye BAŞKA bir markanın hikâyesi anlatılmış olur.
+  */
+  { ad: "arc_storefront_pages", kip: "deger", alan: "baslik",
+    sql: "select public.arc_storefront_pages($1::text) -> 'hakkimizda' ->> 'baslik' as baslik",
+    a: "A Hakkında", b: "B Hakkında" },
+  /*
+    SATICI KİMLİĞİ: bu sızıntının bedeli en yüksek olanı. Yanlış
+    unvan, mesafeli satış sözleşmesinde yanlış tarafı göstermek
+    demek — müşteri kiminle sözleşme yaptığını buradan okuyor.
+  */
+  { ad: "arc_storefront_seller", kip: "deger", alan: "legal_name",
+    sql: "select legal_name from public.arc_storefront_seller($1::text)",
+    a: "A ŞİRKETİ LİMİTED", b: "B ŞİRKETİ LİMİTED" },
 ];
 
 /*
@@ -201,9 +226,30 @@ describe("kiracı sızıntısı", () => {
       path.resolve(import.meta.dirname, "../../supabase/schema/canli-sema.sql"),
       "utf8",
     );
-    const semadakiler = new Set(
-      [...sema.matchAll(/CREATE OR REPLACE FUNCTION public\.(arc_storefront_[a-z_]+)\(/g)].map((m) => m[1]),
-    );
+    /*
+      DÖKÜM + MİGRATION'LAR. Döküm canlıdan alınıyor ve migration SQL
+      Editor'den elle uygulandığı için HEP BİRAZ GERİDE: yeni bir
+      fonksiyonu plana yazmak, döküm yenilenene kadar aşağıdaki ters
+      yön kontrolünü düşürüyordu ("şemada olmayan plan satırı").
+      Oysa fonksiyon var — testin kendisi onu çağırıp sınıyor, çünkü
+      PGlite ortamı dökümün ardından migration'ları da kuruyor
+      (tests/db/ortam.mjs). Kod kataloğun ilerisinde olmak bu depoda
+      olağan akış; check:schema de gecikmeyi hatadan aynı şekilde
+      ayırıyor.
+    */
+    const migrationlar = fs
+      .readdirSync(path.resolve(import.meta.dirname, "../../supabase/migrations"))
+      .filter((ad) => ad.endsWith(".sql"))
+      .map((ad) =>
+        fs.readFileSync(path.resolve(import.meta.dirname, "../../supabase/migrations", ad), "utf8"),
+      )
+      .join("\n");
+
+    const ADLAR = /create or replace function public\.(arc_storefront_[a-z_]+)\s*\(/gi;
+    const semadakiler = new Set([
+      ...[...sema.matchAll(ADLAR)].map((m) => m[1]),
+      ...[...migrationlar.matchAll(ADLAR)].map((m) => m[1]),
+    ]);
     const planda = new Set([...PLAN.map((satir) => satir.ad), ...YAZANLAR, ...ANAHTARLILAR, ...OTURUMLULAR]);
     const eksik = [...semadakiler].filter((ad) => !planda.has(ad)).sort();
     assert.deepEqual(eksik, [], `plana eklenmemiş fonksiyon: ${eksik.join(", ")}`);

@@ -78,6 +78,22 @@ const IKIZSIZ_SERBEST = new Set([
     soran bir fonksiyon.
   */
   "arc_storefront_primary_host",
+  /*
+    Tanıtım sayfalarının metni: ArvoCulture'a özel bir ikizi hiç
+    olmadı — tablo (arc_store_pages) çok kiracılı tasarlandı ve ilk
+    okuyucusu bu fonksiyon. İkiz yazmak, yalnızca bu denetimi
+    memnun etmek için ikinci bir fonksiyon açmak olurdu.
+  */
+  "arc_storefront_pages",
+  /*
+    Satıcı bilgisi: eski aile burada BAŞKA bir adlandırmada —
+    `get_storefront_seller(p_tenant)`, yani "arvoculture" eki yok.
+    Denetimin aradığı get_arvoculture_storefront_* kalıbına uymuyor
+    ve uydurmak için eski fonksiyonu yeniden adlandırmak gerekirdi;
+    o ad ArvoCulture vitrini güncellenip dağıtılana kadar yaşıyor
+    (silinirse hukuki sayfalar yedek sabitlere düşer).
+  */
+  "arc_storefront_seller",
 ]);
 
 /*
