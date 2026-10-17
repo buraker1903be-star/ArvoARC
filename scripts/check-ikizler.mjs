@@ -62,6 +62,15 @@ const IKIZSIZ_SERBEST = new Set([
   "arc_storefront_order_status",
   "arc_storefront_org",
   "arc_storefront_payment_methods",
+  /*
+    Hesap alanı: tek mağazalı karşılıkları get_arvoculture_MY_orders /
+    _returns, yani "storefront" eki olmayan BAŞKA bir adlandırmada.
+    Denetimin aradığı get_arvoculture_storefront_* kalıbına uymuyorlar
+    ve uydurmak için eski fonksiyonları yeniden adlandırmak gerekirdi —
+    onlar ArvoCulture vitrini eski adı bırakana kadar yaşıyor.
+  */
+  "arc_storefront_my_orders",
+  "arc_storefront_my_returns",
 ]);
 
 /*

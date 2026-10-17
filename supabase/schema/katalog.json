@@ -513,6 +513,8 @@
     "arc_storefront_deals",
     "arc_storefront_discounts",
     "arc_storefront_facets",
+    "arc_storefront_my_orders",
+    "arc_storefront_my_returns",
     "arc_storefront_order_status",
     "arc_storefront_org",
     "arc_storefront_payment_methods",

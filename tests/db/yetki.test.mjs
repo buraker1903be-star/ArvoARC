@@ -88,6 +88,13 @@ const PANEL = [
     istediği için oturumlu kullanıcıya açık.
   */
   "public.arc_storefront_return_request",
+  /*
+    Müşterinin hesap alanı: siparişlerim ve iadelerim. Yalnızca
+    oturumlu kullanıcıya açık — süzgeç auth.uid() VE adres, yani
+    anon'a açmanın anlamı yok, oturumsuz çağrı zaten boş dönerdi.
+  */
+  "public.arc_storefront_my_orders",
+  "public.arc_storefront_my_returns",
   /* Medya kitaplığı: panel okuması, anon'a kapalı. */
   "public.arc_medya_listesi",
   "public.arc_medya_ozeti",

@@ -24,7 +24,7 @@ import { before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { islem, rol, veritabani } from "./ortam.mjs";
+import { islem, reddedilir, rol, veritabani } from "./ortam.mjs";
 
 const A = "00000000-0000-4000-8000-00000000e001";
 const B = "00000000-0000-4000-8000-00000000e002";
@@ -173,6 +173,15 @@ const YAZANLAR = new Set(["arc_storefront_create_order", "arc_storefront_return_
 */
 const ANAHTARLILAR = new Set(["arc_storefront_order_status"]);
 
+/*
+  OTURUMLU OKUMALAR: müşterinin kendi hesap alanı. Plandaki "A'nın
+  adresi yalnızca A'yı getiriyor" kalıbına uymuyorlar çünkü oturum
+  da gerekiyor — süzgeç auth.uid() VE adres. Ayrı senaryolarla
+  sınanıyorlar; sızıntı sorusu burada "A'dan alışveriş yapmış
+  müşteri B'nin vitrininde ne görüyor" biçimini alıyor.
+*/
+const OTURUMLULAR = new Set(["arc_storefront_my_orders", "arc_storefront_my_returns"]);
+
 describe("kiracı sızıntısı", () => {
   test("plan ailenin TAMAMINI kapsıyor", () => {
     /*
@@ -187,7 +196,7 @@ describe("kiracı sızıntısı", () => {
     const semadakiler = new Set(
       [...sema.matchAll(/CREATE OR REPLACE FUNCTION public\.(arc_storefront_[a-z_]+)\(/g)].map((m) => m[1]),
     );
-    const planda = new Set([...PLAN.map((satir) => satir.ad), ...YAZANLAR, ...ANAHTARLILAR]);
+    const planda = new Set([...PLAN.map((satir) => satir.ad), ...YAZANLAR, ...ANAHTARLILAR, ...OTURUMLULAR]);
     const eksik = [...semadakiler].filter((ad) => !planda.has(ad)).sort();
     assert.deepEqual(eksik, [], `plana eklenmemiş fonksiyon: ${eksik.join(", ")}`);
     /* Ters yön: plandaki ad şemada yoksa plan bayatlamış. */
@@ -481,6 +490,68 @@ describe("kiracı sızıntısı", () => {
         );
         assert.equal(rows[0].s, null, `"${kotu}" için null dönmeli`);
       }
+    });
+  });
+
+  test("müşterinin siparişleri yalnızca alışveriş yaptığı mağazada görünüyor", async () => {
+    /*
+      ASIL SORU. Eski fonksiyon (get_arvoculture_my_orders) KURUMLA
+      HİÇ SÜZMÜYORDU, yalnızca auth.uid() ile: iki mağazadan alışveriş
+      yapan müşteri, B'nin vitrininde A'dan verdiği siparişleri de
+      görürdü. Kendi verisi ama yanlış yerde — B'nin vitrini başka bir
+      mağazanın sipariş numaralarını ve ürün adlarını gösteriyordu.
+    */
+    await islem(db, async () => {
+      await tohum();
+      const musteri = "00000000-0000-4000-8000-0000000000a1";
+      await rol(db, "postgres");
+      await db.query(
+        `insert into auth.users (id, email) values ($1, 'musteri@example.com')
+         on conflict (id) do nothing`,
+        [musteri],
+      );
+
+      await rol(db, "service_role");
+      for (const [host, sku, ad] of [[A_HOST, "A-1", "A Ürünü"], [B_HOST, "B-1", "B Ürünü"]]) {
+        const { rows } = await db.query(
+          `select order_id from public.arc_storefront_create_order(
+             $1::text, 'musteri@example.com', 'Müşteri', '+905551112233',
+             '{"line":"Adres","city":"İstanbul","district":"Kadıköy","country":"TR"}'::jsonb,
+             $2::jsonb)`,
+          [host, JSON.stringify([{ sku, quantity: 1, name: ad }])],
+        );
+        /* Sipariş misafir olarak açılıyor; hesaba bağlanması ayrı bir adım. */
+        await rol(db, "postgres");
+        await db.query(`update public.arc_orders set user_id = $1 where id = $2`, [musteri, rows[0].order_id]);
+        await rol(db, "service_role");
+      }
+
+      await rol(db, "authenticated", musteri);
+      const oku = async (host) =>
+        (await db.query(`select order_number from public.arc_storefront_my_orders($1::text)`, [host])).rows;
+
+      const a = await oku(A_HOST);
+      const b = await oku(B_HOST);
+      assert.equal(a.length, 1, "A'nın vitrininde A'nın siparişi görünmeli");
+      assert.equal(b.length, 1, "B'nin vitrininde B'nin siparişi görünmeli");
+      assert.notEqual(a[0].order_number, b[0].order_number);
+      /* Mağaza öneki hangi mağazanın siparişi olduğunu söylüyor. */
+      assert.ok(a[0].order_number.startsWith("MA"), `A'da MA ile başlamalı: ${a[0].order_number}`);
+      assert.ok(b[0].order_number.startsWith("MB"), `B'de MB ile başlamalı: ${b[0].order_number}`);
+    });
+  });
+
+  test("oturumsuz çağrı hiç sipariş döndürmüyor", async () => {
+    await islem(db, async () => {
+      await tohum();
+      /* Vitrin bu çağrıyı tarayıcıdan yapıyor; oturum yoksa boş dönmeli. */
+      await rol(db, "anon");
+      await reddedilir(
+        db,
+        `select * from public.arc_storefront_my_orders($1::text)`,
+        [A_HOST],
+        /permission denied/i,
+      );
     });
   });
 
