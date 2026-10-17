@@ -110,8 +110,12 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
   const karsilastirilabilir = onceki.bas >= okumaBasi(donem, simdi);
   const oncekiOzet = karsilastirilabilir ? raporOzeti(siparisSonucu.rows, [], [], onceki, aylar) : null;
   const karsilastirmaAdi = donem.anahtar === "bu_yil" ? "Geçen yıla göre" : donem.anahtar === "ozel" ? "Önceki eşit döneme göre" : "Geçen aya göre";
-  const karsilastirma = (simdiki: number, oncekiDeger: number | undefined) =>
-    oncekiOzet ? <>{karsilastirmaAdi} <Fark deger={fark(simdiki, oncekiDeger ?? 0)} /> · </> : null;
+  /* Önceki dönem BOŞSA yüzde anlamsız (sıfıra bölme): cümle hiç
+     kurulmuyor, yoksa "Önceki eşit döneme göre ·" diye yarım kalıyordu. */
+  const karsilastirma = (simdiki: number, oncekiDeger: number | undefined) => {
+    const deger = oncekiOzet ? fark(simdiki, oncekiDeger ?? 0) : null;
+    return deger === null ? null : <>{karsilastirmaAdi} <Fark deger={deger} /> · </>;
+  };
   const kesildi = siparisSonucu.truncated || iadeSonucu.truncated || kalemParcalari.some((p) => p.truncated);
 
   /* --- Sunum: yukarıdaki özetten türetiliyor, yeni hesap yok --- */
@@ -131,7 +135,7 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
 
   const karVar = o.kar !== null && o.maliyet !== null;
   const karlilikKartlari: Gosterge[] = [
-    { etiket: "Brüt kâr", deger: karVar ? paraYaz(o.kar!) : "—", not: karVar ? `${adet(o.karliSiparis)} siparişte hesaplanabildi` : "Kalemlerin alış fiyatı girilmemiş", simge: "grafik", ton: !karVar ? "info" : o.kar! >= 0 ? "success" : "danger", tonlu: karVar, grafik: { tur: "yigin", parcalar: [{ ad: "Maliyet", deger: o.maliyet ?? 0, ton: "warning" }, { ad: "Kâr", deger: Math.max(0, o.kar ?? 0), ton: "success" }] } },
+    { etiket: "Brüt kâr", deger: karVar ? paraYaz(o.kar!) : "—", not: karVar ? `${adet(o.karliSiparis)} siparişte hesaplanabildi` : o.gecerliAdet ? "Kalemlerin alış fiyatı girilmemiş" : "Bu dönemde geçerli sipariş yok", simge: "grafik", ton: !karVar ? "info" : o.kar! >= 0 ? "success" : "danger", tonlu: karVar, grafik: { tur: "yigin", parcalar: [{ ad: "Maliyet", deger: o.maliyet ?? 0, ton: "warning" }, { ad: "Kâr", deger: Math.max(0, o.kar ?? 0), ton: "success" }] } },
     { etiket: "Kâr marjı", deger: o.marj === null ? "—" : yuzde(o.marj), not: "Hesaplanabilen siparişlerin kalem gelirine oranı", simge: "kivilcim", ton: "gold", grafik: { tur: "gosterge", oran: o.marj ?? 0 } },
     { etiket: "Kargo geliri", deger: paraYaz(o.kargo), not: `Tahsil edilen kargo bedeli · cironun ${yuzde(o.brutCiro ? (o.kargo / o.brutCiro) * 100 : 0)}'i`, simge: "kargo", ton: "info", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.kargo / o.brutCiro) * 100 : 0 } },
     { etiket: "İndirim", deger: paraYaz(o.indirim), not: `Kupon ve havale · ürün toplamının ${yuzde(o.urunToplami ? (o.indirim / o.urunToplami) * 100 : 0)}'i`, simge: "etiket", ton: "warning", grafik: { tur: "gosterge", oran: o.urunToplami ? (o.indirim / o.urunToplami) * 100 : 0 } },
@@ -227,8 +231,8 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
       <section className="rpt-card">
         <header className="rpt-card-head"><div><h2>Bu dönem ne söylüyor?</h2><p>Yönetici için dört kısa not</p></div></header>
         <ul className="rpt-insights">
-          <li data-tone="warning"><span className="rpt-insight-icon"><Simge ad="uyari" boy={17} /></span><div><b>En zayıf adım</b><p>{o.enZayifGecis ? `${o.enZayifGecis.nereden} → ${o.enZayifGecis.nereye} geçişi ${yuzde(o.enZayifGecis.oran)}.` : "Yeterli veri yok."}</p></div></li>
-          <li data-tone="gold"><span className="rpt-insight-icon"><Simge ad="grafik" boy={17} /></span><div><b>Kârlılık</b><p>{karVar ? `${paraYaz(o.karTabani)} kalem gelirinin maliyeti ${paraYaz(o.maliyet!)}; brüt marj ${yuzde(o.marj ?? 0)}.` : "Kâr hesaplanamıyor: kalemlerin alış fiyatı girilmemiş."}</p></div></li>
+          <li data-tone="warning"><span className="rpt-insight-icon"><Simge ad="uyari" boy={17} /></span><div><b>En zayıf adım</b><p>{o.enZayifGecis ? `${o.enZayifGecis.nereden} → ${o.enZayifGecis.nereye} geçişi ${yuzde(o.enZayifGecis.oran)}.` : o.siparisAdedi ? "Bütün siparişler akışta ilerlemiş." : "Bu dönemde sipariş yok."}</p></div></li>
+          <li data-tone="gold"><span className="rpt-insight-icon"><Simge ad="grafik" boy={17} /></span><div><b>Kârlılık</b><p>{karVar ? `${paraYaz(o.karTabani)} kalem gelirinin maliyeti ${paraYaz(o.maliyet!)}; brüt marj ${yuzde(o.marj ?? 0)}.` : o.gecerliAdet ? "Kâr hesaplanamıyor: kalemlerin alış fiyatı girilmemiş." : "Bu dönemde geçerli sipariş yok."}</p></div></li>
           <li data-tone={o.iadeTutari ? "danger" : "success"}><span className="rpt-insight-icon"><Simge ad="geri" boy={17} /></span><div><b>İade yükü</b><p>{o.iadeTutari ? `${paraYaz(o.iadeTutari)} iade edildi; brüt cironun ${yuzde((o.iadeTutari / Math.max(1, o.brutCiro)) * 100)}'i.` : "Bu dönemde iade edilen tutar yok."}</p></div></li>
           <li data-tone="info"><span className="rpt-insight-icon"><Simge ad="kisi" boy={17} /></span><div><b>Satış kaynağı</b><p>{enIyiKaynak ? `Ciro en çok ${enIyiKaynak.etiket} üzerinden geldi: ${paraYaz(enIyiKaynak.ciro)} (${adet(enIyiKaynak.adet)} sipariş).` : "Bu dönemde geçerli sipariş yok."}</p></div></li>
         </ul>
