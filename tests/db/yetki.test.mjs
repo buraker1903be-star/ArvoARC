@@ -19,6 +19,7 @@ const ANON = [
   "public.arc_store_stage",
   "public.arc_variant_available",
   "public.get_arvoculture_storefront_collection_products",
+  "public.get_arvoculture_storefront_collection_products_page",
   "public.get_arvoculture_storefront_collections",
   "public.get_arvoculture_storefront_deals",
   "public.get_arvoculture_storefront_discounts",
@@ -40,6 +41,7 @@ const ANON = [
   */
   "public.arc_storefront_org",
   "public.arc_storefront_collection_products",
+  "public.arc_storefront_collection_products_page",
   "public.arc_storefront_collections",
   "public.arc_storefront_deals",
   "public.arc_storefront_discounts",
