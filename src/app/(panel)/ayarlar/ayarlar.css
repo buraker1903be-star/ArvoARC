@@ -41,3 +41,31 @@
   gap: var(--s4, 16px);
   flex-wrap: wrap;
 }
+
+/*
+  VİTRİN KİPİ SEÇİMİ. Alan adı formunun en başında duruyor çünkü
+  altındaki her şeyi değiştiriyor: alt alan adı alanı, DNS yönergesi
+  ve doğrulamanın yolu.
+*/
+.vitrin-kipi {
+  margin: 0 0 var(--s4, 16px);
+  padding: var(--s3, 12px) var(--s4, 16px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.vitrin-kipi legend {
+  padding: 0 var(--s2, 8px);
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+
+.vitrin-kipi .check-inline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2, 8px);
+}
+
+.vitrin-kipi .check-inline + .check-inline {
+  margin-top: var(--s2, 8px);
+}

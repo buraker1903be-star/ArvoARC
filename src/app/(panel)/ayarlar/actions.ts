@@ -9,6 +9,7 @@ import { requireTenant } from "@/lib/tenant";
 import { altAlanAdresi } from "@/lib/magaza-adresi";
 import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/vercel-domains";
 import { encryptSecret,paymentCredentialsConfigured } from "@/lib/payment-credentials";
+import { disVitriniDogrula } from "@/lib/dis-vitrin-dogrulama";
 import { jetonlariUnut } from "@/lib/tryoto/istemci";
 import { whatsappNumarasiniKaldir,whatsappNumarasiniKaydet,whatsappNumarasiniSina } from "@/lib/whatsapp-hesap";
 import { SABLON_ANAHTARLARI,taninmayanDegiskenler } from "@/lib/eposta-sablonu";
@@ -315,7 +316,15 @@ export async function updateStorefrontDomainSettings(formData:FormData){
   if(!customDomain&&!platformSubdomain)return await bildirimliDonus("/ayarlar",{hata:hataMetni("domain-required")});
 
   const token=`arvo-verification=${randomUUID().replace(/-/g,"")}`;
-  const {data:settings}=await supabase.from("arc_store_settings").select("panel_custom_domain,custom_domain,domain_status,domain_verified_at").eq("organization_id",organization.id).maybeSingle();
+  /*
+    VİTRİN KİPİ. "external" = müşteri sitesini kendi yapıyor; alan
+    adı bizim Vercel projemize EKLENMEZ (DNS zaten başka yere
+    yöneliyor, kayıt sonsuza kadar "DNS bekleniyor"da kalırdı).
+    Kayıt yine gerekli: mağazayı Origin'den çözen her şey ve CORS
+    ona bakıyor.
+  */
+  const disVitrin=String(formData.get("storefront_mode")??"hosted")==="external";
+  const {data:settings}=await supabase.from("arc_store_settings").select("panel_custom_domain,custom_domain,domain_status,domain_verified_at,domain_verification_token").eq("organization_id",organization.id).maybeSingle();
   if(customDomain&&customDomain===settings?.panel_custom_domain)return await bildirimliDonus("/ayarlar",{hata:hataMetni("panel-storefront-domain-conflict")});
 
   /*
@@ -335,7 +344,7 @@ export async function updateStorefrontDomainSettings(formData:FormData){
   const alanAdiAyni=customDomain&&customDomain===settings?.custom_domain;
   const zatenAktif=settings?.domain_status==="active"&&Boolean(settings?.domain_verified_at);
   let provision=null;
-  if(customDomain&&!(alanAdiAyni&&zatenAktif)){
+  if(customDomain&&!disVitrin&&!(alanAdiAyni&&zatenAktif)){
     try{provision=await ensureVercelProjectDomain(customDomain,"storefront");}
     catch(error){return await bildirimliDonus("/ayarlar",{hata:hataMetni(error instanceof Error?error.message:"Vercel alan adı eklenemedi")});}
   }
@@ -344,13 +353,22 @@ export async function updateStorefrontDomainSettings(formData:FormData){
     organization_id:organization.id,
     ...(await magazaAdiTabani(supabase,organization.id,organization.name)),
     custom_domain:customDomain||null,platform_subdomain:platformSubdomain||null,
+    storefront_mode:disVitrin?"external":"hosted",
     /* Sağlama atlandıysa (alan adı aynı ve aktif) mevcut durum korunur;
        yoksa kaydetme işlemi aktif bir alan adını "DNS bekleniyor"a
        düşürür ve kullanıcı var olmayan bir sorunu çözmeye çalışırdı. */
-    domain_status:customDomain?(alanAdiAyni&&zatenAktif?"active":provision?.active?"active":"pending_dns"):"active",
-    domain_verification_token:customDomain?token:null,
+    /*
+      Dış vitrinde doğrulama TXT kaydıyla ve AYRI bir adımda
+      yapılıyor (verifyStorefrontDomain): kaydeder kaydetmez
+      "doğrulandı" demek, sahibi olmadığı bir alan adını iddia eden
+      bir kiracıya o adresten gelen siparişleri yazmak olurdu.
+    */
+    domain_status:customDomain
+      ?(disVitrin?(alanAdiAyni&&zatenAktif?"active":"pending_dns"):alanAdiAyni&&zatenAktif?"active":provision?.active?"active":"pending_dns")
+      :"active",
+    domain_verification_token:customDomain?(alanAdiAyni&&settings?.domain_verification_token?settings.domain_verification_token:token):null,
     domain_verified_at:customDomain
-      ?(alanAdiAyni&&zatenAktif?settings?.domain_verified_at:provision?.active?new Date().toISOString():null)
+      ?(alanAdiAyni&&zatenAktif?settings?.domain_verified_at:(!disVitrin&&provision?.active)?new Date().toISOString():null)
       :new Date().toISOString(),
     storefront_url:storefrontUrl,updated_at:new Date().toISOString()
   },{onConflict:"organization_id"});
@@ -377,15 +395,28 @@ export async function verifyPanelDomain(){
 export async function verifyStorefrontDomain(){
   const {supabase,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))return await bildirimliDonus("/ayarlar",{hata:hataMetni("forbidden")});
-  const {data}=await supabase.from("arc_store_settings").select("custom_domain").eq("organization_id",organization.id).maybeSingle();
+  const {data}=await supabase.from("arc_store_settings").select("custom_domain,storefront_mode,domain_verification_token").eq("organization_id",organization.id).maybeSingle();
   if(!data?.custom_domain)return await bildirimliDonus("/ayarlar",{hata:hataMetni("domain-required")});
-  let result;
-  try{result=await verifyVercelProjectDomain(data.custom_domain,"storefront");}
-  catch(error){return await bildirimliDonus("/ayarlar",{hata:hataMetni(error instanceof Error?error.message:"Vercel doğrulaması başarısız")});}
+
+  /*
+    KİP DOĞRULAMANIN YOLUNU DEĞİŞTİRİYOR. Vitrin bizdeyse soru
+    "alan adı bize mi yöneliyor" ve yanıtı Vercel veriyor. Vitrin
+    müşterideyse DNS zaten başka yere yöneliyor; sorulacak soru
+    "bu alan adı gerçekten senin mi" ve yanıtı TXT kaydı veriyor.
+  */
+  let result:{active:boolean;sebep?:string};
+  if(data.storefront_mode==="external"){
+    const sonuc=await disVitriniDogrula(data.custom_domain,String(data.domain_verification_token??""));
+    result=sonuc.dogrulandi?{active:true}:{active:false,sebep:sonuc.sebep};
+  }else{
+    try{result=await verifyVercelProjectDomain(data.custom_domain,"storefront");}
+    catch(error){return await bildirimliDonus("/ayarlar",{hata:hataMetni(error instanceof Error?error.message:"Vercel doğrulaması başarısız")});}
+  }
   await supabase.from("arc_store_settings").update({domain_status:result.active?"active":"pending_dns",domain_verified_at:result.active?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("organization_id",organization.id);
   revalidatePath("/ayarlar");revalidatePath("/magaza");return await bildirimliDonus("/ayarlar", result.active
     ? {basari:basariMetni("storefront-domain-verified")}
-    : {uyari:hataMetni("storefront-dns-not-ready")});
+    /* DNS beklemesi hata değil; sebebi varsa olduğu gibi gösteriliyor. */
+    : {uyari:result.sebep??hataMetni("storefront-dns-not-ready")});
 }
 
 /*

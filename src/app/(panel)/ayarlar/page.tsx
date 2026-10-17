@@ -40,8 +40,9 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
   const {bolum:bolumParametresi}=await searchParams;
   const bolum:AyarBolumu=AYAR_BOLUMLERI.some(([k])=>k===bolumParametresi)?(bolumParametresi as AyarBolumu):"marka";
   const {supabase,organization,membership,user}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,garanti_enabled,garanti_test_mode,garanti_isyeri_no,garanti_terminal_no,garanti_api_surumu,garanti_guvenlik_duzeyi,garanti_yari_guvenli_kabul,garanti_provizyon_sifresi_enc,garanti_magaza_anahtari_enc,garanti_iade_sifresi_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,storefront_mode,domain_verification_token,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,garanti_enabled,garanti_test_mode,garanti_isyeri_no,garanti_terminal_no,garanti_api_surumu,garanti_guvenlik_duzeyi,garanti_yari_guvenli_kabul,garanti_provizyon_sifresi_enc,garanti_magaza_anahtari_enc,garanti_iade_sifresi_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
+  const disVitrin=settings?.storefront_mode==="external";
   const canManage=["owner","admin","manager"].includes(membership.role);
   /* Ödemenin gittiği hesap (IBAN, PayTR) yalnızca owner/admin: bkz. actions.ts PAYMENT_ROLES. */
   const canManagePayments=["owner","admin"].includes(membership.role);
@@ -179,17 +180,50 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
           <p className="domain-explainer"><b>Herkese açık mağaza</b> · Ürünlerin, koleksiyonların ve ödeme akışının yayınlandığı müşteri adresidir.</p>
           <div className="domain-current storefront"><small>MAĞAZA ADRESİ</small><strong>{settings?.custom_domain??(settings?.platform_subdomain?altAlanAdresi(settings.platform_subdomain):"Henüz tanımlanmadı")}</strong><span>{settings?.domain_verified_at?"SSL ve alan adı doğrulandı":"DNS bağlantısı bekleniyor"}</span></div>
           {canManage&&<form action={updateStorefrontDomainSettings} className="domain-form">
-            <label>ARVO mağaza alt alan adı<div className="domain-input"><input name="storefront_subdomain" defaultValue={settings?.platform_subdomain??""} placeholder="magazaadi" pattern="[a-z0-9-]+"/><span>.{ALT_ALAN_SONEKI}</span></div></label>
-            <div className="domain-divider"><span>veya özel alan adı</span></div>
-            <label>Mağaza alan adı<input name="storefront_custom_domain" defaultValue={settings?.custom_domain??""} placeholder="markaniz.com"/></label>
+            {/*
+              VİTRİN KİMDE? Bu seçim DNS yönergesini de doğrulamayı da
+              değiştiriyor. Müşteri sitesini kendi yaptığında alan adını
+              bizim Vercel projemize eklemek yanlış: DNS başka yere
+              yöneliyor ve kayıt sonsuza kadar "DNS bekleniyor"da
+              kalıyor, kullanıcı var olmayan bir sorunu çözmeye
+              çalışıyor.
+            */}
+            <fieldset className="vitrin-kipi">
+              <legend>Vitrin nerede?</legend>
+              <label className="check-inline">
+                <input type="radio" name="storefront_mode" value="hosted" defaultChecked={disVitrin!==true}/>
+                <span><b>ArvoARC'ta</b> — mağazayı biz barındırıyoruz</span>
+              </label>
+              <label className="check-inline">
+                <input type="radio" name="storefront_mode" value="external" defaultChecked={disVitrin===true}/>
+                <span><b>Kendi sitemde</b> — ürünleri ve siparişleri panelden yönetirim</span>
+              </label>
+            </fieldset>
+            {!disVitrin&&<label>ARVO mağaza alt alan adı<div className="domain-input"><input name="storefront_subdomain" defaultValue={settings?.platform_subdomain??""} placeholder="magazaadi" pattern="[a-z0-9-]+"/><span>.{ALT_ALAN_SONEKI}</span></div></label>}
+            {!disVitrin&&<div className="domain-divider"><span>veya özel alan adı</span></div>}
+            <label>{disVitrin?"Sitenizin alan adı":"Mağaza alan adı"}<input name="storefront_custom_domain" defaultValue={settings?.custom_domain??""} placeholder="markaniz.com"/></label>
+            {disVitrin&&<p className="list-hint">Bu adres yalnızca <b>tanıma</b> için kaydedilir: siparişin hangi mağazaya yazılacağını ve API'mizin hangi siteye açılacağını belirler. DNS'inize dokunulmaz.</p>}
             <button className="panel-primary" type="submit">Mağaza alan adını kaydet</button>
           </form>}
-          {settings?.custom_domain&&domainStatus!=="active"&&<div className="dns-guide">
-            <div><span>1</span><p><b>Vercel DNS kaydı</b><small>Vercel’in mağaza projesinde göstereceği CNAME veya A kaydını DNS sağlayıcınıza ekleyin.</small></p></div>
-            <div><span>2</span><p><b>Mağaza yayını</b><code>https://{settings.custom_domain}</code></p></div>
-            <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli mağaza bağlantısı etkinleşir.</small></p></div>
-            {canManage&&<form action={verifyStorefrontDomain}><button className="panel-primary" type="submit">DNS bağlantısını doğrula</button></form>}
-          </div>}
+          {settings?.custom_domain&&domainStatus!=="active"&&(disVitrin
+            ?/*
+                DIŞ VİTRİNDE KANIT TXT KAYDI. DNS bize yönelmediği
+                için "alan adı bize mi geliyor" diye soramıyoruz;
+                sorduğumuz soru "bu alan adı gerçekten senin mi" ve
+                yanıtı yalnızca DNS'ine erişen biri verebilir.
+              */
+              <div className="dns-guide">
+                <div><span>1</span><p><b>TXT kaydı ekleyin</b><small>DNS sağlayıcınızda, kökte ya da <code>_arvo</code> adında bir TXT kaydı:</small><code>{settings.domain_verification_token??"Kaydı oluşturmak için alan adını kaydedin"}</code></p></div>
+                <div><span>2</span><p><b>Doğrulayın</b><small>Kayıt yayıldıktan sonra aşağıdaki düğmeye basın; birkaç dakika sürebilir.</small></p></div>
+                <div><span>3</span><p><b>Sipariş akışı açılır</b><small>Doğrulandıktan sonra siteniz ödeme ve veri uçlarımızı çağırabilir.</small></p></div>
+                {canManage&&<form action={verifyStorefrontDomain}><button className="panel-primary" type="submit">TXT kaydını doğrula</button></form>}
+              </div>
+            :<div className="dns-guide">
+              <div><span>1</span><p><b>Vercel DNS kaydı</b><small>Vercel’in mağaza projesinde göstereceği CNAME veya A kaydını DNS sağlayıcınıza ekleyin.</small></p></div>
+              <div><span>2</span><p><b>Mağaza yayını</b><code>https://{settings.custom_domain}</code></p></div>
+              <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli mağaza bağlantısı etkinleşir.</small></p></div>
+              {canManage&&<form action={verifyStorefrontDomain}><button className="panel-primary" type="submit">DNS bağlantısını doğrula</button></form>}
+            </div>)}
           <div className="domain-note"><b>Doğru ayrım</b><p><strong>{callbackHost}</strong> yönetim panelidir; {vitrinAdresi?<><strong>{vitrinAdresi}</strong> ise müşterilerin alışveriş yaptığı mağazadır.</>:"mağaza adresi ise müşterilerin alışveriş yaptığı yerdir ve yukarıdan bağlanır."}</p></div>
         </section>
       </section>
