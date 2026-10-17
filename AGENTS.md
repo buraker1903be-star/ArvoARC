@@ -184,6 +184,33 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
 - **Geri dönüş adresi doğrulanır**: başka bölüme ya da dış adrese
   yönlendirme engellenir, filtre ve sayfa korunur.
 
+## Günlük öz denetim
+
+`/api/cron/oz-denetim` her sabah (TR 07:00) her mağazayı MÜŞTERİNİN
+GÖZÜNDEN sınar: vitrin HTTP ile istenir, site haritası indirilir,
+oradan RASTGELE bir ürün adresi açılır, ödeme yöntemi ve tedarikçi
+taramasının son koşması okunur. Sapma varsa kurum sahibinin ArvoOS
+bildirim çekmecesine düşer (mağaza başına tek bildirim, günde bir
+kez — tekrar anahtarında Türkiye günü var).
+
+**Neden var:** bu depoda bulunan kusurların çoğu SESSİZDİ. Site
+haritası bir saatten uzun süre eski listeyi verdi, koleksiyon rafları
+boşaldı, bütün ürün sayfaları 500 verdi, bildirim hiç gitmedi —
+hiçbiri hata üretmedi. Veritabanına sorup "her şey yerinde" demek
+yetmiyordu: 17.10.2026'da ürün sayfaları 500 verirken veritabanı
+gayet sağlamdı.
+
+**Ölçüm rotada, KARAR `lib/oz-denetim.ts`'te** ve saf: eşikleri
+değiştirmek ağ isteği gerektirmesin, karar test edilebilsin diye
+(`tests/oz-denetim.test.ts`). Yeni bir ölçüt eklerken kendine sor:
+bu, MÜŞTERİNİN GÖRECEĞİ bir kusura bağlanıyor mu? "Güzel olurdu"
+ölçütleri bilerek yok — her sabah okunmayan bir rapor, hiç olmayan
+rapordan kötüdür.
+
+**Bulgu varken de 200 dönülür:** bulgu işin başarısızlığı değil
+sonucu. 500 dönmek zamanlayıcı geçmişinde işi "bozuk" gösterir ve
+gerçekten bozulduğu gün fark edilmez.
+
 ## Migration
 
 Yeni dosyayı **`npm run db:new -- <ad>`** ile açın; sürümü son migration'ın
