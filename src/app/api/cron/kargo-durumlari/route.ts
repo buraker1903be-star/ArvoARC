@@ -6,6 +6,8 @@ import { gonderiDurumunuYenile } from "@/lib/kargo-durumu-yenile";
 import { kargoBildirimiGonder } from "@/lib/kargo-bildirimi-gonder";
 import { siparisiKargoyaVerildiYap } from "@/lib/siparis-kargo-durumu";
 import { decryptSecret } from "@/lib/payment-credentials";
+import { arvoosBildirimi } from "@/lib/arvoos-bildirim";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /*
   KARGO DURUMLARININ ZAMANLANMIŞ GÜNCELLENMESİ.
@@ -170,6 +172,8 @@ export async function GET(request: Request) {
     await kargoBildirimiGonder(supabase, magazaId, orderId);
   }
 
+  await sorunluGonderileriBildir(supabase, izlenecek.map((gonderi) => gonderi.id));
+
   /*
     Hepsi düştüyse 500 dönülüyor: 200, Vercel'in zamanlayıcı geçmişinde
     "sorun yok" gösteriyor ve tamamen kopmuş bir entegrasyon hiç fark
@@ -182,4 +186,49 @@ export async function GET(request: Request) {
     { sorulan: izlenecek.length, guncellenen, hata: hatalar.length },
     { status: tamamenBasarisiz ? 500 : 200, headers: { "Cache-Control": "no-store" } },
   );
+}
+
+
+/*
+  SORUNLU GÖNDERİYİ ARVOOS PANELİNE BİLDİRİR.
+
+  OTO'nun "returned", "lost" ve "failed" durumları bizde `failed`
+  oluyor. Müşteriye kendiliğinden haber VERİLMİYOR (paket çoğu zaman
+  birkaç gün sonra teslim ediliyor; karar insanın — AGENTS.md), ama
+  operasyoncunun bunu görmesi gerekiyor. ArvoARC'ın kendi çekmecesi
+  zaten gösteriyordu; bu satır ArvoOS panelini de haberdar ediyor.
+
+  Bu turda DOKUNULAN gönderiler okunuyor, hepsi değil: her turda
+  bütün sorunlu gönderileri taramak, aylar önce kapanmış bir sorunu
+  yeniden bildirmeye çalışmak demekti. Yineleme anahtarı gönderi
+  kimliği, yani aynı paket ikinci kez bildirilmiyor.
+*/
+async function sorunluGonderileriBildir(supabase: SupabaseClient, gonderiIdleri: string[]) {
+  if (!gonderiIdleri.length) return;
+  const { data, error } = await supabase
+    .from("arc_shipments")
+    .select("id,organization_id,sequence,carrier_name,arc_orders(order_number)")
+    .in("id", gonderiIdleri)
+    .eq("status", "failed");
+
+  if (error) {
+    console.error("[kargo] sorunlu gönderiler okunamadı:", error.message);
+    return;
+  }
+
+  for (const gonderi of data ?? []) {
+    const siparis = (Array.isArray(gonderi.arc_orders) ? gonderi.arc_orders[0] : gonderi.arc_orders) as
+      | { order_number?: string | null }
+      | null;
+    await arvoosBildirimi({
+      organizationId: gonderi.organization_id as string,
+      kategori: "arc_kargo_sorunu",
+      baslik: "Kargoda sorun",
+      metin: [siparis?.order_number, gonderi.carrier_name, `paket ${gonderi.sequence}`]
+        .filter(Boolean)
+        .join(" · "),
+      tekrarAnahtari: gonderi.id as string,
+      ekBilgi: { shipment_id: gonderi.id, order_number: siparis?.order_number ?? null },
+    });
+  }
 }
