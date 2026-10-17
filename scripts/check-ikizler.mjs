@@ -83,6 +83,12 @@ const sadelestir = (metin) =>
     .replace(/p_host text\s*,\s*/g, "")
     .replace(/p_host text/g, "")
     .replace(/\s+/g, " ")
+    /* Paranteze yapışık boşluk fark değil: biri kiracı çözümünü tek
+       satıra yazıyor, öteki alt satıra indiriyor ve boşluk düzlenince
+       "x(KURUM" ile "x( KURUM" ayrışmış görünüyordu. */
+    .replace(/\(\s+/g, "(")
+    .replace(/\s+\)/g, ")")
+    .replace(/\s*,\s*/g, ",")
     .trim();
 
 /*
