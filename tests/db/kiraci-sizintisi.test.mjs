@@ -57,14 +57,14 @@ async function tohum() {
     insert into public.arc_store_settings
       (organization_id, store_name, order_prefix, custom_domain, domain_verified_at, shipping_fee,
        free_shipping_threshold, bank_transfer_enabled, bank_transfer_discount_percent,
-       legal_name, contact_email) values
+       legal_name, contact_email, bank_iban) values
       ('${A}', 'Mağaza A', 'MA', '${A_HOST}', now(), 11100, 100000, true,  7,
-       'A ŞİRKETİ LİMİTED', 'a@ornek.test'),
+       'A ŞİRKETİ LİMİTED', 'a@ornek.test', 'TR100000000000000000000001'),
       ('${B}', 'Mağaza B', 'MB', '${B_HOST}', now(), 22200, 200000, false, 3,
-       'B ŞİRKETİ LİMİTED', 'b@ornek.test'),
+       'B ŞİRKETİ LİMİTED', 'b@ornek.test', 'TR100000000000000000000002'),
       -- C alan adını yazmış ama DOĞRULAMAMIŞ: mağazası açılmamalı.
       ('${C}', 'Mağaza C', 'MC', '${C_HOST}', null,  33300, 300000, true,  5,
-       'C ŞİRKETİ LİMİTED', 'c@ornek.test');
+       'C ŞİRKETİ LİMİTED', 'c@ornek.test', 'TR100000000000000000000003');
 
     /* Tanıtım sayfası metni: kiracının kendi anlatısı. A'nın
        "hakkımızda"sı B'nin vitrininde görünmemeli. */
@@ -189,6 +189,16 @@ const PLAN = [
   { ad: "arc_storefront_seller", kip: "deger", alan: "legal_name",
     sql: "select legal_name from public.arc_storefront_seller($1::text)",
     a: "A ŞİRKETİ LİMİTED", b: "B ŞİRKETİ LİMİTED" },
+  /*
+    IBAN: bu ailenin en pahalı sızıntısı. Yanlış IBAN, müşterinin
+    parayı BAŞKA bir mağazanın hesabına göndermesi demek — sipariş
+    "ödeme bekliyor"da kalır, para üçüncü bir yerdedir ve hiçbir
+    yerde hata görünmez. Ödeme adımı bu değeri koddan okuyordu
+    (SELLER.iban, üstelik istemci paketinde).
+  */
+  { ad: "arc_storefront_seller", kip: "deger", alan: "bank_iban",
+    sql: "select bank_iban from public.arc_storefront_seller($1::text)",
+    a: "TR100000000000000000000001", b: "TR100000000000000000000002" },
 ];
 
 /*
