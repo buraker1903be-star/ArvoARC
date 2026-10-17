@@ -43,3 +43,8 @@ jobs:
       # sütun adı derlemede görünmez, üretimde sessizce boş veri döndürür.
       - name: Şema sözleşmesi
         run: npm run check:schema
+      # RLS açık ama politikası olmayan bir tabloyu çağıranın yetkisiyle
+      # okumak sessizce BOŞ sonuç verir: 17.10.2026'da manuel sipariş,
+      # stok hareketi ve iade stoğu bu yüzden canlıda ölüydü.
+      - name: RLS politikaları
+        run: npm run check:rls

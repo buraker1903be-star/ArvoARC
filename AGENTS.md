@@ -199,6 +199,19 @@ yapan fonksiyon herkese açık kalmıştı).
 `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run test:db` — dördü de CI'da
 (`.github/workflows/ci.yml`) çalışır. Derleme CI'da yapılmaz, Vercel tarafında.
 
+**RLS denetimi** (`npm run check:rls`): RLS'i açık ama POLİTİKASI
+olmayan bir tabloyu, çağıranın yetkisiyle çalışan bir yerin okuyup
+okumadığını arar — invoker fonksiyon ya da panel kodu. Böyle bir okuma
+hata vermez, sessizce BOŞ döner ve kural "yok" diye yorumlanır.
+17.10.2026'da canlıda tam bu vardı: `organization_modules` politikasız
+olduğu için `arc_create_order` ve `arc_adjust_inventory` "Commerce
+module is disabled" diyordu — manuel sipariş, elle stok hareketi ve
+iade tamamlanınca stoğun geri eklenmesi ölüydü, üstelik sonuncusu
+sessizce (hata yalnızca sunucu günlüğüne yazılıyordu). Politikasız ama
+hiçbir yerden okunmayan tablo (ArvoOS köprüsünün yazdığı kopyalar)
+yalnızca listelenir. Denetimin kendisi `tests/check-rls.test.ts` ile
+sabitlendi.
+
 **Şema sözleşmesi** (`npm run check:schema`): koddaki tablo, sütun ve RPC
 adları canlı şemanın kataloğuyla (`supabase/schema/katalog.json`)
 karşılaştırılır. **Katalog gecikmesini hatadan ayırır** (16.10.2026): adı

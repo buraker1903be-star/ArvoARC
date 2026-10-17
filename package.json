@@ -17,7 +17,8 @@
     "db:new": "node scripts/new-migration.mjs",
     "schema:catalog": "node scripts/sema-katalog.mjs",
     "olc:iskelet": "node scripts/olc-iskelet.mjs",
-    "olc:rehber": "node scripts/olc-rehber.mjs"
+    "olc:rehber": "node scripts/olc-rehber.mjs",
+    "check:rls": "node scripts/check-rls.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
