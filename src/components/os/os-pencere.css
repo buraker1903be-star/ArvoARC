@@ -93,7 +93,7 @@ dialog.plt-pencere[open] { display: flex; flex-direction: column }
 .plt-pencere-bas small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase }
 .plt-pencere-bas h2 { margin: 3px 0 0; font-size: 17px; font-weight: 650; letter-spacing: -.01em }
 .plt-pencere-kapat {
-  flex: none; width: 32px; height: 32px; padding: 0;
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
   border: 1px solid var(--line); border-radius: 10px;
   background: var(--surface); color: var(--muted);
   font-size: 18px; line-height: 1; cursor: pointer;

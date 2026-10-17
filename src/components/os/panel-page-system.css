@@ -101,7 +101,12 @@
 .panel-drawer-header{position:relative;z-index:5;flex:none;display:block;padding:28px 86px 22px 30px;border-bottom:1px solid var(--line);background:var(--surface)}
 .panel-drawer-header h2{margin:6px 0 0;font:750 26px var(--font-heading);letter-spacing:-.035em;color:var(--ink)}
 .panel-drawer-header p{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:1.6}
-.panel-drawer-close{position:absolute;top:26px;right:30px;width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:22px;line-height:1;cursor:pointer;transition:.18s ease}
+/* Kapatma düğmesi İÇERİĞİNİ ORTALIYOR (17.10.2026). Kutu 38×38 ama
+   globals.css'teki genel `button` kuralının dolgusu (11px 16px)
+   duruyordu: içerik kutusu 6px kalıyor, "×" sağa ve aşağı kayıyordu —
+   pencerenin köşesinde yamuk duran işaret buydu. Dolgu sıfırlanıp
+   ızgarayla ortalanıyor. */
+.panel-drawer-close{position:absolute;top:26px;right:30px;display:grid;place-items:center;width:38px;height:38px;padding:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:22px;line-height:1;cursor:pointer;transition:.18s ease}
 .panel-drawer-close:hover{border-color:var(--primary);color:var(--primary)}
 /* Taban boyu `auto`: gerekçe platform.css · .plt-pencere-govde. */
 .panel-drawer-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:26px 30px 38px}
