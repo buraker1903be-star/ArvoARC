@@ -9,7 +9,7 @@ import { sendEmail } from "@/lib/email/resend";
 import { partialRefundEmail, shippingNoticeHtml, statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { notifyTransferPaid } from "@/lib/email/transfer-paid";
 import { odemeyiIadeEt } from "@/lib/odeme/iade";
-import { isBankTransfer } from "@/lib/payment-method";
+import { isBankTransfer, saglayicidanIadeEdilemez } from "@/lib/payment-method";
 import { iadeDagilimi, refundOutcome } from "@/lib/refund";
 import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock";
 import { requireTenant } from "@/lib/tenant";
@@ -224,8 +224,8 @@ export async function refundOrder(formData: FormData) {
     return await siparise(orderId,{hata:"not-paid"});
   }
 
-  /* Havale PayTR'dan geçmediği için PayTR'dan iade edilemez. */
-  if (isBankTransfer(meta)) {
+  /* Havale ve NAKİT sanal POS'tan geçmedi; oradan iade de edilemez. */
+  if (saglayicidanIadeEdilemez(meta)) {
     return await siparise(orderId,{hata:"transfer-order"});
   }
 

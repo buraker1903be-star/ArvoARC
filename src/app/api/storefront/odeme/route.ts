@@ -1,3 +1,4 @@
+import { HAVALE_ETIKETI } from "@/lib/payment-method";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { storePaytrConfig, type PaytrStoreConfig } from "@/lib/paytr/config";
@@ -441,7 +442,7 @@ export async function POST(request: Request) {
 
     const { error: transferError } = await mergeMetadata(
       {
-        payment_method: "Banka havalesi / EFT",
+        payment_method: HAVALE_ETIKETI,
         transfer_discount: discount,
         transfer_discount_percent: discountPercent,
         ...(note ? { notes: note } : {}),

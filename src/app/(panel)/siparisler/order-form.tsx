@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { liraYaz } from "@/lib/lira";
+import { MANUEL_ODEME_TURLERI } from "@/lib/payment-method";
 import { createOrder } from "./actions";
 import "./siparis-manuel.css";
 
@@ -88,6 +89,25 @@ export function OrderForm({ variants }: { variants: VariantOption[] }) {
         <label>E-posta
           <input name="customer_email" type="email" autoComplete="off" placeholder="Varsa" />
           <small>İkisi de boş bırakılabilir; elden satışta ad yazmak yeterli.</small>
+        </label>
+        {/*
+          ÖDEME TÜRÜ (17.10.2026). Panelden açılan sipariş metadata'ya
+          hiçbir şey yazmıyordu ve ekran hepsini "Kredi kartı"
+          gösteriyordu — telefonla/elden alınan siparişte çoğu zaman
+          yanlış. Varsayılan NAKİT: elden alınan para bu, ayrıca
+          kendiliğinden hiçbir şey tetiklemiyor; havale seçilirse
+          ödeme bekleyen havale akışı (onay, 72 saat uyarısı) açılır.
+        */}
+        <label>Ödeme türü
+          <DurumSecici
+            name="payment_method"
+            etiket="Ödeme türü"
+            bicim="alan"
+            gonder={false}
+            deger={MANUEL_ODEME_TURLERI[0].deger}
+            secenekler={MANUEL_ODEME_TURLERI.map((t) => ({ deger: t.deger, etiket: t.etiket }))}
+          />
+          <small>Sipariş detayında ve iade kararında bu yazıyor.</small>
         </label>
       </div>
     </section>

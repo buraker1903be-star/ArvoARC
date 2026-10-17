@@ -17,7 +17,7 @@ export const HATALAR: Record<string, string> = {
   "invalid-amount": "Geçerli bir iade tutarı girin: sıfırdan büyük olmalı ve iade edilebilir kalan tutarı aşmamalı. Tamamını iade etmek için alanı boş bırakın.",
   "refund-failed": "PayTR iade talebini reddetti. Ayrıntı için sunucu günlüklerine bakın.",
   "refund-recorded-failed": "İade yapıldı ancak sipariş kaydı güncellenemedi. PayTR panelinden doğrulayın; tekrar iade denemeyin.",
-  "transfer-order": "Havale siparişi PayTR'dan iade edilemez. Parayı bankadan iade edip siparişi elle kapatın.",
+  "transfer-order": "Bu sipariş sanal POS'tan geçmedi (havale ya da nakit); oradan iade edilemez. Parayı elden veya bankadan iade edip siparişi elle kapatın.",
   busy: "Bu sipariş için iade zaten işleniyor. Sayfayı yenileyip durumu kontrol edin.",
   "order-closed": "Bu sipariş kapandığı (iptal ya da iade) için akışta ilerletilemez.",
   "order-not-found": "Sipariş bulunamadı.",

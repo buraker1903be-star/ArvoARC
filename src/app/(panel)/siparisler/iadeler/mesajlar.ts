@@ -20,7 +20,7 @@ export const ERRORS: Record<string, string> = {
   "already-refunded": "Bu sipariş zaten tamamen iade edilmiş.",
   "over-remaining": "Bu siparişte daha önce iade yapılmış; tutar, kalan iade edilebilir tutarı aşamaz.",
   "not-paid": "Sipariş ödenmemiş; para iadesi yapılamaz.",
-  "transfer-order": "Havale siparişi PayTR'dan iade edilemez. Parayı bankadan iade edip siparişi elle kapatın.",
+  "transfer-order": "Bu sipariş sanal POS'tan geçmedi (havale ya da nakit); oradan iade edilemez. Parayı elden veya bankadan iade edip siparişi elle kapatın.",
   busy: "Bu talep için iade zaten işleniyor. Sayfayı yenileyip durumu kontrol edin.",
   "save-failed": "Karar kaydedilemedi; müşteriye e-posta gönderilmedi. Tekrar deneyin.",
   "refund-recorded-failed": "İade yapıldı ancak kayıt güncellenemedi. PayTR panelinden doğrulayın; tekrar iade denemeyin.",

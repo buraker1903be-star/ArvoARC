@@ -12,7 +12,7 @@ import { odemeyiIadeEt } from "@/lib/odeme/iade";
 import { sendEmail } from "@/lib/email/resend";
 import { returnDecisionEmail } from "@/lib/email/order-confirmation";
 import { calculateRefund, refundOutcome } from "@/lib/refund";
-import { isBankTransfer } from "@/lib/payment-method";
+import { saglayicidanIadeEdilemez } from "@/lib/payment-method";
 import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock";
 
 /**
@@ -155,7 +155,8 @@ export async function resolveReturn(formData: FormData) {
     edilmiş sipariş buradan ikinci kez iade edilebiliyordu.
   */
   const orderMeta = (order.metadata ?? {}) as Record<string, unknown>;
-  if (isBankTransfer(orderMeta)) return await bildirimliDonus(geri,{hata:hataMetni("transfer-order")});
+  /* Havale ve nakit sanal POS'tan geçmedi (lib/payment-method). */
+  if (saglayicidanIadeEdilemez(orderMeta)) return await bildirimliDonus(geri,{hata:hataMetni("transfer-order")});
   if (order.payment_status === "refunded") return await bildirimliDonus(geri,{hata:hataMetni("already-refunded")});
   if (order.payment_status !== "paid" && order.payment_status !== "partially_refunded") {
     return await bildirimliDonus(geri,{hata:hataMetni("not-paid")});

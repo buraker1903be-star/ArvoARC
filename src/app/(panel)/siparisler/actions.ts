@@ -10,7 +10,7 @@ import { statusUpdateEmail } from "@/lib/email/order-confirmation";
 import { isOrderClosed } from "@/lib/commerce-labels";
 import { ARSIVLENEBILIR_DURUMLAR, nextOrderStep } from "@/lib/order-flow";
 import { backUrl } from "@/lib/back-url";
-import { isBankTransfer } from "@/lib/payment-method";
+import { isBankTransfer, manuelOdemeTuru } from "@/lib/payment-method";
 import { notifyTransferPaid } from "@/lib/email/transfer-paid";
 import { claimOrderLock } from "@/lib/order-lock";
 import { yetkiYok } from "@/lib/yetki-metni";
@@ -58,12 +58,39 @@ export async function createOrder(formData: FormData) {
 
   if (error) return await bildirimliDonus(`/siparisler`,{hata:hataMetni(error.message)});
 
+  /*
+    ÖDEME TÜRÜ SİPARİŞ OLUŞTUKTAN SONRA YAZILIYOR: arc_create_order
+    metadata'yı boş kuruyor ve imzası ArvoOS köprüsüyle paylaşılmadığı
+    için burada değiştirilmiyor. Değer formdan OLDUĞU GİBİ değil izinli
+    etiketlerden geçerek yazılıyor (lib/payment-method); metadata
+    serbest metin ve ekranda doğrudan gösteriliyor.
+
+    Yazılamazsa sipariş yine geçerli — yalnızca ödeme türü varsayılana
+    ("Kredi kartı") düşer, o yüzden mesajda söyleniyor.
+  */
+  const orderId = data?.[0]?.order_id;
+  const odemeTuru = manuelOdemeTuru(formData.get("payment_method"));
+  let odemeYazilamadi = false;
+  if (orderId && odemeTuru) {
+    const { error: metaHatasi } = await supabase
+      .from("arc_orders")
+      .update({ metadata: { payment_method: odemeTuru } })
+      .eq("organization_id", membership.organization_id)
+      .eq("id", orderId);
+    if (metaHatasi) {
+      odemeYazilamadi = true;
+      console.error("[manuel sipariş] ödeme türü yazılamadı", orderId, metaHatasi.message);
+    }
+  }
+
   revalidatePath("/");
   revalidatePath("/stok");
   revalidatePath("/siparisler");
   const orderNumber = data?.[0]?.order_number ?? "created";
   /* Sipariş numarası artık ADRESTE değil MESAJDA. */
-  return await bildirimliDonus("/siparisler",{basari:`${orderNumber} numaralı sipariş oluşturuldu.`});
+  return await bildirimliDonus("/siparisler",{
+    basari: `${orderNumber} numaralı sipariş oluşturuldu.${odemeYazilamadi ? " Ödeme türü kaydedilemedi, sipariş detayından düzeltin." : ""}`,
+  });
 }
 
 /* Müşteri bildirimi; gönderim hatası durum güncellemesini geçersiz kılmaz. */

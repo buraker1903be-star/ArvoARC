@@ -11,7 +11,12 @@
   kalemde tekrarlanmak yerine bir kez yazılıyor, hizayı tek kural
   tutuyor.
 */
-.os-root .siparis-manuel-musteri{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-4)}
+/* Üç alan (ad · e-posta · ödeme türü) yan yana; pencere daralınca ikiye,
+   telefonda tek sütuna iner. */
+.os-root .siparis-manuel-musteri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-4)}
+@media(max-width:900px){
+  .os-root .siparis-manuel-musteri{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 .os-root .siparis-manuel-musteri small{display:block;margin-top:6px;color:var(--muted);font-size:var(--fs-micro)}
 .os-root :is(.siparis-manuel-basliklar,.siparis-manuel-satir){
   display:grid;grid-template-columns:minmax(0,1fr) 92px 132px 62px;gap:var(--sp-3);align-items:center
