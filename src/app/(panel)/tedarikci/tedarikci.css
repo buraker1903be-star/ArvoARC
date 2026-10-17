@@ -5,3 +5,7 @@
 .os-root .tedarikci-ozet dt{color:var(--muted);font-size:var(--fs-micro);font-weight:var(--fw-semibold)}
 .os-root .tedarikci-ozet dd{margin:2px 0 0;font-size:var(--fs-sm)}
 @media (max-width:760px){.os-root .tedarikci-ozet{grid-template-columns:1fr}}
+
+/* Tedarikçi kartları artık ızgaranın sol sütununda; kartlar arasındaki
+   boşluk listeye taşındı (17.10.2026). */
+.os-root .tedarikci-liste{display:flex;flex-direction:column;gap:var(--sp-4);min-width:0}

@@ -6,6 +6,8 @@ import "../modules.css";
 import "@/components/arvo-ui/kayit-detay.css";
 import "./tedarikci.css";
 import { yetkiYok } from "@/lib/yetki-metni";
+import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
+import { yuzdeEkli } from "@/lib/turkce-ek";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +25,37 @@ export default async function SuppliersPage() {
   const { supabase, organization, membership } = await requireTenant();
   const canManage = ["owner", "admin"].includes(membership.role);
 
-  const { data: suppliers, error } = await supabase.from("arc_suppliers").select("*").eq("organization_id", organization.id).order("name");
+  /*
+    TEDARİK KATALOĞUNUN SAĞLIĞI (17.10.2026). Sayfa yalnızca fiyat
+    kuralını ve eşitleme saatini gösteriyordu; "bu katalogdan kaç ürün
+    GERÇEKTEN satılabilir durumda" sorusunun karşılığı yoktu. Sayımlar
+    head:true — satır taşımıyor.
+
+    Ölçüt `supplier` sütunu: tedarikçiden gelen ürün ve varyantta dolu,
+    kendi ürünlerimizde boş.
+  */
+  const tedarikUrunu = () => supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).not("supplier", "is", null);
+  const tedarikVaryanti = () => supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).not("supplier", "is", null);
+  const [{ data: suppliers, error }, urunSayimi, yayindaSayimi, varyantSayimi, satilamazSayimi, maliyetsizSayimi] = await Promise.all([
+    supabase.from("arc_suppliers").select("*").eq("organization_id", organization.id).order("name"),
+    tedarikUrunu(),
+    tedarikUrunu().eq("status", "active"),
+    tedarikVaryanti(),
+    /* Satılamaz: stoğu bitmiş VE stoksuz satışı kapalı. */
+    tedarikVaryanti().lte("stock", 0).eq("allow_backorder", false),
+    tedarikVaryanti().is("cost_price", null),
+  ]);
   if (error) throw new Error(error.message);
+  /* Sayım düşerse sıfır gösterilmiyor: "satılamaz ürün yok" demek,
+     olmayan bir iyi haber vermek olurdu. */
+  const sayim = (sonuc: { count: number | null; error: { message: string } | null }) => (sonuc.error ? null : sonuc.count ?? 0);
+  const tedarikUrun = sayim(urunSayimi);
+  const tedarikYayinda = sayim(yayindaSayimi);
+  const tedarikVaryant = sayim(varyantSayimi);
+  const tedarikSatilamaz = sayim(satilamazSayimi);
+  const tedarikMaliyetsiz = sayim(maliyetsizSayimi);
+  const sayiYaz = (deger: number | null) => (deger === null ? "—" : deger.toLocaleString("tr-TR"));
+  const oranYaz = (deger: number | null, taban: number | null) => (deger === null || !taban ? null : Math.round((deger / taban) * 100));
 
   /* ArvoOS kalıbı (16.10.2026): başlık, her tedarikçi bir panel kartı. */
   return (
@@ -37,6 +68,10 @@ export default async function SuppliersPage() {
         </div>
       </header>
 
+      {/* Solda tedarikçi kartları, sağda tedarik kataloğunun sağlığı:
+          katalog ve sipariş ekranlarıyla aynı ızgara. */}
+      <div className="talep-izgara personel-iki ekip-izgara">
+      <div className="talep-bilgi tedarikci-liste">
         {(suppliers ?? []).length === 0 ? (
           <div className="panel-card crm-empty-state talep-bos-kutu"><h2>Tanımlı tedarikçi yok</h2><p>Tedarikçi entegrasyonu kurulduğunda burada görünür.</p></div>
         ) : null}
@@ -89,7 +124,9 @@ export default async function SuppliersPage() {
                     <label>Stok tamponu (adet)<input name="stock_buffer" type="number" min="0" max="100" step="1" defaultValue={supplier.stock_buffer ?? 5} className="ac-input" /></label>
                     <label>Yuvarlama (kuruş)<input name="round_to_kurus" type="number" min="0" max="99" step="1" defaultValue={round} required className="ac-input" /></label>
                     <label className="check-inline is-wide"><input name="publish_directly" type="checkbox" defaultChecked={supplier.publish_directly ?? false} /> Yeni ürünler doğrudan yayınlansın (kapalıysa taslak gelir)</label>
-                    <div className="catalog-form-actions"><button className="panel-primary" type="submit">Kaydet</button></div>
+                    {/* Ortak kaydet şeridi (panel-ui.css): katalog ve
+                        ayarlar formlarıyla aynı düzen. */}
+                    <div className="kaydet-serit"><span>Kural bir sonraki eşitlemede bütün katalog fiyatlarına uygulanır.</span><button className="panel-primary" type="submit">Kaydet</button></div>
                   </form>
 
                   {/* Önizleme içe aktarmadaki hesabın aynısı; ek hizmet
@@ -122,6 +159,47 @@ export default async function SuppliersPage() {
             </KKart>
           );
         })}
+      </div>
+
+      <IstatistikKarti
+        kapsam="tedarikçiden gelen ürünlerin tamamı"
+        kutular={[
+          { ad: "Tedarik ürünü", deger: sayiYaz(tedarikUrun), alt: `${sayiYaz(tedarikVaryant)} varyant` },
+          {
+            ad: "Yayında",
+            deger: sayiYaz(tedarikYayinda),
+            oran: oranYaz(tedarikYayinda, tedarikUrun),
+            alt: tedarikUrun ? `${sayiYaz(tedarikUrun)} ürünün ${yuzdeEkli(oranYaz(tedarikYayinda, tedarikUrun) ?? 0)} vitrinde` : "—",
+          },
+          {
+            /* Tedarikçi stoğu tampon değerin altına düşünce ürün satışa
+               kapanıyor; bu sayı o kapananların toplamı. */
+            ad: "Satılamaz varyant",
+            deger: sayiYaz(tedarikSatilamaz),
+            oran: oranYaz(tedarikSatilamaz, tedarikVaryant),
+            alt: "stoğu bitmiş · stoksuz satışı kapalı",
+            ton: tedarikSatilamaz ? "uyari" : undefined,
+          },
+          {
+            ad: "Maliyeti eksik",
+            deger: sayiYaz(tedarikMaliyetsiz),
+            oran: oranYaz(tedarikMaliyetsiz, tedarikVaryant),
+            alt: "alış fiyatı yok · kâr ve fiyat kuralı işlemez",
+            ton: tedarikMaliyetsiz ? "uyari" : undefined,
+          },
+        ]}
+        gruplar={[
+          {
+            baslik: "Tedarikçiye göre katalog",
+            satirlar: (suppliers ?? []).map((supplier) => ({
+              ad: supplier.name,
+              adet: supplier.sync_total ?? 0,
+              etiket: (supplier.sync_total ?? 0).toLocaleString("tr-TR"),
+            })),
+          },
+        ]}
+      />
+      </div>
     </main>
   );
 }
