@@ -42,9 +42,12 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   fonksiyonun yetki satırını olduğu gibi taşıyor, imleç de ileri
   alındı.
 
-  Döküm yenilendiğinde bu sürümü yine sonuncunun bir ardına alın.
+  17.10.2026 dökümü bugünün iki migration'ını da içeriyor (modül okuma
+  politikası ve silinen siparişin satış hareketi) — ikisi de canlıya
+  uygulandı. İmleç yine sonuncunun (20261017091102) bir ardında; döküm
+  yenilendiğinde aynı şekilde ileri alın.
 */
-const ILK_UYGULANAN = "20261007132450";
+const ILK_UYGULANAN = "20261017091103";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;

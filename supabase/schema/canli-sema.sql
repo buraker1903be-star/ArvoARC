@@ -1,4 +1,4 @@
--- Canlı şema dışa aktarımı: 2026-10-11
+-- Canlı şema dışa aktarımı: 2026-10-17
 -- scripts/sema-disa-aktar.sql ile üretildi. Elle düzenlemeyin.
 -- Sıra: tipler, sekanslar, tablolar, fonksiyonlar, varsayılanlar,
 -- kısıtlar, yabancı anahtarlar, indeksler, görünümler, RLS, politikalar,
@@ -165,7 +165,9 @@ create table if not exists public.arc_orders (
   metadata jsonb not null,
   created_at timestamp with time zone not null,
   updated_at timestamp with time zone not null,
-  user_id uuid
+  user_id uuid,
+  archived_at timestamp with time zone,
+  archived_by uuid
 );
 
 create table if not exists public.arc_payment_orders (
@@ -659,6 +661,25 @@ end;
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION private.arc_order_archive_guard()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+begin
+  if new.archived_at is not null and new.status not in ('fulfilled', 'cancelled', 'refunded') then
+    if old.archived_at is null then
+      raise exception 'Yalnızca tamamlanan, iptal ya da iade edilen sipariş arşivlenir'
+        using errcode = 'check_violation';
+    end if;
+    new.archived_at := null;
+    new.archived_by := null;
+  end if;
+  return new;
+end
+$function$
+;
+
 CREATE OR REPLACE FUNCTION private.arc_order_item_cost()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -672,6 +693,23 @@ begin
      where v.id = new.variant_id
        and v.organization_id = new.organization_id;
   end if;
+  return new;
+end
+$function$
+;
+
+CREATE OR REPLACE FUNCTION private.arc_return_request_unarchive()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  update public.arc_orders
+     set archived_at = null, archived_by = null
+   where id = new.order_id
+     and organization_id = new.organization_id
+     and archived_at is not null;
   return new;
 end
 $function$
@@ -1475,6 +1513,42 @@ AS $function$
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.arc_close_missing_supplier_variants(p_organization_id uuid, p_supplier text, p_skus text[])
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_kapanan integer;
+begin
+  if p_organization_id is null then
+    raise exception 'Mağaza belirtilmedi';
+  end if;
+  if p_supplier is null or btrim(p_supplier) = '' then
+    raise exception 'Tedarikçi belirtilmedi';
+  end if;
+  if p_skus is null or coalesce(array_length(p_skus, 1), 0) = 0 then
+    raise exception 'Akış SKU listesi boş; hiçbir varyant kapatılmadı';
+  end if;
+
+  update public.arc_product_variants v
+     set stock = 0,
+         updated_at = now()
+   where v.organization_id = p_organization_id
+     and v.supplier = p_supplier
+     and v.supplier_sku is not null
+     and coalesce(v.stock, 0) <> 0
+     and not exists (
+       select 1 from unnest(p_skus) as s(sku) where s.sku = v.supplier_sku
+     );
+
+  get diagnostics v_kapanan = row_count;
+  return v_kapanan;
+end;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.arc_count_coupon_use()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1578,7 +1652,7 @@ begin
     raise exception 'Commerce module is disabled';
   end if;
 
-  v_order_number := 'ARC-' || to_char(clock_timestamp(), 'YYYYMMDD-HH24MISS') || '-' || upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
+  v_order_number := 'ARC-' || to_char(clock_timestamp() at time zone 'Europe/Istanbul', 'YYYYMMDD-HH24MISS') || '-' || upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
 
   insert into public.arc_orders (
     organization_id, order_number, source, status, payment_status,
@@ -1649,7 +1723,6 @@ begin
     raise exception 'Mağaza belirtilmedi';
   end if;
 
-  -- Satış ayarları mağazadan; satır yoksa bugünkü ArvoCulture değerleri.
   select coalesce(s.order_prefix, 'AC'),
          coalesce(s.shipping_fee, 12000),
          coalesce(s.free_shipping_threshold, 200000)
@@ -1678,10 +1751,6 @@ begin
     raise exception 'Sepette çok fazla kalem var';
   end if;
 
-  /*
-    Panelin okuduğu adres yapısı. Alan adları Shopify aktarımıyla aynı
-    tutulur ki panelde tek bir gösterim kodu yeterli olsun.
-  */
   v_addr := jsonb_build_object(
     'name', trim(p_name),
     'phone', nullif(trim(coalesce(p_phone, '')), ''),
@@ -1693,7 +1762,7 @@ begin
     'country', coalesce(nullif(trim(coalesce(p_address ->> 'country', '')), ''), 'TR')
   );
 
-  v_order_number := v_prefix || to_char(now(), 'YYMMDD') || '-' ||
+  v_order_number := v_prefix || to_char(now() at time zone 'Europe/Istanbul', 'YYMMDD') || '-' ||
                     upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
 
   insert into public.arc_orders (
@@ -1723,7 +1792,6 @@ begin
       raise exception 'Geçersiz sepet kalemi';
     end if;
 
-    -- Önce SKU, bulunamazsa ürün slug'ı.
     select v.id, v.price, v.stock, v.allow_backorder, p.name
       into v_variant
     from public.arc_product_variants v
@@ -1790,14 +1858,6 @@ begin
     v_free_shipping_coupon := coalesce(v_free_shipping_coupon, false);
   end if;
 
-  /*
-    Ücretsiz kargo iki yoldan gelir:
-      - "Ücretsiz Kargo" tipli kupon (eskiden hiçbir şey yapmıyordu),
-      - eşiği geçen sepet.
-    Eşik indirim ÖNCESİ ara toplamla karşılaştırılır: eskiden indirim
-    sonrası tutarla bakılıyordu, yani kupon kullanan müşteri ücretsiz
-    kargoyu kaybediyordu.
-  */
   if v_free_shipping_coupon or v_subtotal >= v_free_threshold then
     v_shipping := 0;
   else
@@ -1878,13 +1938,20 @@ begin
   /*
     Hareket kayıtları siliniyor: yabancı anahtar olmadığı için CASCADE
     onlara ulaşmıyor ve silinmezlerse var olmayan bir siparişi işaret
-    eden satırlar kalıyor. İptal sırasında yazılan geri verme kaydı da
-    buna dâhil; net etki sıfır olduğu için stok doğru kalıyor.
+    eden satırlar kalıyor. ÜÇ TÜR de siliniyor ve net etkileri sıfır
+    olduğu için stok doğru kalıyor:
+      order_status → iptalde yazılan geri verme (+n),
+      order        → manuel siparişin satış kaydı (−n),
+      return_request → iadede stoğa geri ekleme (+n); talep siparişle
+                       birlikte CASCADE ile gittiği için sahipsiz kalırdı.
   */
   delete from public.arc_inventory_movements
    where organization_id = v_order.organization_id
-     and reference_type = 'order_status'
-     and reference_id = p_order_id::text;
+     and (
+       (reference_type in ('order_status', 'order') and reference_id = p_order_id::text)
+       or (reference_type = 'return_request'
+           and reference_id in (select r.id::text from public.arc_return_requests r where r.order_id = p_order_id))
+     );
 
   delete from public.arc_orders
    where id = p_order_id
@@ -1928,7 +1995,6 @@ declare
   v_discount bigint := 0;
   v_gross bigint := 0;
 begin
-  -- Yalnızca yeni siparişte ve vergi girilmemişse hesapla.
   if coalesce(new.tax, 0) <> 0 then
     return new;
   end if;
@@ -1937,10 +2003,6 @@ begin
   from public.arc_store_settings s
   where s.organization_id = new.organization_id;
 
-  /*
-    Her kalem kendi ürününün oranıyla hesaplanır. Ürün
-    bulunamazsa mağaza varsayılanı kullanılır.
-  */
   select coalesce(sum(
     public.arc_extract_vat(i.total, coalesce(p.tax_rate, v_rate, 20))
   ), 0)
@@ -1953,27 +2015,17 @@ begin
     on p.id = v.product_id
   where i.order_id = new.id;
 
-  -- Kargo da KDV'ye tabidir; genel oranla hesaplanır.
   v_tax := v_tax + public.arc_extract_vat(
     coalesce(new.shipping, 0),
     coalesce(v_rate, 20)
   );
 
-  /*
-    İndirim payı düşülür.
-
-    Vergi kalem tutarları üzerinden hesaplanıyor ama müşteri
-    indirimli tutarı ödüyor. İndirim düşülmezse devlete fazla
-    vergi beyan edilir.
-
-    İndirim toplam üzerinden orantılı dağıtılıyor: hangi kaleme
-    ait olduğu bilinmiyor.
-  */
-  v_discount := coalesce((new.metadata ->> 'discount')::bigint, 0);
+  v_discount := coalesce((new.metadata ->> 'discount')::bigint, 0)
+              + coalesce((new.metadata ->> 'transfer_discount')::bigint, 0);
   v_gross := coalesce(new.subtotal, 0) + coalesce(new.shipping, 0);
 
   if v_discount > 0 and v_gross > 0 then
-    v_tax := round(v_tax * (1 - v_discount::numeric / v_gross))::bigint;
+    v_tax := round(v_tax * (1 - least(v_discount, v_gross)::numeric / v_gross))::bigint;
   end if;
 
   update public.arc_orders
@@ -2263,6 +2315,75 @@ AS $function$
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.arc_set_supplier_links(p_organization_id uuid, p_supplier text, p_rows jsonb)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_yazilan integer;
+begin
+  if p_organization_id is null then
+    raise exception 'Mağaza belirtilmedi';
+  end if;
+
+  with veri as (
+    select distinct on (r ->> 'code')
+           (r ->> 'code')::text as code,
+           (r ->> 'link')::text as link
+      from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) as r
+     where coalesce(r ->> 'code', '') <> ''
+       and coalesce(r ->> 'link', '') like 'https://%'
+  )
+  update public.arc_products p
+     set metadata = coalesce(p.metadata, '{}'::jsonb) || jsonb_build_object('supplier_link', d.link)
+    from veri d
+   where p.organization_id = p_organization_id
+     and p.supplier = p_supplier
+     and p.supplier_product_code = d.code
+     and (p.metadata ->> 'supplier_link') is distinct from d.link;
+
+  get diagnostics v_yazilan = row_count;
+  return v_yazilan;
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_set_supplier_variant_stock(p_organization_id uuid, p_supplier text, p_rows jsonb)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_yazilan integer;
+begin
+  if p_organization_id is null then
+    raise exception 'Mağaza belirtilmedi';
+  end if;
+
+  with veri as (
+    select (r ->> 'sku')::text as sku,
+           greatest(0, (r ->> 'stock')::integer) as stock
+      from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) as r
+     where coalesce(r ->> 'sku', '') <> ''
+  )
+  update public.arc_product_variants v
+     set stock = d.stock,
+         updated_at = now()
+    from veri d
+   where v.organization_id = p_organization_id
+     and v.supplier = p_supplier
+     and v.supplier_sku = d.sku
+     and v.stock is distinct from d.stock;
+
+  get diagnostics v_yazilan = row_count;
+  return v_yazilan;
+end;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text DEFAULT NULL::text, p_failure_reason text DEFAULT NULL::text)
  RETURNS text
  LANGUAGE plpgsql
@@ -2362,6 +2483,219 @@ begin
 
   return 'paid';
 end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_siparis_kalemi_duzenle(p_order_id uuid, p_item_id uuid, p_adet integer, p_variant_id uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_user uuid := auth.uid();
+  v_order record;
+  v_item record;
+  v_var record;
+  v_hedef uuid;
+  v_islem text;
+  v_eski_toplam bigint;
+  v_ara bigint;
+  v_indirim bigint;
+  v_toplam bigint;
+  v_alacak bigint;
+  v_yontem text;
+  v_yeni_sku text;
+  v_havale bigint;
+  v_havale_orani numeric;
+  v_cikan jsonb;
+begin
+  if v_user is null then
+    raise exception 'Oturum gerekli' using errcode = 'insufficient_privilege';
+  end if;
+  if p_adet is null or p_adet < 0 or p_adet > 999 then
+    raise exception 'Geçersiz adet' using errcode = 'check_violation';
+  end if;
+
+  select * into v_order from public.arc_orders where id = p_order_id for update;
+  if not found then
+    raise exception 'Sipariş bulunamadı';
+  end if;
+
+  if not exists (
+    select 1 from public.organization_memberships m
+     where m.organization_id = v_order.organization_id
+       and m.user_id = v_user
+       and m.is_active = true
+       and m.role::text in ('owner', 'admin', 'manager')
+  ) then
+    raise exception 'Sipariş düzenleme yetkiniz yok' using errcode = 'insufficient_privilege';
+  end if;
+
+  if v_order.status not in ('pending', 'confirmed', 'processing') then
+    raise exception 'Kargoya verilmiş ya da kapanmış sipariş düzenlenemez' using errcode = 'check_violation';
+  end if;
+  if v_order.payment_status in ('refunded', 'partially_refunded') then
+    raise exception 'İadesi yapılmış sipariş düzenlenemez' using errcode = 'check_violation';
+  end if;
+  v_yontem := lower(coalesce(v_order.metadata ->> 'payment_method', ''));
+  if v_order.payment_status in ('pending', 'authorized') and v_yontem <> '' and position('havale' in v_yontem) = 0 then
+    raise exception 'Kart ödemesi tamamlanmadan sipariş düzenlenemez' using errcode = 'check_violation';
+  end if;
+
+  select * into v_item
+    from public.arc_order_items
+   where id = p_item_id and order_id = v_order.id and organization_id = v_order.organization_id
+   for update;
+  if not found then
+    raise exception 'Kalem bulunamadı';
+  end if;
+
+  if exists (
+    select 1 from public.arc_shipment_items si
+      join public.arc_shipments s on s.id = si.shipment_id
+     where si.order_item_id = v_item.id and s.status <> 'cancelled'
+  ) then
+    raise exception 'Bu kalem bir gönderide; önce gönderiyi iptal edin' using errcode = 'check_violation';
+  end if;
+
+  v_eski_toplam := v_order.total;
+
+  if v_item.variant_id is not null then
+    update public.arc_product_variants
+       set stock = stock + v_item.quantity, updated_at = now()
+     where id = v_item.variant_id and organization_id = v_order.organization_id;
+    if found then
+      insert into public.arc_inventory_movements
+        (organization_id, variant_id, kind, quantity, reference_type, reference_id, note, created_by)
+      values
+        (v_order.organization_id, v_item.variant_id, 'return', v_item.quantity, 'order_status', v_order.id::text,
+         'Sipariş düzenlendi: ' || v_order.order_number || ' · ' || v_item.sku, v_user);
+    end if;
+  end if;
+
+  if p_adet = 0 then
+    if not exists (
+      select 1 from public.arc_order_items
+       where order_id = v_order.id and organization_id = v_order.organization_id and id <> v_item.id
+    ) then
+      raise exception 'Siparişte tek kalem var; kaldırmak yerine siparişi iptal edin' using errcode = 'check_violation';
+    end if;
+    delete from public.arc_order_items where id = v_item.id;
+    v_islem := 'kaldirildi';
+  else
+    v_hedef := coalesce(p_variant_id, v_item.variant_id);
+    if v_hedef is null then
+      update public.arc_order_items
+         set quantity = p_adet, total = unit_price * p_adet
+       where id = v_item.id;
+      v_islem := 'adet';
+    else
+      select v.id, v.sku, v.price, v.stock, v.allow_backorder, v.supplier, p.name as urun
+        into v_var
+        from public.arc_product_variants v
+        join public.arc_products p on p.id = v.product_id and p.organization_id = v.organization_id
+       where v.id = v_hedef and v.organization_id = v_order.organization_id
+       for update of v;
+      if not found then
+        raise exception 'Varyant bulunamadı';
+      end if;
+      if not public.arc_variant_available(v_var.stock, v_var.allow_backorder, v_var.supplier)
+         or (not coalesce(v_var.allow_backorder, false) and v_var.stock < p_adet) then
+        raise exception 'Stok yetersiz: % (stok %)', v_var.sku, v_var.stock using errcode = 'check_violation';
+      end if;
+
+      if v_hedef = v_item.variant_id then
+        update public.arc_order_items
+           set quantity = p_adet, total = unit_price * p_adet
+         where id = v_item.id;
+        v_islem := 'adet';
+      else
+        delete from public.arc_order_items where id = v_item.id;
+        insert into public.arc_order_items
+          (organization_id, order_id, variant_id, product_name, sku, quantity, unit_price, total)
+        values
+          (v_order.organization_id, v_order.id, v_var.id, v_var.urun, v_var.sku, p_adet, v_var.price, v_var.price * p_adet);
+        v_islem := 'degisti';
+        v_yeni_sku := v_var.sku;
+      end if;
+
+      update public.arc_product_variants
+         set stock = stock - p_adet, updated_at = now()
+       where id = v_var.id;
+      insert into public.arc_inventory_movements
+        (organization_id, variant_id, kind, quantity, reference_type, reference_id, note, created_by)
+      values
+        (v_order.organization_id, v_var.id, 'sale', -p_adet, 'order_status', v_order.id::text,
+         'Sipariş düzenlendi: ' || v_order.order_number || ' · ' || v_var.sku, v_user);
+    end if;
+  end if;
+
+  select coalesce(sum(total), 0) into v_ara
+    from public.arc_order_items
+   where order_id = v_order.id and organization_id = v_order.organization_id;
+  v_indirim := least(coalesce((v_order.metadata ->> 'discount')::bigint, 0), v_ara);
+  if v_order.metadata ? 'transfer_discount' then
+    v_havale_orani := coalesce(
+      (v_order.metadata ->> 'transfer_discount_percent')::numeric,
+      case when coalesce(v_order.subtotal, 0) - coalesce((v_order.metadata ->> 'discount')::bigint, 0) > 0
+        then (v_order.metadata ->> 'transfer_discount')::numeric * 100
+             / (v_order.subtotal - coalesce((v_order.metadata ->> 'discount')::bigint, 0))
+        else 0 end
+    );
+    v_havale := round(greatest(v_ara - v_indirim, 0) * v_havale_orani / 100)::bigint;
+  else
+    v_havale := 0;
+  end if;
+  v_toplam := greatest(v_ara - v_indirim - v_havale, 0) + coalesce(v_order.shipping, 0);
+  v_alacak := coalesce((v_order.metadata ->> 'duzenleme_alacagi')::bigint, 0);
+
+  if v_order.payment_status = 'paid' then
+    v_alacak := v_alacak + (v_eski_toplam - v_toplam);
+    if v_alacak < 0 then
+      raise exception 'Ödenmiş siparişin tutarı ödenen tutarı aşamaz (% kuruş fazla)', -v_alacak
+        using errcode = 'check_violation';
+    end if;
+  end if;
+
+  if v_islem in ('kaldirildi', 'degisti') then
+    v_cikan := jsonb_build_object(
+      'urun', v_item.product_name, 'sku', v_item.sku, 'variant_id', v_item.variant_id,
+      'adet', v_item.quantity, 'birim', v_item.unit_price, 'tutar', v_item.total,
+      'islem', v_islem, 'yerine', v_yeni_sku, 'zaman', now(), 'kim', v_user
+    );
+  end if;
+
+  update public.arc_orders
+     set subtotal = v_ara,
+         total = v_toplam,
+         tax = 0,
+         metadata = v_order.metadata
+           || case when v_order.metadata ? 'discount' then jsonb_build_object('discount', v_indirim) else '{}'::jsonb end
+           || case when v_order.metadata ? 'transfer_discount' then jsonb_build_object('transfer_discount', v_havale) else '{}'::jsonb end
+           || case when v_order.payment_status = 'paid' then jsonb_build_object('duzenleme_alacagi', v_alacak) else '{}'::jsonb end
+           || case when v_cikan is not null
+                then jsonb_build_object('cikan_kalemler', coalesce(v_order.metadata -> 'cikan_kalemler', '[]'::jsonb) || jsonb_build_array(v_cikan))
+                else '{}'::jsonb end,
+         updated_at = now()
+   where id = v_order.id;
+
+  insert into public.arc_order_events (organization_id, order_id, event_type, event_data, created_by)
+  values (v_order.organization_id, v_order.id, 'item_edited', jsonb_build_object(
+    'islem', v_islem,
+    'urun', v_item.product_name,
+    'eski_sku', v_item.sku,
+    'yeni_sku', v_yeni_sku,
+    'eski_adet', v_item.quantity,
+    'yeni_adet', p_adet,
+    'eski_toplam', v_eski_toplam,
+    'yeni_toplam', v_toplam,
+    'alacak', case when v_order.payment_status = 'paid' then v_alacak else null end
+  ), v_user);
+
+  return jsonb_build_object('islem', v_islem, 'eski_toplam', v_eski_toplam, 'yeni_toplam', v_toplam,
+    'alacak', case when v_order.payment_status = 'paid' then v_alacak else 0 end);
+end
 $function$
 ;
 
@@ -2978,12 +3312,24 @@ begin
   end if;
 
   /*
-    Cayma süresi. Teslim tarihi kayıtlı değilse sipariş
+    Cayma süresi: ON DÖRT GÜN. Teslim tarihi kayıtlı değilse sipariş
     tarihinden sayılıyor; müşteri lehine geniş yorum.
+
+    OTUZ GÜN YAZIYORDU ve vitrin on dört gün söz veriyor ("14 gün
+    içinde iade", ürün sayfasında). İkisi ayrışınca mağaza, taahhüt
+    etmediği bir iadeyi kabul etmek zorunda kalıyordu: on beşinci günde
+    gelen talep sisteme giriyor, ekranda "karar bekliyor" diye duruyor
+    ve reddetmenin bedeli müşteriye "ama sizin fonksiyonunuz kabul
+    etti" dedirtiyor. Kaynak vitrindeki söz (16.10.2026, kurum
+    sahibinin kararı).
+
+    Süre MAĞAZA BAŞINA DEĞİL: şu an tek bir sayı. Mağazaya göre
+    değişmesi gerekirse arc_store_settings'e bir alan eklenip buradan
+    okunur; bugün öyle bir alan yok ve uydurmak yerine sabit kaldı.
   */
   v_days := extract(day from now() - v_order.created_at);
 
-  if v_days > 30 then
+  if v_days > 14 then
     raise exception 'İade süresi dolmuş.';
   end if;
 
@@ -3476,12 +3822,24 @@ begin
   end if;
 
   /*
-    Cayma süresi. Teslim tarihi kayıtlı değilse sipariş
+    Cayma süresi: ON DÖRT GÜN. Teslim tarihi kayıtlı değilse sipariş
     tarihinden sayılıyor; müşteri lehine geniş yorum.
+
+    OTUZ GÜN YAZIYORDU ve vitrin on dört gün söz veriyor ("14 gün
+    içinde iade", ürün sayfasında). İkisi ayrışınca mağaza, taahhüt
+    etmediği bir iadeyi kabul etmek zorunda kalıyordu: on beşinci günde
+    gelen talep sisteme giriyor, ekranda "karar bekliyor" diye duruyor
+    ve reddetmenin bedeli müşteriye "ama sizin fonksiyonunuz kabul
+    etti" dedirtiyor. Kaynak vitrindeki söz (16.10.2026, kurum
+    sahibinin kararı).
+
+    Süre MAĞAZA BAŞINA DEĞİL: şu an tek bir sayı. Mağazaya göre
+    değişmesi gerekirse arc_store_settings'e bir alan eklenip buradan
+    okunur; bugün öyle bir alan yok ve uydurmak yerine sabit kaldı.
   */
   v_days := extract(day from now() - v_order.created_at);
 
-  if v_days > 30 then
+  if v_days > 14 then
     raise exception 'İade süresi dolmuş.';
   end if;
 
@@ -4747,7 +5105,7 @@ alter table public.arc_inventory_movements add constraint arc_inventory_movement
 
 alter table public.arc_order_events add constraint arc_order_events_event_data_check CHECK ((jsonb_typeof(event_data) = 'object'::text));
 
-alter table public.arc_order_events add constraint arc_order_events_event_type_check CHECK ((event_type = ANY (ARRAY['status_updated'::text, 'fulfillment_updated'::text])));
+alter table public.arc_order_events add constraint arc_order_events_event_type_check CHECK ((event_type = ANY (ARRAY['status_updated'::text, 'fulfillment_updated'::text, 'payment_amount_mismatch'::text, 'payment_settle_failed'::text, 'payment_session_failed'::text, 'stock_shortfall'::text, 'item_edited'::text])));
 
 alter table public.arc_order_events add constraint arc_order_events_pkey PRIMARY KEY (id);
 
@@ -4993,6 +5351,8 @@ CREATE INDEX arc_order_events_order_created_idx ON public.arc_order_events USING
 
 CREATE INDEX arc_order_items_org_order_idx ON public.arc_order_items USING btree (organization_id, order_id);
 
+CREATE INDEX arc_orders_aktif_liste_idx ON public.arc_orders USING btree (organization_id, created_at DESC) WHERE (archived_at IS NULL);
+
 CREATE INDEX arc_orders_customer_email_idx ON public.arc_orders USING btree (lower(customer_email));
 
 CREATE INDEX arc_orders_org_created_idx ON public.arc_orders USING btree (organization_id, created_at DESC);
@@ -5122,6 +5482,8 @@ alter table public.arc_order_items add constraint arc_order_items_order_id_organ
 alter table public.arc_order_items add constraint arc_order_items_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
 alter table public.arc_order_items add constraint arc_order_items_variant_id_organization_id_fkey FOREIGN KEY (variant_id, organization_id) REFERENCES arc_product_variants(id, organization_id) ON DELETE SET NULL;
+
+alter table public.arc_orders add constraint arc_orders_archived_by_fkey FOREIGN KEY (archived_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 alter table public.arc_orders add constraint arc_orders_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
@@ -5556,13 +5918,22 @@ create policy arc_suppliers_members_read on public.arc_suppliers as PERMISSIVE f
 create policy arc_members_read_own_membership on public.organization_memberships as PERMISSIVE for SELECT to authenticated
   using ((user_id = ( SELECT auth.uid() AS uid)));
 
+create policy arc_members_read_own_modules on public.organization_modules as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = organization_modules.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
+
 revoke all on function private.arc_guard_payment_settings() from public;
 
 revoke all on function private.arc_guard_store_domains() from public;
 
 revoke all on function private.arc_magaza_varsayilanlari() from public;
 
+revoke all on function private.arc_order_archive_guard() from public;
+
 revoke all on function private.arc_order_item_cost() from public;
+
+revoke all on function private.arc_return_request_unarchive() from public;
 
 revoke all on function private.arvo_arc_shipment_item_guard() from public;
 
@@ -5571,8 +5942,8 @@ revoke all on function private.arvo_arc_shipment_source_guard() from public;
 revoke all on function private.arvo_arc_shipment_touch() from public;
 
 revoke all on function private.arvo_is_org_admin(target_org uuid) from public;
-grant execute on function private.arvo_is_org_admin(target_org uuid) to service_role;
 grant execute on function private.arvo_is_org_admin(target_org uuid) to authenticated;
+grant execute on function private.arvo_is_org_admin(target_org uuid) to service_role;
 
 revoke all on function private.can_manage_organization_assets(organization_id_text text) from public;
 grant execute on function private.can_manage_organization_assets(organization_id_text text) to authenticated;
@@ -5585,8 +5956,8 @@ grant execute on function public.arc_address_line(p_addr jsonb) to service_role;
 grant execute on function public.arc_address_line(p_addr jsonb) to authenticated;
 
 revoke all on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) from public;
-grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to authenticated;
 grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to service_role;
+grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to authenticated;
 
 revoke all on function public.arc_aktarim_hesap_yukle(p_kullanicilar jsonb, p_kimlikler jsonb) from public;
 grant execute on function public.arc_aktarim_hesap_yukle(p_kullanicilar jsonb, p_kimlikler jsonb) to service_role;
@@ -5621,6 +5992,9 @@ revoke all on function public.arc_clean(p_value text) from public;
 grant execute on function public.arc_clean(p_value text) to authenticated;
 grant execute on function public.arc_clean(p_value text) to service_role;
 
+revoke all on function public.arc_close_missing_supplier_variants(p_organization_id uuid, p_supplier text, p_skus text[]) from public;
+grant execute on function public.arc_close_missing_supplier_variants(p_organization_id uuid, p_supplier text, p_skus text[]) to service_role;
+
 revoke all on function public.arc_count_coupon_use() from public;
 grant execute on function public.arc_count_coupon_use() to service_role;
 
@@ -5632,9 +6006,9 @@ revoke all on function public.arc_create_storefront_order(p_organization_id uuid
 grant execute on function public.arc_create_storefront_order(p_organization_id uuid, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
 
 revoke all on function public.arc_decode_entities(t text) from public;
-grant execute on function public.arc_decode_entities(t text) to authenticated;
 grant execute on function public.arc_decode_entities(t text) to public;
 grant execute on function public.arc_decode_entities(t text) to service_role;
+grant execute on function public.arc_decode_entities(t text) to authenticated;
 grant execute on function public.arc_decode_entities(t text) to anon;
 
 revoke all on function public.arc_delete_order(p_order_id uuid) from public;
@@ -5679,28 +6053,38 @@ grant execute on function public.arc_resolve_commerce_tenant() to authenticated;
 grant execute on function public.arc_resolve_commerce_tenant() to service_role;
 
 revoke all on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) from public;
-grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to service_role;
 grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to authenticated;
+grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to service_role;
 
 revoke all on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) from public;
-grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to service_role;
 grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to authenticated;
+grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to service_role;
+
+revoke all on function public.arc_set_supplier_links(p_organization_id uuid, p_supplier text, p_rows jsonb) from public;
+grant execute on function public.arc_set_supplier_links(p_organization_id uuid, p_supplier text, p_rows jsonb) to service_role;
+
+revoke all on function public.arc_set_supplier_variant_stock(p_organization_id uuid, p_supplier text, p_rows jsonb) from public;
+grant execute on function public.arc_set_supplier_variant_stock(p_organization_id uuid, p_supplier text, p_rows jsonb) to service_role;
 
 revoke all on function public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) from public;
 grant execute on function public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) to service_role;
+
+revoke all on function public.arc_siparis_kalemi_duzenle(p_order_id uuid, p_item_id uuid, p_adet integer, p_variant_id uuid) from public;
+grant execute on function public.arc_siparis_kalemi_duzenle(p_order_id uuid, p_item_id uuid, p_adet integer, p_variant_id uuid) to service_role;
+grant execute on function public.arc_siparis_kalemi_duzenle(p_order_id uuid, p_item_id uuid, p_adet integer, p_variant_id uuid) to authenticated;
 
 revoke all on function public.arc_slugify(p_text text) from public;
 grant execute on function public.arc_slugify(p_text text) to authenticated;
 grant execute on function public.arc_slugify(p_text text) to service_role;
 
 revoke all on function public.arc_store_stage(p_organization_id uuid) from public;
-grant execute on function public.arc_store_stage(p_organization_id uuid) to authenticated;
 grant execute on function public.arc_store_stage(p_organization_id uuid) to anon;
 grant execute on function public.arc_store_stage(p_organization_id uuid) to service_role;
+grant execute on function public.arc_store_stage(p_organization_id uuid) to authenticated;
 
 revoke all on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
-grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
 grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
+grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
 grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to authenticated;
 
 revoke all on function public.arc_storefront_collections(p_host text) from public;
@@ -5715,19 +6099,19 @@ revoke all on function public.arc_storefront_create_order(p_host text, p_email t
 grant execute on function public.arc_storefront_create_order(p_host text, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
 
 revoke all on function public.arc_storefront_deals(p_host text, p_limit integer) from public;
-grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to service_role;
 grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to anon;
+grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to service_role;
 grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to authenticated;
 
 revoke all on function public.arc_storefront_discounts(p_host text) from public;
-grant execute on function public.arc_storefront_discounts(p_host text) to authenticated;
-grant execute on function public.arc_storefront_discounts(p_host text) to service_role;
 grant execute on function public.arc_storefront_discounts(p_host text) to anon;
+grant execute on function public.arc_storefront_discounts(p_host text) to service_role;
+grant execute on function public.arc_storefront_discounts(p_host text) to authenticated;
 
 revoke all on function public.arc_storefront_facets(p_host text) from public;
-grant execute on function public.arc_storefront_facets(p_host text) to authenticated;
-grant execute on function public.arc_storefront_facets(p_host text) to service_role;
 grant execute on function public.arc_storefront_facets(p_host text) to anon;
+grant execute on function public.arc_storefront_facets(p_host text) to service_role;
+grant execute on function public.arc_storefront_facets(p_host text) to authenticated;
 
 revoke all on function public.arc_storefront_org(p_host text) from public;
 grant execute on function public.arc_storefront_org(p_host text) to service_role;
@@ -5735,9 +6119,9 @@ grant execute on function public.arc_storefront_org(p_host text) to anon;
 grant execute on function public.arc_storefront_org(p_host text) to authenticated;
 
 revoke all on function public.arc_storefront_payment_methods(p_host text) from public;
-grant execute on function public.arc_storefront_payment_methods(p_host text) to service_role;
-grant execute on function public.arc_storefront_payment_methods(p_host text) to authenticated;
 grant execute on function public.arc_storefront_payment_methods(p_host text) to anon;
+grant execute on function public.arc_storefront_payment_methods(p_host text) to authenticated;
+grant execute on function public.arc_storefront_payment_methods(p_host text) to service_role;
 
 revoke all on function public.arc_storefront_product(p_host text, p_slug text) from public;
 grant execute on function public.arc_storefront_product(p_host text, p_slug text) to authenticated;
@@ -5745,33 +6129,33 @@ grant execute on function public.arc_storefront_product(p_host text, p_slug text
 grant execute on function public.arc_storefront_product(p_host text, p_slug text) to anon;
 
 revoke all on function public.arc_storefront_product_badges(p_host text) from public;
-grant execute on function public.arc_storefront_product_badges(p_host text) to authenticated;
 grant execute on function public.arc_storefront_product_badges(p_host text) to service_role;
 grant execute on function public.arc_storefront_product_badges(p_host text) to anon;
+grant execute on function public.arc_storefront_product_badges(p_host text) to authenticated;
 
 revoke all on function public.arc_storefront_product_count(p_host text) from public;
-grant execute on function public.arc_storefront_product_count(p_host text) to authenticated;
 grant execute on function public.arc_storefront_product_count(p_host text) to service_role;
 grant execute on function public.arc_storefront_product_count(p_host text) to anon;
+grant execute on function public.arc_storefront_product_count(p_host text) to authenticated;
 
 revoke all on function public.arc_storefront_product_slugs(p_host text, p_limit integer) from public;
-grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to authenticated;
 grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to service_role;
 grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to anon;
+grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer) to authenticated;
 
 revoke all on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) from public;
-grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to anon;
 grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to service_role;
+grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to anon;
 grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to authenticated;
 
 revoke all on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
-grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
 grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
+grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
 grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
 
 revoke all on function public.arc_storefront_return_request(p_host text, p_order_number text, p_items jsonb, p_reason text, p_note text) from public;
-grant execute on function public.arc_storefront_return_request(p_host text, p_order_number text, p_items jsonb, p_reason text, p_note text) to authenticated;
 grant execute on function public.arc_storefront_return_request(p_host text, p_order_number text, p_items jsonb, p_reason text, p_note text) to service_role;
+grant execute on function public.arc_storefront_return_request(p_host text, p_order_number text, p_items jsonb, p_reason text, p_note text) to authenticated;
 
 revoke all on function public.arc_storefront_search_index(p_host text, p_limit integer) from public;
 grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer) to service_role;
@@ -5779,26 +6163,26 @@ grant execute on function public.arc_storefront_search_index(p_host text, p_limi
 grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer) to authenticated;
 
 revoke all on function public.arc_storefront_settings(p_host text) from public;
+grant execute on function public.arc_storefront_settings(p_host text) to service_role;
 grant execute on function public.arc_storefront_settings(p_host text) to anon;
 grant execute on function public.arc_storefront_settings(p_host text) to authenticated;
-grant execute on function public.arc_storefront_settings(p_host text) to service_role;
 
 revoke all on function public.arc_storefront_variants(p_host text, p_slug text) from public;
+grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to service_role;
 grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to anon;
 grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to authenticated;
-grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to service_role;
 
 revoke all on function public.arc_total_stock_units() from public;
-grant execute on function public.arc_total_stock_units() to service_role;
 grant execute on function public.arc_total_stock_units() to authenticated;
+grant execute on function public.arc_total_stock_units() to service_role;
 
 revoke all on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) from public;
-grant execute on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) to service_role;
 grant execute on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) to authenticated;
+grant execute on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) to service_role;
 
 revoke all on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) from public;
-grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to anon;
 grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to authenticated;
+grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to anon;
 grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to service_role;
 
 revoke all on function public.attach_arvoculture_order_owner() from public;
@@ -5808,12 +6192,12 @@ revoke all on function public.check_arvoculture_coupon(p_code text, p_subtotal b
 grant execute on function public.check_arvoculture_coupon(p_code text, p_subtotal bigint, p_email text) to service_role;
 
 revoke all on function public.claim_arvoculture_orders() from public;
-grant execute on function public.claim_arvoculture_orders() to authenticated;
 grant execute on function public.claim_arvoculture_orders() to service_role;
+grant execute on function public.claim_arvoculture_orders() to authenticated;
 
 revoke all on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) from public;
-grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to service_role;
 grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to authenticated;
+grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to service_role;
 
 revoke all on function public.create_arvoculture_storefront_order(p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) from public;
 grant execute on function public.create_arvoculture_storefront_order(p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
@@ -5827,35 +6211,35 @@ grant execute on function public.get_arvoculture_my_returns() to authenticated;
 grant execute on function public.get_arvoculture_my_returns() to service_role;
 
 revoke all on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
+grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
 grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
 grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to authenticated;
-grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
 
 revoke all on function public.get_arvoculture_storefront_collections() from public;
-grant execute on function public.get_arvoculture_storefront_collections() to anon;
 grant execute on function public.get_arvoculture_storefront_collections() to service_role;
 grant execute on function public.get_arvoculture_storefront_collections() to authenticated;
+grant execute on function public.get_arvoculture_storefront_collections() to anon;
 
 revoke all on function public.get_arvoculture_storefront_deals(p_limit integer) from public;
-grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to authenticated;
 grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to anon;
+grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to authenticated;
 grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to service_role;
 
 revoke all on function public.get_arvoculture_storefront_discounts() from public;
-grant execute on function public.get_arvoculture_storefront_discounts() to authenticated;
 grant execute on function public.get_arvoculture_storefront_discounts() to service_role;
 grant execute on function public.get_arvoculture_storefront_discounts() to anon;
+grant execute on function public.get_arvoculture_storefront_discounts() to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_facets() from public;
 grant execute on function public.get_arvoculture_storefront_facets() to public;
-grant execute on function public.get_arvoculture_storefront_facets() to service_role;
 grant execute on function public.get_arvoculture_storefront_facets() to authenticated;
 grant execute on function public.get_arvoculture_storefront_facets() to anon;
+grant execute on function public.get_arvoculture_storefront_facets() to service_role;
 
 revoke all on function public.get_arvoculture_storefront_product(p_slug text) from public;
-grant execute on function public.get_arvoculture_storefront_product(p_slug text) to service_role;
-grant execute on function public.get_arvoculture_storefront_product(p_slug text) to anon;
 grant execute on function public.get_arvoculture_storefront_product(p_slug text) to authenticated;
+grant execute on function public.get_arvoculture_storefront_product(p_slug text) to anon;
+grant execute on function public.get_arvoculture_storefront_product(p_slug text) to service_role;
 
 revoke all on function public.get_arvoculture_storefront_product_badges() from public;
 grant execute on function public.get_arvoculture_storefront_product_badges() to anon;
@@ -5863,25 +6247,25 @@ grant execute on function public.get_arvoculture_storefront_product_badges() to 
 grant execute on function public.get_arvoculture_storefront_product_badges() to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_product_count() from public;
-grant execute on function public.get_arvoculture_storefront_product_count() to service_role;
 grant execute on function public.get_arvoculture_storefront_product_count() to anon;
+grant execute on function public.get_arvoculture_storefront_product_count() to service_role;
 grant execute on function public.get_arvoculture_storefront_product_count() to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) from public;
 grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to service_role;
-grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to authenticated;
 grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to anon;
+grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) from public;
 grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to anon;
-grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to service_role;
 grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to authenticated;
+grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to service_role;
 
 revoke all on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
+grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to public;
 grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
 grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
 grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
-grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to public;
 
 revoke all on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) from public;
 grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to service_role;
@@ -5889,19 +6273,19 @@ grant execute on function public.get_arvoculture_storefront_search_index(p_limit
 grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_settings() from public;
+grant execute on function public.get_arvoculture_storefront_settings() to anon;
 grant execute on function public.get_arvoculture_storefront_settings() to authenticated;
 grant execute on function public.get_arvoculture_storefront_settings() to service_role;
-grant execute on function public.get_arvoculture_storefront_settings() to anon;
 
 revoke all on function public.get_arvoculture_storefront_variants(p_slug text) from public;
-grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to authenticated;
-grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to anon;
 grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to service_role;
+grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to anon;
+grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to authenticated;
 
 revoke all on function public.get_storefront_seller(p_tenant text) from public;
+grant execute on function public.get_storefront_seller(p_tenant text) to anon;
 grant execute on function public.get_storefront_seller(p_tenant text) to service_role;
 grant execute on function public.get_storefront_seller(p_tenant text) to authenticated;
-grant execute on function public.get_storefront_seller(p_tenant text) to anon;
 
 revoke all on function public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) from public;
 grant execute on function public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) to service_role;
@@ -5916,6 +6300,8 @@ CREATE TRIGGER arc_order_item_cost BEFORE INSERT ON public.arc_order_items FOR E
 
 CREATE TRIGGER arc_order_items_stock_check BEFORE INSERT ON public.arc_order_items FOR EACH ROW EXECUTE FUNCTION arc_check_supplier_stock();
 
+CREATE TRIGGER arc_order_archive_guard BEFORE UPDATE OF archived_at, status ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION private.arc_order_archive_guard();
+
 CREATE TRIGGER arc_orders_attach_owner BEFORE INSERT ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION attach_arvoculture_order_owner();
 
 CREATE TRIGGER arc_orders_count_coupon_use AFTER UPDATE OF payment_status ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION arc_count_coupon_use();
@@ -5923,6 +6309,8 @@ CREATE TRIGGER arc_orders_count_coupon_use AFTER UPDATE OF payment_status ON pub
 CREATE TRIGGER arc_orders_fill_tax AFTER UPDATE OF subtotal, total ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION arc_fill_order_tax();
 
 CREATE TRIGGER arc_orders_log_event AFTER UPDATE ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION arc_log_order_event();
+
+CREATE TRIGGER arc_return_request_unarchive AFTER INSERT ON public.arc_return_requests FOR EACH ROW EXECUTE FUNCTION private.arc_return_request_unarchive();
 
 CREATE TRIGGER arvo_arc_shipment_item_guard BEFORE INSERT OR UPDATE ON public.arc_shipment_items FOR EACH ROW EXECUTE FUNCTION private.arvo_arc_shipment_item_guard();
 

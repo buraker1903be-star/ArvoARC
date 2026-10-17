@@ -124,6 +124,8 @@
       "variant_id"
     ],
     "arc_orders": [
+      "archived_at",
+      "archived_by",
       "created_at",
       "currency",
       "customer_email",
@@ -469,6 +471,7 @@
     "arc_check_coupon",
     "arc_check_supplier_stock",
     "arc_clean",
+    "arc_close_missing_supplier_variants",
     "arc_count_coupon_use",
     "arc_create_order",
     "arc_create_storefront_order",
@@ -484,7 +487,10 @@
     "arc_reprice_supplier",
     "arc_resolve_commerce_tenant",
     "arc_sale_price",
+    "arc_set_supplier_links",
+    "arc_set_supplier_variant_stock",
     "arc_settle_storefront_order",
+    "arc_siparis_kalemi_duzenle",
     "arc_slugify",
     "arc_store_stage",
     "arc_storefront_collection_products",
