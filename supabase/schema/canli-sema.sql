@@ -3789,7 +3789,12 @@ AS $function$
     end,
     h.v_price,
     h.v_sku
-  limit 60;
+  /* 60 YETMİYORDU: renk × beden birleşimi 60'ı geçen üründe liste
+     SESSİZCE kesiliyordu — eksik ton/beden hiç görünmüyor, müşteri
+     stokta olan varyantı seçemiyordu. ArvoCulture ikizinde
+     20261017120705 ile 200'e çıkarıldı; bu aile o düzeltmenin
+     dışında kalmıştı. */
+  limit 200;
 $function$
 ;
 
