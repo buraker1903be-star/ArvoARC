@@ -164,6 +164,15 @@ const PLAN = [
 */
 const YAZANLAR = new Set(["arc_storefront_create_order", "arc_storefront_return_request"]);
 
+/*
+  ANAHTARLA ÇALIŞANLAR: kiracıyı ADRESTEN değil, müşterinin
+  bağlantısındaki anahtardan çözüyorlar. Plandaki "A'nın adresi
+  yalnızca A'yı getiriyor" kalıbı bunlara uymuyor — adres hiç
+  sorulmuyor. Ayrı senaryolarla sınanıyorlar; sızıntı sorusu burada
+  "A'nın anahtarı B'nin siparişini açabiliyor mu" biçimini alıyor.
+*/
+const ANAHTARLILAR = new Set(["arc_storefront_order_status"]);
+
 describe("kiracı sızıntısı", () => {
   test("plan ailenin TAMAMINI kapsıyor", () => {
     /*
@@ -178,7 +187,7 @@ describe("kiracı sızıntısı", () => {
     const semadakiler = new Set(
       [...sema.matchAll(/CREATE OR REPLACE FUNCTION public\.(arc_storefront_[a-z_]+)\(/g)].map((m) => m[1]),
     );
-    const planda = new Set([...PLAN.map((satir) => satir.ad), ...YAZANLAR]);
+    const planda = new Set([...PLAN.map((satir) => satir.ad), ...YAZANLAR, ...ANAHTARLILAR]);
     const eksik = [...semadakiler].filter((ad) => !planda.has(ad)).sort();
     assert.deepEqual(eksik, [], `plana eklenmemiş fonksiyon: ${eksik.join(", ")}`);
     /* Ters yön: plandaki ad şemada yoksa plan bayatlamış. */
@@ -371,6 +380,107 @@ describe("kiracı sızıntısı", () => {
         [A_HOST],
       );
       assert.ok(rows[0].order_id);
+    });
+  });
+
+  test("sipariş durumu yalnızca kendi anahtarıyla açılıyor", async () => {
+    await islem(db, async () => {
+      await tohum();
+      await rol(db, "service_role");
+      const { rows: a } = await db.query(
+        `select order_id from public.arc_storefront_create_order(
+           $1::text, 'a@example.com', 'A Müşterisi', '+905551112233',
+           '{"line":"Adres","city":"İstanbul","district":"Kadıköy","country":"TR"}'::jsonb,
+           '[{"sku":"A-1","quantity":1,"name":"A Ürünü"}]'::jsonb)`,
+        [A_HOST],
+      );
+      const { rows: b } = await db.query(
+        `select order_id from public.arc_storefront_create_order(
+           $1::text, 'b@example.com', 'B Müşterisi', '+905551112244',
+           '{"line":"Adres","city":"İzmir","district":"Konak","country":"TR"}'::jsonb,
+           '[{"sku":"B-1","quantity":1,"name":"B Ürünü"}]'::jsonb)`,
+        [B_HOST],
+      );
+
+      await rol(db, "postgres");
+      const anahtar = async (id) =>
+        (await db.query(`select public_token from public.arc_orders where id = $1`, [id]))
+          .rows[0].public_token;
+      const aAnahtar = await anahtar(a[0].order_id);
+      const bAnahtar = await anahtar(b[0].order_id);
+
+      /* Vitrin bu çağrıyı tarayıcıdaki anon anahtarıyla yapıyor. */
+      await rol(db, "anon");
+
+      const oku = async (token) =>
+        (await db.query(`select public.arc_storefront_order_status($1::text) as s`, [token]))
+          .rows[0].s;
+
+      const aSonuc = await oku(aAnahtar);
+      const bSonuc = await oku(bAnahtar);
+      assert.ok(aSonuc, "A kendi anahtarıyla siparişini görmeli");
+      assert.ok(bSonuc, "B kendi anahtarıyla siparişini görmeli");
+
+      /*
+        ASIL SORU: A'nın anahtarı B'nin verisini taşıyor mu. Kalem
+        adlarına bakmak yeterli — iki mağazanın ürünleri ayrı.
+      */
+      assert.ok(
+        !JSON.stringify(aSonuc).includes("B Ürünü"),
+        "A'nın anahtarından B'nin ürünü görünmemeli",
+      );
+      assert.ok(
+        !JSON.stringify(bSonuc).includes("A Ürünü"),
+        "B'nin anahtarından A'nın ürünü görünmemeli",
+      );
+      assert.notEqual(aSonuc.siparis_no, bSonuc.siparis_no);
+    });
+  });
+
+  test("sipariş durumu kişisel veri döndürmüyor", async () => {
+    /*
+      Bağlantı WhatsApp'tan gidiyor ve İLETİLEBİLİYOR. Adres, e-posta
+      ve telefon "siparişim nerede" sorusu için gerekmiyor; eline
+      geçen biri için kişisel veri olurlar.
+    */
+    await islem(db, async () => {
+      await tohum();
+      await rol(db, "service_role");
+      const { rows } = await db.query(
+        `select order_id from public.arc_storefront_create_order(
+           $1::text, 'gizli@example.com', 'A Müşterisi', '+905551112233',
+           '{"line":"Gizli Sokak 5","city":"İstanbul","district":"Kadıköy","country":"TR"}'::jsonb,
+           '[{"sku":"A-1","quantity":1,"name":"A Ürünü"}]'::jsonb)`,
+        [A_HOST],
+      );
+      await rol(db, "postgres");
+      const { rows: tok } = await db.query(
+        `select public_token from public.arc_orders where id = $1`,
+        [rows[0].order_id],
+      );
+      await rol(db, "anon");
+      const { rows: sonuc } = await db.query(
+        `select public.arc_storefront_order_status($1::text) as s`,
+        [tok[0].public_token],
+      );
+      const metin = JSON.stringify(sonuc[0].s);
+      for (const sizinti of ["gizli@example.com", "905551112233", "Gizli Sokak"]) {
+        assert.ok(!metin.includes(sizinti), `sayfa ${sizinti} döndürmemeli`);
+      }
+    });
+  });
+
+  test("tanınmayan ve bozuk anahtar boş dönüyor", async () => {
+    await islem(db, async () => {
+      await tohum();
+      await rol(db, "anon");
+      for (const kotu of ["0".repeat(32), "abc", "", "ABCDEF0123456789ABCDEF0123456789"]) {
+        const { rows } = await db.query(
+          `select public.arc_storefront_order_status($1::text) as s`,
+          [kotu],
+        );
+        assert.equal(rows[0].s, null, `"${kotu}" için null dönmeli`);
+      }
     });
   });
 

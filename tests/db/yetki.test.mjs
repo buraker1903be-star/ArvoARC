@@ -48,6 +48,15 @@ const ANON = [
   "public.arc_storefront_deals",
   "public.arc_storefront_discounts",
   "public.arc_storefront_facets",
+  /*
+    Sipariş durum sayfasının okuması. Anon'a AÇIK olmak zorunda:
+    müşteri oturum açmadan, bağlantısındaki anahtarla geliyor.
+    Fonksiyon yalnızca o anahtarla eşleşen tek siparişi döndürüyor;
+    adres, e-posta ve telefon hiç dönmüyor. PANEL listesi ANON'u
+    içine aldığı için oturumlu kullanıcıya ayrıca yazılmıyor —
+    yazılınca aynı ad iki kez sayılıyor ve liste gerçekle tutmuyor.
+  */
+  "public.arc_storefront_order_status",
   "public.arc_storefront_product",
   "public.arc_storefront_product_badges",
   "public.arc_storefront_product_count",
@@ -103,6 +112,7 @@ const PANEL = [
   "public.arc_normalize_address",
   "public.arc_resolve_commerce_tenant",
   "public.arc_sale_price",
+  /* İki aşırı yüklü imza var; liste adları saydığı için satır da iki. */
   "public.arc_sale_price",
   "public.arc_slugify",
   "public.arc_total_stock_units",
@@ -147,8 +157,18 @@ async function acik(db, rol) {
 
 test("fonksiyonlar yalnızca listedeki rollere açık", async () => {
   const db = await veritabani();
-  assert.deepEqual(await acik(db, "anon"), ANON.toSorted());
-  assert.deepEqual(await acik(db, "authenticated"), PANEL.toSorted());
+  /*
+    İKİ TARAF DA JAVASCRIPT'İN SIRALAMASIYLA diziliyor.
+
+    Önceden gerçek liste SQL'in `order by 1`'inden, beklenen liste
+    JS'in `toSorted()`'ından geliyordu. İki harmanlama alt çizgiyi
+    farklı değerlendiriyor: `arc_storefront_order_status` ile
+    `arc_storefront_org` ikisinde ters sırada çıktı ve deepEqual,
+    aynı kümeyi taşıyan iki diziyi "farklı" saydı. Hata da yanıltıcı
+    görünüyordu — eksik bir ad varmış gibi.
+  */
+  assert.deepEqual((await acik(db, "anon")).toSorted(), ANON.toSorted());
+  assert.deepEqual((await acik(db, "authenticated")).toSorted(), PANEL.toSorted());
 });
 
 test("para, stok, fiyat ve aktarım fonksiyonları müşteriye kapalı", async () => {

@@ -65,7 +65,41 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   yanıtlanıyor (her migration'ı dosya yerinde ve yerinden alınmış
   hâlde koşturarak).
 */
-const ILK_UYGULANAN = "20261017144836";
+const ILK_UYGULANAN = "20261017152720";
+
+/*
+  PGLITE'TA PGCRYPTO YOK.
+
+  Canlıda var (Supabase açık getiriyor) ve döküm onu kullanıyor:
+  arc_orders.public_token varsayılanı encode(gen_random_bytes(16),'hex').
+  PGlite eklentiyi tanımadığı için dökümün YÜKLENMESİ düşüyordu —
+  `alter column ... set default` ifadeyi çözümlerken fonksiyonu
+  arıyor, henüz hiçbir satır eklenmeden.
+
+  Çözüm iki adımlı: dökümü yükleyebilmek için geçici bir vekil
+  tanımlanıyor, yükleme biter bitmez varsayılan PGlite'ın KENDİ
+  çekirdek fonksiyonuna çevrilip vekil siliniyor. Böylece düzenekte
+  fazladan bir fonksiyon KALMIYOR — ilk denemede kalmıştı ve
+  "anon/authenticated neyi çağırabiliyor" listesini sabitleyen yetki
+  testine sızıp onu kırdı.
+
+  Üretilen değer her iki yolda da aynı biçimde: 32 haneli onaltılık.
+  Testlerde aranan şey zaten biçim; tahmin edilemezlik canlıdaki
+  pgcrypto'nun işi.
+*/
+const PGCRYPTO_VEKILI = `
+create or replace function public.gen_random_bytes(n integer)
+returns bytea language sql as $vekil$
+  select decode(string_agg(lpad(to_hex((random() * 255)::int), 2, '0'), ''), 'hex')
+  from generate_series(1, n)
+$vekil$;
+`;
+
+const PGCRYPTO_VEKILINI_KALDIR = `
+alter table public.arc_orders
+  alter column public_token set default replace(gen_random_uuid()::text, '-', '');
+drop function if exists public.gen_random_bytes(integer);
+`;
 
 const SUPABASE_KABUGU = `
 create role anon nologin;
@@ -122,6 +156,7 @@ export async function veritabani() {
     }
   };
 
+  await db.exec(PGCRYPTO_VEKILI);
   await uygula(path.join(KOK, "schema", "canli-sema.sql"));
   await db.exec(SUPABASE_TABLO_VARSAYILANI);
   await db.exec(SUPABASE_YENI_NESNE_VARSAYILANI);
@@ -130,6 +165,8 @@ export async function veritabani() {
     .filter((f) => f.endsWith(".sql") && f.slice(0, 14) >= ILK_UYGULANAN)
     .sort();
   for (const dosya of sonrakiler) await uygula(path.join(KOK, "migrations", dosya));
+  /* Vekil EN SONDA kaldırılıyor: döküm gibi migration'lar da onu çağırıyor. */
+  await db.exec(PGCRYPTO_VEKILINI_KALDIR);
   return db;
 }
 

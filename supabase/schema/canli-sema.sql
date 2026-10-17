@@ -167,7 +167,8 @@ create table if not exists public.arc_orders (
   updated_at timestamp with time zone not null,
   user_id uuid,
   archived_at timestamp with time zone,
-  archived_by uuid
+  archived_by uuid,
+  public_token text not null
 );
 
 create table if not exists public.arc_payment_orders (
@@ -2808,6 +2809,16 @@ AS $function$
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[] DEFAULT NULL::text[], p_menu_groups text[] DEFAULT NULL::text[])
+ RETURNS TABLE(brands jsonb, sizes jsonb, max_price bigint, total_count bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_koleksiyon_secenekleri(public.arc_storefront_org(p_host), p_collection_slugs, p_menu_groups);
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.arc_storefront_collection_products(p_host text, p_collection_slug text DEFAULT NULL::text, p_menu_groups text[] DEFAULT NULL::text[], p_limit integer DEFAULT 200)
  RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, specs jsonb, size_guide jsonb, sizes jsonb)
  LANGUAGE sql
@@ -2825,16 +2836,6 @@ CREATE OR REPLACE FUNCTION public.arc_storefront_collection_products_page(p_host
  SET search_path TO ''
 AS $function$
   select * from public.arc_vitrin_koleksiyon_sayfasi(public.arc_storefront_org(p_host), p_collection_slugs, p_menu_groups, p_limit, p_offset, p_brand, p_size, p_max_price, p_only_discounted, p_only_available, p_sort);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[] DEFAULT NULL::text[], p_menu_groups text[] DEFAULT NULL::text[])
- RETURNS TABLE(brands jsonb, sizes jsonb, max_price bigint, total_count bigint)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_koleksiyon_secenekleri(public.arc_storefront_org(p_host), p_collection_slugs, p_menu_groups);
 $function$
 ;
 
@@ -2910,6 +2911,86 @@ CREATE OR REPLACE FUNCTION public.arc_storefront_facets(p_host text)
  SET search_path TO ''
 AS $function$
   select * from public.arc_vitrin_secenekler(public.arc_storefront_org(p_host));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_order_status(p_token text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_order public.arc_orders;
+  v_items jsonb;
+  v_shipments jsonb;
+begin
+  /*
+    Biçim denetimi önce: 32 haneli onaltılık değilse veritabanına hiç
+    sorulmuyor. Uç anon'a açık; her yanlış denemeyi sorguya çevirmek
+    gereksiz yük.
+  */
+  if p_token is null or p_token !~ '^[0-9a-f]{32}$' then
+    return null;
+  end if;
+
+  select * into v_order
+    from public.arc_orders
+   where public_token = p_token;
+
+  if not found then
+    return null;
+  end if;
+
+  select coalesce(jsonb_agg(
+           jsonb_build_object(
+             'ad', i.product_name,
+             'sku', i.sku,
+             'adet', i.quantity,
+             'birim', i.unit_price,
+             'tutar', i.total
+           ) order by i.product_name
+         ), '[]'::jsonb)
+    into v_items
+    from public.arc_order_items i
+   where i.order_id = v_order.id;
+
+  /*
+    Kargo kaydı birden çok olabiliyor (kısmi gönderim, yeniden
+    gönderim). Hepsi veriliyor; sayfa sırayla gösteriyor.
+    İptal edilenler dışarıda: müşteriye iptal edilmiş bir takip
+    numarası göstermek "kargom kayıp" telefonu demek.
+  */
+  select coalesce(jsonb_agg(
+           jsonb_build_object(
+             'firma', s.carrier_name,
+             'takip_no', s.tracking_number,
+             'takip_adresi', s.tracking_url,
+             'durum', s.status,
+             'cikis', s.shipped_at,
+             'teslim', s.delivered_at
+           ) order by s.created_at
+         ), '[]'::jsonb)
+    into v_shipments
+    from public.arc_shipments s
+   where s.order_id = v_order.id
+     and s.status <> 'cancelled';
+
+  return jsonb_build_object(
+    'siparis_no', v_order.order_number,
+    'tarih', v_order.created_at,
+    'durum', v_order.status,
+    'odeme_durumu', v_order.payment_status,
+    'musteri', v_order.customer_name,
+    'para_birimi', v_order.currency,
+    'ara_toplam', v_order.subtotal,
+    'kargo', v_order.shipping,
+    'vergi', v_order.tax,
+    'toplam', v_order.total,
+    'kalemler', v_items,
+    'gonderiler', v_shipments
+  );
+end;
 $function$
 ;
 
@@ -3129,2264 +3210,6 @@ AS $function$
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.attach_arvoculture_order_owner()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-begin
-  if new.user_id is null and auth.uid() is not null then
-    new.user_id := auth.uid();
-  end if;
-  return new;
-end;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.check_arvoculture_coupon(p_code text, p_subtotal bigint DEFAULT 0, p_email text DEFAULT NULL::text)
- RETURNS TABLE(valid boolean, message text, discount_type text, value numeric, minimum_subtotal bigint, discount_amount bigint)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_check_coupon(
-    (select id from public.organizations where slug = 'arvoculture' limit 1),
-    p_code, p_subtotal, p_email)
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.claim_arvoculture_orders()
- RETURNS integer
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_user_id uuid := auth.uid();
-  v_email text := lower(coalesce(auth.jwt() ->> 'email', ''));
-  v_verified boolean :=
-    coalesce((auth.jwt() -> 'user_metadata' ->> 'email_verified')::boolean, false)
-    or coalesce((auth.jwt() ->> 'email_verified')::boolean, false);
-  v_imported boolean;
-  v_count integer;
-  v_name text;
-  v_phone text;
-  v_meta jsonb;
-  v_addr jsonb;
-  v_line text;
-  v_city text;
-  v_district text;
-  v_postal text;
-  v_row record;
-  v_seq integer := 0;
-begin
-  if v_user_id is null or v_email = '' or not v_verified then
-    return 0;
-  end if;
-
-  -- --- 1. Siparişleri hesaba bağla -------------------------
-  update public.arc_orders
-     set user_id = v_user_id, updated_at = now()
-   where user_id is null
-     and lower(customer_email) = v_email;
-
-  get diagnostics v_count = row_count;
-
-  -- --- 2. Ad ve telefon ------------------------------------
-  select o.customer_name, o.metadata
-    into v_name, v_meta
-  from public.arc_orders o
-  where o.user_id = v_user_id
-  order by o.created_at desc
-  limit 1;
-
-  v_addr := public.arc_find_address(coalesce(v_meta, '{}'::jsonb));
-
-  v_phone := coalesce(
-    public.arc_clean(v_addr ->> 'phone'),
-    public.arc_clean(v_meta ->> 'phone')
-  );
-
-  v_name := coalesce(
-    public.arc_clean(v_name),
-    public.arc_clean(v_addr ->> 'name')
-  );
-
-  update auth.users u
-     set raw_user_meta_data =
-           coalesce(u.raw_user_meta_data, '{}'::jsonb)
-           || jsonb_strip_nulls(
-                jsonb_build_object(
-                  'full_name',
-                  case when coalesce(u.raw_user_meta_data ->> 'full_name', '') = ''
-                       then v_name end,
-                  'phone',
-                  case when coalesce(u.raw_user_meta_data ->> 'phone', '') = ''
-                       then v_phone end
-                )
-              )
-   where u.id = v_user_id;
-
-  -- --- 3. Adresler: yalnızca bir kez ------------------------
-  select coalesce(
-           (raw_user_meta_data ->> 'addresses_imported')::boolean,
-           false
-         )
-    into v_imported
-  from auth.users
-  where id = v_user_id;
-
-  if v_imported then
-    -- Aktarım daha önce yapıldı. Müşterinin sildiği adresleri
-    -- geri getirmiyoruz.
-    return v_count;
-  end if;
-
-  for v_row in
-    select o.customer_name, o.metadata as meta, o.created_at
-    from public.arc_orders o
-    where o.user_id = v_user_id
-    order by o.created_at desc
-  loop
-    v_addr := public.arc_find_address(coalesce(v_row.meta, '{}'::jsonb));
-
-    v_line := coalesce(
-      public.arc_clean(v_addr ->> 'line'),
-      public.arc_address_line(v_addr)
-    );
-
-    if v_line is null then
-      continue;
-    end if;
-
-    v_city := coalesce(public.arc_clean(v_addr ->> 'city'), '-');
-    v_district := coalesce(
-      public.arc_clean(v_addr ->> 'district'),
-      public.arc_clean(v_addr ->> 'province'),
-      '-'
-    );
-    v_postal := coalesce(
-      public.arc_clean(v_addr ->> 'postal'),
-      public.arc_clean(v_addr ->> 'zip')
-    );
-
-    if exists (
-      select 1 from public.arc_customer_addresses a
-      where a.user_id = v_user_id
-        and lower(trim(a.line)) = lower(v_line)
-        and lower(trim(a.city)) = lower(v_city)
-    ) then
-      continue;
-    end if;
-
-    v_seq := v_seq + 1;
-
-    insert into public.arc_customer_addresses (
-      user_id, title, full_name, phone,
-      city, district, postal_code, line,
-      is_billing, is_shipping, is_default
-    )
-    values (
-      v_user_id,
-      case when v_seq = 1 then 'Ev' else 'Kayıtlı adres ' || v_seq end,
-      coalesce(
-        public.arc_clean(v_row.customer_name),
-        public.arc_clean(v_addr ->> 'name'),
-        'Ad Soyad'
-      ),
-      coalesce(
-        public.arc_clean(v_addr ->> 'phone'),
-        public.arc_clean(v_row.meta ->> 'phone'),
-        '-'
-      ),
-      v_city,
-      v_district,
-      v_postal,
-      v_line,
-      true,
-      true,
-      v_seq = 1 and not exists (
-        select 1 from public.arc_customer_addresses a2
-        where a2.user_id = v_user_id and a2.is_default
-      )
-    );
-  end loop;
-
-  -- Aktarım tamamlandı; bir daha çalışmayacak.
-  update auth.users
-     set raw_user_meta_data =
-           coalesce(raw_user_meta_data, '{}'::jsonb)
-           || jsonb_build_object('addresses_imported', true)
-   where id = v_user_id;
-
-  return v_count;
-end;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text DEFAULT NULL::text)
- RETURNS uuid
- LANGUAGE sql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select public.arc_vitrin_iade_talebi(
-    (select id from public.organizations where slug = 'arvoculture' limit 1),
-    p_order_number, p_items, p_reason, p_note);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.create_arvoculture_storefront_order(p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text DEFAULT NULL::text)
- RETURNS TABLE(order_id uuid, order_number text, total bigint)
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_org_id uuid;
-begin
-  select id into v_org_id from public.organizations where slug = 'arvoculture' limit 1;
-  if v_org_id is null then
-    raise exception 'Organizasyon bulunamadı';
-  end if;
-  return query select * from public.arc_create_storefront_order(
-    v_org_id, p_email, p_name, p_phone, p_address, p_items, p_coupon_code);
-end;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_my_orders()
- RETURNS TABLE(order_number text, status text, payment_status text, subtotal bigint, discount bigint, shipping bigint, total bigint, currency text, coupon_code text, address jsonb, billing_address jsonb, note text, created_at timestamp with time zone, items jsonb, shipments jsonb)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select
-    o.order_number,
-    o.status,
-    o.payment_status,
-    coalesce(o.subtotal, 0) as subtotal,
-    coalesce((o.metadata ->> 'discount')::bigint, 0) as discount,
-    coalesce(o.shipping, 0) as shipping,
-    coalesce(o.total, 0) as total,
-    o.currency,
-    o.metadata ->> 'coupon_code' as coupon_code,
-
-    -- Teslimat adresi: hangi yapıda gelirse gelsin normalleştirilir.
-    coalesce(
-      public.arc_normalize_address(o.metadata -> 'shipping_address'),
-      public.arc_normalize_address(o.metadata -> 'address'),
-      public.arc_normalize_address(o.metadata -> 'billing')
-    ) as address,
-
-    -- Fatura adresi. Ayrı tanımlı değilse teslimat adresi kullanılır.
-    coalesce(
-      public.arc_normalize_address(o.metadata -> 'billing'),
-      public.arc_normalize_address(o.metadata -> 'billing_address'),
-      public.arc_normalize_address(o.metadata -> 'shipping_address'),
-      public.arc_normalize_address(o.metadata -> 'address')
-    ) as billing_address,
-
-    public.arc_clean(o.metadata ->> 'note') as note,
-    o.created_at,
-    coalesce(
-      (
-        select jsonb_agg(
-          jsonb_build_object(
-            'name', i.product_name,
-            'sku', i.sku,
-            'quantity', i.quantity,
-            'unit_price', i.unit_price,
-            'total', i.total,
-            'slug', p.slug,
-            'image', p.metadata -> 'image_paths' ->> 0
-          )
-          order by i.id
-        )
-        from public.arc_order_items i
-        left join lateral (
-          select v.*
-          from public.arc_product_variants v
-          where (i.variant_id is not null and v.id = i.variant_id)
-             or (
-               i.variant_id is null
-               and i.sku is not null
-               and v.organization_id = i.organization_id
-               and v.sku = i.sku
-             )
-          limit 1
-        ) v on true
-        left join public.arc_products p
-          on p.id = v.product_id
-        where i.order_id = o.id
-      ),
-      '[]'::jsonb
-    ) as items,
-
-    -- GÖNDERİLER. Bir sipariş birden çok pakete bölünebiliyor ve her
-    -- paketin kendi takip numarası var; müşteri tek numara görüp
-    -- gelmeyen kalemi kayıp sanmasın diye hepsi ayrı ayrı veriliyor.
-    -- İptal edilen gönderi listede YOK: yola çıkmayacak bir paketin
-    -- takip numarasını göstermek müşteriyi boşuna bekletir.
-    coalesce(
-      (
-        select jsonb_agg(
-          jsonb_build_object(
-            'sequence', s.sequence,
-            'status', s.status,
-            'carrier', s.carrier_name,
-            'tracking_number', s.tracking_number,
-            'tracking_url', s.tracking_url,
-            'shipped_at', s.shipped_at,
-            'delivered_at', s.delivered_at,
-            'items', coalesce(
-              (
-                select jsonb_agg(jsonb_build_object('name', oi.product_name, 'quantity', si.quantity) order by oi.product_name)
-                from public.arc_shipment_items si
-                join public.arc_order_items oi on oi.id = si.order_item_id
-                where si.shipment_id = s.id
-              ),
-              '[]'::jsonb
-            )
-          )
-          order by s.sequence
-        )
-        from public.arc_shipments s
-        where s.order_id = o.id
-          and s.status <> 'cancelled'
-          -- Taslak gönderi OTO'da henüz yok; müşteriye gösterilecek bir şey taşımıyor.
-          and s.status <> 'draft'
-      ),
-      '[]'::jsonb
-    ) as shipments
-  from public.arc_orders o
-  where o.user_id = auth.uid()
-  order by o.created_at desc
-  limit 100;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_my_returns()
- RETURNS TABLE(id uuid, order_number text, items jsonb, reason text, status text, status_note text, refund_amount bigint, created_at timestamp with time zone, resolved_at timestamp with time zone)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select
-    r.id, o.order_number, r.items, r.reason,
-    r.status, r.status_note, r.refund_amount,
-    r.created_at, r.resolved_at
-  from public.arc_return_requests r
-  join public.arc_orders o on o.id = r.order_id
-  where r.user_id = auth.uid()
-  order by r.created_at desc
-  limit 50;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_collection_products(p_collection_slug text DEFAULT NULL::text, p_menu_groups text[] DEFAULT NULL::text[], p_limit integer DEFAULT 200)
- RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, specs jsonb, size_guide jsonb, sizes jsonb)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_koleksiyon_urunleri(
-    (select id from public.organizations where slug = 'arvoculture' limit 1), p_collection_slug, p_menu_groups, p_limit);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[] DEFAULT NULL::text[], p_menu_groups text[] DEFAULT NULL::text[], p_limit integer DEFAULT 24, p_offset integer DEFAULT 0, p_brand text DEFAULT NULL::text, p_size text DEFAULT NULL::text, p_max_price bigint DEFAULT NULL::bigint, p_only_discounted boolean DEFAULT false, p_only_available boolean DEFAULT false, p_sort text DEFAULT 'onerilen'::text)
- RETURNS TABLE(slug text, name text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, sizes jsonb, total_count bigint)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_koleksiyon_sayfasi(
-    (select id from public.organizations where slug = 'arvoculture' limit 1), p_collection_slugs, p_menu_groups, p_limit, p_offset, p_brand, p_size, p_max_price, p_only_discounted, p_only_available, p_sort);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_collection_facets(p_collection_slugs text[] DEFAULT NULL::text[], p_menu_groups text[] DEFAULT NULL::text[])
- RETURNS TABLE(brands jsonb, sizes jsonb, max_price bigint, total_count bigint)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_koleksiyon_secenekleri(
-    (select id from public.organizations where slug = 'arvoculture' limit 1), p_collection_slugs, p_menu_groups);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_collections()
- RETURNS TABLE(title text, slug text, description text, menu_group text, parent text, product_count integer)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_koleksiyonlar(
-    (select id from public.organizations where slug = 'arvoculture' limit 1));
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_deals(p_limit integer DEFAULT 12)
- RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, specs jsonb, size_guide jsonb)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_firsatlar(
-    (select id from public.organizations where slug = 'arvoculture' limit 1), p_limit);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_discounts()
- RETURNS TABLE(id uuid, name text, code text, discount_type text, value bigint, minimum_subtotal bigint, combinable boolean, badge text)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_indirimler(
-    (select id from public.organizations where slug = 'arvoculture' limit 1));
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_facets()
- RETURNS TABLE(brands jsonb, sizes jsonb, max_price bigint, total_count bigint)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_secenekler(
-    (select id from public.organizations where slug = 'arvoculture' limit 1));
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_product(p_slug text)
- RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_urun(
-    (select id from public.organizations where slug = 'arvoculture' limit 1), p_slug);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_product_badges()
- RETURNS TABLE(slug text, badge text, badge_tone text, is_best_seller boolean, discount_percent integer)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_urun_rozetleri(
-    (select id from public.organizations where slug = 'arvoculture' limit 1));
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_product_count()
- RETURNS integer
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select public.arc_vitrin_urun_sayisi(
-    (select id from public.organizations where slug = 'arvoculture' limit 1));
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_product_slugs(p_limit integer DEFAULT 1000, p_offset integer DEFAULT 0)
- RETURNS TABLE(slug text, updated_at timestamp with time zone)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_urun_adresleri(
-    (select id from public.organizations where slug = 'arvoculture' limit 1), p_limit, p_offset);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_products(p_limit integer DEFAULT 24, p_offset integer DEFAULT 0)
- RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, specs jsonb, size_guide jsonb, sizes jsonb)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_urunler(
-    (select id from public.organizations where slug = 'arvoculture' limit 1), p_limit, p_offset);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_products_page(p_limit integer DEFAULT 24, p_offset integer DEFAULT 0, p_brand text DEFAULT NULL::text, p_size text DEFAULT NULL::text, p_max_price bigint DEFAULT NULL::bigint, p_only_discounted boolean DEFAULT false, p_only_available boolean DEFAULT false, p_sort text DEFAULT 'onerilen'::text)
- RETURNS TABLE(slug text, name text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, sizes jsonb, total_count bigint)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_urun_sayfasi(
-    (select id from public.organizations where slug = 'arvoculture' limit 1), p_limit, p_offset, p_brand, p_size, p_max_price, p_only_discounted, p_only_available, p_sort);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_search_index(p_limit integer DEFAULT 1000, p_offset integer DEFAULT 0)
- RETURNS TABLE(slug text, name text, vendor text, product_type text, price bigint, compare_at_price bigint, image_path text)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_arama_dizini(
-    (select id from public.organizations where slug = 'arvoculture' limit 1), p_limit, p_offset);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_settings()
- RETURNS TABLE(shipping_fee bigint, free_shipping_threshold bigint, bank_transfer_enabled boolean, bank_transfer_discount_percent numeric)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_ayarlar(
-    (select id from public.organizations where slug = 'arvoculture' limit 1));
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_variants(p_slug text)
- RETURNS TABLE(sku text, title text, color text, size text, price bigint, compare_at_price bigint, stock integer, available boolean, image_path text, attributes jsonb)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select * from public.arc_vitrin_varyantlar(
-    (select id from public.organizations where slug = 'arvoculture' limit 1), p_slug);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.get_storefront_seller(p_tenant text DEFAULT 'arvoculture'::text)
- RETURNS TABLE(legal_name text, trade_name text, mersis_no text, tax_office text, tax_number text, trade_registry_no text, address_line text, address_district text, address_city text, address_country text, contact_email text, contact_phone text, whatsapp_number text, kep_address text, etbis_verified boolean, storefront_url text)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select
-    s.legal_name,
-    coalesce(s.trade_name, o.name) as trade_name,
-    s.mersis_no,
-    s.tax_office,
-    s.tax_number,
-    s.trade_registry_no,
-    s.address_line,
-    s.address_district,
-    s.address_city,
-    coalesce(s.address_country, 'Türkiye') as address_country,
-    s.contact_email,
-    s.contact_phone,
-    s.whatsapp_number,
-    s.kep_address,
-    coalesce(s.etbis_verified, false) as etbis_verified,
-    s.storefront_url
-  from public.arc_store_settings s
-  join public.organizations o
-    on o.id = s.organization_id
-  where o.slug = p_tenant
-  limit 1;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text DEFAULT NULL::text, p_failure_reason text DEFAULT NULL::text)
- RETURNS text
- LANGUAGE sql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select public.arc_settle_storefront_order(p_order_id, p_paid, p_payment_reference, p_failure_reason);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.update_arvoculture_profile(p_full_name text, p_phone text)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-begin
-  if auth.uid() is null then
-    raise exception 'Oturum bulunamadı';
-  end if;
-
-  update auth.users
-     set raw_user_meta_data =
-           coalesce(raw_user_meta_data, '{}'::jsonb)
-           || jsonb_build_object(
-                'full_name', nullif(trim(p_full_name), ''),
-                'phone', nullif(trim(p_phone), '')
-              )
-   where id = auth.uid();
-end;
-$function$
-;
-
-alter table public.arc_collection_products alter column "position" set default 0;
-
-alter table public.arc_collection_products alter column created_at set default now();
-
-alter table public.arc_collections alter column created_at set default now();
-
-alter table public.arc_collections alter column description set default ''::text;
-
-alter table public.arc_collections alter column id set default gen_random_uuid();
-
-alter table public.arc_collections alter column metadata set default '{}'::jsonb;
-
-alter table public.arc_collections alter column seo_description set default ''::text;
-
-alter table public.arc_collections alter column seo_title set default ''::text;
-
-alter table public.arc_collections alter column source set default 'native'::text;
-
-alter table public.arc_collections alter column status set default 'active'::text;
-
-alter table public.arc_collections alter column updated_at set default now();
-
-alter table public.arc_customer_addresses alter column created_at set default now();
-
-alter table public.arc_customer_addresses alter column id set default gen_random_uuid();
-
-alter table public.arc_customer_addresses alter column is_billing set default true;
-
-alter table public.arc_customer_addresses alter column is_default set default false;
-
-alter table public.arc_customer_addresses alter column is_shipping set default true;
-
-alter table public.arc_customer_addresses alter column updated_at set default now();
-
-alter table public.arc_customer_favourites alter column created_at set default now();
-
-alter table public.arc_customer_favourites alter column id set default gen_random_uuid();
-
-alter table public.arc_customer_favourites alter column user_id set default auth.uid();
-
-alter table public.arc_discounts alter column combinable set default false;
-
-alter table public.arc_discounts alter column created_at set default now();
-
-alter table public.arc_discounts alter column id set default gen_random_uuid();
-
-alter table public.arc_discounts alter column metadata set default '{}'::jsonb;
-
-alter table public.arc_discounts alter column minimum_subtotal set default 0;
-
-alter table public.arc_discounts alter column status set default 'draft'::text;
-
-alter table public.arc_discounts alter column updated_at set default now();
-
-alter table public.arc_discounts alter column usage_count set default 0;
-
-alter table public.arc_discounts alter column value set default 0;
-
-alter table public.arc_import_batches alter column created_at set default now();
-
-alter table public.arc_import_batches alter column error_rows set default 0;
-
-alter table public.arc_import_batches alter column id set default gen_random_uuid();
-
-alter table public.arc_import_batches alter column imported_rows set default 0;
-
-alter table public.arc_import_batches alter column metadata set default '{}'::jsonb;
-
-alter table public.arc_import_batches alter column skipped_rows set default 0;
-
-alter table public.arc_import_batches alter column source set default 'shopify'::text;
-
-alter table public.arc_import_batches alter column status set default 'processing'::text;
-
-alter table public.arc_import_batches alter column total_rows set default 0;
-
-alter table public.arc_import_errors alter column created_at set default now();
-
-alter table public.arc_import_errors alter column id set default gen_random_uuid();
-
-alter table public.arc_import_errors alter column payload set default '{}'::jsonb;
-
-alter table public.arc_inventory_movements alter column created_at set default now();
-
-alter table public.arc_inventory_movements alter column id set default gen_random_uuid();
-
-alter table public.arc_order_events alter column created_at set default now();
-
-alter table public.arc_order_events alter column event_data set default '{}'::jsonb;
-
-alter table public.arc_order_events alter column id set default gen_random_uuid();
-
-alter table public.arc_order_items alter column id set default gen_random_uuid();
-
-alter table public.arc_orders alter column created_at set default now();
-
-alter table public.arc_orders alter column currency set default 'TRY'::text;
-
-alter table public.arc_orders alter column id set default gen_random_uuid();
-
-alter table public.arc_orders alter column metadata set default '{}'::jsonb;
-
-alter table public.arc_orders alter column payment_status set default 'pending'::text;
-
-alter table public.arc_orders alter column shipping set default 0;
-
-alter table public.arc_orders alter column source set default 'native'::text;
-
-alter table public.arc_orders alter column status set default 'pending'::text;
-
-alter table public.arc_orders alter column subtotal set default 0;
-
-alter table public.arc_orders alter column tax set default 0;
-
-alter table public.arc_orders alter column total set default 0;
-
-alter table public.arc_orders alter column updated_at set default now();
-
-alter table public.arc_payment_orders alter column created_at set default now();
-
-alter table public.arc_payment_orders alter column currency set default 'TL'::text;
-
-alter table public.arc_payment_orders alter column id set default gen_random_uuid();
-
-alter table public.arc_payment_orders alter column payment_method set default 'card'::text;
-
-alter table public.arc_payment_orders alter column paytr_test_mode set default false;
-
-alter table public.arc_payment_orders alter column saglayici set default 'paytr'::text;
-
-alter table public.arc_payment_orders alter column status set default 'awaiting_payment'::text;
-
-alter table public.arc_payment_orders alter column updated_at set default now();
-
-alter table public.arc_price_collections alter column created_at set default now();
-
-alter table public.arc_price_collections alter column id set default gen_random_uuid();
-
-alter table public.arc_price_collections alter column kaynak set default 'lr'::text;
-
-alter table public.arc_product_variants alter column allow_backorder set default true;
-
-alter table public.arc_product_variants alter column attributes set default '{}'::jsonb;
-
-alter table public.arc_product_variants alter column created_at set default now();
-
-alter table public.arc_product_variants alter column currency set default 'TRY'::text;
-
-alter table public.arc_product_variants alter column id set default gen_random_uuid();
-
-alter table public.arc_product_variants alter column price set default 0;
-
-alter table public.arc_product_variants alter column stock set default 0;
-
-alter table public.arc_product_variants alter column updated_at set default now();
-
-alter table public.arc_products alter column created_at set default now();
-
-alter table public.arc_products alter column description set default ''::text;
-
-alter table public.arc_products alter column id set default gen_random_uuid();
-
-alter table public.arc_products alter column metadata set default '{}'::jsonb;
-
-alter table public.arc_products alter column source set default 'native'::text;
-
-alter table public.arc_products alter column status set default 'draft'::text;
-
-alter table public.arc_products alter column updated_at set default now();
-
-alter table public.arc_return_requests alter column created_at set default now();
-
-alter table public.arc_return_requests alter column id set default gen_random_uuid();
-
-alter table public.arc_return_requests alter column items set default '[]'::jsonb;
-
-alter table public.arc_return_requests alter column status set default 'beklemede'::text;
-
-alter table public.arc_return_requests alter column updated_at set default now();
-
-alter table public.arc_saved_views alter column created_at set default now();
-
-alter table public.arc_saved_views alter column id set default gen_random_uuid();
-
-alter table public.arc_saved_views alter column sira set default 0;
-
-alter table public.arc_shipment_items alter column created_at set default now();
-
-alter table public.arc_shipment_items alter column id set default gen_random_uuid();
-
-alter table public.arc_shipments alter column created_at set default now();
-
-alter table public.arc_shipments alter column id set default gen_random_uuid();
-
-alter table public.arc_shipments alter column sequence set default 1;
-
-alter table public.arc_shipments alter column source set default 'oto'::text;
-
-alter table public.arc_shipments alter column status set default 'draft'::text;
-
-alter table public.arc_shipments alter column updated_at set default now();
-
-alter table public.arc_store_settings alter column accent_color set default '#6f9548'::text;
-
-alter table public.arc_store_settings alter column address_country set default 'Türkiye'::text;
-
-alter table public.arc_store_settings alter column bank_transfer_discount_percent set default 3;
-
-alter table public.arc_store_settings alter column bank_transfer_enabled set default false;
-
-alter table public.arc_store_settings alter column created_at set default now();
-
-alter table public.arc_store_settings alter column currency set default 'TRY'::text;
-
-alter table public.arc_store_settings alter column default_tax_rate set default 20;
-
-alter table public.arc_store_settings alter column domain_status set default 'not_configured'::text;
-
-alter table public.arc_store_settings alter column etbis_verified set default false;
-
-alter table public.arc_store_settings alter column free_shipping_threshold set default 200000;
-
-alter table public.arc_store_settings alter column garanti_api_surumu set default 'v512'::text;
-
-alter table public.arc_store_settings alter column garanti_enabled set default false;
-
-alter table public.arc_store_settings alter column garanti_guvenlik_duzeyi set default '3D_PAY_HOSTING'::text;
-
-alter table public.arc_store_settings alter column garanti_test_mode set default true;
-
-alter table public.arc_store_settings alter column garanti_yari_guvenli_kabul set default false;
-
-alter table public.arc_store_settings alter column locale set default 'tr-TR'::text;
-
-alter table public.arc_store_settings alter column low_stock_threshold set default 5;
-
-alter table public.arc_store_settings alter column odeme_saglayicisi set default 'paytr'::text;
-
-alter table public.arc_store_settings alter column panel_domain_status set default 'not_configured'::text;
-
-alter table public.arc_store_settings alter column paytr_enabled set default false;
-
-alter table public.arc_store_settings alter column paytr_max_installment set default 0;
-
-alter table public.arc_store_settings alter column paytr_no_installment set default false;
-
-alter table public.arc_store_settings alter column paytr_test_mode set default true;
-
-alter table public.arc_store_settings alter column primary_color set default '#002045'::text;
-
-alter table public.arc_store_settings alter column shipping_fee set default 12000;
-
-alter table public.arc_store_settings alter column tami_enabled set default false;
-
-alter table public.arc_store_settings alter column tami_test_mode set default true;
-
-alter table public.arc_store_settings alter column tryoto_enabled set default false;
-
-alter table public.arc_store_settings alter column tryoto_test_mode set default true;
-
-alter table public.arc_store_settings alter column updated_at set default now();
-
-alter table public.arc_store_themes alter column config set default '{}'::jsonb;
-
-alter table public.arc_store_themes alter column created_at set default now();
-
-alter table public.arc_store_themes alter column id set default gen_random_uuid();
-
-alter table public.arc_store_themes alter column updated_at set default now();
-
-alter table public.arc_store_themes alter column version set default 1;
-
-alter table public.arc_suppliers alter column active set default true;
-
-alter table public.arc_suppliers alter column brand_override set default 'ArvoCulture'::text;
-
-alter table public.arc_suppliers alter column created_at set default now();
-
-alter table public.arc_suppliers alter column id set default gen_random_uuid();
-
-alter table public.arc_suppliers alter column margin_percent set default 40;
-
-alter table public.arc_suppliers alter column publish_directly set default false;
-
-alter table public.arc_suppliers alter column round_to_kurus set default 90;
-
-alter table public.arc_suppliers alter column service_fee set default 0;
-
-alter table public.arc_suppliers alter column shipping_markup set default 6000;
-
-alter table public.arc_suppliers alter column stock_buffer set default 5;
-
-alter table public.arc_suppliers alter column sync_cursor set default 0;
-
-alter table public.arc_suppliers alter column sync_total set default 0;
-
-alter table public.arc_suppliers alter column updated_at set default now();
-
-alter table public.organization_memberships alter column is_active set default true;
-
-alter table public.organization_memberships alter column joined_at set default now();
-
-alter table public.organization_memberships alter column permissions set default '{}'::jsonb;
-
-alter table public.organization_memberships alter column role set default 'member'::membership_role;
-
-alter table public.organization_memberships alter column role_from_management set default false;
-
-alter table public.organization_modules alter column configuration set default '{}'::jsonb;
-
-alter table public.organization_modules alter column enabled_at set default now();
-
-alter table public.organization_modules alter column is_enabled set default true;
-
-alter table public.organization_product_licenses alter column created_at set default now();
-
-alter table public.organization_product_licenses alter column status set default 'inactive'::text;
-
-alter table public.organization_product_licenses alter column updated_at set default now();
-
-alter table public.organizations alter column created_at set default now();
-
-alter table public.organizations alter column id set default gen_random_uuid();
-
-alter table public.organizations alter column kind set default 'customer'::text;
-
-alter table public.organizations alter column primary_color set default '#183f31'::text;
-
-alter table public.organizations alter column provisioning_state set default 'creating'::text;
-
-alter table public.organizations alter column sector set default 'general'::text;
-
-alter table public.organizations alter column status set default 'trial'::organization_status;
-
-alter table public.organizations alter column updated_at set default now();
-
-alter table public.arc_collection_products add constraint arc_collection_products_pkey PRIMARY KEY (collection_id, product_id);
-
-alter table public.arc_collection_products add constraint arc_collection_products_position_check CHECK (("position" >= 0));
-
-alter table public.arc_collections add constraint arc_collections_id_organization_id_key UNIQUE (id, organization_id);
-
-alter table public.arc_collections add constraint arc_collections_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text));
-
-alter table public.arc_collections add constraint arc_collections_organization_id_slug_key UNIQUE (organization_id, slug);
-
-alter table public.arc_collections add constraint arc_collections_pkey PRIMARY KEY (id);
-
-alter table public.arc_collections add constraint arc_collections_slug_check CHECK ((slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'::text));
-
-alter table public.arc_collections add constraint arc_collections_source_check CHECK ((source = ANY (ARRAY['native'::text, 'shopify'::text])));
-
-alter table public.arc_collections add constraint arc_collections_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'archived'::text])));
-
-alter table public.arc_collections add constraint arc_collections_title_check CHECK (((char_length(title) >= 1) AND (char_length(title) <= 160)));
-
-alter table public.arc_customer_addresses add constraint arc_customer_addresses_pkey PRIMARY KEY (id);
-
-alter table public.arc_customer_favourites add constraint arc_customer_favourites_pkey PRIMARY KEY (id);
-
-alter table public.arc_customer_favourites add constraint arc_customer_favourites_slug_format CHECK ((product_slug ~ '^[a-z0-9][a-z0-9-]{0,199}$'::text));
-
-alter table public.arc_customer_favourites add constraint arc_customer_favourites_unique UNIQUE (user_id, product_slug);
-
-alter table public.arc_discounts add constraint arc_discounts_check CHECK ((((discount_type = 'percentage'::text) AND ((value >= 1) AND (value <= 100))) OR ((discount_type = 'fixed_amount'::text) AND (value > 0)) OR ((discount_type = 'free_shipping'::text) AND (value = 0))));
-
-alter table public.arc_discounts add constraint arc_discounts_check1 CHECK (((ends_at IS NULL) OR (starts_at IS NULL) OR (ends_at > starts_at)));
-
-alter table public.arc_discounts add constraint arc_discounts_code_check CHECK (((code IS NULL) OR (code ~ '^[A-Z0-9_-]{2,40}$'::text)));
-
-alter table public.arc_discounts add constraint arc_discounts_discount_type_check CHECK ((discount_type = ANY (ARRAY['percentage'::text, 'fixed_amount'::text, 'free_shipping'::text])));
-
-alter table public.arc_discounts add constraint arc_discounts_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text));
-
-alter table public.arc_discounts add constraint arc_discounts_minimum_subtotal_check CHECK ((minimum_subtotal >= 0));
-
-alter table public.arc_discounts add constraint arc_discounts_name_check CHECK (((char_length(name) >= 1) AND (char_length(name) <= 160)));
-
-alter table public.arc_discounts add constraint arc_discounts_organization_id_code_key UNIQUE (organization_id, code);
-
-alter table public.arc_discounts add constraint arc_discounts_per_customer_limit_check CHECK (((per_customer_limit IS NULL) OR (per_customer_limit > 0)));
-
-alter table public.arc_discounts add constraint arc_discounts_pkey PRIMARY KEY (id);
-
-alter table public.arc_discounts add constraint arc_discounts_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'paused'::text, 'expired'::text])));
-
-alter table public.arc_discounts add constraint arc_discounts_usage_count_check CHECK ((usage_count >= 0));
-
-alter table public.arc_discounts add constraint arc_discounts_usage_limit_check CHECK (((usage_limit IS NULL) OR (usage_limit > 0)));
-
-alter table public.arc_discounts add constraint arc_discounts_value_check CHECK ((value >= 0));
-
-alter table public.arc_import_batches add constraint arc_import_batches_error_rows_check CHECK ((error_rows >= 0));
-
-alter table public.arc_import_batches add constraint arc_import_batches_imported_rows_check CHECK ((imported_rows >= 0));
-
-alter table public.arc_import_batches add constraint arc_import_batches_kind_check CHECK ((kind = ANY (ARRAY['products'::text, 'orders'::text])));
-
-alter table public.arc_import_batches add constraint arc_import_batches_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text));
-
-alter table public.arc_import_batches add constraint arc_import_batches_pkey PRIMARY KEY (id);
-
-alter table public.arc_import_batches add constraint arc_import_batches_skipped_rows_check CHECK ((skipped_rows >= 0));
-
-alter table public.arc_import_batches add constraint arc_import_batches_source_check CHECK ((source = 'shopify'::text));
-
-alter table public.arc_import_batches add constraint arc_import_batches_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text])));
-
-alter table public.arc_import_batches add constraint arc_import_batches_total_rows_check CHECK ((total_rows >= 0));
-
-alter table public.arc_import_errors add constraint arc_import_errors_pkey PRIMARY KEY (id);
-
-alter table public.arc_inventory_movements add constraint arc_inventory_movements_kind_check CHECK ((kind = ANY (ARRAY['in'::text, 'out'::text, 'adjustment'::text, 'sale'::text, 'return'::text, 'sync'::text])));
-
-alter table public.arc_inventory_movements add constraint arc_inventory_movements_pkey PRIMARY KEY (id);
-
-alter table public.arc_order_events add constraint arc_order_events_event_data_check CHECK ((jsonb_typeof(event_data) = 'object'::text));
-
-alter table public.arc_order_events add constraint arc_order_events_event_type_check CHECK ((event_type = ANY (ARRAY['status_updated'::text, 'fulfillment_updated'::text, 'payment_amount_mismatch'::text, 'payment_settle_failed'::text, 'payment_session_failed'::text, 'stock_shortfall'::text, 'item_edited'::text])));
-
-alter table public.arc_order_events add constraint arc_order_events_pkey PRIMARY KEY (id);
-
-alter table public.arc_order_items add constraint arc_order_items_pkey PRIMARY KEY (id);
-
-alter table public.arc_order_items add constraint arc_order_items_quantity_check CHECK ((quantity > 0));
-
-alter table public.arc_order_items add constraint arc_order_items_total_check CHECK ((total >= 0));
-
-alter table public.arc_order_items add constraint arc_order_items_unit_price_check CHECK ((unit_price >= 0));
-
-alter table public.arc_orders add constraint arc_orders_id_organization_id_key UNIQUE (id, organization_id);
-
-alter table public.arc_orders add constraint arc_orders_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text));
-
-alter table public.arc_orders add constraint arc_orders_organization_id_order_number_key UNIQUE (organization_id, order_number);
-
-alter table public.arc_orders add constraint arc_orders_organization_id_source_external_id_key UNIQUE (organization_id, source, external_id);
-
-alter table public.arc_orders add constraint arc_orders_payment_status_check CHECK ((payment_status = ANY (ARRAY['pending'::text, 'authorized'::text, 'paid'::text, 'partially_refunded'::text, 'refunded'::text, 'failed'::text])));
-
-alter table public.arc_orders add constraint arc_orders_pkey PRIMARY KEY (id);
-
-alter table public.arc_orders add constraint arc_orders_shipping_check CHECK ((shipping >= 0));
-
-alter table public.arc_orders add constraint arc_orders_source_check CHECK ((source = ANY (ARRAY['native'::text, 'shopify'::text])));
-
-alter table public.arc_orders add constraint arc_orders_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'processing'::text, 'fulfilled'::text, 'cancelled'::text, 'refunded'::text])));
-
-alter table public.arc_orders add constraint arc_orders_subtotal_check CHECK ((subtotal >= 0));
-
-alter table public.arc_orders add constraint arc_orders_tax_check CHECK ((tax >= 0));
-
-alter table public.arc_orders add constraint arc_orders_total_check CHECK ((total >= 0));
-
-alter table public.arc_payment_orders add constraint arc_payment_orders_expected_amount_check CHECK ((expected_amount > 0));
-
-alter table public.arc_payment_orders add constraint arc_payment_orders_merchant_oid_key UNIQUE (merchant_oid);
-
-alter table public.arc_payment_orders add constraint arc_payment_orders_payment_method_check CHECK ((payment_method = ANY (ARRAY['card'::text, 'eft'::text])));
-
-alter table public.arc_payment_orders add constraint arc_payment_orders_pkey PRIMARY KEY (id);
-
-alter table public.arc_payment_orders add constraint arc_payment_orders_saglayici_check CHECK ((saglayici = ANY (ARRAY['paytr'::text, 'tami'::text])));
-
-alter table public.arc_payment_orders add constraint arc_payment_orders_status_check CHECK ((status = ANY (ARRAY['awaiting_payment'::text, 'paid'::text, 'failed'::text, 'cancelled'::text])));
-
-alter table public.arc_price_collections add constraint arc_price_collections_pkey PRIMARY KEY (id);
-
-alter table public.arc_product_variants add constraint arc_product_variants_attributes_check CHECK ((jsonb_typeof(attributes) = 'object'::text));
-
-alter table public.arc_product_variants add constraint arc_product_variants_compare_at_price_check CHECK (((compare_at_price IS NULL) OR (compare_at_price >= 0)));
-
-alter table public.arc_product_variants add constraint arc_product_variants_id_organization_id_key UNIQUE (id, organization_id);
-
-alter table public.arc_product_variants add constraint arc_product_variants_organization_id_external_id_key UNIQUE (organization_id, external_id);
-
-alter table public.arc_product_variants add constraint arc_product_variants_pkey PRIMARY KEY (id);
-
-alter table public.arc_product_variants add constraint arc_product_variants_price_check CHECK ((price >= 0));
-
-alter table public.arc_products add constraint arc_products_id_organization_key UNIQUE (id, organization_id);
-
-alter table public.arc_products add constraint arc_products_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text));
-
-alter table public.arc_products add constraint arc_products_name_check CHECK (((char_length(name) >= 1) AND (char_length(name) <= 200)));
-
-alter table public.arc_products add constraint arc_products_organization_id_slug_key UNIQUE (organization_id, slug);
-
-alter table public.arc_products add constraint arc_products_organization_id_source_external_id_key UNIQUE (organization_id, source, external_id);
-
-alter table public.arc_products add constraint arc_products_pkey PRIMARY KEY (id);
-
-alter table public.arc_products add constraint arc_products_source_check CHECK ((source = ANY (ARRAY['native'::text, 'shopify'::text])));
-
-alter table public.arc_products add constraint arc_products_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'archived'::text])));
-
-alter table public.arc_products add constraint arc_products_yayin_araligi CHECK (((publish_at IS NULL) OR (unpublish_at IS NULL) OR (unpublish_at > publish_at)));
-
-alter table public.arc_return_requests add constraint arc_return_requests_pkey PRIMARY KEY (id);
-
-alter table public.arc_return_requests add constraint arc_return_status_check CHECK ((status = ANY (ARRAY['beklemede'::text, 'onaylandi'::text, 'reddedildi'::text, 'tamamlandi'::text])));
-
-alter table public.arc_saved_views add constraint arc_saved_views_ad_check CHECK (((length(btrim(ad)) >= 1) AND (length(btrim(ad)) <= 40)));
-
-alter table public.arc_saved_views add constraint arc_saved_views_liste_check CHECK ((liste = ANY (ARRAY['siparisler'::text, 'urunler'::text])));
-
-alter table public.arc_saved_views add constraint arc_saved_views_pkey PRIMARY KEY (id);
-
-alter table public.arc_saved_views add constraint arc_saved_views_sorgu_check CHECK (((length(sorgu) >= 1) AND (length(sorgu) <= 400)));
-
-alter table public.arc_shipment_items add constraint arc_shipment_items_pkey PRIMARY KEY (id);
-
-alter table public.arc_shipment_items add constraint arc_shipment_items_quantity_check CHECK ((quantity > 0));
-
-alter table public.arc_shipment_items add constraint arc_shipment_items_unique UNIQUE (shipment_id, order_item_id);
-
-alter table public.arc_shipments add constraint arc_shipments_cost_check CHECK (((shipping_cost IS NULL) OR (shipping_cost >= 0)));
-
-alter table public.arc_shipments add constraint arc_shipments_pkey PRIMARY KEY (id);
-
-alter table public.arc_shipments add constraint arc_shipments_sequence_check CHECK ((sequence > 0));
-
-alter table public.arc_shipments add constraint arc_shipments_source_check CHECK ((source = ANY (ARRAY['oto'::text, 'manual'::text])));
-
-alter table public.arc_shipments add constraint arc_shipments_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'created'::text, 'picked_up'::text, 'in_transit'::text, 'delivered'::text, 'cancelled'::text, 'failed'::text])));
-
-alter table public.arc_store_settings add constraint arc_store_settings_accent_color_check CHECK ((accent_color ~ '^#[0-9A-Fa-f]{6}$'::text));
-
-alter table public.arc_store_settings add constraint arc_store_settings_bank_iban_check CHECK (((bank_iban IS NULL) OR (bank_iban ~ '^TR[0-9]{24}$'::text)));
-
-alter table public.arc_store_settings add constraint arc_store_settings_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text));
-
-alter table public.arc_store_settings add constraint arc_store_settings_custom_domain_check CHECK (((custom_domain IS NULL) OR (custom_domain ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$'::text)));
-
-alter table public.arc_store_settings add constraint arc_store_settings_domain_status_check CHECK ((domain_status = ANY (ARRAY['not_configured'::text, 'pending_dns'::text, 'verifying'::text, 'active'::text, 'failed'::text])));
-
-alter table public.arc_store_settings add constraint arc_store_settings_garanti_api_surumu_check CHECK ((garanti_api_surumu = ANY (ARRAY['v512'::text, 'v0.01'::text])));
-
-alter table public.arc_store_settings add constraint arc_store_settings_locale_check CHECK (((char_length(locale) >= 2) AND (char_length(locale) <= 20)));
-
-alter table public.arc_store_settings add constraint arc_store_settings_low_stock_threshold_check CHECK (((low_stock_threshold >= 0) AND (low_stock_threshold <= 10000)));
-
-alter table public.arc_store_settings add constraint arc_store_settings_odeme_saglayicisi_check CHECK ((odeme_saglayicisi = ANY (ARRAY['paytr'::text, 'garanti'::text])));
-
-alter table public.arc_store_settings add constraint arc_store_settings_order_prefix_check CHECK ((order_prefix ~ '^[A-Z]{1,6}$'::text));
-
-alter table public.arc_store_settings add constraint arc_store_settings_panel_custom_domain_check CHECK (((panel_custom_domain IS NULL) OR (panel_custom_domain ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$'::text)));
-
-alter table public.arc_store_settings add constraint arc_store_settings_panel_domain_status_check CHECK ((panel_domain_status = ANY (ARRAY['not_configured'::text, 'pending_dns'::text, 'verifying'::text, 'active'::text, 'failed'::text])));
-
-alter table public.arc_store_settings add constraint arc_store_settings_paytr_installment_check CHECK (((paytr_max_installment >= 0) AND (paytr_max_installment <= 12)));
-
-alter table public.arc_store_settings add constraint arc_store_settings_pkey PRIMARY KEY (organization_id);
-
-alter table public.arc_store_settings add constraint arc_store_settings_platform_subdomain_check CHECK (((platform_subdomain IS NULL) OR (platform_subdomain ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$'::text)));
-
-alter table public.arc_store_settings add constraint arc_store_settings_primary_color_check CHECK ((primary_color ~ '^#[0-9A-Fa-f]{6}$'::text));
-
-alter table public.arc_store_settings add constraint arc_store_settings_shipping_check CHECK (((shipping_fee >= 0) AND (free_shipping_threshold >= 0)));
-
-alter table public.arc_store_settings add constraint arc_store_settings_store_name_check CHECK (((char_length(store_name) >= 1) AND (char_length(store_name) <= 160)));
-
-alter table public.arc_store_settings add constraint arc_store_settings_storefront_url_check CHECK (((storefront_url IS NULL) OR (storefront_url ~ '^https://[A-Za-z0-9.-]+(?::[0-9]+)?(?:/.*)?$'::text)));
-
-alter table public.arc_store_settings add constraint arc_store_settings_transfer_discount_check CHECK (((bank_transfer_discount_percent >= (0)::numeric) AND (bank_transfer_discount_percent <= (100)::numeric)));
-
-alter table public.arc_store_themes add constraint arc_store_themes_config_check CHECK ((jsonb_typeof(config) = 'object'::text));
-
-alter table public.arc_store_themes add constraint arc_store_themes_mode_check CHECK ((mode = ANY (ARRAY['draft'::text, 'published'::text])));
-
-alter table public.arc_store_themes add constraint arc_store_themes_organization_id_mode_key UNIQUE (organization_id, mode);
-
-alter table public.arc_store_themes add constraint arc_store_themes_pkey PRIMARY KEY (id);
-
-alter table public.arc_store_themes add constraint arc_store_themes_version_check CHECK ((version > 0));
-
-alter table public.arc_suppliers add constraint arc_suppliers_organization_id_code_key UNIQUE (organization_id, code);
-
-alter table public.arc_suppliers add constraint arc_suppliers_pkey PRIMARY KEY (id);
-
-alter table public.organization_memberships add constraint organization_memberships_permissions_check CHECK ((jsonb_typeof(permissions) = 'object'::text));
-
-alter table public.organization_memberships add constraint organization_memberships_pkey PRIMARY KEY (organization_id, user_id);
-
-alter table public.organization_modules add constraint organization_modules_configuration_check CHECK ((jsonb_typeof(configuration) = 'object'::text));
-
-alter table public.organization_modules add constraint organization_modules_pkey PRIMARY KEY (organization_id, module_code);
-
-alter table public.organization_product_licenses add constraint organization_product_licenses_monthly_fee_check CHECK (((monthly_fee IS NULL) OR (monthly_fee > 0)));
-
-alter table public.organization_product_licenses add constraint organization_product_licenses_pkey PRIMARY KEY (organization_id, product);
-
-alter table public.organization_product_licenses add constraint organization_product_licenses_product_check CHECK ((product = ANY (ARRAY['arvolab'::text, 'arc'::text])));
-
-alter table public.organization_product_licenses add constraint organization_product_licenses_status_check CHECK ((status = ANY (ARRAY['inactive'::text, 'trialing'::text, 'active'::text, 'past_due'::text, 'suspended'::text, 'canceled'::text])));
-
-alter table public.organizations add constraint organizations_bank_account_holder_len CHECK (((bank_account_holder IS NULL) OR ((char_length(bank_account_holder) >= 1) AND (char_length(bank_account_holder) <= 200)))) NOT VALID;
-
-alter table public.organizations add constraint organizations_bank_name_len CHECK (((bank_name IS NULL) OR ((char_length(bank_name) >= 1) AND (char_length(bank_name) <= 120)))) NOT VALID;
-
-alter table public.organizations add constraint organizations_brand_color_format CHECK (((brand_color IS NULL) OR (brand_color ~* '^#[0-9a-f]{6}$'::text)));
-
-alter table public.organizations add constraint organizations_custom_domain_key UNIQUE (custom_domain);
-
-alter table public.organizations add constraint organizations_custom_domain_status_check CHECK ((custom_domain_status = ANY (ARRAY['pending'::text, 'verified'::text, 'failed'::text])));
-
-alter table public.organizations add constraint organizations_iban_format CHECK (((iban IS NULL) OR ((iban ~ '^TR[0-9]{24}$'::text) AND (((((substr(iban, 5) || '2927'::text) || substr(iban, 3, 2)))::numeric % (97)::numeric) = (1)::numeric)))) NOT VALID;
-
-alter table public.organizations add constraint organizations_kind_check CHECK ((kind = ANY (ARRAY['customer'::text, 'internal'::text])));
-
-alter table public.organizations add constraint organizations_legal_address_len CHECK (((legal_address IS NULL) OR ((char_length(legal_address) >= 1) AND (char_length(legal_address) <= 500)))) NOT VALID;
-
-alter table public.organizations add constraint organizations_legal_city_len CHECK (((legal_city IS NULL) OR ((char_length(legal_city) >= 1) AND (char_length(legal_city) <= 60)))) NOT VALID;
-
-alter table public.organizations add constraint organizations_legal_district_len CHECK (((legal_district IS NULL) OR ((char_length(legal_district) >= 1) AND (char_length(legal_district) <= 60)))) NOT VALID;
-
-alter table public.organizations add constraint organizations_legal_name_len CHECK (((legal_name IS NULL) OR ((char_length(legal_name) >= 1) AND (char_length(legal_name) <= 200)))) NOT VALID;
-
-alter table public.organizations add constraint organizations_mersis_no_format CHECK (((mersis_no IS NULL) OR (mersis_no ~ '^[0-9]{16}$'::text))) NOT VALID;
-
-alter table public.organizations add constraint organizations_name_check CHECK (((char_length(name) >= 2) AND (char_length(name) <= 160)));
-
-alter table public.organizations add constraint organizations_pkey PRIMARY KEY (id);
-
-alter table public.organizations add constraint organizations_provisioning_state_check CHECK ((provisioning_state = ANY (ARRAY['creating'::text, 'inviting_owner'::text, 'waiting_owner'::text, 'active'::text, 'suspended'::text, 'archived'::text, 'failed'::text])));
-
-alter table public.organizations add constraint organizations_slug_check CHECK ((slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'::text));
-
-alter table public.organizations add constraint organizations_slug_key UNIQUE (slug);
-
-alter table public.organizations add constraint organizations_tax_number_format CHECK (((tax_number IS NULL) OR (tax_number ~ '^[0-9]{10,11}$'::text))) NOT VALID;
-
-alter table public.organizations add constraint organizations_tax_office_len CHECK (((tax_office IS NULL) OR ((char_length(tax_office) >= 1) AND (char_length(tax_office) <= 120)))) NOT VALID;
-
-CREATE INDEX arc_collection_products_collection_org_idx ON public.arc_collection_products USING btree (collection_id, organization_id);
-
-CREATE INDEX arc_collection_products_collection_position_idx ON public.arc_collection_products USING btree (collection_id, "position");
-
-CREATE INDEX arc_collection_products_org_product_idx ON public.arc_collection_products USING btree (organization_id, product_id);
-
-CREATE INDEX arc_collection_products_product_org_idx ON public.arc_collection_products USING btree (product_id, organization_id);
-
-CREATE INDEX arc_collections_org_status_idx ON public.arc_collections USING btree (organization_id, status);
-
-CREATE INDEX arc_customer_addresses_user_idx ON public.arc_customer_addresses USING btree (user_id, created_at DESC);
-
-CREATE INDEX arc_customer_favourites_user_created_idx ON public.arc_customer_favourites USING btree (user_id, created_at DESC);
-
-CREATE INDEX arc_discounts_org_status_idx ON public.arc_discounts USING btree (organization_id, status);
-
-CREATE INDEX arc_discounts_org_type_idx ON public.arc_discounts USING btree (organization_id, discount_type);
-
-CREATE INDEX arc_import_batches_org_created_idx ON public.arc_import_batches USING btree (organization_id, created_at DESC);
-
-CREATE INDEX arc_import_errors_batch_idx ON public.arc_import_errors USING btree (batch_id, created_at);
-
-CREATE INDEX arc_inventory_org_created_idx ON public.arc_inventory_movements USING btree (organization_id, created_at DESC);
-
-CREATE INDEX arc_inventory_org_variant_idx ON public.arc_inventory_movements USING btree (organization_id, variant_id, created_at DESC);
-
-CREATE INDEX arc_order_events_order_created_idx ON public.arc_order_events USING btree (order_id, created_at DESC);
-
-CREATE INDEX arc_order_items_org_order_idx ON public.arc_order_items USING btree (organization_id, order_id);
-
-CREATE INDEX arc_orders_aktif_liste_idx ON public.arc_orders USING btree (organization_id, created_at DESC) WHERE (archived_at IS NULL);
-
-CREATE INDEX arc_orders_customer_email_idx ON public.arc_orders USING btree (lower(customer_email));
-
-CREATE INDEX arc_orders_org_created_idx ON public.arc_orders USING btree (organization_id, created_at DESC);
-
-CREATE INDEX arc_orders_org_payment_created_idx ON public.arc_orders USING btree (organization_id, payment_status, created_at DESC);
-
-CREATE INDEX arc_orders_org_status_created_idx ON public.arc_orders USING btree (organization_id, status, created_at DESC);
-
-CREATE INDEX arc_orders_user_id_idx ON public.arc_orders USING btree (user_id);
-
-CREATE INDEX arc_payment_orders_org_created_idx ON public.arc_payment_orders USING btree (organization_id, created_at DESC);
-
-CREATE INDEX arc_payment_orders_status_idx ON public.arc_payment_orders USING btree (status, created_at DESC);
-
-CREATE INDEX arc_price_collections_org_idx ON public.arc_price_collections USING btree (organization_id, created_at DESC);
-
-CREATE INDEX arc_variants_org_product_idx ON public.arc_product_variants USING btree (organization_id, product_id);
-
-CREATE INDEX arc_variants_org_stock_idx ON public.arc_product_variants USING btree (organization_id, stock);
-
-CREATE INDEX arc_variants_product_idx ON public.arc_product_variants USING btree (product_id);
-
-CREATE INDEX arc_variants_supplier_sku_idx ON public.arc_product_variants USING btree (organization_id, supplier, supplier_sku);
-
-CREATE UNIQUE INDEX arc_variants_product_sku_uniq ON public.arc_product_variants USING btree (organization_id, product_id, sku);
-
-CREATE UNIQUE INDEX arc_variants_supplier_sku_uniq ON public.arc_product_variants USING btree (organization_id, supplier_sku) WHERE (supplier_sku IS NOT NULL);
-
-CREATE INDEX arc_products_org_status_idx ON public.arc_products USING btree (organization_id, status);
-
-CREATE INDEX arc_products_supplier_idx ON public.arc_products USING btree (organization_id, supplier, supplier_product_code);
-
-CREATE INDEX arc_products_yayin_bitisi_idx ON public.arc_products USING btree (unpublish_at) WHERE (unpublish_at IS NOT NULL);
-
-CREATE INDEX arc_products_yayin_zamani_idx ON public.arc_products USING btree (publish_at) WHERE (publish_at IS NOT NULL);
-
-CREATE INDEX arc_return_requests_order_idx ON public.arc_return_requests USING btree (order_id);
-
-CREATE INDEX arc_return_requests_org_status_idx ON public.arc_return_requests USING btree (organization_id, status, created_at DESC);
-
-CREATE UNIQUE INDEX arc_return_requests_open_unique ON public.arc_return_requests USING btree (order_id) WHERE (status = 'beklemede'::text);
-
-CREATE INDEX arc_saved_views_liste_idx ON public.arc_saved_views USING btree (organization_id, liste, sira, created_at);
-
-CREATE UNIQUE INDEX arc_saved_views_ad_uniq ON public.arc_saved_views USING btree (organization_id, liste, lower(ad));
-
-CREATE INDEX arc_shipment_items_order_item_idx ON public.arc_shipment_items USING btree (order_item_id);
-
-CREATE INDEX arc_shipments_order_idx ON public.arc_shipments USING btree (order_id, sequence);
-
-CREATE INDEX arc_shipments_org_idx ON public.arc_shipments USING btree (organization_id, status);
-
-CREATE INDEX arc_shipments_supplier_idx ON public.arc_shipments USING btree (organization_id, supplier) WHERE (supplier IS NOT NULL);
-
-CREATE UNIQUE INDEX arc_shipments_tracking_idx ON public.arc_shipments USING btree (organization_id, carrier_code, tracking_number) WHERE (tracking_number IS NOT NULL);
-
-CREATE UNIQUE INDEX arc_store_settings_custom_domain_uidx ON public.arc_store_settings USING btree (custom_domain) WHERE (custom_domain IS NOT NULL);
-
-CREATE UNIQUE INDEX arc_store_settings_custom_domain_unique_idx ON public.arc_store_settings USING btree (lower(custom_domain)) WHERE ((custom_domain IS NOT NULL) AND (TRIM(BOTH FROM custom_domain) <> ''::text));
-
-CREATE UNIQUE INDEX arc_store_settings_order_prefix_unique_idx ON public.arc_store_settings USING btree (upper(order_prefix)) WHERE ((order_prefix IS NOT NULL) AND (TRIM(BOTH FROM order_prefix) <> ''::text));
-
-CREATE UNIQUE INDEX arc_store_settings_panel_custom_domain_uidx ON public.arc_store_settings USING btree (panel_custom_domain) WHERE (panel_custom_domain IS NOT NULL);
-
-CREATE UNIQUE INDEX arc_store_settings_panel_domain_unique_idx ON public.arc_store_settings USING btree (lower(panel_custom_domain)) WHERE ((panel_custom_domain IS NOT NULL) AND (TRIM(BOTH FROM panel_custom_domain) <> ''::text));
-
-CREATE UNIQUE INDEX arc_store_settings_platform_subdomain_uidx ON public.arc_store_settings USING btree (platform_subdomain) WHERE (platform_subdomain IS NOT NULL);
-
-CREATE UNIQUE INDEX arc_store_settings_platform_subdomain_unique_idx ON public.arc_store_settings USING btree (lower(platform_subdomain)) WHERE ((platform_subdomain IS NOT NULL) AND (TRIM(BOTH FROM platform_subdomain) <> ''::text));
-
-CREATE INDEX arc_store_themes_org_mode_idx ON public.arc_store_themes USING btree (organization_id, mode);
-
-CREATE INDEX organization_memberships_user_active_idx ON public.organization_memberships USING btree (user_id, is_active);
-
-CREATE INDEX organization_memberships_user_idx ON public.organization_memberships USING btree (user_id, organization_id) WHERE (is_active = true);
-
-CREATE INDEX organization_modules_module_code_idx ON public.organization_modules USING btree (module_code);
-
-CREATE INDEX organization_modules_org_enabled_idx ON public.organization_modules USING btree (organization_id, is_enabled);
-
-CREATE INDEX organization_modules_org_idx ON public.organization_modules USING btree (organization_id) WHERE (is_enabled = true);
-
-CREATE INDEX organization_product_licenses_product_status_idx ON public.organization_product_licenses USING btree (product, status);
-
-CREATE INDEX organizations_kind_idx ON public.organizations USING btree (kind);
-
-CREATE INDEX organizations_plan_code_idx ON public.organizations USING btree (plan_code);
-
-CREATE UNIQUE INDEX organizations_custom_domain_unique_idx ON public.organizations USING btree (lower(custom_domain)) WHERE (custom_domain IS NOT NULL);
-
-alter table public.arc_collection_products add constraint arc_collection_products_collection_id_organization_id_fkey FOREIGN KEY (collection_id, organization_id) REFERENCES arc_collections(id, organization_id) ON DELETE CASCADE;
-
-alter table public.arc_collection_products add constraint arc_collection_products_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_collection_products add constraint arc_collection_products_product_id_organization_id_fkey FOREIGN KEY (product_id, organization_id) REFERENCES arc_products(id, organization_id) ON DELETE CASCADE;
-
-alter table public.arc_collections add constraint arc_collections_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_customer_addresses add constraint arc_customer_addresses_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-
-alter table public.arc_customer_favourites add constraint arc_customer_favourites_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-
-alter table public.arc_discounts add constraint arc_discounts_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_import_batches add constraint arc_import_batches_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public.arc_import_batches add constraint arc_import_batches_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_import_errors add constraint arc_import_errors_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES arc_import_batches(id) ON DELETE CASCADE;
-
-alter table public.arc_import_errors add constraint arc_import_errors_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_inventory_movements add constraint arc_inventory_movements_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public.arc_inventory_movements add constraint arc_inventory_movements_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_inventory_movements add constraint arc_inventory_movements_variant_id_organization_id_fkey FOREIGN KEY (variant_id, organization_id) REFERENCES arc_product_variants(id, organization_id) ON DELETE CASCADE;
-
-alter table public.arc_order_events add constraint arc_order_events_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public.arc_order_events add constraint arc_order_events_order_id_organization_id_fkey FOREIGN KEY (order_id, organization_id) REFERENCES arc_orders(id, organization_id) ON DELETE CASCADE;
-
-alter table public.arc_order_events add constraint arc_order_events_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_order_items add constraint arc_order_items_order_id_organization_id_fkey FOREIGN KEY (order_id, organization_id) REFERENCES arc_orders(id, organization_id) ON DELETE CASCADE;
-
-alter table public.arc_order_items add constraint arc_order_items_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_order_items add constraint arc_order_items_variant_id_organization_id_fkey FOREIGN KEY (variant_id, organization_id) REFERENCES arc_product_variants(id, organization_id) ON DELETE SET NULL;
-
-alter table public.arc_orders add constraint arc_orders_archived_by_fkey FOREIGN KEY (archived_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public.arc_orders add constraint arc_orders_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_orders add constraint arc_orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id);
-
-alter table public.arc_price_collections add constraint arc_price_collections_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_product_variants add constraint arc_product_variants_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_product_variants add constraint arc_product_variants_product_id_fkey FOREIGN KEY (product_id) REFERENCES arc_products(id) ON DELETE CASCADE;
-
-alter table public.arc_products add constraint arc_products_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public.arc_products add constraint arc_products_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_return_requests add constraint arc_return_requests_order_id_fkey FOREIGN KEY (order_id) REFERENCES arc_orders(id) ON DELETE CASCADE;
-
-alter table public.arc_return_requests add constraint arc_return_requests_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_return_requests add constraint arc_return_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public.arc_saved_views add constraint arc_saved_views_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public.arc_saved_views add constraint arc_saved_views_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_shipment_items add constraint arc_shipment_items_order_item_id_fkey FOREIGN KEY (order_item_id) REFERENCES arc_order_items(id) ON DELETE CASCADE;
-
-alter table public.arc_shipment_items add constraint arc_shipment_items_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_shipment_items add constraint arc_shipment_items_shipment_id_fkey FOREIGN KEY (shipment_id) REFERENCES arc_shipments(id) ON DELETE CASCADE;
-
-alter table public.arc_shipments add constraint arc_shipments_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public.arc_shipments add constraint arc_shipments_order_id_fkey FOREIGN KEY (order_id) REFERENCES arc_orders(id) ON DELETE CASCADE;
-
-alter table public.arc_shipments add constraint arc_shipments_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_store_settings add constraint arc_store_settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_store_themes add constraint arc_store_themes_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.arc_store_themes add constraint arc_store_themes_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public.arc_suppliers add constraint arc_suppliers_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.organization_memberships add constraint organization_memberships_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.organization_memberships add constraint organization_memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-
-alter table public.organization_modules add constraint organization_modules_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.organization_product_licenses add constraint organization_product_licenses_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
-
-alter table public.organization_product_licenses add constraint organization_product_licenses_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id);
-
-alter table public.arc_collection_products enable row level security;
-
-alter table public.arc_collections enable row level security;
-
-alter table public.arc_customer_addresses enable row level security;
-
-alter table public.arc_customer_favourites enable row level security;
-
-alter table public.arc_discounts enable row level security;
-
-alter table public.arc_import_batches enable row level security;
-
-alter table public.arc_import_errors enable row level security;
-
-alter table public.arc_inventory_movements enable row level security;
-
-alter table public.arc_order_events enable row level security;
-
-alter table public.arc_order_items enable row level security;
-
-alter table public.arc_orders enable row level security;
-
-alter table public.arc_payment_orders enable row level security;
-
-alter table public.arc_price_collections enable row level security;
-
-alter table public.arc_product_variants enable row level security;
-
-alter table public.arc_products enable row level security;
-
-alter table public.arc_return_requests enable row level security;
-
-alter table public.arc_saved_views enable row level security;
-
-alter table public.arc_shipment_items enable row level security;
-
-alter table public.arc_shipments enable row level security;
-
-alter table public.arc_store_settings enable row level security;
-
-alter table public.arc_store_themes enable row level security;
-
-alter table public.arc_suppliers enable row level security;
-
-alter table public.organization_memberships enable row level security;
-
-alter table public.organization_modules enable row level security;
-
-alter table public.organization_product_licenses enable row level security;
-
-alter table public.organizations enable row level security;
-
-create policy "arc managers delete collection products" on public.arc_collection_products as PERMISSIVE for DELETE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_collection_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc managers insert collection products" on public.arc_collection_products as PERMISSIVE for INSERT to authenticated
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_collection_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc managers update collection products" on public.arc_collection_products as PERMISSIVE for UPDATE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_collection_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_collection_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc members read collection products" on public.arc_collection_products as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_collection_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy "arc managers delete collections" on public.arc_collections as PERMISSIVE for DELETE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc managers insert collections" on public.arc_collections as PERMISSIVE for INSERT to authenticated
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc managers update collections" on public.arc_collections as PERMISSIVE for UPDATE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc members read collections" on public.arc_collections as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy arc_addresses_owner_delete on public.arc_customer_addresses as PERMISSIVE for DELETE to authenticated
-  using ((user_id = auth.uid()));
-
-create policy arc_addresses_owner_insert on public.arc_customer_addresses as PERMISSIVE for INSERT to authenticated
-  with check ((user_id = auth.uid()));
-
-create policy arc_addresses_owner_select on public.arc_customer_addresses as PERMISSIVE for SELECT to authenticated
-  using ((user_id = auth.uid()));
-
-create policy arc_addresses_owner_update on public.arc_customer_addresses as PERMISSIVE for UPDATE to authenticated
-  using ((user_id = auth.uid()))
-  with check ((user_id = auth.uid()));
-
-create policy arc_customer_favourites_delete_own on public.arc_customer_favourites as PERMISSIVE for DELETE to authenticated
-  using ((user_id = ( SELECT auth.uid() AS uid)));
-
-create policy arc_customer_favourites_insert_own on public.arc_customer_favourites as PERMISSIVE for INSERT to authenticated
-  with check ((user_id = ( SELECT auth.uid() AS uid)));
-
-create policy arc_customer_favourites_select_own on public.arc_customer_favourites as PERMISSIVE for SELECT to authenticated
-  using ((user_id = ( SELECT auth.uid() AS uid)));
-
-create policy "arc managers delete discounts" on public.arc_discounts as PERMISSIVE for DELETE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc managers insert discounts" on public.arc_discounts as PERMISSIVE for INSERT to authenticated
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc managers update discounts" on public.arc_discounts as PERMISSIVE for UPDATE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc members read discounts" on public.arc_discounts as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy "arc managers manage import batches" on public.arc_import_batches as PERMISSIVE for ALL to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_import_batches.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_import_batches.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
-
-create policy "arc members read import batches" on public.arc_import_batches as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_import_batches.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy "arc managers manage import errors" on public.arc_import_errors as PERMISSIVE for ALL to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_import_errors.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_import_errors.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
-
-create policy "arc members read import errors" on public.arc_import_errors as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_import_errors.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy "arc managers manage inventory" on public.arc_inventory_movements as PERMISSIVE for ALL to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_inventory_movements.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_inventory_movements.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
-
-create policy "arc members read inventory" on public.arc_inventory_movements as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_inventory_movements.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy "arc managers insert order events" on public.arc_order_events as PERMISSIVE for INSERT to authenticated
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_order_events.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc members read order events" on public.arc_order_events as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_order_events.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy "arc managers manage order items" on public.arc_order_items as PERMISSIVE for ALL to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_order_items.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_order_items.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
-
-create policy "arc members read order items" on public.arc_order_items as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_order_items.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy arc_order_items_customer_select on public.arc_order_items as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM arc_orders o
-  WHERE ((o.id = arc_order_items.order_id) AND (o.user_id = auth.uid())))));
-
-create policy "arc managers manage orders" on public.arc_orders as PERMISSIVE for ALL to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_orders.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_orders.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
-
-create policy "arc members read orders" on public.arc_orders as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_orders.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy arc_orders_customer_select on public.arc_orders as PERMISSIVE for SELECT to authenticated
-  using ((user_id = auth.uid()));
-
-create policy arc_price_collections_member_read on public.arc_price_collections as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_price_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
-
-create policy arc_price_collections_member_update on public.arc_price_collections as PERMISSIVE for UPDATE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_price_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_price_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
-
-create policy "arc managers manage variants" on public.arc_product_variants as PERMISSIVE for ALL to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_product_variants.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_product_variants.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
-
-create policy "arc members read variants" on public.arc_product_variants as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_product_variants.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy "arc managers manage products" on public.arc_products as PERMISSIVE for ALL to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
-
-create policy "arc members read products" on public.arc_products as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy "arc managers update returns" on public.arc_return_requests as PERMISSIVE for UPDATE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_return_requests.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc members read returns" on public.arc_return_requests as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_return_requests.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy "customers read own returns" on public.arc_return_requests as PERMISSIVE for SELECT to authenticated
-  using ((user_id = ( SELECT auth.uid() AS uid)));
-
-create policy arc_saved_views_manager_delete on public.arc_saved_views as PERMISSIVE for DELETE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_saved_views.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy arc_saved_views_manager_insert on public.arc_saved_views as PERMISSIVE for INSERT to authenticated
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_saved_views.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy arc_saved_views_manager_update on public.arc_saved_views as PERMISSIVE for UPDATE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_saved_views.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_saved_views.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy arc_saved_views_member_read on public.arc_saved_views as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_saved_views.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
-
-create policy arc_shipment_items_member_all on public.arc_shipment_items as PERMISSIVE for ALL to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_shipment_items.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_shipment_items.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
-
-create policy arc_shipments_member_all on public.arc_shipments as PERMISSIVE for ALL to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_shipments.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_shipments.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
-
-create policy "arc managers insert store settings" on public.arc_store_settings as PERMISSIVE for INSERT to authenticated
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships membership
-  WHERE ((membership.organization_id = arc_store_settings.organization_id) AND (membership.user_id = ( SELECT auth.uid() AS uid)) AND (membership.is_active = true) AND ((membership.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc managers update store settings" on public.arc_store_settings as PERMISSIVE for UPDATE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships membership
-  WHERE ((membership.organization_id = arc_store_settings.organization_id) AND (membership.user_id = ( SELECT auth.uid() AS uid)) AND (membership.is_active = true) AND ((membership.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships membership
-  WHERE ((membership.organization_id = arc_store_settings.organization_id) AND (membership.user_id = ( SELECT auth.uid() AS uid)) AND (membership.is_active = true) AND ((membership.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc members read store settings" on public.arc_store_settings as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships membership
-  WHERE ((membership.organization_id = arc_store_settings.organization_id) AND (membership.user_id = ( SELECT auth.uid() AS uid)) AND (membership.is_active = true)))));
-
-create policy "arc managers delete store themes" on public.arc_store_themes as PERMISSIVE for DELETE to authenticated
-  using (((mode = 'draft'::text) AND (EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_store_themes.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text])))))));
-
-create policy "arc managers insert store themes" on public.arc_store_themes as PERMISSIVE for INSERT to authenticated
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_store_themes.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc managers update store themes" on public.arc_store_themes as PERMISSIVE for UPDATE to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_store_themes.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
-  with check ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_store_themes.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
-
-create policy "arc members read store themes" on public.arc_store_themes as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_store_themes.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
-
-create policy "public reads published store themes" on public.arc_store_themes as PERMISSIVE for SELECT to anon
-  using ((mode = 'published'::text));
-
-create policy arc_suppliers_admins_delete on public.arc_suppliers as PERMISSIVE for DELETE to authenticated
-  using (private.arvo_is_org_admin(organization_id));
-
-create policy arc_suppliers_admins_insert on public.arc_suppliers as PERMISSIVE for INSERT to authenticated
-  with check (private.arvo_is_org_admin(organization_id));
-
-create policy arc_suppliers_admins_update on public.arc_suppliers as PERMISSIVE for UPDATE to authenticated
-  using (private.arvo_is_org_admin(organization_id))
-  with check (private.arvo_is_org_admin(organization_id));
-
-create policy arc_suppliers_members_read on public.arc_suppliers as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = arc_suppliers.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
-
-create policy arc_members_read_own_membership on public.organization_memberships as PERMISSIVE for SELECT to authenticated
-  using ((user_id = ( SELECT auth.uid() AS uid)));
-
-create policy arc_members_read_own_modules on public.organization_modules as PERMISSIVE for SELECT to authenticated
-  using ((EXISTS ( SELECT 1
-   FROM organization_memberships m
-  WHERE ((m.organization_id = organization_modules.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
-
-revoke all on function private.arc_guard_payment_settings() from public;
-
-revoke all on function private.arc_guard_store_domains() from public;
-
-revoke all on function private.arc_magaza_varsayilanlari() from public;
-
-revoke all on function private.arc_order_archive_guard() from public;
-
-revoke all on function private.arc_order_item_cost() from public;
-
-revoke all on function private.arc_return_request_unarchive() from public;
-
-revoke all on function private.arvo_arc_shipment_item_guard() from public;
-
-revoke all on function private.arvo_arc_shipment_source_guard() from public;
-
-revoke all on function private.arvo_arc_shipment_touch() from public;
-
-revoke all on function private.arvo_is_org_admin(target_org uuid) from public;
-grant execute on function private.arvo_is_org_admin(target_org uuid) to authenticated;
-grant execute on function private.arvo_is_org_admin(target_org uuid) to service_role;
-
-revoke all on function private.can_manage_organization_assets(organization_id_text text) from public;
-grant execute on function private.can_manage_organization_assets(organization_id_text text) to authenticated;
-
-revoke all on function public.arc_address_before_write() from public;
-grant execute on function public.arc_address_before_write() to service_role;
-
-revoke all on function public.arc_address_line(p_addr jsonb) from public;
-grant execute on function public.arc_address_line(p_addr jsonb) to service_role;
-grant execute on function public.arc_address_line(p_addr jsonb) to authenticated;
-
-revoke all on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) from public;
-grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to service_role;
-grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to authenticated;
-
-revoke all on function public.arc_aktarim_hesap_yukle(p_kullanicilar jsonb, p_kimlikler jsonb) from public;
-grant execute on function public.arc_aktarim_hesap_yukle(p_kullanicilar jsonb, p_kimlikler jsonb) to service_role;
-
-revoke all on function public.arc_aktarim_pk(p_tablo text) from public;
-grant execute on function public.arc_aktarim_pk(p_tablo text) to service_role;
-
-revoke all on function public.arc_aktarim_sil(p_tablo text, p_anahtarlar jsonb) from public;
-grant execute on function public.arc_aktarim_sil(p_tablo text, p_anahtarlar jsonb) to service_role;
-
-revoke all on function public.arc_aktarim_yukle(p_tablo text, p_satirlar jsonb) from public;
-grant execute on function public.arc_aktarim_yukle(p_tablo text, p_satirlar jsonb) to service_role;
-
-revoke all on function public.arc_baslik(p_text text) from public;
-grant execute on function public.arc_baslik(p_text text) to service_role;
-grant execute on function public.arc_baslik(p_text text) to authenticated;
-
-revoke all on function public.arc_bulk_update_supplier_stock(p_organization_id uuid, p_supplier text, p_rows jsonb) from public;
-grant execute on function public.arc_bulk_update_supplier_stock(p_organization_id uuid, p_supplier text, p_rows jsonb) to service_role;
-
-revoke all on function public.arc_categorize_supplier_products(p_supplier text, p_organization_id uuid) from public;
-grant execute on function public.arc_categorize_supplier_products(p_supplier text, p_organization_id uuid) to service_role;
-
-revoke all on function public.arc_check_coupon(p_organization_id uuid, p_code text, p_subtotal bigint, p_email text) from public;
-grant execute on function public.arc_check_coupon(p_organization_id uuid, p_code text, p_subtotal bigint, p_email text) to authenticated;
-grant execute on function public.arc_check_coupon(p_organization_id uuid, p_code text, p_subtotal bigint, p_email text) to service_role;
-
-revoke all on function public.arc_check_supplier_stock() from public;
-grant execute on function public.arc_check_supplier_stock() to service_role;
-
-revoke all on function public.arc_clean(p_value text) from public;
-grant execute on function public.arc_clean(p_value text) to authenticated;
-grant execute on function public.arc_clean(p_value text) to service_role;
-
-revoke all on function public.arc_close_missing_supplier_variants(p_organization_id uuid, p_supplier text, p_skus text[]) from public;
-grant execute on function public.arc_close_missing_supplier_variants(p_organization_id uuid, p_supplier text, p_skus text[]) to service_role;
-
-revoke all on function public.arc_count_coupon_use() from public;
-grant execute on function public.arc_count_coupon_use() to service_role;
-
-revoke all on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) from public;
-grant execute on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) to authenticated;
-grant execute on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) to service_role;
-
-revoke all on function public.arc_create_storefront_order(p_organization_id uuid, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) from public;
-grant execute on function public.arc_create_storefront_order(p_organization_id uuid, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
-
-revoke all on function public.arc_decode_entities(t text) from public;
-grant execute on function public.arc_decode_entities(t text) to anon;
-grant execute on function public.arc_decode_entities(t text) to authenticated;
-grant execute on function public.arc_decode_entities(t text) to service_role;
-grant execute on function public.arc_decode_entities(t text) to public;
-
-revoke all on function public.arc_delete_order(p_order_id uuid) from public;
-grant execute on function public.arc_delete_order(p_order_id uuid) to service_role;
-grant execute on function public.arc_delete_order(p_order_id uuid) to authenticated;
-
-revoke all on function public.arc_extract_vat(p_gross bigint, p_rate numeric) from public;
-grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to authenticated;
-grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to anon;
-grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to service_role;
-
-revoke all on function public.arc_fill_order_tax() from public;
-grant execute on function public.arc_fill_order_tax() to service_role;
-
-revoke all on function public.arc_find_address(p_meta jsonb) from public;
-grant execute on function public.arc_find_address(p_meta jsonb) to service_role;
-grant execute on function public.arc_find_address(p_meta jsonb) to authenticated;
-
-revoke all on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) from public;
-grant execute on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) to authenticated;
-grant execute on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) to service_role;
-
-revoke all on function public.arc_log_order_event() from public;
-grant execute on function public.arc_log_order_event() to service_role;
-
-revoke all on function public.arc_medya_listesi(p_organization_id uuid, p_arama text, p_limit integer, p_offset integer) from public;
-grant execute on function public.arc_medya_listesi(p_organization_id uuid, p_arama text, p_limit integer, p_offset integer) to authenticated;
-grant execute on function public.arc_medya_listesi(p_organization_id uuid, p_arama text, p_limit integer, p_offset integer) to service_role;
-
-revoke all on function public.arc_medya_ozeti(p_organization_id uuid) from public;
-grant execute on function public.arc_medya_ozeti(p_organization_id uuid) to authenticated;
-grant execute on function public.arc_medya_ozeti(p_organization_id uuid) to service_role;
-
-revoke all on function public.arc_normalize_address(p_addr jsonb) from public;
-grant execute on function public.arc_normalize_address(p_addr jsonb) to service_role;
-grant execute on function public.arc_normalize_address(p_addr jsonb) to authenticated;
-
-revoke all on function public.arc_reprice_supplier(p_supplier text) from public;
-grant execute on function public.arc_reprice_supplier(p_supplier text) to service_role;
-
-revoke all on function public.arc_reprice_supplier(p_supplier text, p_organization_id uuid) from public;
-grant execute on function public.arc_reprice_supplier(p_supplier text, p_organization_id uuid) to service_role;
-
-revoke all on function public.arc_resolve_commerce_tenant() from public;
-grant execute on function public.arc_resolve_commerce_tenant() to authenticated;
-grant execute on function public.arc_resolve_commerce_tenant() to service_role;
-
-revoke all on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) from public;
-grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to service_role;
-grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to authenticated;
-
-revoke all on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) from public;
-grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to service_role;
-grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to authenticated;
-
-revoke all on function public.arc_set_supplier_links(p_organization_id uuid, p_supplier text, p_rows jsonb) from public;
-grant execute on function public.arc_set_supplier_links(p_organization_id uuid, p_supplier text, p_rows jsonb) to service_role;
-
-revoke all on function public.arc_set_supplier_variant_stock(p_organization_id uuid, p_supplier text, p_rows jsonb) from public;
-grant execute on function public.arc_set_supplier_variant_stock(p_organization_id uuid, p_supplier text, p_rows jsonb) to service_role;
-
-revoke all on function public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) from public;
-grant execute on function public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) to service_role;
-
-revoke all on function public.arc_siparis_kalemi_duzenle(p_order_id uuid, p_item_id uuid, p_adet integer, p_variant_id uuid) from public;
-grant execute on function public.arc_siparis_kalemi_duzenle(p_order_id uuid, p_item_id uuid, p_adet integer, p_variant_id uuid) to service_role;
-grant execute on function public.arc_siparis_kalemi_duzenle(p_order_id uuid, p_item_id uuid, p_adet integer, p_variant_id uuid) to authenticated;
-
-revoke all on function public.arc_slugify(p_text text) from public;
-grant execute on function public.arc_slugify(p_text text) to service_role;
-grant execute on function public.arc_slugify(p_text text) to authenticated;
-
-revoke all on function public.arc_store_stage(p_organization_id uuid) from public;
-grant execute on function public.arc_store_stage(p_organization_id uuid) to authenticated;
-grant execute on function public.arc_store_stage(p_organization_id uuid) to anon;
-grant execute on function public.arc_store_stage(p_organization_id uuid) to service_role;
-
-revoke all on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
-grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to authenticated;
-grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
-grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
-
-revoke all on function public.arc_storefront_collection_products_page(p_host text, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
-grant execute on function public.arc_storefront_collection_products_page(p_host text, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
-grant execute on function public.arc_storefront_collection_products_page(p_host text, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
-grant execute on function public.arc_storefront_collection_products_page(p_host text, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
-
-revoke all on function public.arc_storefront_collections(p_host text) from public;
-grant execute on function public.arc_storefront_collections(p_host text) to service_role;
-grant execute on function public.arc_storefront_collections(p_host text) to authenticated;
-grant execute on function public.arc_storefront_collections(p_host text) to anon;
-
-revoke all on function public.arc_storefront_coupon(p_host text, p_code text, p_subtotal bigint, p_email text) from public;
-grant execute on function public.arc_storefront_coupon(p_host text, p_code text, p_subtotal bigint, p_email text) to service_role;
-
-revoke all on function public.arc_storefront_create_order(p_host text, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) from public;
-grant execute on function public.arc_storefront_create_order(p_host text, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
-
-revoke all on function public.arc_storefront_deals(p_host text, p_limit integer) from public;
-grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to authenticated;
-grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to service_role;
-grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to anon;
-
-revoke all on function public.arc_storefront_discounts(p_host text) from public;
-grant execute on function public.arc_storefront_discounts(p_host text) to service_role;
-grant execute on function public.arc_storefront_discounts(p_host text) to anon;
-grant execute on function public.arc_storefront_discounts(p_host text) to authenticated;
-
-revoke all on function public.arc_storefront_facets(p_host text) from public;
-grant execute on function public.arc_storefront_facets(p_host text) to authenticated;
-grant execute on function public.arc_storefront_facets(p_host text) to service_role;
-grant execute on function public.arc_storefront_facets(p_host text) to anon;
-
-revoke all on function public.arc_storefront_org(p_host text) from public;
-grant execute on function public.arc_storefront_org(p_host text) to authenticated;
-grant execute on function public.arc_storefront_org(p_host text) to anon;
-grant execute on function public.arc_storefront_org(p_host text) to service_role;
-
-revoke all on function public.arc_storefront_payment_methods(p_host text) from public;
-grant execute on function public.arc_storefront_payment_methods(p_host text) to anon;
-grant execute on function public.arc_storefront_payment_methods(p_host text) to authenticated;
-grant execute on function public.arc_storefront_payment_methods(p_host text) to service_role;
-
-revoke all on function public.arc_storefront_product(p_host text, p_slug text) from public;
-grant execute on function public.arc_storefront_product(p_host text, p_slug text) to authenticated;
-grant execute on function public.arc_storefront_product(p_host text, p_slug text) to anon;
-grant execute on function public.arc_storefront_product(p_host text, p_slug text) to service_role;
-
-revoke all on function public.arc_storefront_product_badges(p_host text) from public;
-grant execute on function public.arc_storefront_product_badges(p_host text) to authenticated;
-grant execute on function public.arc_storefront_product_badges(p_host text) to anon;
-grant execute on function public.arc_storefront_product_badges(p_host text) to service_role;
-
-revoke all on function public.arc_storefront_product_count(p_host text) from public;
-grant execute on function public.arc_storefront_product_count(p_host text) to authenticated;
-grant execute on function public.arc_storefront_product_count(p_host text) to service_role;
-grant execute on function public.arc_storefront_product_count(p_host text) to anon;
-
-revoke all on function public.arc_storefront_product_slugs(p_host text, p_limit integer, p_offset integer) from public;
-grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer, p_offset integer) to authenticated;
-grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer, p_offset integer) to service_role;
-grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer, p_offset integer) to anon;
-
-revoke all on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) from public;
-grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to authenticated;
-grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to anon;
-grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to service_role;
-
-revoke all on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
-grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
-grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
-grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
-
-revoke all on function public.arc_storefront_return_request(p_host text, p_order_number text, p_items jsonb, p_reason text, p_note text) from public;
-grant execute on function public.arc_storefront_return_request(p_host text, p_order_number text, p_items jsonb, p_reason text, p_note text) to authenticated;
-grant execute on function public.arc_storefront_return_request(p_host text, p_order_number text, p_items jsonb, p_reason text, p_note text) to service_role;
-
-revoke all on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) from public;
-grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) to service_role;
-grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) to anon;
-grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) to authenticated;
-
-revoke all on function public.arc_storefront_settings(p_host text) from public;
-grant execute on function public.arc_storefront_settings(p_host text) to authenticated;
-grant execute on function public.arc_storefront_settings(p_host text) to service_role;
-grant execute on function public.arc_storefront_settings(p_host text) to anon;
-
-revoke all on function public.arc_storefront_variants(p_host text, p_slug text) from public;
-grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to authenticated;
-grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to service_role;
-grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to anon;
-
-revoke all on function public.arc_total_stock_units() from public;
-grant execute on function public.arc_total_stock_units() to service_role;
-grant execute on function public.arc_total_stock_units() to authenticated;
-
-revoke all on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) from public;
-grant execute on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) to authenticated;
-grant execute on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) to service_role;
-
-revoke all on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) from public;
-grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to anon;
-grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to authenticated;
-grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to service_role;
-
-revoke all on function public.attach_arvoculture_order_owner() from public;
-grant execute on function public.attach_arvoculture_order_owner() to service_role;
-
-revoke all on function public.check_arvoculture_coupon(p_code text, p_subtotal bigint, p_email text) from public;
-grant execute on function public.check_arvoculture_coupon(p_code text, p_subtotal bigint, p_email text) to service_role;
-
-revoke all on function public.claim_arvoculture_orders() from public;
-grant execute on function public.claim_arvoculture_orders() to service_role;
-grant execute on function public.claim_arvoculture_orders() to authenticated;
-
-revoke all on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) from public;
-grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to service_role;
-grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to authenticated;
-
-revoke all on function public.create_arvoculture_storefront_order(p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) from public;
-grant execute on function public.create_arvoculture_storefront_order(p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
-
-revoke all on function public.get_arvoculture_my_orders() from public;
-grant execute on function public.get_arvoculture_my_orders() to service_role;
-grant execute on function public.get_arvoculture_my_orders() to authenticated;
-
-revoke all on function public.get_arvoculture_my_returns() from public;
-grant execute on function public.get_arvoculture_my_returns() to authenticated;
-grant execute on function public.get_arvoculture_my_returns() to service_role;
-
-revoke all on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
-grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
-grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to authenticated;
-grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
-
-revoke all on function public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
-grant execute on function public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
-grant execute on function public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
-grant execute on function public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
-
-revoke all on function public.get_arvoculture_storefront_collections() from public;
-grant execute on function public.get_arvoculture_storefront_collections() to anon;
-grant execute on function public.get_arvoculture_storefront_collections() to service_role;
-grant execute on function public.get_arvoculture_storefront_collections() to authenticated;
-
-revoke all on function public.get_arvoculture_storefront_deals(p_limit integer) from public;
-grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to service_role;
-grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to authenticated;
-grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to anon;
-
-revoke all on function public.get_arvoculture_storefront_discounts() from public;
-grant execute on function public.get_arvoculture_storefront_discounts() to service_role;
-grant execute on function public.get_arvoculture_storefront_discounts() to authenticated;
-grant execute on function public.get_arvoculture_storefront_discounts() to anon;
-
-revoke all on function public.get_arvoculture_storefront_facets() from public;
-grant execute on function public.get_arvoculture_storefront_facets() to service_role;
-grant execute on function public.get_arvoculture_storefront_facets() to anon;
-grant execute on function public.get_arvoculture_storefront_facets() to authenticated;
-grant execute on function public.get_arvoculture_storefront_facets() to public;
-
-revoke all on function public.get_arvoculture_storefront_product(p_slug text) from public;
-grant execute on function public.get_arvoculture_storefront_product(p_slug text) to anon;
-grant execute on function public.get_arvoculture_storefront_product(p_slug text) to authenticated;
-grant execute on function public.get_arvoculture_storefront_product(p_slug text) to service_role;
-
-revoke all on function public.get_arvoculture_storefront_product_badges() from public;
-grant execute on function public.get_arvoculture_storefront_product_badges() to service_role;
-grant execute on function public.get_arvoculture_storefront_product_badges() to anon;
-grant execute on function public.get_arvoculture_storefront_product_badges() to authenticated;
-
-revoke all on function public.get_arvoculture_storefront_product_count() from public;
-grant execute on function public.get_arvoculture_storefront_product_count() to service_role;
-grant execute on function public.get_arvoculture_storefront_product_count() to authenticated;
-grant execute on function public.get_arvoculture_storefront_product_count() to anon;
-
-revoke all on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) from public;
-grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to authenticated;
-grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to service_role;
-grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to anon;
-
-revoke all on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) from public;
-grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to service_role;
-grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to anon;
-grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to authenticated;
-
-revoke all on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
-grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
-grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
-grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
-grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to public;
-
-revoke all on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) from public;
-grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to authenticated;
-grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to service_role;
-grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to anon;
-
-revoke all on function public.get_arvoculture_storefront_settings() from public;
-grant execute on function public.get_arvoculture_storefront_settings() to anon;
-grant execute on function public.get_arvoculture_storefront_settings() to authenticated;
-grant execute on function public.get_arvoculture_storefront_settings() to service_role;
-
-revoke all on function public.get_arvoculture_storefront_variants(p_slug text) from public;
-grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to service_role;
-grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to anon;
-grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to authenticated;
-
-revoke all on function public.get_storefront_seller(p_tenant text) from public;
-grant execute on function public.get_storefront_seller(p_tenant text) to anon;
-grant execute on function public.get_storefront_seller(p_tenant text) to service_role;
-grant execute on function public.get_storefront_seller(p_tenant text) to authenticated;
-
-revoke all on function public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) from public;
-grant execute on function public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) to service_role;
-
-revoke all on function public.update_arvoculture_profile(p_full_name text, p_phone text) from public;
-grant execute on function public.update_arvoculture_profile(p_full_name text, p_phone text) to service_role;
-grant execute on function public.update_arvoculture_profile(p_full_name text, p_phone text) to authenticated;
-
-CREATE TRIGGER arc_addresses_before_write BEFORE INSERT OR UPDATE ON public.arc_customer_addresses FOR EACH ROW EXECUTE FUNCTION arc_address_before_write();
-
-CREATE TRIGGER arc_order_item_cost BEFORE INSERT ON public.arc_order_items FOR EACH ROW EXECUTE FUNCTION private.arc_order_item_cost();
-
-CREATE TRIGGER arc_order_items_stock_check BEFORE INSERT ON public.arc_order_items FOR EACH ROW EXECUTE FUNCTION arc_check_supplier_stock();
-
-CREATE TRIGGER arc_order_archive_guard BEFORE UPDATE OF archived_at, status ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION private.arc_order_archive_guard();
-
-CREATE TRIGGER arc_orders_attach_owner BEFORE INSERT ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION attach_arvoculture_order_owner();
-
-CREATE TRIGGER arc_orders_count_coupon_use AFTER UPDATE OF payment_status ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION arc_count_coupon_use();
-
-CREATE TRIGGER arc_orders_fill_tax AFTER UPDATE OF subtotal, total ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION arc_fill_order_tax();
-
-CREATE TRIGGER arc_orders_log_event AFTER UPDATE ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION arc_log_order_event();
-
-CREATE TRIGGER arc_return_request_unarchive AFTER INSERT ON public.arc_return_requests FOR EACH ROW EXECUTE FUNCTION private.arc_return_request_unarchive();
-
-CREATE TRIGGER arvo_arc_shipment_item_guard BEFORE INSERT OR UPDATE ON public.arc_shipment_items FOR EACH ROW EXECUTE FUNCTION private.arvo_arc_shipment_item_guard();
-
-CREATE TRIGGER arvo_arc_shipment_source_guard BEFORE INSERT OR UPDATE ON public.arc_shipments FOR EACH ROW EXECUTE FUNCTION private.arvo_arc_shipment_source_guard();
-
-CREATE TRIGGER arvo_arc_shipment_touch BEFORE UPDATE ON public.arc_shipments FOR EACH ROW EXECUTE FUNCTION private.arvo_arc_shipment_touch();
-
-CREATE TRIGGER arc_guard_payment_settings BEFORE INSERT OR UPDATE ON public.arc_store_settings FOR EACH ROW EXECUTE FUNCTION private.arc_guard_payment_settings();
-
-CREATE TRIGGER arc_guard_store_domains BEFORE INSERT OR UPDATE OF custom_domain, panel_custom_domain ON public.arc_store_settings FOR EACH ROW EXECUTE FUNCTION private.arc_guard_store_domains();
-
-CREATE TRIGGER arc_magaza_varsayilanlari BEFORE INSERT ON public.arc_store_settings FOR EACH ROW EXECUTE FUNCTION private.arc_magaza_varsayilanlari();
-
--- 20261017133904 ile gelen raf fonksiyonlarının yetkileri.
-revoke all on function public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
-grant execute on function public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon, authenticated, service_role;
-revoke all on function public.arc_storefront_collection_products_page(p_host text, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
-grant execute on function public.arc_storefront_collection_products_page(p_host text, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon, authenticated, service_role;
-revoke all on function public.get_arvoculture_storefront_collection_facets(p_collection_slugs text[], p_menu_groups text[]) from public;
-grant execute on function public.get_arvoculture_storefront_collection_facets(p_collection_slugs text[], p_menu_groups text[]) to anon, authenticated, service_role;
-revoke all on function public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[], p_menu_groups text[]) from public;
-grant execute on function public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[], p_menu_groups text[]) to anon, authenticated, service_role;
-
--- 17.10.2026: vitrin gövdeleri tek yerde (arc_vitrin_*).
 CREATE OR REPLACE FUNCTION public.arc_vitrin_arama_dizini(p_organization_id uuid, p_limit integer DEFAULT 1000, p_offset integer DEFAULT 0)
  RETURNS TABLE(slug text, name text, vendor text, product_type text, price bigint, compare_at_price bigint, image_path text)
  LANGUAGE sql
@@ -6318,37 +4141,2319 @@ AS $function$
 $function$
 ;
 
-revoke all on function public.arc_vitrin_koleksiyonlar(p_organization_id uuid) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_koleksiyonlar(p_organization_id uuid) to service_role;
-revoke all on function public.arc_vitrin_koleksiyon_secenekleri(p_organization_id uuid, p_collection_slugs text[], p_menu_groups text[]) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_koleksiyon_secenekleri(p_organization_id uuid, p_collection_slugs text[], p_menu_groups text[]) to service_role;
-revoke all on function public.arc_vitrin_koleksiyon_urunleri(p_organization_id uuid, p_collection_slug text, p_menu_groups text[], p_limit integer) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_koleksiyon_urunleri(p_organization_id uuid, p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
-revoke all on function public.arc_vitrin_koleksiyon_sayfasi(p_organization_id uuid, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_koleksiyon_sayfasi(p_organization_id uuid, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
-revoke all on function public.arc_vitrin_firsatlar(p_organization_id uuid, p_limit integer) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_firsatlar(p_organization_id uuid, p_limit integer) to service_role;
-revoke all on function public.arc_vitrin_indirimler(p_organization_id uuid) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_indirimler(p_organization_id uuid) to service_role;
-revoke all on function public.arc_vitrin_secenekler(p_organization_id uuid) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_secenekler(p_organization_id uuid) to service_role;
-revoke all on function public.arc_vitrin_urun(p_organization_id uuid, p_slug text) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_urun(p_organization_id uuid, p_slug text) to service_role;
-revoke all on function public.arc_vitrin_urun_rozetleri(p_organization_id uuid) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_urun_rozetleri(p_organization_id uuid) to service_role;
-revoke all on function public.arc_vitrin_urun_sayisi(p_organization_id uuid) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_urun_sayisi(p_organization_id uuid) to service_role;
-revoke all on function public.arc_vitrin_urun_adresleri(p_organization_id uuid, p_limit integer, p_offset integer) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_urun_adresleri(p_organization_id uuid, p_limit integer, p_offset integer) to service_role;
-revoke all on function public.arc_vitrin_urunler(p_organization_id uuid, p_limit integer, p_offset integer) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_urunler(p_organization_id uuid, p_limit integer, p_offset integer) to service_role;
-revoke all on function public.arc_vitrin_urun_sayfasi(p_organization_id uuid, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_urun_sayfasi(p_organization_id uuid, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
-revoke all on function public.arc_vitrin_arama_dizini(p_organization_id uuid, p_limit integer, p_offset integer) from public, anon, authenticated;
+CREATE OR REPLACE FUNCTION public.attach_arvoculture_order_owner()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if new.user_id is null and auth.uid() is not null then
+    new.user_id := auth.uid();
+  end if;
+  return new;
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.check_arvoculture_coupon(p_code text, p_subtotal bigint DEFAULT 0, p_email text DEFAULT NULL::text)
+ RETURNS TABLE(valid boolean, message text, discount_type text, value numeric, minimum_subtotal bigint, discount_amount bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_check_coupon(
+    (select id from public.organizations where slug = 'arvoculture' limit 1),
+    p_code, p_subtotal, p_email)
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.claim_arvoculture_orders()
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_user_id uuid := auth.uid();
+  v_email text := lower(coalesce(auth.jwt() ->> 'email', ''));
+  v_verified boolean :=
+    coalesce((auth.jwt() -> 'user_metadata' ->> 'email_verified')::boolean, false)
+    or coalesce((auth.jwt() ->> 'email_verified')::boolean, false);
+  v_imported boolean;
+  v_count integer;
+  v_name text;
+  v_phone text;
+  v_meta jsonb;
+  v_addr jsonb;
+  v_line text;
+  v_city text;
+  v_district text;
+  v_postal text;
+  v_row record;
+  v_seq integer := 0;
+begin
+  if v_user_id is null or v_email = '' or not v_verified then
+    return 0;
+  end if;
+
+  -- --- 1. Siparişleri hesaba bağla -------------------------
+  update public.arc_orders
+     set user_id = v_user_id, updated_at = now()
+   where user_id is null
+     and lower(customer_email) = v_email;
+
+  get diagnostics v_count = row_count;
+
+  -- --- 2. Ad ve telefon ------------------------------------
+  select o.customer_name, o.metadata
+    into v_name, v_meta
+  from public.arc_orders o
+  where o.user_id = v_user_id
+  order by o.created_at desc
+  limit 1;
+
+  v_addr := public.arc_find_address(coalesce(v_meta, '{}'::jsonb));
+
+  v_phone := coalesce(
+    public.arc_clean(v_addr ->> 'phone'),
+    public.arc_clean(v_meta ->> 'phone')
+  );
+
+  v_name := coalesce(
+    public.arc_clean(v_name),
+    public.arc_clean(v_addr ->> 'name')
+  );
+
+  update auth.users u
+     set raw_user_meta_data =
+           coalesce(u.raw_user_meta_data, '{}'::jsonb)
+           || jsonb_strip_nulls(
+                jsonb_build_object(
+                  'full_name',
+                  case when coalesce(u.raw_user_meta_data ->> 'full_name', '') = ''
+                       then v_name end,
+                  'phone',
+                  case when coalesce(u.raw_user_meta_data ->> 'phone', '') = ''
+                       then v_phone end
+                )
+              )
+   where u.id = v_user_id;
+
+  -- --- 3. Adresler: yalnızca bir kez ------------------------
+  select coalesce(
+           (raw_user_meta_data ->> 'addresses_imported')::boolean,
+           false
+         )
+    into v_imported
+  from auth.users
+  where id = v_user_id;
+
+  if v_imported then
+    -- Aktarım daha önce yapıldı. Müşterinin sildiği adresleri
+    -- geri getirmiyoruz.
+    return v_count;
+  end if;
+
+  for v_row in
+    select o.customer_name, o.metadata as meta, o.created_at
+    from public.arc_orders o
+    where o.user_id = v_user_id
+    order by o.created_at desc
+  loop
+    v_addr := public.arc_find_address(coalesce(v_row.meta, '{}'::jsonb));
+
+    v_line := coalesce(
+      public.arc_clean(v_addr ->> 'line'),
+      public.arc_address_line(v_addr)
+    );
+
+    if v_line is null then
+      continue;
+    end if;
+
+    v_city := coalesce(public.arc_clean(v_addr ->> 'city'), '-');
+    v_district := coalesce(
+      public.arc_clean(v_addr ->> 'district'),
+      public.arc_clean(v_addr ->> 'province'),
+      '-'
+    );
+    v_postal := coalesce(
+      public.arc_clean(v_addr ->> 'postal'),
+      public.arc_clean(v_addr ->> 'zip')
+    );
+
+    if exists (
+      select 1 from public.arc_customer_addresses a
+      where a.user_id = v_user_id
+        and lower(trim(a.line)) = lower(v_line)
+        and lower(trim(a.city)) = lower(v_city)
+    ) then
+      continue;
+    end if;
+
+    v_seq := v_seq + 1;
+
+    insert into public.arc_customer_addresses (
+      user_id, title, full_name, phone,
+      city, district, postal_code, line,
+      is_billing, is_shipping, is_default
+    )
+    values (
+      v_user_id,
+      case when v_seq = 1 then 'Ev' else 'Kayıtlı adres ' || v_seq end,
+      coalesce(
+        public.arc_clean(v_row.customer_name),
+        public.arc_clean(v_addr ->> 'name'),
+        'Ad Soyad'
+      ),
+      coalesce(
+        public.arc_clean(v_addr ->> 'phone'),
+        public.arc_clean(v_row.meta ->> 'phone'),
+        '-'
+      ),
+      v_city,
+      v_district,
+      v_postal,
+      v_line,
+      true,
+      true,
+      v_seq = 1 and not exists (
+        select 1 from public.arc_customer_addresses a2
+        where a2.user_id = v_user_id and a2.is_default
+      )
+    );
+  end loop;
+
+  -- Aktarım tamamlandı; bir daha çalışmayacak.
+  update auth.users
+     set raw_user_meta_data =
+           coalesce(raw_user_meta_data, '{}'::jsonb)
+           || jsonb_build_object('addresses_imported', true)
+   where id = v_user_id;
+
+  return v_count;
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select public.arc_vitrin_iade_talebi(
+    (select id from public.organizations where slug = 'arvoculture' limit 1),
+    p_order_number, p_items, p_reason, p_note);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.create_arvoculture_storefront_order(p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text DEFAULT NULL::text)
+ RETURNS TABLE(order_id uuid, order_number text, total bigint)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_org_id uuid;
+begin
+  select id into v_org_id from public.organizations where slug = 'arvoculture' limit 1;
+  if v_org_id is null then
+    raise exception 'Organizasyon bulunamadı';
+  end if;
+  return query select * from public.arc_create_storefront_order(
+    v_org_id, p_email, p_name, p_phone, p_address, p_items, p_coupon_code);
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_my_orders()
+ RETURNS TABLE(order_number text, status text, payment_status text, subtotal bigint, discount bigint, shipping bigint, total bigint, currency text, coupon_code text, address jsonb, billing_address jsonb, note text, created_at timestamp with time zone, items jsonb, shipments jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    o.order_number,
+    o.status,
+    o.payment_status,
+    coalesce(o.subtotal, 0) as subtotal,
+    coalesce((o.metadata ->> 'discount')::bigint, 0) as discount,
+    coalesce(o.shipping, 0) as shipping,
+    coalesce(o.total, 0) as total,
+    o.currency,
+    o.metadata ->> 'coupon_code' as coupon_code,
+
+    -- Teslimat adresi: hangi yapıda gelirse gelsin normalleştirilir.
+    coalesce(
+      public.arc_normalize_address(o.metadata -> 'shipping_address'),
+      public.arc_normalize_address(o.metadata -> 'address'),
+      public.arc_normalize_address(o.metadata -> 'billing')
+    ) as address,
+
+    -- Fatura adresi. Ayrı tanımlı değilse teslimat adresi kullanılır.
+    coalesce(
+      public.arc_normalize_address(o.metadata -> 'billing'),
+      public.arc_normalize_address(o.metadata -> 'billing_address'),
+      public.arc_normalize_address(o.metadata -> 'shipping_address'),
+      public.arc_normalize_address(o.metadata -> 'address')
+    ) as billing_address,
+
+    public.arc_clean(o.metadata ->> 'note') as note,
+    o.created_at,
+    coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object(
+            'name', i.product_name,
+            'sku', i.sku,
+            'quantity', i.quantity,
+            'unit_price', i.unit_price,
+            'total', i.total,
+            'slug', p.slug,
+            'image', p.metadata -> 'image_paths' ->> 0
+          )
+          order by i.id
+        )
+        from public.arc_order_items i
+        left join lateral (
+          select v.*
+          from public.arc_product_variants v
+          where (i.variant_id is not null and v.id = i.variant_id)
+             or (
+               i.variant_id is null
+               and i.sku is not null
+               and v.organization_id = i.organization_id
+               and v.sku = i.sku
+             )
+          limit 1
+        ) v on true
+        left join public.arc_products p
+          on p.id = v.product_id
+        where i.order_id = o.id
+      ),
+      '[]'::jsonb
+    ) as items,
+
+    -- GÖNDERİLER. Bir sipariş birden çok pakete bölünebiliyor ve her
+    -- paketin kendi takip numarası var; müşteri tek numara görüp
+    -- gelmeyen kalemi kayıp sanmasın diye hepsi ayrı ayrı veriliyor.
+    -- İptal edilen gönderi listede YOK: yola çıkmayacak bir paketin
+    -- takip numarasını göstermek müşteriyi boşuna bekletir.
+    coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object(
+            'sequence', s.sequence,
+            'status', s.status,
+            'carrier', s.carrier_name,
+            'tracking_number', s.tracking_number,
+            'tracking_url', s.tracking_url,
+            'shipped_at', s.shipped_at,
+            'delivered_at', s.delivered_at,
+            'items', coalesce(
+              (
+                select jsonb_agg(jsonb_build_object('name', oi.product_name, 'quantity', si.quantity) order by oi.product_name)
+                from public.arc_shipment_items si
+                join public.arc_order_items oi on oi.id = si.order_item_id
+                where si.shipment_id = s.id
+              ),
+              '[]'::jsonb
+            )
+          )
+          order by s.sequence
+        )
+        from public.arc_shipments s
+        where s.order_id = o.id
+          and s.status <> 'cancelled'
+          -- Taslak gönderi OTO'da henüz yok; müşteriye gösterilecek bir şey taşımıyor.
+          and s.status <> 'draft'
+      ),
+      '[]'::jsonb
+    ) as shipments
+  from public.arc_orders o
+  where o.user_id = auth.uid()
+  order by o.created_at desc
+  limit 100;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_my_returns()
+ RETURNS TABLE(id uuid, order_number text, items jsonb, reason text, status text, status_note text, refund_amount bigint, created_at timestamp with time zone, resolved_at timestamp with time zone)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    r.id, o.order_number, r.items, r.reason,
+    r.status, r.status_note, r.refund_amount,
+    r.created_at, r.resolved_at
+  from public.arc_return_requests r
+  join public.arc_orders o on o.id = r.order_id
+  where r.user_id = auth.uid()
+  order by r.created_at desc
+  limit 50;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_collection_facets(p_collection_slugs text[] DEFAULT NULL::text[], p_menu_groups text[] DEFAULT NULL::text[])
+ RETURNS TABLE(brands jsonb, sizes jsonb, max_price bigint, total_count bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_koleksiyon_secenekleri(
+    (select id from public.organizations where slug = 'arvoculture' limit 1), p_collection_slugs, p_menu_groups);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_collection_products(p_collection_slug text DEFAULT NULL::text, p_menu_groups text[] DEFAULT NULL::text[], p_limit integer DEFAULT 200)
+ RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, specs jsonb, size_guide jsonb, sizes jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_koleksiyon_urunleri(
+    (select id from public.organizations where slug = 'arvoculture' limit 1), p_collection_slug, p_menu_groups, p_limit);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[] DEFAULT NULL::text[], p_menu_groups text[] DEFAULT NULL::text[], p_limit integer DEFAULT 24, p_offset integer DEFAULT 0, p_brand text DEFAULT NULL::text, p_size text DEFAULT NULL::text, p_max_price bigint DEFAULT NULL::bigint, p_only_discounted boolean DEFAULT false, p_only_available boolean DEFAULT false, p_sort text DEFAULT 'onerilen'::text)
+ RETURNS TABLE(slug text, name text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, sizes jsonb, total_count bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_koleksiyon_sayfasi(
+    (select id from public.organizations where slug = 'arvoculture' limit 1), p_collection_slugs, p_menu_groups, p_limit, p_offset, p_brand, p_size, p_max_price, p_only_discounted, p_only_available, p_sort);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_collections()
+ RETURNS TABLE(title text, slug text, description text, menu_group text, parent text, product_count integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_koleksiyonlar(
+    (select id from public.organizations where slug = 'arvoculture' limit 1));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_deals(p_limit integer DEFAULT 12)
+ RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, specs jsonb, size_guide jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_firsatlar(
+    (select id from public.organizations where slug = 'arvoculture' limit 1), p_limit);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_discounts()
+ RETURNS TABLE(id uuid, name text, code text, discount_type text, value bigint, minimum_subtotal bigint, combinable boolean, badge text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_indirimler(
+    (select id from public.organizations where slug = 'arvoculture' limit 1));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_facets()
+ RETURNS TABLE(brands jsonb, sizes jsonb, max_price bigint, total_count bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_secenekler(
+    (select id from public.organizations where slug = 'arvoculture' limit 1));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_product(p_slug text)
+ RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_urun(
+    (select id from public.organizations where slug = 'arvoculture' limit 1), p_slug);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_product_badges()
+ RETURNS TABLE(slug text, badge text, badge_tone text, is_best_seller boolean, discount_percent integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_urun_rozetleri(
+    (select id from public.organizations where slug = 'arvoculture' limit 1));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_product_count()
+ RETURNS integer
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select public.arc_vitrin_urun_sayisi(
+    (select id from public.organizations where slug = 'arvoculture' limit 1));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_product_slugs(p_limit integer DEFAULT 1000, p_offset integer DEFAULT 0)
+ RETURNS TABLE(slug text, updated_at timestamp with time zone)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_urun_adresleri(
+    (select id from public.organizations where slug = 'arvoculture' limit 1), p_limit, p_offset);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_products(p_limit integer DEFAULT 24, p_offset integer DEFAULT 0)
+ RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, specs jsonb, size_guide jsonb, sizes jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_urunler(
+    (select id from public.organizations where slug = 'arvoculture' limit 1), p_limit, p_offset);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_products_page(p_limit integer DEFAULT 24, p_offset integer DEFAULT 0, p_brand text DEFAULT NULL::text, p_size text DEFAULT NULL::text, p_max_price bigint DEFAULT NULL::bigint, p_only_discounted boolean DEFAULT false, p_only_available boolean DEFAULT false, p_sort text DEFAULT 'onerilen'::text)
+ RETURNS TABLE(slug text, name text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb, sizes jsonb, total_count bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_urun_sayfasi(
+    (select id from public.organizations where slug = 'arvoculture' limit 1), p_limit, p_offset, p_brand, p_size, p_max_price, p_only_discounted, p_only_available, p_sort);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_search_index(p_limit integer DEFAULT 1000, p_offset integer DEFAULT 0)
+ RETURNS TABLE(slug text, name text, vendor text, product_type text, price bigint, compare_at_price bigint, image_path text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_arama_dizini(
+    (select id from public.organizations where slug = 'arvoculture' limit 1), p_limit, p_offset);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_settings()
+ RETURNS TABLE(shipping_fee bigint, free_shipping_threshold bigint, bank_transfer_enabled boolean, bank_transfer_discount_percent numeric)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_ayarlar(
+    (select id from public.organizations where slug = 'arvoculture' limit 1));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_variants(p_slug text)
+ RETURNS TABLE(sku text, title text, color text, size text, price bigint, compare_at_price bigint, stock integer, available boolean, image_path text, attributes jsonb)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_varyantlar(
+    (select id from public.organizations where slug = 'arvoculture' limit 1), p_slug);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_storefront_seller(p_tenant text DEFAULT 'arvoculture'::text)
+ RETURNS TABLE(legal_name text, trade_name text, mersis_no text, tax_office text, tax_number text, trade_registry_no text, address_line text, address_district text, address_city text, address_country text, contact_email text, contact_phone text, whatsapp_number text, kep_address text, etbis_verified boolean, storefront_url text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    s.legal_name,
+    coalesce(s.trade_name, o.name) as trade_name,
+    s.mersis_no,
+    s.tax_office,
+    s.tax_number,
+    s.trade_registry_no,
+    s.address_line,
+    s.address_district,
+    s.address_city,
+    coalesce(s.address_country, 'Türkiye') as address_country,
+    s.contact_email,
+    s.contact_phone,
+    s.whatsapp_number,
+    s.kep_address,
+    coalesce(s.etbis_verified, false) as etbis_verified,
+    s.storefront_url
+  from public.arc_store_settings s
+  join public.organizations o
+    on o.id = s.organization_id
+  where o.slug = p_tenant
+  limit 1;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text DEFAULT NULL::text, p_failure_reason text DEFAULT NULL::text)
+ RETURNS text
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select public.arc_settle_storefront_order(p_order_id, p_paid, p_payment_reference, p_failure_reason);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.update_arvoculture_profile(p_full_name text, p_phone text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if auth.uid() is null then
+    raise exception 'Oturum bulunamadı';
+  end if;
+
+  update auth.users
+     set raw_user_meta_data =
+           coalesce(raw_user_meta_data, '{}'::jsonb)
+           || jsonb_build_object(
+                'full_name', nullif(trim(p_full_name), ''),
+                'phone', nullif(trim(p_phone), '')
+              )
+   where id = auth.uid();
+end;
+$function$
+;
+
+alter table public.arc_collection_products alter column "position" set default 0;
+
+alter table public.arc_collection_products alter column created_at set default now();
+
+alter table public.arc_collections alter column created_at set default now();
+
+alter table public.arc_collections alter column description set default ''::text;
+
+alter table public.arc_collections alter column id set default gen_random_uuid();
+
+alter table public.arc_collections alter column metadata set default '{}'::jsonb;
+
+alter table public.arc_collections alter column seo_description set default ''::text;
+
+alter table public.arc_collections alter column seo_title set default ''::text;
+
+alter table public.arc_collections alter column source set default 'native'::text;
+
+alter table public.arc_collections alter column status set default 'active'::text;
+
+alter table public.arc_collections alter column updated_at set default now();
+
+alter table public.arc_customer_addresses alter column created_at set default now();
+
+alter table public.arc_customer_addresses alter column id set default gen_random_uuid();
+
+alter table public.arc_customer_addresses alter column is_billing set default true;
+
+alter table public.arc_customer_addresses alter column is_default set default false;
+
+alter table public.arc_customer_addresses alter column is_shipping set default true;
+
+alter table public.arc_customer_addresses alter column updated_at set default now();
+
+alter table public.arc_customer_favourites alter column created_at set default now();
+
+alter table public.arc_customer_favourites alter column id set default gen_random_uuid();
+
+alter table public.arc_customer_favourites alter column user_id set default auth.uid();
+
+alter table public.arc_discounts alter column combinable set default false;
+
+alter table public.arc_discounts alter column created_at set default now();
+
+alter table public.arc_discounts alter column id set default gen_random_uuid();
+
+alter table public.arc_discounts alter column metadata set default '{}'::jsonb;
+
+alter table public.arc_discounts alter column minimum_subtotal set default 0;
+
+alter table public.arc_discounts alter column status set default 'draft'::text;
+
+alter table public.arc_discounts alter column updated_at set default now();
+
+alter table public.arc_discounts alter column usage_count set default 0;
+
+alter table public.arc_discounts alter column value set default 0;
+
+alter table public.arc_import_batches alter column created_at set default now();
+
+alter table public.arc_import_batches alter column error_rows set default 0;
+
+alter table public.arc_import_batches alter column id set default gen_random_uuid();
+
+alter table public.arc_import_batches alter column imported_rows set default 0;
+
+alter table public.arc_import_batches alter column metadata set default '{}'::jsonb;
+
+alter table public.arc_import_batches alter column skipped_rows set default 0;
+
+alter table public.arc_import_batches alter column source set default 'shopify'::text;
+
+alter table public.arc_import_batches alter column status set default 'processing'::text;
+
+alter table public.arc_import_batches alter column total_rows set default 0;
+
+alter table public.arc_import_errors alter column created_at set default now();
+
+alter table public.arc_import_errors alter column id set default gen_random_uuid();
+
+alter table public.arc_import_errors alter column payload set default '{}'::jsonb;
+
+alter table public.arc_inventory_movements alter column created_at set default now();
+
+alter table public.arc_inventory_movements alter column id set default gen_random_uuid();
+
+alter table public.arc_order_events alter column created_at set default now();
+
+alter table public.arc_order_events alter column event_data set default '{}'::jsonb;
+
+alter table public.arc_order_events alter column id set default gen_random_uuid();
+
+alter table public.arc_order_items alter column id set default gen_random_uuid();
+
+alter table public.arc_orders alter column created_at set default now();
+
+alter table public.arc_orders alter column currency set default 'TRY'::text;
+
+alter table public.arc_orders alter column id set default gen_random_uuid();
+
+alter table public.arc_orders alter column metadata set default '{}'::jsonb;
+
+alter table public.arc_orders alter column payment_status set default 'pending'::text;
+
+alter table public.arc_orders alter column public_token set default encode(gen_random_bytes(16), 'hex'::text);
+
+alter table public.arc_orders alter column shipping set default 0;
+
+alter table public.arc_orders alter column source set default 'native'::text;
+
+alter table public.arc_orders alter column status set default 'pending'::text;
+
+alter table public.arc_orders alter column subtotal set default 0;
+
+alter table public.arc_orders alter column tax set default 0;
+
+alter table public.arc_orders alter column total set default 0;
+
+alter table public.arc_orders alter column updated_at set default now();
+
+alter table public.arc_payment_orders alter column created_at set default now();
+
+alter table public.arc_payment_orders alter column currency set default 'TL'::text;
+
+alter table public.arc_payment_orders alter column id set default gen_random_uuid();
+
+alter table public.arc_payment_orders alter column payment_method set default 'card'::text;
+
+alter table public.arc_payment_orders alter column paytr_test_mode set default false;
+
+alter table public.arc_payment_orders alter column saglayici set default 'paytr'::text;
+
+alter table public.arc_payment_orders alter column status set default 'awaiting_payment'::text;
+
+alter table public.arc_payment_orders alter column updated_at set default now();
+
+alter table public.arc_price_collections alter column created_at set default now();
+
+alter table public.arc_price_collections alter column id set default gen_random_uuid();
+
+alter table public.arc_price_collections alter column kaynak set default 'lr'::text;
+
+alter table public.arc_product_variants alter column allow_backorder set default true;
+
+alter table public.arc_product_variants alter column attributes set default '{}'::jsonb;
+
+alter table public.arc_product_variants alter column created_at set default now();
+
+alter table public.arc_product_variants alter column currency set default 'TRY'::text;
+
+alter table public.arc_product_variants alter column id set default gen_random_uuid();
+
+alter table public.arc_product_variants alter column price set default 0;
+
+alter table public.arc_product_variants alter column stock set default 0;
+
+alter table public.arc_product_variants alter column updated_at set default now();
+
+alter table public.arc_products alter column created_at set default now();
+
+alter table public.arc_products alter column description set default ''::text;
+
+alter table public.arc_products alter column id set default gen_random_uuid();
+
+alter table public.arc_products alter column metadata set default '{}'::jsonb;
+
+alter table public.arc_products alter column source set default 'native'::text;
+
+alter table public.arc_products alter column status set default 'draft'::text;
+
+alter table public.arc_products alter column updated_at set default now();
+
+alter table public.arc_return_requests alter column created_at set default now();
+
+alter table public.arc_return_requests alter column id set default gen_random_uuid();
+
+alter table public.arc_return_requests alter column items set default '[]'::jsonb;
+
+alter table public.arc_return_requests alter column status set default 'beklemede'::text;
+
+alter table public.arc_return_requests alter column updated_at set default now();
+
+alter table public.arc_saved_views alter column created_at set default now();
+
+alter table public.arc_saved_views alter column id set default gen_random_uuid();
+
+alter table public.arc_saved_views alter column sira set default 0;
+
+alter table public.arc_shipment_items alter column created_at set default now();
+
+alter table public.arc_shipment_items alter column id set default gen_random_uuid();
+
+alter table public.arc_shipments alter column created_at set default now();
+
+alter table public.arc_shipments alter column id set default gen_random_uuid();
+
+alter table public.arc_shipments alter column sequence set default 1;
+
+alter table public.arc_shipments alter column source set default 'oto'::text;
+
+alter table public.arc_shipments alter column status set default 'draft'::text;
+
+alter table public.arc_shipments alter column updated_at set default now();
+
+alter table public.arc_store_settings alter column accent_color set default '#6f9548'::text;
+
+alter table public.arc_store_settings alter column address_country set default 'Türkiye'::text;
+
+alter table public.arc_store_settings alter column bank_transfer_discount_percent set default 3;
+
+alter table public.arc_store_settings alter column bank_transfer_enabled set default false;
+
+alter table public.arc_store_settings alter column created_at set default now();
+
+alter table public.arc_store_settings alter column currency set default 'TRY'::text;
+
+alter table public.arc_store_settings alter column default_tax_rate set default 20;
+
+alter table public.arc_store_settings alter column domain_status set default 'not_configured'::text;
+
+alter table public.arc_store_settings alter column etbis_verified set default false;
+
+alter table public.arc_store_settings alter column free_shipping_threshold set default 200000;
+
+alter table public.arc_store_settings alter column garanti_api_surumu set default 'v512'::text;
+
+alter table public.arc_store_settings alter column garanti_enabled set default false;
+
+alter table public.arc_store_settings alter column garanti_guvenlik_duzeyi set default '3D_PAY_HOSTING'::text;
+
+alter table public.arc_store_settings alter column garanti_test_mode set default true;
+
+alter table public.arc_store_settings alter column garanti_yari_guvenli_kabul set default false;
+
+alter table public.arc_store_settings alter column locale set default 'tr-TR'::text;
+
+alter table public.arc_store_settings alter column low_stock_threshold set default 5;
+
+alter table public.arc_store_settings alter column odeme_saglayicisi set default 'paytr'::text;
+
+alter table public.arc_store_settings alter column panel_domain_status set default 'not_configured'::text;
+
+alter table public.arc_store_settings alter column paytr_enabled set default false;
+
+alter table public.arc_store_settings alter column paytr_max_installment set default 0;
+
+alter table public.arc_store_settings alter column paytr_no_installment set default false;
+
+alter table public.arc_store_settings alter column paytr_test_mode set default true;
+
+alter table public.arc_store_settings alter column primary_color set default '#002045'::text;
+
+alter table public.arc_store_settings alter column shipping_fee set default 12000;
+
+alter table public.arc_store_settings alter column tami_enabled set default false;
+
+alter table public.arc_store_settings alter column tami_test_mode set default true;
+
+alter table public.arc_store_settings alter column tryoto_enabled set default false;
+
+alter table public.arc_store_settings alter column tryoto_test_mode set default true;
+
+alter table public.arc_store_settings alter column updated_at set default now();
+
+alter table public.arc_store_themes alter column config set default '{}'::jsonb;
+
+alter table public.arc_store_themes alter column created_at set default now();
+
+alter table public.arc_store_themes alter column id set default gen_random_uuid();
+
+alter table public.arc_store_themes alter column updated_at set default now();
+
+alter table public.arc_store_themes alter column version set default 1;
+
+alter table public.arc_suppliers alter column active set default true;
+
+alter table public.arc_suppliers alter column brand_override set default 'ArvoCulture'::text;
+
+alter table public.arc_suppliers alter column created_at set default now();
+
+alter table public.arc_suppliers alter column id set default gen_random_uuid();
+
+alter table public.arc_suppliers alter column margin_percent set default 40;
+
+alter table public.arc_suppliers alter column publish_directly set default false;
+
+alter table public.arc_suppliers alter column round_to_kurus set default 90;
+
+alter table public.arc_suppliers alter column service_fee set default 0;
+
+alter table public.arc_suppliers alter column shipping_markup set default 6000;
+
+alter table public.arc_suppliers alter column stock_buffer set default 5;
+
+alter table public.arc_suppliers alter column sync_cursor set default 0;
+
+alter table public.arc_suppliers alter column sync_total set default 0;
+
+alter table public.arc_suppliers alter column updated_at set default now();
+
+alter table public.organization_memberships alter column is_active set default true;
+
+alter table public.organization_memberships alter column joined_at set default now();
+
+alter table public.organization_memberships alter column permissions set default '{}'::jsonb;
+
+alter table public.organization_memberships alter column role set default 'member'::membership_role;
+
+alter table public.organization_memberships alter column role_from_management set default false;
+
+alter table public.organization_modules alter column configuration set default '{}'::jsonb;
+
+alter table public.organization_modules alter column enabled_at set default now();
+
+alter table public.organization_modules alter column is_enabled set default true;
+
+alter table public.organization_product_licenses alter column created_at set default now();
+
+alter table public.organization_product_licenses alter column status set default 'inactive'::text;
+
+alter table public.organization_product_licenses alter column updated_at set default now();
+
+alter table public.organizations alter column created_at set default now();
+
+alter table public.organizations alter column id set default gen_random_uuid();
+
+alter table public.organizations alter column kind set default 'customer'::text;
+
+alter table public.organizations alter column primary_color set default '#183f31'::text;
+
+alter table public.organizations alter column provisioning_state set default 'creating'::text;
+
+alter table public.organizations alter column sector set default 'general'::text;
+
+alter table public.organizations alter column status set default 'trial'::organization_status;
+
+alter table public.organizations alter column updated_at set default now();
+
+alter table public.arc_collection_products add constraint arc_collection_products_pkey PRIMARY KEY (collection_id, product_id);
+
+alter table public.arc_collection_products add constraint arc_collection_products_position_check CHECK (("position" >= 0));
+
+alter table public.arc_collections add constraint arc_collections_id_organization_id_key UNIQUE (id, organization_id);
+
+alter table public.arc_collections add constraint arc_collections_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text));
+
+alter table public.arc_collections add constraint arc_collections_organization_id_slug_key UNIQUE (organization_id, slug);
+
+alter table public.arc_collections add constraint arc_collections_pkey PRIMARY KEY (id);
+
+alter table public.arc_collections add constraint arc_collections_slug_check CHECK ((slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'::text));
+
+alter table public.arc_collections add constraint arc_collections_source_check CHECK ((source = ANY (ARRAY['native'::text, 'shopify'::text])));
+
+alter table public.arc_collections add constraint arc_collections_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'archived'::text])));
+
+alter table public.arc_collections add constraint arc_collections_title_check CHECK (((char_length(title) >= 1) AND (char_length(title) <= 160)));
+
+alter table public.arc_customer_addresses add constraint arc_customer_addresses_pkey PRIMARY KEY (id);
+
+alter table public.arc_customer_favourites add constraint arc_customer_favourites_pkey PRIMARY KEY (id);
+
+alter table public.arc_customer_favourites add constraint arc_customer_favourites_slug_format CHECK ((product_slug ~ '^[a-z0-9][a-z0-9-]{0,199}$'::text));
+
+alter table public.arc_customer_favourites add constraint arc_customer_favourites_unique UNIQUE (user_id, product_slug);
+
+alter table public.arc_discounts add constraint arc_discounts_check CHECK ((((discount_type = 'percentage'::text) AND ((value >= 1) AND (value <= 100))) OR ((discount_type = 'fixed_amount'::text) AND (value > 0)) OR ((discount_type = 'free_shipping'::text) AND (value = 0))));
+
+alter table public.arc_discounts add constraint arc_discounts_check1 CHECK (((ends_at IS NULL) OR (starts_at IS NULL) OR (ends_at > starts_at)));
+
+alter table public.arc_discounts add constraint arc_discounts_code_check CHECK (((code IS NULL) OR (code ~ '^[A-Z0-9_-]{2,40}$'::text)));
+
+alter table public.arc_discounts add constraint arc_discounts_discount_type_check CHECK ((discount_type = ANY (ARRAY['percentage'::text, 'fixed_amount'::text, 'free_shipping'::text])));
+
+alter table public.arc_discounts add constraint arc_discounts_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text));
+
+alter table public.arc_discounts add constraint arc_discounts_minimum_subtotal_check CHECK ((minimum_subtotal >= 0));
+
+alter table public.arc_discounts add constraint arc_discounts_name_check CHECK (((char_length(name) >= 1) AND (char_length(name) <= 160)));
+
+alter table public.arc_discounts add constraint arc_discounts_organization_id_code_key UNIQUE (organization_id, code);
+
+alter table public.arc_discounts add constraint arc_discounts_per_customer_limit_check CHECK (((per_customer_limit IS NULL) OR (per_customer_limit > 0)));
+
+alter table public.arc_discounts add constraint arc_discounts_pkey PRIMARY KEY (id);
+
+alter table public.arc_discounts add constraint arc_discounts_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'paused'::text, 'expired'::text])));
+
+alter table public.arc_discounts add constraint arc_discounts_usage_count_check CHECK ((usage_count >= 0));
+
+alter table public.arc_discounts add constraint arc_discounts_usage_limit_check CHECK (((usage_limit IS NULL) OR (usage_limit > 0)));
+
+alter table public.arc_discounts add constraint arc_discounts_value_check CHECK ((value >= 0));
+
+alter table public.arc_import_batches add constraint arc_import_batches_error_rows_check CHECK ((error_rows >= 0));
+
+alter table public.arc_import_batches add constraint arc_import_batches_imported_rows_check CHECK ((imported_rows >= 0));
+
+alter table public.arc_import_batches add constraint arc_import_batches_kind_check CHECK ((kind = ANY (ARRAY['products'::text, 'orders'::text])));
+
+alter table public.arc_import_batches add constraint arc_import_batches_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text));
+
+alter table public.arc_import_batches add constraint arc_import_batches_pkey PRIMARY KEY (id);
+
+alter table public.arc_import_batches add constraint arc_import_batches_skipped_rows_check CHECK ((skipped_rows >= 0));
+
+alter table public.arc_import_batches add constraint arc_import_batches_source_check CHECK ((source = 'shopify'::text));
+
+alter table public.arc_import_batches add constraint arc_import_batches_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text])));
+
+alter table public.arc_import_batches add constraint arc_import_batches_total_rows_check CHECK ((total_rows >= 0));
+
+alter table public.arc_import_errors add constraint arc_import_errors_pkey PRIMARY KEY (id);
+
+alter table public.arc_inventory_movements add constraint arc_inventory_movements_kind_check CHECK ((kind = ANY (ARRAY['in'::text, 'out'::text, 'adjustment'::text, 'sale'::text, 'return'::text, 'sync'::text])));
+
+alter table public.arc_inventory_movements add constraint arc_inventory_movements_pkey PRIMARY KEY (id);
+
+alter table public.arc_order_events add constraint arc_order_events_event_data_check CHECK ((jsonb_typeof(event_data) = 'object'::text));
+
+alter table public.arc_order_events add constraint arc_order_events_event_type_check CHECK ((event_type = ANY (ARRAY['status_updated'::text, 'fulfillment_updated'::text, 'payment_amount_mismatch'::text, 'payment_settle_failed'::text, 'payment_session_failed'::text, 'stock_shortfall'::text, 'item_edited'::text])));
+
+alter table public.arc_order_events add constraint arc_order_events_pkey PRIMARY KEY (id);
+
+alter table public.arc_order_items add constraint arc_order_items_pkey PRIMARY KEY (id);
+
+alter table public.arc_order_items add constraint arc_order_items_quantity_check CHECK ((quantity > 0));
+
+alter table public.arc_order_items add constraint arc_order_items_total_check CHECK ((total >= 0));
+
+alter table public.arc_order_items add constraint arc_order_items_unit_price_check CHECK ((unit_price >= 0));
+
+alter table public.arc_orders add constraint arc_orders_id_organization_id_key UNIQUE (id, organization_id);
+
+alter table public.arc_orders add constraint arc_orders_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text));
+
+alter table public.arc_orders add constraint arc_orders_organization_id_order_number_key UNIQUE (organization_id, order_number);
+
+alter table public.arc_orders add constraint arc_orders_organization_id_source_external_id_key UNIQUE (organization_id, source, external_id);
+
+alter table public.arc_orders add constraint arc_orders_payment_status_check CHECK ((payment_status = ANY (ARRAY['pending'::text, 'authorized'::text, 'paid'::text, 'partially_refunded'::text, 'refunded'::text, 'failed'::text])));
+
+alter table public.arc_orders add constraint arc_orders_pkey PRIMARY KEY (id);
+
+alter table public.arc_orders add constraint arc_orders_shipping_check CHECK ((shipping >= 0));
+
+alter table public.arc_orders add constraint arc_orders_source_check CHECK ((source = ANY (ARRAY['native'::text, 'shopify'::text])));
+
+alter table public.arc_orders add constraint arc_orders_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'processing'::text, 'fulfilled'::text, 'cancelled'::text, 'refunded'::text])));
+
+alter table public.arc_orders add constraint arc_orders_subtotal_check CHECK ((subtotal >= 0));
+
+alter table public.arc_orders add constraint arc_orders_tax_check CHECK ((tax >= 0));
+
+alter table public.arc_orders add constraint arc_orders_total_check CHECK ((total >= 0));
+
+alter table public.arc_payment_orders add constraint arc_payment_orders_expected_amount_check CHECK ((expected_amount > 0));
+
+alter table public.arc_payment_orders add constraint arc_payment_orders_merchant_oid_key UNIQUE (merchant_oid);
+
+alter table public.arc_payment_orders add constraint arc_payment_orders_payment_method_check CHECK ((payment_method = ANY (ARRAY['card'::text, 'eft'::text])));
+
+alter table public.arc_payment_orders add constraint arc_payment_orders_pkey PRIMARY KEY (id);
+
+alter table public.arc_payment_orders add constraint arc_payment_orders_saglayici_check CHECK ((saglayici = ANY (ARRAY['paytr'::text, 'tami'::text])));
+
+alter table public.arc_payment_orders add constraint arc_payment_orders_status_check CHECK ((status = ANY (ARRAY['awaiting_payment'::text, 'paid'::text, 'failed'::text, 'cancelled'::text])));
+
+alter table public.arc_price_collections add constraint arc_price_collections_pkey PRIMARY KEY (id);
+
+alter table public.arc_product_variants add constraint arc_product_variants_attributes_check CHECK ((jsonb_typeof(attributes) = 'object'::text));
+
+alter table public.arc_product_variants add constraint arc_product_variants_compare_at_price_check CHECK (((compare_at_price IS NULL) OR (compare_at_price >= 0)));
+
+alter table public.arc_product_variants add constraint arc_product_variants_id_organization_id_key UNIQUE (id, organization_id);
+
+alter table public.arc_product_variants add constraint arc_product_variants_organization_id_external_id_key UNIQUE (organization_id, external_id);
+
+alter table public.arc_product_variants add constraint arc_product_variants_pkey PRIMARY KEY (id);
+
+alter table public.arc_product_variants add constraint arc_product_variants_price_check CHECK ((price >= 0));
+
+alter table public.arc_products add constraint arc_products_id_organization_key UNIQUE (id, organization_id);
+
+alter table public.arc_products add constraint arc_products_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text));
+
+alter table public.arc_products add constraint arc_products_name_check CHECK (((char_length(name) >= 1) AND (char_length(name) <= 200)));
+
+alter table public.arc_products add constraint arc_products_organization_id_slug_key UNIQUE (organization_id, slug);
+
+alter table public.arc_products add constraint arc_products_organization_id_source_external_id_key UNIQUE (organization_id, source, external_id);
+
+alter table public.arc_products add constraint arc_products_pkey PRIMARY KEY (id);
+
+alter table public.arc_products add constraint arc_products_source_check CHECK ((source = ANY (ARRAY['native'::text, 'shopify'::text])));
+
+alter table public.arc_products add constraint arc_products_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'archived'::text])));
+
+alter table public.arc_products add constraint arc_products_yayin_araligi CHECK (((publish_at IS NULL) OR (unpublish_at IS NULL) OR (unpublish_at > publish_at)));
+
+alter table public.arc_return_requests add constraint arc_return_requests_pkey PRIMARY KEY (id);
+
+alter table public.arc_return_requests add constraint arc_return_status_check CHECK ((status = ANY (ARRAY['beklemede'::text, 'onaylandi'::text, 'reddedildi'::text, 'tamamlandi'::text])));
+
+alter table public.arc_saved_views add constraint arc_saved_views_ad_check CHECK (((length(btrim(ad)) >= 1) AND (length(btrim(ad)) <= 40)));
+
+alter table public.arc_saved_views add constraint arc_saved_views_liste_check CHECK ((liste = ANY (ARRAY['siparisler'::text, 'urunler'::text])));
+
+alter table public.arc_saved_views add constraint arc_saved_views_pkey PRIMARY KEY (id);
+
+alter table public.arc_saved_views add constraint arc_saved_views_sorgu_check CHECK (((length(sorgu) >= 1) AND (length(sorgu) <= 400)));
+
+alter table public.arc_shipment_items add constraint arc_shipment_items_pkey PRIMARY KEY (id);
+
+alter table public.arc_shipment_items add constraint arc_shipment_items_quantity_check CHECK ((quantity > 0));
+
+alter table public.arc_shipment_items add constraint arc_shipment_items_unique UNIQUE (shipment_id, order_item_id);
+
+alter table public.arc_shipments add constraint arc_shipments_cost_check CHECK (((shipping_cost IS NULL) OR (shipping_cost >= 0)));
+
+alter table public.arc_shipments add constraint arc_shipments_pkey PRIMARY KEY (id);
+
+alter table public.arc_shipments add constraint arc_shipments_sequence_check CHECK ((sequence > 0));
+
+alter table public.arc_shipments add constraint arc_shipments_source_check CHECK ((source = ANY (ARRAY['oto'::text, 'manual'::text])));
+
+alter table public.arc_shipments add constraint arc_shipments_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'created'::text, 'picked_up'::text, 'in_transit'::text, 'delivered'::text, 'cancelled'::text, 'failed'::text])));
+
+alter table public.arc_store_settings add constraint arc_store_settings_accent_color_check CHECK ((accent_color ~ '^#[0-9A-Fa-f]{6}$'::text));
+
+alter table public.arc_store_settings add constraint arc_store_settings_bank_iban_check CHECK (((bank_iban IS NULL) OR (bank_iban ~ '^TR[0-9]{24}$'::text)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_currency_check CHECK ((currency ~ '^[A-Z]{3}$'::text));
+
+alter table public.arc_store_settings add constraint arc_store_settings_custom_domain_check CHECK (((custom_domain IS NULL) OR (custom_domain ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$'::text)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_domain_status_check CHECK ((domain_status = ANY (ARRAY['not_configured'::text, 'pending_dns'::text, 'verifying'::text, 'active'::text, 'failed'::text])));
+
+alter table public.arc_store_settings add constraint arc_store_settings_garanti_api_surumu_check CHECK ((garanti_api_surumu = ANY (ARRAY['v512'::text, 'v0.01'::text])));
+
+alter table public.arc_store_settings add constraint arc_store_settings_locale_check CHECK (((char_length(locale) >= 2) AND (char_length(locale) <= 20)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_low_stock_threshold_check CHECK (((low_stock_threshold >= 0) AND (low_stock_threshold <= 10000)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_odeme_saglayicisi_check CHECK ((odeme_saglayicisi = ANY (ARRAY['paytr'::text, 'garanti'::text])));
+
+alter table public.arc_store_settings add constraint arc_store_settings_order_prefix_check CHECK ((order_prefix ~ '^[A-Z]{1,6}$'::text));
+
+alter table public.arc_store_settings add constraint arc_store_settings_panel_custom_domain_check CHECK (((panel_custom_domain IS NULL) OR (panel_custom_domain ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$'::text)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_panel_domain_status_check CHECK ((panel_domain_status = ANY (ARRAY['not_configured'::text, 'pending_dns'::text, 'verifying'::text, 'active'::text, 'failed'::text])));
+
+alter table public.arc_store_settings add constraint arc_store_settings_paytr_installment_check CHECK (((paytr_max_installment >= 0) AND (paytr_max_installment <= 12)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_pkey PRIMARY KEY (organization_id);
+
+alter table public.arc_store_settings add constraint arc_store_settings_platform_subdomain_check CHECK (((platform_subdomain IS NULL) OR (platform_subdomain ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$'::text)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_primary_color_check CHECK ((primary_color ~ '^#[0-9A-Fa-f]{6}$'::text));
+
+alter table public.arc_store_settings add constraint arc_store_settings_shipping_check CHECK (((shipping_fee >= 0) AND (free_shipping_threshold >= 0)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_store_name_check CHECK (((char_length(store_name) >= 1) AND (char_length(store_name) <= 160)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_storefront_url_check CHECK (((storefront_url IS NULL) OR (storefront_url ~ '^https://[A-Za-z0-9.-]+(?::[0-9]+)?(?:/.*)?$'::text)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_transfer_discount_check CHECK (((bank_transfer_discount_percent >= (0)::numeric) AND (bank_transfer_discount_percent <= (100)::numeric)));
+
+alter table public.arc_store_themes add constraint arc_store_themes_config_check CHECK ((jsonb_typeof(config) = 'object'::text));
+
+alter table public.arc_store_themes add constraint arc_store_themes_mode_check CHECK ((mode = ANY (ARRAY['draft'::text, 'published'::text])));
+
+alter table public.arc_store_themes add constraint arc_store_themes_organization_id_mode_key UNIQUE (organization_id, mode);
+
+alter table public.arc_store_themes add constraint arc_store_themes_pkey PRIMARY KEY (id);
+
+alter table public.arc_store_themes add constraint arc_store_themes_version_check CHECK ((version > 0));
+
+alter table public.arc_suppliers add constraint arc_suppliers_organization_id_code_key UNIQUE (organization_id, code);
+
+alter table public.arc_suppliers add constraint arc_suppliers_pkey PRIMARY KEY (id);
+
+alter table public.organization_memberships add constraint organization_memberships_permissions_check CHECK ((jsonb_typeof(permissions) = 'object'::text));
+
+alter table public.organization_memberships add constraint organization_memberships_pkey PRIMARY KEY (organization_id, user_id);
+
+alter table public.organization_modules add constraint organization_modules_configuration_check CHECK ((jsonb_typeof(configuration) = 'object'::text));
+
+alter table public.organization_modules add constraint organization_modules_pkey PRIMARY KEY (organization_id, module_code);
+
+alter table public.organization_product_licenses add constraint organization_product_licenses_monthly_fee_check CHECK (((monthly_fee IS NULL) OR (monthly_fee > 0)));
+
+alter table public.organization_product_licenses add constraint organization_product_licenses_pkey PRIMARY KEY (organization_id, product);
+
+alter table public.organization_product_licenses add constraint organization_product_licenses_product_check CHECK ((product = ANY (ARRAY['arvolab'::text, 'arc'::text])));
+
+alter table public.organization_product_licenses add constraint organization_product_licenses_status_check CHECK ((status = ANY (ARRAY['inactive'::text, 'trialing'::text, 'active'::text, 'past_due'::text, 'suspended'::text, 'canceled'::text])));
+
+alter table public.organizations add constraint organizations_bank_account_holder_len CHECK (((bank_account_holder IS NULL) OR ((char_length(bank_account_holder) >= 1) AND (char_length(bank_account_holder) <= 200)))) NOT VALID;
+
+alter table public.organizations add constraint organizations_bank_name_len CHECK (((bank_name IS NULL) OR ((char_length(bank_name) >= 1) AND (char_length(bank_name) <= 120)))) NOT VALID;
+
+alter table public.organizations add constraint organizations_brand_color_format CHECK (((brand_color IS NULL) OR (brand_color ~* '^#[0-9a-f]{6}$'::text)));
+
+alter table public.organizations add constraint organizations_custom_domain_key UNIQUE (custom_domain);
+
+alter table public.organizations add constraint organizations_custom_domain_status_check CHECK ((custom_domain_status = ANY (ARRAY['pending'::text, 'verified'::text, 'failed'::text])));
+
+alter table public.organizations add constraint organizations_iban_format CHECK (((iban IS NULL) OR ((iban ~ '^TR[0-9]{24}$'::text) AND (((((substr(iban, 5) || '2927'::text) || substr(iban, 3, 2)))::numeric % (97)::numeric) = (1)::numeric)))) NOT VALID;
+
+alter table public.organizations add constraint organizations_kind_check CHECK ((kind = ANY (ARRAY['customer'::text, 'internal'::text])));
+
+alter table public.organizations add constraint organizations_legal_address_len CHECK (((legal_address IS NULL) OR ((char_length(legal_address) >= 1) AND (char_length(legal_address) <= 500)))) NOT VALID;
+
+alter table public.organizations add constraint organizations_legal_city_len CHECK (((legal_city IS NULL) OR ((char_length(legal_city) >= 1) AND (char_length(legal_city) <= 60)))) NOT VALID;
+
+alter table public.organizations add constraint organizations_legal_district_len CHECK (((legal_district IS NULL) OR ((char_length(legal_district) >= 1) AND (char_length(legal_district) <= 60)))) NOT VALID;
+
+alter table public.organizations add constraint organizations_legal_name_len CHECK (((legal_name IS NULL) OR ((char_length(legal_name) >= 1) AND (char_length(legal_name) <= 200)))) NOT VALID;
+
+alter table public.organizations add constraint organizations_mersis_no_format CHECK (((mersis_no IS NULL) OR (mersis_no ~ '^[0-9]{16}$'::text))) NOT VALID;
+
+alter table public.organizations add constraint organizations_name_check CHECK (((char_length(name) >= 2) AND (char_length(name) <= 160)));
+
+alter table public.organizations add constraint organizations_pkey PRIMARY KEY (id);
+
+alter table public.organizations add constraint organizations_provisioning_state_check CHECK ((provisioning_state = ANY (ARRAY['creating'::text, 'inviting_owner'::text, 'waiting_owner'::text, 'active'::text, 'suspended'::text, 'archived'::text, 'failed'::text])));
+
+alter table public.organizations add constraint organizations_slug_check CHECK ((slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'::text));
+
+alter table public.organizations add constraint organizations_slug_key UNIQUE (slug);
+
+alter table public.organizations add constraint organizations_tax_number_format CHECK (((tax_number IS NULL) OR (tax_number ~ '^[0-9]{10,11}$'::text))) NOT VALID;
+
+alter table public.organizations add constraint organizations_tax_office_len CHECK (((tax_office IS NULL) OR ((char_length(tax_office) >= 1) AND (char_length(tax_office) <= 120)))) NOT VALID;
+
+CREATE INDEX arc_collection_products_collection_org_idx ON public.arc_collection_products USING btree (collection_id, organization_id);
+
+CREATE INDEX arc_collection_products_collection_position_idx ON public.arc_collection_products USING btree (collection_id, "position");
+
+CREATE INDEX arc_collection_products_org_product_idx ON public.arc_collection_products USING btree (organization_id, product_id);
+
+CREATE INDEX arc_collection_products_product_org_idx ON public.arc_collection_products USING btree (product_id, organization_id);
+
+CREATE INDEX arc_collections_org_status_idx ON public.arc_collections USING btree (organization_id, status);
+
+CREATE INDEX arc_customer_addresses_user_idx ON public.arc_customer_addresses USING btree (user_id, created_at DESC);
+
+CREATE INDEX arc_customer_favourites_user_created_idx ON public.arc_customer_favourites USING btree (user_id, created_at DESC);
+
+CREATE INDEX arc_discounts_org_status_idx ON public.arc_discounts USING btree (organization_id, status);
+
+CREATE INDEX arc_discounts_org_type_idx ON public.arc_discounts USING btree (organization_id, discount_type);
+
+CREATE INDEX arc_import_batches_org_created_idx ON public.arc_import_batches USING btree (organization_id, created_at DESC);
+
+CREATE INDEX arc_import_errors_batch_idx ON public.arc_import_errors USING btree (batch_id, created_at);
+
+CREATE INDEX arc_inventory_org_created_idx ON public.arc_inventory_movements USING btree (organization_id, created_at DESC);
+
+CREATE INDEX arc_inventory_org_variant_idx ON public.arc_inventory_movements USING btree (organization_id, variant_id, created_at DESC);
+
+CREATE INDEX arc_order_events_order_created_idx ON public.arc_order_events USING btree (order_id, created_at DESC);
+
+CREATE INDEX arc_order_items_org_order_idx ON public.arc_order_items USING btree (organization_id, order_id);
+
+CREATE INDEX arc_orders_aktif_liste_idx ON public.arc_orders USING btree (organization_id, created_at DESC) WHERE (archived_at IS NULL);
+
+CREATE INDEX arc_orders_customer_email_idx ON public.arc_orders USING btree (lower(customer_email));
+
+CREATE INDEX arc_orders_org_created_idx ON public.arc_orders USING btree (organization_id, created_at DESC);
+
+CREATE INDEX arc_orders_org_payment_created_idx ON public.arc_orders USING btree (organization_id, payment_status, created_at DESC);
+
+CREATE INDEX arc_orders_org_status_created_idx ON public.arc_orders USING btree (organization_id, status, created_at DESC);
+
+CREATE INDEX arc_orders_user_id_idx ON public.arc_orders USING btree (user_id);
+
+CREATE UNIQUE INDEX arc_orders_public_token_key ON public.arc_orders USING btree (public_token);
+
+CREATE INDEX arc_payment_orders_org_created_idx ON public.arc_payment_orders USING btree (organization_id, created_at DESC);
+
+CREATE INDEX arc_payment_orders_status_idx ON public.arc_payment_orders USING btree (status, created_at DESC);
+
+CREATE INDEX arc_price_collections_org_idx ON public.arc_price_collections USING btree (organization_id, created_at DESC);
+
+CREATE INDEX arc_variants_org_product_idx ON public.arc_product_variants USING btree (organization_id, product_id);
+
+CREATE INDEX arc_variants_org_stock_idx ON public.arc_product_variants USING btree (organization_id, stock);
+
+CREATE INDEX arc_variants_product_idx ON public.arc_product_variants USING btree (product_id);
+
+CREATE INDEX arc_variants_supplier_sku_idx ON public.arc_product_variants USING btree (organization_id, supplier, supplier_sku);
+
+CREATE UNIQUE INDEX arc_variants_product_sku_uniq ON public.arc_product_variants USING btree (organization_id, product_id, sku);
+
+CREATE UNIQUE INDEX arc_variants_supplier_sku_uniq ON public.arc_product_variants USING btree (organization_id, supplier_sku) WHERE (supplier_sku IS NOT NULL);
+
+CREATE INDEX arc_products_org_status_idx ON public.arc_products USING btree (organization_id, status);
+
+CREATE INDEX arc_products_supplier_idx ON public.arc_products USING btree (organization_id, supplier, supplier_product_code);
+
+CREATE INDEX arc_products_yayin_bitisi_idx ON public.arc_products USING btree (unpublish_at) WHERE (unpublish_at IS NOT NULL);
+
+CREATE INDEX arc_products_yayin_zamani_idx ON public.arc_products USING btree (publish_at) WHERE (publish_at IS NOT NULL);
+
+CREATE INDEX arc_return_requests_order_idx ON public.arc_return_requests USING btree (order_id);
+
+CREATE INDEX arc_return_requests_org_status_idx ON public.arc_return_requests USING btree (organization_id, status, created_at DESC);
+
+CREATE UNIQUE INDEX arc_return_requests_open_unique ON public.arc_return_requests USING btree (order_id) WHERE (status = 'beklemede'::text);
+
+CREATE INDEX arc_saved_views_liste_idx ON public.arc_saved_views USING btree (organization_id, liste, sira, created_at);
+
+CREATE UNIQUE INDEX arc_saved_views_ad_uniq ON public.arc_saved_views USING btree (organization_id, liste, lower(ad));
+
+CREATE INDEX arc_shipment_items_order_item_idx ON public.arc_shipment_items USING btree (order_item_id);
+
+CREATE INDEX arc_shipments_order_idx ON public.arc_shipments USING btree (order_id, sequence);
+
+CREATE INDEX arc_shipments_org_idx ON public.arc_shipments USING btree (organization_id, status);
+
+CREATE INDEX arc_shipments_supplier_idx ON public.arc_shipments USING btree (organization_id, supplier) WHERE (supplier IS NOT NULL);
+
+CREATE UNIQUE INDEX arc_shipments_tracking_idx ON public.arc_shipments USING btree (organization_id, carrier_code, tracking_number) WHERE (tracking_number IS NOT NULL);
+
+CREATE UNIQUE INDEX arc_store_settings_custom_domain_uidx ON public.arc_store_settings USING btree (custom_domain) WHERE (custom_domain IS NOT NULL);
+
+CREATE UNIQUE INDEX arc_store_settings_custom_domain_unique_idx ON public.arc_store_settings USING btree (lower(custom_domain)) WHERE ((custom_domain IS NOT NULL) AND (TRIM(BOTH FROM custom_domain) <> ''::text));
+
+CREATE UNIQUE INDEX arc_store_settings_order_prefix_unique_idx ON public.arc_store_settings USING btree (upper(order_prefix)) WHERE ((order_prefix IS NOT NULL) AND (TRIM(BOTH FROM order_prefix) <> ''::text));
+
+CREATE UNIQUE INDEX arc_store_settings_panel_custom_domain_uidx ON public.arc_store_settings USING btree (panel_custom_domain) WHERE (panel_custom_domain IS NOT NULL);
+
+CREATE UNIQUE INDEX arc_store_settings_panel_domain_unique_idx ON public.arc_store_settings USING btree (lower(panel_custom_domain)) WHERE ((panel_custom_domain IS NOT NULL) AND (TRIM(BOTH FROM panel_custom_domain) <> ''::text));
+
+CREATE UNIQUE INDEX arc_store_settings_platform_subdomain_uidx ON public.arc_store_settings USING btree (platform_subdomain) WHERE (platform_subdomain IS NOT NULL);
+
+CREATE UNIQUE INDEX arc_store_settings_platform_subdomain_unique_idx ON public.arc_store_settings USING btree (lower(platform_subdomain)) WHERE ((platform_subdomain IS NOT NULL) AND (TRIM(BOTH FROM platform_subdomain) <> ''::text));
+
+CREATE INDEX arc_store_themes_org_mode_idx ON public.arc_store_themes USING btree (organization_id, mode);
+
+CREATE INDEX organization_memberships_user_active_idx ON public.organization_memberships USING btree (user_id, is_active);
+
+CREATE INDEX organization_memberships_user_idx ON public.organization_memberships USING btree (user_id, organization_id) WHERE (is_active = true);
+
+CREATE INDEX organization_modules_module_code_idx ON public.organization_modules USING btree (module_code);
+
+CREATE INDEX organization_modules_org_enabled_idx ON public.organization_modules USING btree (organization_id, is_enabled);
+
+CREATE INDEX organization_modules_org_idx ON public.organization_modules USING btree (organization_id) WHERE (is_enabled = true);
+
+CREATE INDEX organization_product_licenses_product_status_idx ON public.organization_product_licenses USING btree (product, status);
+
+CREATE INDEX organizations_kind_idx ON public.organizations USING btree (kind);
+
+CREATE INDEX organizations_plan_code_idx ON public.organizations USING btree (plan_code);
+
+CREATE UNIQUE INDEX organizations_custom_domain_unique_idx ON public.organizations USING btree (lower(custom_domain)) WHERE (custom_domain IS NOT NULL);
+
+alter table public.arc_collection_products add constraint arc_collection_products_collection_id_organization_id_fkey FOREIGN KEY (collection_id, organization_id) REFERENCES arc_collections(id, organization_id) ON DELETE CASCADE;
+
+alter table public.arc_collection_products add constraint arc_collection_products_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_collection_products add constraint arc_collection_products_product_id_organization_id_fkey FOREIGN KEY (product_id, organization_id) REFERENCES arc_products(id, organization_id) ON DELETE CASCADE;
+
+alter table public.arc_collections add constraint arc_collections_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_customer_addresses add constraint arc_customer_addresses_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+alter table public.arc_customer_favourites add constraint arc_customer_favourites_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+alter table public.arc_discounts add constraint arc_discounts_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_import_batches add constraint arc_import_batches_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public.arc_import_batches add constraint arc_import_batches_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_import_errors add constraint arc_import_errors_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES arc_import_batches(id) ON DELETE CASCADE;
+
+alter table public.arc_import_errors add constraint arc_import_errors_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_inventory_movements add constraint arc_inventory_movements_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public.arc_inventory_movements add constraint arc_inventory_movements_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_inventory_movements add constraint arc_inventory_movements_variant_id_organization_id_fkey FOREIGN KEY (variant_id, organization_id) REFERENCES arc_product_variants(id, organization_id) ON DELETE CASCADE;
+
+alter table public.arc_order_events add constraint arc_order_events_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public.arc_order_events add constraint arc_order_events_order_id_organization_id_fkey FOREIGN KEY (order_id, organization_id) REFERENCES arc_orders(id, organization_id) ON DELETE CASCADE;
+
+alter table public.arc_order_events add constraint arc_order_events_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_order_items add constraint arc_order_items_order_id_organization_id_fkey FOREIGN KEY (order_id, organization_id) REFERENCES arc_orders(id, organization_id) ON DELETE CASCADE;
+
+alter table public.arc_order_items add constraint arc_order_items_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_order_items add constraint arc_order_items_variant_id_organization_id_fkey FOREIGN KEY (variant_id, organization_id) REFERENCES arc_product_variants(id, organization_id) ON DELETE SET NULL;
+
+alter table public.arc_orders add constraint arc_orders_archived_by_fkey FOREIGN KEY (archived_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public.arc_orders add constraint arc_orders_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_orders add constraint arc_orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id);
+
+alter table public.arc_price_collections add constraint arc_price_collections_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_product_variants add constraint arc_product_variants_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_product_variants add constraint arc_product_variants_product_id_fkey FOREIGN KEY (product_id) REFERENCES arc_products(id) ON DELETE CASCADE;
+
+alter table public.arc_products add constraint arc_products_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public.arc_products add constraint arc_products_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_return_requests add constraint arc_return_requests_order_id_fkey FOREIGN KEY (order_id) REFERENCES arc_orders(id) ON DELETE CASCADE;
+
+alter table public.arc_return_requests add constraint arc_return_requests_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_return_requests add constraint arc_return_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public.arc_saved_views add constraint arc_saved_views_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public.arc_saved_views add constraint arc_saved_views_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_shipment_items add constraint arc_shipment_items_order_item_id_fkey FOREIGN KEY (order_item_id) REFERENCES arc_order_items(id) ON DELETE CASCADE;
+
+alter table public.arc_shipment_items add constraint arc_shipment_items_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_shipment_items add constraint arc_shipment_items_shipment_id_fkey FOREIGN KEY (shipment_id) REFERENCES arc_shipments(id) ON DELETE CASCADE;
+
+alter table public.arc_shipments add constraint arc_shipments_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public.arc_shipments add constraint arc_shipments_order_id_fkey FOREIGN KEY (order_id) REFERENCES arc_orders(id) ON DELETE CASCADE;
+
+alter table public.arc_shipments add constraint arc_shipments_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_store_settings add constraint arc_store_settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_store_themes add constraint arc_store_themes_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_store_themes add constraint arc_store_themes_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public.arc_suppliers add constraint arc_suppliers_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.organization_memberships add constraint organization_memberships_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.organization_memberships add constraint organization_memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+alter table public.organization_modules add constraint organization_modules_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.organization_product_licenses add constraint organization_product_licenses_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.organization_product_licenses add constraint organization_product_licenses_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id);
+
+alter table public.arc_collection_products enable row level security;
+
+alter table public.arc_collections enable row level security;
+
+alter table public.arc_customer_addresses enable row level security;
+
+alter table public.arc_customer_favourites enable row level security;
+
+alter table public.arc_discounts enable row level security;
+
+alter table public.arc_import_batches enable row level security;
+
+alter table public.arc_import_errors enable row level security;
+
+alter table public.arc_inventory_movements enable row level security;
+
+alter table public.arc_order_events enable row level security;
+
+alter table public.arc_order_items enable row level security;
+
+alter table public.arc_orders enable row level security;
+
+alter table public.arc_payment_orders enable row level security;
+
+alter table public.arc_price_collections enable row level security;
+
+alter table public.arc_product_variants enable row level security;
+
+alter table public.arc_products enable row level security;
+
+alter table public.arc_return_requests enable row level security;
+
+alter table public.arc_saved_views enable row level security;
+
+alter table public.arc_shipment_items enable row level security;
+
+alter table public.arc_shipments enable row level security;
+
+alter table public.arc_store_settings enable row level security;
+
+alter table public.arc_store_themes enable row level security;
+
+alter table public.arc_suppliers enable row level security;
+
+alter table public.organization_memberships enable row level security;
+
+alter table public.organization_modules enable row level security;
+
+alter table public.organization_product_licenses enable row level security;
+
+alter table public.organizations enable row level security;
+
+create policy "arc managers delete collection products" on public.arc_collection_products as PERMISSIVE for DELETE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_collection_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc managers insert collection products" on public.arc_collection_products as PERMISSIVE for INSERT to authenticated
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_collection_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc managers update collection products" on public.arc_collection_products as PERMISSIVE for UPDATE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_collection_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_collection_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc members read collection products" on public.arc_collection_products as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_collection_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy "arc managers delete collections" on public.arc_collections as PERMISSIVE for DELETE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc managers insert collections" on public.arc_collections as PERMISSIVE for INSERT to authenticated
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc managers update collections" on public.arc_collections as PERMISSIVE for UPDATE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc members read collections" on public.arc_collections as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy arc_addresses_owner_delete on public.arc_customer_addresses as PERMISSIVE for DELETE to authenticated
+  using ((user_id = auth.uid()));
+
+create policy arc_addresses_owner_insert on public.arc_customer_addresses as PERMISSIVE for INSERT to authenticated
+  with check ((user_id = auth.uid()));
+
+create policy arc_addresses_owner_select on public.arc_customer_addresses as PERMISSIVE for SELECT to authenticated
+  using ((user_id = auth.uid()));
+
+create policy arc_addresses_owner_update on public.arc_customer_addresses as PERMISSIVE for UPDATE to authenticated
+  using ((user_id = auth.uid()))
+  with check ((user_id = auth.uid()));
+
+create policy arc_customer_favourites_delete_own on public.arc_customer_favourites as PERMISSIVE for DELETE to authenticated
+  using ((user_id = ( SELECT auth.uid() AS uid)));
+
+create policy arc_customer_favourites_insert_own on public.arc_customer_favourites as PERMISSIVE for INSERT to authenticated
+  with check ((user_id = ( SELECT auth.uid() AS uid)));
+
+create policy arc_customer_favourites_select_own on public.arc_customer_favourites as PERMISSIVE for SELECT to authenticated
+  using ((user_id = ( SELECT auth.uid() AS uid)));
+
+create policy "arc managers delete discounts" on public.arc_discounts as PERMISSIVE for DELETE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc managers insert discounts" on public.arc_discounts as PERMISSIVE for INSERT to authenticated
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc managers update discounts" on public.arc_discounts as PERMISSIVE for UPDATE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc members read discounts" on public.arc_discounts as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy "arc managers manage import batches" on public.arc_import_batches as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_import_batches.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_import_batches.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
+
+create policy "arc members read import batches" on public.arc_import_batches as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_import_batches.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy "arc managers manage import errors" on public.arc_import_errors as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_import_errors.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_import_errors.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
+
+create policy "arc members read import errors" on public.arc_import_errors as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_import_errors.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy "arc managers manage inventory" on public.arc_inventory_movements as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_inventory_movements.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_inventory_movements.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
+
+create policy "arc members read inventory" on public.arc_inventory_movements as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_inventory_movements.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy "arc managers insert order events" on public.arc_order_events as PERMISSIVE for INSERT to authenticated
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_order_events.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc members read order events" on public.arc_order_events as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_order_events.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy "arc managers manage order items" on public.arc_order_items as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_order_items.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_order_items.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
+
+create policy "arc members read order items" on public.arc_order_items as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_order_items.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy arc_order_items_customer_select on public.arc_order_items as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM arc_orders o
+  WHERE ((o.id = arc_order_items.order_id) AND (o.user_id = auth.uid())))));
+
+create policy "arc managers manage orders" on public.arc_orders as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_orders.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_orders.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
+
+create policy "arc members read orders" on public.arc_orders as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_orders.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy arc_orders_customer_select on public.arc_orders as PERMISSIVE for SELECT to authenticated
+  using ((user_id = auth.uid()));
+
+create policy arc_price_collections_member_read on public.arc_price_collections as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_price_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
+
+create policy arc_price_collections_member_update on public.arc_price_collections as PERMISSIVE for UPDATE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_price_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_price_collections.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
+
+create policy "arc managers manage variants" on public.arc_product_variants as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_product_variants.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_product_variants.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
+
+create policy "arc members read variants" on public.arc_product_variants as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_product_variants.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy "arc managers manage products" on public.arc_products as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
+
+create policy "arc members read products" on public.arc_products as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_products.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy "arc managers update returns" on public.arc_return_requests as PERMISSIVE for UPDATE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_return_requests.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc members read returns" on public.arc_return_requests as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_return_requests.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy "customers read own returns" on public.arc_return_requests as PERMISSIVE for SELECT to authenticated
+  using ((user_id = ( SELECT auth.uid() AS uid)));
+
+create policy arc_saved_views_manager_delete on public.arc_saved_views as PERMISSIVE for DELETE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_saved_views.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy arc_saved_views_manager_insert on public.arc_saved_views as PERMISSIVE for INSERT to authenticated
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_saved_views.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy arc_saved_views_manager_update on public.arc_saved_views as PERMISSIVE for UPDATE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_saved_views.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_saved_views.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy arc_saved_views_member_read on public.arc_saved_views as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_saved_views.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
+
+create policy arc_shipment_items_member_all on public.arc_shipment_items as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_shipment_items.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_shipment_items.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
+
+create policy arc_shipments_member_all on public.arc_shipments as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_shipments.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_shipments.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
+
+create policy "arc managers insert store settings" on public.arc_store_settings as PERMISSIVE for INSERT to authenticated
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships membership
+  WHERE ((membership.organization_id = arc_store_settings.organization_id) AND (membership.user_id = ( SELECT auth.uid() AS uid)) AND (membership.is_active = true) AND ((membership.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc managers update store settings" on public.arc_store_settings as PERMISSIVE for UPDATE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships membership
+  WHERE ((membership.organization_id = arc_store_settings.organization_id) AND (membership.user_id = ( SELECT auth.uid() AS uid)) AND (membership.is_active = true) AND ((membership.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships membership
+  WHERE ((membership.organization_id = arc_store_settings.organization_id) AND (membership.user_id = ( SELECT auth.uid() AS uid)) AND (membership.is_active = true) AND ((membership.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc members read store settings" on public.arc_store_settings as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships membership
+  WHERE ((membership.organization_id = arc_store_settings.organization_id) AND (membership.user_id = ( SELECT auth.uid() AS uid)) AND (membership.is_active = true)))));
+
+create policy "arc managers delete store themes" on public.arc_store_themes as PERMISSIVE for DELETE to authenticated
+  using (((mode = 'draft'::text) AND (EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_store_themes.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text])))))));
+
+create policy "arc managers insert store themes" on public.arc_store_themes as PERMISSIVE for INSERT to authenticated
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_store_themes.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc managers update store themes" on public.arc_store_themes as PERMISSIVE for UPDATE to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_store_themes.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_store_themes.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true) AND ((m.role)::text = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text]))))));
+
+create policy "arc members read store themes" on public.arc_store_themes as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_store_themes.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy "public reads published store themes" on public.arc_store_themes as PERMISSIVE for SELECT to anon
+  using ((mode = 'published'::text));
+
+create policy arc_suppliers_admins_delete on public.arc_suppliers as PERMISSIVE for DELETE to authenticated
+  using (private.arvo_is_org_admin(organization_id));
+
+create policy arc_suppliers_admins_insert on public.arc_suppliers as PERMISSIVE for INSERT to authenticated
+  with check (private.arvo_is_org_admin(organization_id));
+
+create policy arc_suppliers_admins_update on public.arc_suppliers as PERMISSIVE for UPDATE to authenticated
+  using (private.arvo_is_org_admin(organization_id))
+  with check (private.arvo_is_org_admin(organization_id));
+
+create policy arc_suppliers_members_read on public.arc_suppliers as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_suppliers.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
+
+create policy arc_members_read_own_membership on public.organization_memberships as PERMISSIVE for SELECT to authenticated
+  using ((user_id = ( SELECT auth.uid() AS uid)));
+
+create policy arc_members_read_own_modules on public.organization_modules as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = organization_modules.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
+
+revoke all on function private.arc_guard_payment_settings() from public;
+
+revoke all on function private.arc_guard_store_domains() from public;
+
+revoke all on function private.arc_magaza_varsayilanlari() from public;
+
+revoke all on function private.arc_order_archive_guard() from public;
+
+revoke all on function private.arc_order_item_cost() from public;
+
+revoke all on function private.arc_return_request_unarchive() from public;
+
+revoke all on function private.arvo_arc_shipment_item_guard() from public;
+
+revoke all on function private.arvo_arc_shipment_source_guard() from public;
+
+revoke all on function private.arvo_arc_shipment_touch() from public;
+
+revoke all on function private.arvo_is_org_admin(target_org uuid) from public;
+grant execute on function private.arvo_is_org_admin(target_org uuid) to authenticated;
+grant execute on function private.arvo_is_org_admin(target_org uuid) to service_role;
+
+revoke all on function private.can_manage_organization_assets(organization_id_text text) from public;
+grant execute on function private.can_manage_organization_assets(organization_id_text text) to authenticated;
+
+revoke all on function public.arc_address_before_write() from public;
+grant execute on function public.arc_address_before_write() to service_role;
+
+revoke all on function public.arc_address_line(p_addr jsonb) from public;
+grant execute on function public.arc_address_line(p_addr jsonb) to service_role;
+grant execute on function public.arc_address_line(p_addr jsonb) to authenticated;
+
+revoke all on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) from public;
+grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to service_role;
+grant execute on function public.arc_adjust_inventory(p_variant_id uuid, p_quantity integer, p_kind text, p_reference_type text, p_reference_id text, p_note text) to authenticated;
+
+revoke all on function public.arc_aktarim_hesap_yukle(p_kullanicilar jsonb, p_kimlikler jsonb) from public;
+grant execute on function public.arc_aktarim_hesap_yukle(p_kullanicilar jsonb, p_kimlikler jsonb) to service_role;
+
+revoke all on function public.arc_aktarim_pk(p_tablo text) from public;
+grant execute on function public.arc_aktarim_pk(p_tablo text) to service_role;
+
+revoke all on function public.arc_aktarim_sil(p_tablo text, p_anahtarlar jsonb) from public;
+grant execute on function public.arc_aktarim_sil(p_tablo text, p_anahtarlar jsonb) to service_role;
+
+revoke all on function public.arc_aktarim_yukle(p_tablo text, p_satirlar jsonb) from public;
+grant execute on function public.arc_aktarim_yukle(p_tablo text, p_satirlar jsonb) to service_role;
+
+revoke all on function public.arc_baslik(p_text text) from public;
+grant execute on function public.arc_baslik(p_text text) to service_role;
+grant execute on function public.arc_baslik(p_text text) to authenticated;
+
+revoke all on function public.arc_bulk_update_supplier_stock(p_organization_id uuid, p_supplier text, p_rows jsonb) from public;
+grant execute on function public.arc_bulk_update_supplier_stock(p_organization_id uuid, p_supplier text, p_rows jsonb) to service_role;
+
+revoke all on function public.arc_categorize_supplier_products(p_supplier text, p_organization_id uuid) from public;
+grant execute on function public.arc_categorize_supplier_products(p_supplier text, p_organization_id uuid) to service_role;
+
+revoke all on function public.arc_check_coupon(p_organization_id uuid, p_code text, p_subtotal bigint, p_email text) from public;
+grant execute on function public.arc_check_coupon(p_organization_id uuid, p_code text, p_subtotal bigint, p_email text) to service_role;
+grant execute on function public.arc_check_coupon(p_organization_id uuid, p_code text, p_subtotal bigint, p_email text) to authenticated;
+
+revoke all on function public.arc_check_supplier_stock() from public;
+grant execute on function public.arc_check_supplier_stock() to service_role;
+
+revoke all on function public.arc_clean(p_value text) from public;
+grant execute on function public.arc_clean(p_value text) to service_role;
+grant execute on function public.arc_clean(p_value text) to authenticated;
+
+revoke all on function public.arc_close_missing_supplier_variants(p_organization_id uuid, p_supplier text, p_skus text[]) from public;
+grant execute on function public.arc_close_missing_supplier_variants(p_organization_id uuid, p_supplier text, p_skus text[]) to service_role;
+
+revoke all on function public.arc_count_coupon_use() from public;
+grant execute on function public.arc_count_coupon_use() to service_role;
+
+revoke all on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) from public;
+grant execute on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) to service_role;
+grant execute on function public.arc_create_order(p_customer_name text, p_customer_email text, p_items jsonb, p_source text) to authenticated;
+
+revoke all on function public.arc_create_storefront_order(p_organization_id uuid, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) from public;
+grant execute on function public.arc_create_storefront_order(p_organization_id uuid, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
+
+revoke all on function public.arc_decode_entities(t text) from public;
+grant execute on function public.arc_decode_entities(t text) to anon;
+grant execute on function public.arc_decode_entities(t text) to authenticated;
+grant execute on function public.arc_decode_entities(t text) to service_role;
+grant execute on function public.arc_decode_entities(t text) to public;
+
+revoke all on function public.arc_delete_order(p_order_id uuid) from public;
+grant execute on function public.arc_delete_order(p_order_id uuid) to service_role;
+grant execute on function public.arc_delete_order(p_order_id uuid) to authenticated;
+
+revoke all on function public.arc_extract_vat(p_gross bigint, p_rate numeric) from public;
+grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to anon;
+grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to authenticated;
+grant execute on function public.arc_extract_vat(p_gross bigint, p_rate numeric) to service_role;
+
+revoke all on function public.arc_fill_order_tax() from public;
+grant execute on function public.arc_fill_order_tax() to service_role;
+
+revoke all on function public.arc_find_address(p_meta jsonb) from public;
+grant execute on function public.arc_find_address(p_meta jsonb) to service_role;
+grant execute on function public.arc_find_address(p_meta jsonb) to authenticated;
+
+revoke all on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) from public;
+grant execute on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) to service_role;
+grant execute on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) to authenticated;
+
+revoke all on function public.arc_log_order_event() from public;
+grant execute on function public.arc_log_order_event() to service_role;
+
+revoke all on function public.arc_medya_listesi(p_organization_id uuid, p_arama text, p_limit integer, p_offset integer) from public;
+grant execute on function public.arc_medya_listesi(p_organization_id uuid, p_arama text, p_limit integer, p_offset integer) to service_role;
+grant execute on function public.arc_medya_listesi(p_organization_id uuid, p_arama text, p_limit integer, p_offset integer) to authenticated;
+
+revoke all on function public.arc_medya_ozeti(p_organization_id uuid) from public;
+grant execute on function public.arc_medya_ozeti(p_organization_id uuid) to service_role;
+grant execute on function public.arc_medya_ozeti(p_organization_id uuid) to authenticated;
+
+revoke all on function public.arc_normalize_address(p_addr jsonb) from public;
+grant execute on function public.arc_normalize_address(p_addr jsonb) to service_role;
+grant execute on function public.arc_normalize_address(p_addr jsonb) to authenticated;
+
+revoke all on function public.arc_reprice_supplier(p_supplier text) from public;
+grant execute on function public.arc_reprice_supplier(p_supplier text) to service_role;
+
+revoke all on function public.arc_reprice_supplier(p_supplier text, p_organization_id uuid) from public;
+grant execute on function public.arc_reprice_supplier(p_supplier text, p_organization_id uuid) to service_role;
+
+revoke all on function public.arc_resolve_commerce_tenant() from public;
+grant execute on function public.arc_resolve_commerce_tenant() to service_role;
+grant execute on function public.arc_resolve_commerce_tenant() to authenticated;
+
+revoke all on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) from public;
+grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to service_role;
+grant execute on function public.arc_sale_price(p_cost bigint, p_margin integer, p_shipping bigint, p_round integer) to authenticated;
+
+revoke all on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) from public;
+grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to service_role;
+grant execute on function public.arc_sale_price(p_cost bigint, p_margin numeric, p_shipping bigint, p_round integer, p_service bigint) to authenticated;
+
+revoke all on function public.arc_set_supplier_links(p_organization_id uuid, p_supplier text, p_rows jsonb) from public;
+grant execute on function public.arc_set_supplier_links(p_organization_id uuid, p_supplier text, p_rows jsonb) to service_role;
+
+revoke all on function public.arc_set_supplier_variant_stock(p_organization_id uuid, p_supplier text, p_rows jsonb) from public;
+grant execute on function public.arc_set_supplier_variant_stock(p_organization_id uuid, p_supplier text, p_rows jsonb) to service_role;
+
+revoke all on function public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) from public;
+grant execute on function public.arc_settle_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) to service_role;
+
+revoke all on function public.arc_siparis_kalemi_duzenle(p_order_id uuid, p_item_id uuid, p_adet integer, p_variant_id uuid) from public;
+grant execute on function public.arc_siparis_kalemi_duzenle(p_order_id uuid, p_item_id uuid, p_adet integer, p_variant_id uuid) to service_role;
+grant execute on function public.arc_siparis_kalemi_duzenle(p_order_id uuid, p_item_id uuid, p_adet integer, p_variant_id uuid) to authenticated;
+
+revoke all on function public.arc_slugify(p_text text) from public;
+grant execute on function public.arc_slugify(p_text text) to service_role;
+grant execute on function public.arc_slugify(p_text text) to authenticated;
+
+revoke all on function public.arc_store_stage(p_organization_id uuid) from public;
+grant execute on function public.arc_store_stage(p_organization_id uuid) to anon;
+grant execute on function public.arc_store_stage(p_organization_id uuid) to authenticated;
+grant execute on function public.arc_store_stage(p_organization_id uuid) to service_role;
+
+revoke all on function public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[], p_menu_groups text[]) from public;
+grant execute on function public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[], p_menu_groups text[]) to service_role;
+grant execute on function public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[], p_menu_groups text[]) to anon;
+grant execute on function public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[], p_menu_groups text[]) to authenticated;
+
+revoke all on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
+grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
+grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
+grant execute on function public.arc_storefront_collection_products(p_host text, p_collection_slug text, p_menu_groups text[], p_limit integer) to authenticated;
+
+revoke all on function public.arc_storefront_collection_products_page(p_host text, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
+grant execute on function public.arc_storefront_collection_products_page(p_host text, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
+grant execute on function public.arc_storefront_collection_products_page(p_host text, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
+grant execute on function public.arc_storefront_collection_products_page(p_host text, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
+
+revoke all on function public.arc_storefront_collections(p_host text) from public;
+grant execute on function public.arc_storefront_collections(p_host text) to service_role;
+grant execute on function public.arc_storefront_collections(p_host text) to anon;
+grant execute on function public.arc_storefront_collections(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_coupon(p_host text, p_code text, p_subtotal bigint, p_email text) from public;
+grant execute on function public.arc_storefront_coupon(p_host text, p_code text, p_subtotal bigint, p_email text) to service_role;
+
+revoke all on function public.arc_storefront_create_order(p_host text, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) from public;
+grant execute on function public.arc_storefront_create_order(p_host text, p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
+
+revoke all on function public.arc_storefront_deals(p_host text, p_limit integer) from public;
+grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to service_role;
+grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to anon;
+grant execute on function public.arc_storefront_deals(p_host text, p_limit integer) to authenticated;
+
+revoke all on function public.arc_storefront_discounts(p_host text) from public;
+grant execute on function public.arc_storefront_discounts(p_host text) to service_role;
+grant execute on function public.arc_storefront_discounts(p_host text) to anon;
+grant execute on function public.arc_storefront_discounts(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_facets(p_host text) from public;
+grant execute on function public.arc_storefront_facets(p_host text) to service_role;
+grant execute on function public.arc_storefront_facets(p_host text) to anon;
+grant execute on function public.arc_storefront_facets(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_order_status(p_token text) from public;
+grant execute on function public.arc_storefront_order_status(p_token text) to service_role;
+grant execute on function public.arc_storefront_order_status(p_token text) to anon;
+grant execute on function public.arc_storefront_order_status(p_token text) to authenticated;
+
+revoke all on function public.arc_storefront_org(p_host text) from public;
+grant execute on function public.arc_storefront_org(p_host text) to service_role;
+grant execute on function public.arc_storefront_org(p_host text) to anon;
+grant execute on function public.arc_storefront_org(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_payment_methods(p_host text) from public;
+grant execute on function public.arc_storefront_payment_methods(p_host text) to anon;
+grant execute on function public.arc_storefront_payment_methods(p_host text) to authenticated;
+grant execute on function public.arc_storefront_payment_methods(p_host text) to service_role;
+
+revoke all on function public.arc_storefront_product(p_host text, p_slug text) from public;
+grant execute on function public.arc_storefront_product(p_host text, p_slug text) to service_role;
+grant execute on function public.arc_storefront_product(p_host text, p_slug text) to anon;
+grant execute on function public.arc_storefront_product(p_host text, p_slug text) to authenticated;
+
+revoke all on function public.arc_storefront_product_badges(p_host text) from public;
+grant execute on function public.arc_storefront_product_badges(p_host text) to service_role;
+grant execute on function public.arc_storefront_product_badges(p_host text) to anon;
+grant execute on function public.arc_storefront_product_badges(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_product_count(p_host text) from public;
+grant execute on function public.arc_storefront_product_count(p_host text) to service_role;
+grant execute on function public.arc_storefront_product_count(p_host text) to anon;
+grant execute on function public.arc_storefront_product_count(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_product_slugs(p_host text, p_limit integer, p_offset integer) from public;
+grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer, p_offset integer) to service_role;
+grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer, p_offset integer) to anon;
+grant execute on function public.arc_storefront_product_slugs(p_host text, p_limit integer, p_offset integer) to authenticated;
+
+revoke all on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) from public;
+grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to service_role;
+grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to anon;
+grant execute on function public.arc_storefront_products(p_host text, p_limit integer, p_offset integer) to authenticated;
+
+revoke all on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
+grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
+grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
+grant execute on function public.arc_storefront_products_page(p_host text, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
+
+revoke all on function public.arc_storefront_return_request(p_host text, p_order_number text, p_items jsonb, p_reason text, p_note text) from public;
+grant execute on function public.arc_storefront_return_request(p_host text, p_order_number text, p_items jsonb, p_reason text, p_note text) to service_role;
+grant execute on function public.arc_storefront_return_request(p_host text, p_order_number text, p_items jsonb, p_reason text, p_note text) to authenticated;
+
+revoke all on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) from public;
+grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) to service_role;
+grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) to anon;
+grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) to authenticated;
+
+revoke all on function public.arc_storefront_settings(p_host text) from public;
+grant execute on function public.arc_storefront_settings(p_host text) to service_role;
+grant execute on function public.arc_storefront_settings(p_host text) to anon;
+grant execute on function public.arc_storefront_settings(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_variants(p_host text, p_slug text) from public;
+grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to service_role;
+grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to anon;
+grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to authenticated;
+
+revoke all on function public.arc_total_stock_units() from public;
+grant execute on function public.arc_total_stock_units() to service_role;
+grant execute on function public.arc_total_stock_units() to authenticated;
+
+revoke all on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) from public;
+grant execute on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) to service_role;
+grant execute on function public.arc_update_order_status(p_order_id uuid, p_status text, p_payment_status text) to authenticated;
+
+revoke all on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) from public;
+grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to anon;
+grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to authenticated;
+grant execute on function public.arc_variant_available(p_stock integer, p_allow_backorder boolean, p_supplier text) to service_role;
+
+revoke all on function public.arc_vitrin_arama_dizini(p_organization_id uuid, p_limit integer, p_offset integer) from public;
 grant execute on function public.arc_vitrin_arama_dizini(p_organization_id uuid, p_limit integer, p_offset integer) to service_role;
-revoke all on function public.arc_vitrin_ayarlar(p_organization_id uuid) from public, anon, authenticated;
+
+revoke all on function public.arc_vitrin_ayarlar(p_organization_id uuid) from public;
 grant execute on function public.arc_vitrin_ayarlar(p_organization_id uuid) to service_role;
-revoke all on function public.arc_vitrin_varyantlar(p_organization_id uuid, p_slug text) from public, anon, authenticated;
-grant execute on function public.arc_vitrin_varyantlar(p_organization_id uuid, p_slug text) to service_role;
-revoke all on function public.arc_vitrin_iade_talebi(p_organization_id uuid, p_order_number text, p_items jsonb, p_reason text, p_note text) from public, anon, authenticated;
+
+revoke all on function public.arc_vitrin_firsatlar(p_organization_id uuid, p_limit integer) from public;
+grant execute on function public.arc_vitrin_firsatlar(p_organization_id uuid, p_limit integer) to service_role;
+
+revoke all on function public.arc_vitrin_iade_talebi(p_organization_id uuid, p_order_number text, p_items jsonb, p_reason text, p_note text) from public;
 grant execute on function public.arc_vitrin_iade_talebi(p_organization_id uuid, p_order_number text, p_items jsonb, p_reason text, p_note text) to service_role;
+
+revoke all on function public.arc_vitrin_indirimler(p_organization_id uuid) from public;
+grant execute on function public.arc_vitrin_indirimler(p_organization_id uuid) to service_role;
+
+revoke all on function public.arc_vitrin_koleksiyon_sayfasi(p_organization_id uuid, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
+grant execute on function public.arc_vitrin_koleksiyon_sayfasi(p_organization_id uuid, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
+
+revoke all on function public.arc_vitrin_koleksiyon_secenekleri(p_organization_id uuid, p_collection_slugs text[], p_menu_groups text[]) from public;
+grant execute on function public.arc_vitrin_koleksiyon_secenekleri(p_organization_id uuid, p_collection_slugs text[], p_menu_groups text[]) to service_role;
+
+revoke all on function public.arc_vitrin_koleksiyon_urunleri(p_organization_id uuid, p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
+grant execute on function public.arc_vitrin_koleksiyon_urunleri(p_organization_id uuid, p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
+
+revoke all on function public.arc_vitrin_koleksiyonlar(p_organization_id uuid) from public;
+grant execute on function public.arc_vitrin_koleksiyonlar(p_organization_id uuid) to service_role;
+
+revoke all on function public.arc_vitrin_secenekler(p_organization_id uuid) from public;
+grant execute on function public.arc_vitrin_secenekler(p_organization_id uuid) to service_role;
+
+revoke all on function public.arc_vitrin_urun(p_organization_id uuid, p_slug text) from public;
+grant execute on function public.arc_vitrin_urun(p_organization_id uuid, p_slug text) to service_role;
+
+revoke all on function public.arc_vitrin_urun_adresleri(p_organization_id uuid, p_limit integer, p_offset integer) from public;
+grant execute on function public.arc_vitrin_urun_adresleri(p_organization_id uuid, p_limit integer, p_offset integer) to service_role;
+
+revoke all on function public.arc_vitrin_urun_rozetleri(p_organization_id uuid) from public;
+grant execute on function public.arc_vitrin_urun_rozetleri(p_organization_id uuid) to service_role;
+
+revoke all on function public.arc_vitrin_urun_sayfasi(p_organization_id uuid, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
+grant execute on function public.arc_vitrin_urun_sayfasi(p_organization_id uuid, p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
+
+revoke all on function public.arc_vitrin_urun_sayisi(p_organization_id uuid) from public;
+grant execute on function public.arc_vitrin_urun_sayisi(p_organization_id uuid) to service_role;
+
+revoke all on function public.arc_vitrin_urunler(p_organization_id uuid, p_limit integer, p_offset integer) from public;
+grant execute on function public.arc_vitrin_urunler(p_organization_id uuid, p_limit integer, p_offset integer) to service_role;
+
+revoke all on function public.arc_vitrin_varyantlar(p_organization_id uuid, p_slug text) from public;
+grant execute on function public.arc_vitrin_varyantlar(p_organization_id uuid, p_slug text) to service_role;
+
+revoke all on function public.attach_arvoculture_order_owner() from public;
+grant execute on function public.attach_arvoculture_order_owner() to service_role;
+
+revoke all on function public.check_arvoculture_coupon(p_code text, p_subtotal bigint, p_email text) from public;
+grant execute on function public.check_arvoculture_coupon(p_code text, p_subtotal bigint, p_email text) to service_role;
+
+revoke all on function public.claim_arvoculture_orders() from public;
+grant execute on function public.claim_arvoculture_orders() to service_role;
+grant execute on function public.claim_arvoculture_orders() to authenticated;
+
+revoke all on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) from public;
+grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to service_role;
+grant execute on function public.create_arvoculture_return_request(p_order_number text, p_items jsonb, p_reason text, p_note text) to authenticated;
+
+revoke all on function public.create_arvoculture_storefront_order(p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) from public;
+grant execute on function public.create_arvoculture_storefront_order(p_email text, p_name text, p_phone text, p_address jsonb, p_items jsonb, p_coupon_code text) to service_role;
+
+revoke all on function public.get_arvoculture_my_orders() from public;
+grant execute on function public.get_arvoculture_my_orders() to service_role;
+grant execute on function public.get_arvoculture_my_orders() to authenticated;
+
+revoke all on function public.get_arvoculture_my_returns() from public;
+grant execute on function public.get_arvoculture_my_returns() to service_role;
+grant execute on function public.get_arvoculture_my_returns() to authenticated;
+
+revoke all on function public.get_arvoculture_storefront_collection_facets(p_collection_slugs text[], p_menu_groups text[]) from public;
+grant execute on function public.get_arvoculture_storefront_collection_facets(p_collection_slugs text[], p_menu_groups text[]) to service_role;
+grant execute on function public.get_arvoculture_storefront_collection_facets(p_collection_slugs text[], p_menu_groups text[]) to anon;
+grant execute on function public.get_arvoculture_storefront_collection_facets(p_collection_slugs text[], p_menu_groups text[]) to authenticated;
+
+revoke all on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) from public;
+grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to anon;
+grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to authenticated;
+grant execute on function public.get_arvoculture_storefront_collection_products(p_collection_slug text, p_menu_groups text[], p_limit integer) to service_role;
+
+revoke all on function public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
+grant execute on function public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
+grant execute on function public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
+grant execute on function public.get_arvoculture_storefront_collection_products_page(p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
+
+revoke all on function public.get_arvoculture_storefront_collections() from public;
+grant execute on function public.get_arvoculture_storefront_collections() to anon;
+grant execute on function public.get_arvoculture_storefront_collections() to authenticated;
+grant execute on function public.get_arvoculture_storefront_collections() to service_role;
+
+revoke all on function public.get_arvoculture_storefront_deals(p_limit integer) from public;
+grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to anon;
+grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to authenticated;
+grant execute on function public.get_arvoculture_storefront_deals(p_limit integer) to service_role;
+
+revoke all on function public.get_arvoculture_storefront_discounts() from public;
+grant execute on function public.get_arvoculture_storefront_discounts() to anon;
+grant execute on function public.get_arvoculture_storefront_discounts() to authenticated;
+grant execute on function public.get_arvoculture_storefront_discounts() to service_role;
+
+revoke all on function public.get_arvoculture_storefront_facets() from public;
+grant execute on function public.get_arvoculture_storefront_facets() to anon;
+grant execute on function public.get_arvoculture_storefront_facets() to authenticated;
+grant execute on function public.get_arvoculture_storefront_facets() to service_role;
+grant execute on function public.get_arvoculture_storefront_facets() to public;
+
+revoke all on function public.get_arvoculture_storefront_product(p_slug text) from public;
+grant execute on function public.get_arvoculture_storefront_product(p_slug text) to anon;
+grant execute on function public.get_arvoculture_storefront_product(p_slug text) to authenticated;
+grant execute on function public.get_arvoculture_storefront_product(p_slug text) to service_role;
+
+revoke all on function public.get_arvoculture_storefront_product_badges() from public;
+grant execute on function public.get_arvoculture_storefront_product_badges() to anon;
+grant execute on function public.get_arvoculture_storefront_product_badges() to authenticated;
+grant execute on function public.get_arvoculture_storefront_product_badges() to service_role;
+
+revoke all on function public.get_arvoculture_storefront_product_count() from public;
+grant execute on function public.get_arvoculture_storefront_product_count() to anon;
+grant execute on function public.get_arvoculture_storefront_product_count() to authenticated;
+grant execute on function public.get_arvoculture_storefront_product_count() to service_role;
+
+revoke all on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) from public;
+grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to service_role;
+grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to anon;
+grant execute on function public.get_arvoculture_storefront_product_slugs(p_limit integer, p_offset integer) to authenticated;
+
+revoke all on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) from public;
+grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to anon;
+grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to authenticated;
+grant execute on function public.get_arvoculture_storefront_products(p_limit integer, p_offset integer) to service_role;
+
+revoke all on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
+grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to anon;
+grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to authenticated;
+grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
+grant execute on function public.get_arvoculture_storefront_products_page(p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to public;
+
+revoke all on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) from public;
+grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to service_role;
+grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to anon;
+grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to authenticated;
+
+revoke all on function public.get_arvoculture_storefront_settings() from public;
+grant execute on function public.get_arvoculture_storefront_settings() to anon;
+grant execute on function public.get_arvoculture_storefront_settings() to authenticated;
+grant execute on function public.get_arvoculture_storefront_settings() to service_role;
+
+revoke all on function public.get_arvoculture_storefront_variants(p_slug text) from public;
+grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to service_role;
+grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to anon;
+grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to authenticated;
+
+revoke all on function public.get_storefront_seller(p_tenant text) from public;
+grant execute on function public.get_storefront_seller(p_tenant text) to anon;
+grant execute on function public.get_storefront_seller(p_tenant text) to authenticated;
+grant execute on function public.get_storefront_seller(p_tenant text) to service_role;
+
+revoke all on function public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) from public;
+grant execute on function public.settle_arvoculture_storefront_order(p_order_id uuid, p_paid boolean, p_payment_reference text, p_failure_reason text) to service_role;
+
+revoke all on function public.update_arvoculture_profile(p_full_name text, p_phone text) from public;
+grant execute on function public.update_arvoculture_profile(p_full_name text, p_phone text) to service_role;
+grant execute on function public.update_arvoculture_profile(p_full_name text, p_phone text) to authenticated;
+
+CREATE TRIGGER arc_addresses_before_write BEFORE INSERT OR UPDATE ON public.arc_customer_addresses FOR EACH ROW EXECUTE FUNCTION arc_address_before_write();
+
+CREATE TRIGGER arc_order_item_cost BEFORE INSERT ON public.arc_order_items FOR EACH ROW EXECUTE FUNCTION private.arc_order_item_cost();
+
+CREATE TRIGGER arc_order_items_stock_check BEFORE INSERT ON public.arc_order_items FOR EACH ROW EXECUTE FUNCTION arc_check_supplier_stock();
+
+CREATE TRIGGER arc_order_archive_guard BEFORE UPDATE OF archived_at, status ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION private.arc_order_archive_guard();
+
+CREATE TRIGGER arc_orders_attach_owner BEFORE INSERT ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION attach_arvoculture_order_owner();
+
+CREATE TRIGGER arc_orders_count_coupon_use AFTER UPDATE OF payment_status ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION arc_count_coupon_use();
+
+CREATE TRIGGER arc_orders_fill_tax AFTER UPDATE OF subtotal, total ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION arc_fill_order_tax();
+
+CREATE TRIGGER arc_orders_log_event AFTER UPDATE ON public.arc_orders FOR EACH ROW EXECUTE FUNCTION arc_log_order_event();
+
+CREATE TRIGGER arc_return_request_unarchive AFTER INSERT ON public.arc_return_requests FOR EACH ROW EXECUTE FUNCTION private.arc_return_request_unarchive();
+
+CREATE TRIGGER arvo_arc_shipment_item_guard BEFORE INSERT OR UPDATE ON public.arc_shipment_items FOR EACH ROW EXECUTE FUNCTION private.arvo_arc_shipment_item_guard();
+
+CREATE TRIGGER arvo_arc_shipment_source_guard BEFORE INSERT OR UPDATE ON public.arc_shipments FOR EACH ROW EXECUTE FUNCTION private.arvo_arc_shipment_source_guard();
+
+CREATE TRIGGER arvo_arc_shipment_touch BEFORE UPDATE ON public.arc_shipments FOR EACH ROW EXECUTE FUNCTION private.arvo_arc_shipment_touch();
+
+CREATE TRIGGER arc_guard_payment_settings BEFORE INSERT OR UPDATE ON public.arc_store_settings FOR EACH ROW EXECUTE FUNCTION private.arc_guard_payment_settings();
+
+CREATE TRIGGER arc_guard_store_domains BEFORE INSERT OR UPDATE OF custom_domain, panel_custom_domain ON public.arc_store_settings FOR EACH ROW EXECUTE FUNCTION private.arc_guard_store_domains();
+
+CREATE TRIGGER arc_magaza_varsayilanlari BEFORE INSERT ON public.arc_store_settings FOR EACH ROW EXECUTE FUNCTION private.arc_magaza_varsayilanlari();
