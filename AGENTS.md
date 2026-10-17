@@ -226,6 +226,17 @@ hiçbir yerden okunmayan tablo (ArvoOS köprüsünün yazdığı kopyalar)
 yalnızca listelenir. Denetimin kendisi `tests/check-rls.test.ts` ile
 sabitlendi.
 
+**Kiracı sızıntısı** (`tests/db/kiraci-sizintisi.test.mjs`): vitrin
+ailesinin BÜTÜN fonksiyonları iki mağazayla sınanır — A'nın adresinden
+yalnızca A'nın verisi gelmeli, B'nin tek satırı bile görünmemeli,
+alan adını doğrulamamış mağazanın vitrini hiç açılmamalı. Dosyada bir
+ÖLÇÜM PLANI var ve yeni bir `arc_storefront_*` fonksiyonu plana
+yazılmazsa test düşer: kapsam insan hafızasına bırakılmıyor. Yetki
+düzeyleri de burada kayıtlı — kupon ve sipariş oluşturma yalnızca
+`service_role`'a açık (tarayıcıdaki anon anahtarıyla çağrılırsa vitrinin
+sunucu tarafındaki stok, kupon sınırı ve tutar denetimleri atlanırdı),
+iade talebi `authenticated`'a.
+
 **Kiracı ikizleri** (`npm run check:ikizler`): vitrin fonksiyonlarının
 iki ailesi var — çok kiracılı `arc_storefront_*` (adresten mağazayı
 çözer) ve ArvoCulture'a özel `get_arvoculture_storefront_*`. Gövdeleri
