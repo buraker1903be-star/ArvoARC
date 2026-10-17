@@ -48,3 +48,40 @@ export function akisTamMi(akistakiUrun: number, oncekiToplam: number | null | un
   if (!Number.isFinite(onceki) || onceki <= 0) return true;
   return akistakiUrun >= onceki * AKIS_TAMLIK_ESIGI;
 }
+
+/*
+  VARYANT SATILABİLİR Mİ? — arc_variant_available'ın TS karşılığı.
+
+  Aynı kural sipariş düzenleme ekranında elle yazılmıştı
+  (siparisler/[id]/page.tsx: `v.supplier ? v.stock > tampon : …`).
+  Yorumunda "bu kuralın ikizini çizmiyor, aynı kuralı okuyor" dense
+  de yazılı hâli bir ikizdi: SQL'deki eşik değişirse rozet sessizce
+  yanlış kalırdı. Kural artık burada, testi tests/supplier-stock.test.ts.
+
+  Eşik `sellableStock` ile aynı: tampon 5 iken 5 adet satılabilir,
+  4 adet kapanır. Tampon 0 kuralı devre dışı bırakır, bu yüzden
+  "stok > 0" koşulu ayrıca duruyor — `>=` tek başına stoksuz
+  tedarikçi ürününü de satılabilir yapardı.
+
+  Panelin stok sayımları (operasyon, stok, tedarikçi sayfaları)
+  PostgREST süzgeciyle `stock > 0` diyor ve tamponu bilmiyor; içe
+  aktarım tamponun altını 0 yazdığı için tedarikçi varyantında ikisi
+  aynı yanıtı veriyor. Elle stok girilen varyantta ayrışabilir.
+*/
+export type VaryantStogu = {
+  stock: number | null | undefined;
+  allow_backorder?: boolean | null;
+  supplier?: string | null;
+};
+
+export function varyantSatilabilirMi(
+  varyant: VaryantStogu,
+  tamponlar: Map<string, number> | ((kod: string) => number | undefined),
+  varsayilanTampon = 5,
+): boolean {
+  const stok = Number.isFinite(Number(varyant.stock)) ? Math.trunc(Number(varyant.stock)) : 0;
+  if (!varyant.supplier) return stok > 0 || Boolean(varyant.allow_backorder);
+  const bul = typeof tamponlar === "function" ? tamponlar : (kod: string) => tamponlar.get(kod);
+  const tampon = Number(bul(varyant.supplier) ?? varsayilanTampon);
+  return stok > 0 && stok >= (Number.isFinite(tampon) ? tampon : varsayilanTampon);
+}

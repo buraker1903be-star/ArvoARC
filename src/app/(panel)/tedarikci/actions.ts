@@ -69,9 +69,13 @@ export async function updateSupplier(formData: FormData) {
         fiyatına giriyor (api/tedarikci/ice-aktar), yani kaydedilmemesi
         doğrudan fiyatı etkiliyordu.
 
-        NOT: stock_buffer artık saklanıyor ama henüz hiçbir davranışı yok —
-        "tedarikçi stoğu bu değerin altına düşerse ürün satışa kapanır"
-        kuralı kodda uygulanmıyor.
+        NOT (17.10.2026 güncellemesi): stock_buffer'ın artık davranışı
+        VAR ve iki yerde okunuyor — içe aktarım tamponun altındaki
+        miktarı 0 yazıyor (lib/supplier-stock.ts) ve satılabilirlik
+        kuralı tamponu okuyor (arc_variant_available, vitrinin bütün
+        listeleri ve sipariş denetimi). Burada duran not "henüz hiçbir
+        davranışı yok" diyordu; bu alanı değiştirmek artık doğrudan
+        neyin satılabildiğini değiştiriyor.
       */
       service_fee: service,
       stock_buffer: Math.round(buffer),

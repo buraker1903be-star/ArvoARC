@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { akisTamMi, sellableStock } from "@/lib/supplier-stock";
+import { akisTamMi, sellableStock, varyantSatilabilirMi } from "@/lib/supplier-stock";
 
 test("tampon eşiktir: altına düşen satışa kapanır", () => {
   assert.equal(sellableStock(5, 5), 5);
@@ -24,4 +24,40 @@ test("yarım ya da boş akış hiçbir şeyi kapatmaz", () => {
 test("ilk turda kıyas yok: boş olmayan akış yeterli", () => {
   assert.equal(akisTamMi(3161, 0), true);
   assert.equal(akisTamMi(3161, null), true);
+});
+
+/*
+  arc_variant_available'ın TS karşılığı. Eşik sınırı `sellableStock`
+  ile aynı olmalı: tampon 5 iken 5 adet satılabilir. SQL tarafı
+  "stok > tampon" diyordu ve tam sınırda panel "5 adet var" derken
+  vitrin ürünü hiç göstermiyordu (migration 20261017123209).
+*/
+test("tedarikçi varyantı tamponun altına düşünce kapanıyor", () => {
+  const tampon = new Map([["LR", 5]]);
+  const varyant = (stock: number) => ({ stock, supplier: "LR", allow_backorder: false });
+  assert.equal(varyantSatilabilirMi(varyant(9), tampon), true);
+  /* Tam sınır: içe aktarım bu miktarı satılabilir yazıyor. */
+  assert.equal(varyantSatilabilirMi(varyant(5), tampon), true);
+  assert.equal(varyantSatilabilirMi(varyant(4), tampon), false);
+  assert.equal(varyantSatilabilirMi(varyant(0), tampon), false);
+});
+
+test("tampon 0 kuralı devre dışı bırakıyor, stoksuzu satmıyor", () => {
+  const tampon = new Map([["LR", 0]]);
+  assert.equal(varyantSatilabilirMi({ stock: 1, supplier: "LR" }, tampon), true);
+  /* `>=` tek başına olsaydı stok 0 da satılabilir çıkardı. */
+  assert.equal(varyantSatilabilirMi({ stock: 0, supplier: "LR" }, tampon), false);
+});
+
+test("tedarikçisi olmayan varyantta stoksuz satış kuralı geçerli", () => {
+  const bos = new Map<string, number>();
+  assert.equal(varyantSatilabilirMi({ stock: 0, allow_backorder: true }, bos), true);
+  assert.equal(varyantSatilabilirMi({ stock: 0, allow_backorder: false }, bos), false);
+  assert.equal(varyantSatilabilirMi({ stock: 3, allow_backorder: false }, bos), true);
+});
+
+test("tanımsız tedarikçide varsayılan tampon 5", () => {
+  const bos = new Map<string, number>();
+  assert.equal(varyantSatilabilirMi({ stock: 5, supplier: "YOK" }, bos), true);
+  assert.equal(varyantSatilabilirMi({ stock: 4, supplier: "YOK" }, bos), false);
 });

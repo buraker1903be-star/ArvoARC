@@ -21,6 +21,7 @@ import { veritabani, rol } from "./ortam.mjs";
 const KURUM = "aaaaaaaa-0000-0000-0000-000000000001";
 const TAMPONLU = "aaaaaaaa-0000-0000-0000-000000000002"; // stok 3, tampon 5
 const BOL = "aaaaaaaa-0000-0000-0000-000000000003"; // stok 9, tampon 5
+const SINIR = "aaaaaaaa-0000-0000-0000-000000000005"; // stok 5, tampon 5 (tam sınır)
 const KOLEKSIYON = "aaaaaaaa-0000-0000-0000-000000000004";
 
 let db;
@@ -35,18 +36,22 @@ before(async () => {
     insert into public.arc_suppliers
       (id, organization_id, code, name, active, margin_percent, shipping_markup, round_to_kurus,
        publish_directly, created_at, updated_at, sync_cursor, sync_total, service_fee, stock_buffer) values
-      (gen_random_uuid(), '${KURUM}', 'LR', 'LR Health & Beauty', true, 0, 0, 1, true, now(), now(), 0, 0, 0, 5);
+      (gen_random_uuid(), '${KURUM}', 'LR', 'LR Health & Beauty', true, 0, 0, 1, true, now(), now(), 0, 0, 0, 5),
+      /* Tamponu 0 olan tedarikçi: kural devre dışı. */
+      (gen_random_uuid(), '${KURUM}', 'SIFIR', 'Tamponsuz', true, 0, 0, 1, true, now(), now(), 0, 0, 0, 0);
 
     insert into public.arc_products (id, organization_id, name, slug, description, status, source, created_at, updated_at, metadata) values
       ('${TAMPONLU}', '${KURUM}', 'Tamponun altında', 'tamponun-altinda', '', 'active', 'native', now(), now(), '{}'::jsonb),
-      ('${BOL}',      '${KURUM}', 'Tamponun üstünde', 'tamponun-ustunde', '', 'active', 'native', now(), now(), '{}'::jsonb);
+      ('${BOL}',      '${KURUM}', 'Tamponun üstünde', 'tamponun-ustunde', '', 'active', 'native', now(), now(), '{}'::jsonb),
+      ('${SINIR}',    '${KURUM}', 'Tam sınırda', 'tam-sinirda', '', 'active', 'native', now(), now(), '{}'::jsonb);
 
     /* İndirimli: fırsatlar listesine girebilsin. */
     insert into public.arc_product_variants
       (id, organization_id, product_id, sku, title, price, compare_at_price, currency, stock, attributes,
        created_at, updated_at, allow_backorder, supplier) values
       (gen_random_uuid(), '${KURUM}', '${TAMPONLU}', 'LR-1', 'Kırmızı / M', 10000, 20000, 'TRY', 3, '{}'::jsonb, now(), now(), false, 'LR'),
-      (gen_random_uuid(), '${KURUM}', '${BOL}',      'LR-2', 'Kırmızı / M', 10000, 20000, 'TRY', 9, '{}'::jsonb, now(), now(), false, 'LR');
+      (gen_random_uuid(), '${KURUM}', '${BOL}',      'LR-2', 'Kırmızı / M', 10000, 20000, 'TRY', 9, '{}'::jsonb, now(), now(), false, 'LR'),
+      (gen_random_uuid(), '${KURUM}', '${SINIR}',    'LR-3', 'Kırmızı / M', 10000, 20000, 'TRY', 5, '{}'::jsonb, now(), now(), false, 'LR');
 
     insert into public.arc_collections
       (id, organization_id, title, slug, description, status, source, seo_title, seo_description, metadata, created_at, updated_at) values
@@ -54,7 +59,8 @@ before(async () => {
 
     insert into public.arc_collection_products (organization_id, collection_id, product_id, "position", created_at) values
       ('${KURUM}', '${KOLEKSIYON}', '${TAMPONLU}', 1, now()),
-      ('${KURUM}', '${KOLEKSIYON}', '${BOL}', 2, now());
+      ('${KURUM}', '${KOLEKSIYON}', '${BOL}', 2, now()),
+      ('${KURUM}', '${KOLEKSIYON}', '${SINIR}', 3, now());
   `);
 });
 
@@ -94,11 +100,39 @@ describe("vitrinde uygunluk tek kuraldan", () => {
     assert.equal(sayfa["tamponun-ustunde"], true);
   });
 
+  test("tam sınırdaki varyant satılabilir: tampon eşiktir, rezerv değil", async () => {
+    /*
+      Panelde alanın açıklaması "bu değerin ALTINA düşerse kapanır" ve
+      içe aktarım bu sözleşmeyi uyguluyor (sellableStock(5,5) === 5).
+      Fonksiyon "stok > tampon" derken tam sınırda panel "5 adet var"
+      diyor, vitrin ürünü hiç göstermiyordu (20261017123209).
+    */
+    const katalog = await uygunluk(
+      `select slug, available from public.get_arvoculture_storefront_products(50, 0)`,
+    );
+    const sayfa = await uygunluk(
+      `select slug, available from public.get_arvoculture_storefront_product('tam-sinirda')`,
+    );
+    assert.equal(katalog["tam-sinirda"], true);
+    assert.equal(sayfa["tam-sinirda"], true);
+  });
+
+  test("tampon 0 kuralı kapatıyor ama stoksuzu satmıyor", async () => {
+    /* `>=` tek başına olsaydı `stok >= 0` her miktarı satılabilir
+       yapardı — stoksuz tedarikçi ürünü bile. */
+    const satir = (await db.query(`
+      select public.arc_variant_available(0, false, 'SIFIR') as stoksuz,
+             public.arc_variant_available(1, false, 'SIFIR') as birli
+    `)).rows[0];
+    assert.equal(satir.stoksuz, false);
+    assert.equal(satir.birli, true);
+  });
+
   test("fırsatlar listesi tampon altındaki ürünü hiç göstermiyor", async () => {
     const satirlar = (await db.query(
       `select slug from public.get_arvoculture_storefront_deals(50)`,
     )).rows.map((satir) => satir.slug);
-    assert.deepEqual(satirlar, ["tamponun-ustunde"]);
+    assert.deepEqual(satirlar.sort(), ["tam-sinirda", "tamponun-ustunde"]);
   });
 
   test("yüzeylerin yanıtı siparişin denetimiyle aynı", async () => {

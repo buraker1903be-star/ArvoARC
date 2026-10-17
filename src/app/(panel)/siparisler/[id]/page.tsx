@@ -34,6 +34,7 @@ import "../orders.css";
 import "@/components/arvo-ui/kayit-detay.css";
 import "./siparis-detay.css";
 import { formatPersonName } from "@/lib/format-name";
+import { varyantSatilabilirMi } from "@/lib/supplier-stock";
 
 /* Paket durumunun rozet tonu: yalnızca teslim yeşil, yolda mavi, taslak nötr, sorun kırmızı. */
 const PAKET_TONU:Record<string,string>={draft:"neutral",created:"info",picked_up:"info",in_transit:"info",delivered:"success",failed:"danger",cancelled:"neutral"};
@@ -132,9 +133,10 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   /*
     DÜZENLEME VERİSİ (16.10.2026): her kalemin ürününün bütün varyantları
     (değiştirme seçenekleri) ve tedarikçi tamponu (stok rozeti). Tedarikçi
-    ürününde "stokta" demek stok > tampon (arc_variant_available); kendi
-    ürünümüzde stok > 0 ya da stoksuz satış açık. Rozet bu kuralın
-    ikizini çizmiyor, aynı kuralı okuyor: satılabilir() aşağıda.
+    ürününde "stokta" demek stoğun tamponun altına düşmemiş olması
+    (arc_variant_available); kendi ürünümüzde stok > 0 ya da stoksuz
+    satış açık. Rozet kuralı lib/supplier-stock.ts'ten okuyor — eskiden
+    burada elle yazılıydı, yani SQL'in ikiziydi.
   */
   const kalemVaryantIdleri=[...new Set((items??[]).map(item=>item.variant_id).filter((v):v is string=>Boolean(v)))];
   const {data:kalemVaryantlari,error:kalemVaryantHatasi}=kalemVaryantIdleri.length
@@ -154,7 +156,9 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   if(tamponHatasi)throw new Error("Tedarikçi tamponu okunamadı: "+tamponHatasi.message);
   const secenekler=(secenekVerisi??[]) as Secenek[];
   const tampon=new Map(((tamponVerisi??[]) as {code:string;stock_buffer:number|null}[]).map(t=>[t.code,t.stock_buffer??5]));
-  const satilabilir=(v:Secenek)=>v.supplier?v.stock>(tampon.get(v.supplier)??5):v.stock>0||v.allow_backorder;
+  /* Kural lib/supplier-stock.ts'te; burada elle yazılıydı ve SQL'deki
+     eşik değişince rozet sessizce yanlış kalırdı. */
+  const satilabilir=(v:Secenek)=>varyantSatilabilirMi(v,tampon);
   const varyantById=new Map(secenekler.map(v=>[v.id,v]));
 
   /*
