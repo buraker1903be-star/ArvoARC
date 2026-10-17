@@ -156,3 +156,47 @@ describe("koleksiyon rafı sayfalanıyor", () => {
     assert.equal(satirlar.length, 0);
   });
 });
+
+/*
+  KURUM KOŞULU KAPSAMI DARALTAMAZ — VERİTABANI GARANTİSİ.
+
+  Fonksiyon koleksiyon join'lerinde `organization_id =
+  p.organization_id` koşulunu taşıyor; çalışan ikizi taşımıyor.
+  "Fazladan koşul satır düşürüyor olabilir" diye bir test yazıldı:
+  kurum alanı ürününkinden BAŞKA bir bağlantı satırı kurulmaya
+  çalışıldı ve veritabanı kabul etmedi —
+  arc_collection_products'ın BİLEŞİK yabancı anahtarları
+  (product_id, organization_id) ve (collection_id, organization_id)
+  böyle bir satırı imkânsız kılıyor.
+
+  Yani koşul gereksiz ama zararsız; kapsamı daraltması mümkün
+  değil. Bu test o garantiyi kayda geçiriyor, çünkü yokluğunda
+  aynı yanlış teşhis yeniden yapılır.
+*/
+describe("koleksiyon bağlantısı kurum alanında tutarsız olamıyor", () => {
+  const BASKA = "dddddddd-0000-0000-0000-00000000dead";
+
+  test("kurum alanı ürününkinden farklı bağlantı satırı yazılamıyor", async () => {
+    /* Taze ürün: birincil anahtar (koleksiyon, ürün) çakışmasın da
+       düşen kısıt gerçekten yabancı anahtar olsun. */
+    await db.exec(`
+      insert into public.organizations
+        (id, name, slug, sector, status, plan_code, created_at, updated_at, provisioning_state, primary_color) values
+        ('${BASKA}', 'Eski kayıt', 'eski-kayit', 'retail', 'active', 'starter', now(), now(), 'active', '#000000')
+      on conflict (id) do nothing;
+
+      insert into public.arc_products (id, organization_id, name, slug, description, status, source, created_at, updated_at, metadata) values
+        (gen_random_uuid(), '${KURUM}', 'Bağlantı denemesi', 'baglanti-denemesi', '', 'active', 'native', now(), now(), '{}'::jsonb);
+    `);
+    await assert.rejects(
+      () =>
+        db.exec(`
+          insert into public.arc_collection_products (organization_id, collection_id, product_id, "position", created_at) values
+            ('${BASKA}', (select id from public.arc_collections where slug='erkek' and organization_id='${KURUM}'),
+             (select id from public.arc_products where slug='baglanti-denemesi' and organization_id='${KURUM}'), 999, now());
+        `),
+      /foreign key constraint/,
+      "bileşik yabancı anahtar böyle bir satırı engellemeli",
+    );
+  });
+});
