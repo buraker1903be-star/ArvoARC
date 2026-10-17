@@ -321,6 +321,16 @@ create table if not exists public.arc_shipments (
   customer_notified_at timestamp with time zone
 );
 
+create table if not exists public.arc_store_pages (
+  organization_id uuid not null,
+  page_key text not null,
+  title text not null,
+  body text not null,
+  updated_by uuid,
+  created_at timestamp with time zone not null,
+  updated_at timestamp with time zone not null
+);
+
 create table if not exists public.arc_store_settings (
   organization_id uuid not null,
   store_name text not null,
@@ -3165,6 +3175,28 @@ AS $function$
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.arc_storefront_pages(p_host text)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select coalesce(
+           jsonb_object_agg(
+             p.page_key,
+             jsonb_build_object('baslik', p.title, 'govde', p.body)
+           ),
+           '{}'::jsonb
+         )
+  from public.arc_store_pages p
+  where p.organization_id = public.arc_storefront_org(p_host)
+    /* Başlığı ve gövdesi boş satır, "varsayılana dön" demektir:
+       panelde alanları boşaltıp kaydeden kiracı satırı silmiş sayılıyor
+       ama elle girilmiş eski bir boş satır da aynı anlama gelmeli. */
+    and (length(btrim(p.title)) > 0 or length(btrim(p.body)) > 0);
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.arc_storefront_payment_methods(p_host text)
  RETURNS TABLE(bank_transfer_enabled boolean, bank_transfer_discount_percent numeric, card_enabled boolean)
  LANGUAGE sql
@@ -3283,6 +3315,37 @@ CREATE OR REPLACE FUNCTION public.arc_storefront_search_index(p_host text, p_lim
  SET search_path TO ''
 AS $function$
   select * from public.arc_vitrin_arama_dizini(public.arc_storefront_org(p_host), p_limit, p_offset);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_seller(p_host text)
+ RETURNS TABLE(legal_name text, trade_name text, mersis_no text, tax_office text, tax_number text, trade_registry_no text, address_line text, address_district text, address_city text, address_country text, contact_email text, contact_phone text, whatsapp_number text, kep_address text, etbis_verified boolean, storefront_url text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select
+    s.legal_name,
+    coalesce(s.trade_name, o.name) as trade_name,
+    s.mersis_no,
+    s.tax_office,
+    s.tax_number,
+    s.trade_registry_no,
+    s.address_line,
+    s.address_district,
+    s.address_city,
+    coalesce(s.address_country, 'Türkiye') as address_country,
+    s.contact_email,
+    s.contact_phone,
+    s.whatsapp_number,
+    s.kep_address,
+    coalesce(s.etbis_verified, false) as etbis_verified,
+    s.storefront_url
+  from public.arc_store_settings s
+  join public.organizations o
+    on o.id = s.organization_id
+  where s.organization_id = public.arc_storefront_org(p_host)
+  limit 1;
 $function$
 ;
 
@@ -5110,6 +5173,14 @@ alter table public.arc_shipments alter column status set default 'draft'::text;
 
 alter table public.arc_shipments alter column updated_at set default now();
 
+alter table public.arc_store_pages alter column body set default ''::text;
+
+alter table public.arc_store_pages alter column created_at set default now();
+
+alter table public.arc_store_pages alter column title set default ''::text;
+
+alter table public.arc_store_pages alter column updated_at set default now();
+
 alter table public.arc_store_settings alter column accent_color set default '#6f9548'::text;
 
 alter table public.arc_store_settings alter column address_country set default 'Türkiye'::text;
@@ -5442,6 +5513,12 @@ alter table public.arc_shipments add constraint arc_shipments_source_check CHECK
 
 alter table public.arc_shipments add constraint arc_shipments_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'created'::text, 'picked_up'::text, 'in_transit'::text, 'delivered'::text, 'cancelled'::text, 'failed'::text])));
 
+alter table public.arc_store_pages add constraint arc_store_pages_key_check CHECK ((page_key = ANY (ARRAY['hakkimizda'::text, 'sss'::text, 'iletisim'::text])));
+
+alter table public.arc_store_pages add constraint arc_store_pages_pkey PRIMARY KEY (organization_id, page_key);
+
+alter table public.arc_store_pages add constraint arc_store_pages_uzunluk_check CHECK (((length(title) <= 200) AND (length(body) <= 8000)));
+
 alter table public.arc_store_settings add constraint arc_store_settings_accent_color_check CHECK ((accent_color ~ '^#[0-9A-Fa-f]{6}$'::text));
 
 alter table public.arc_store_settings add constraint arc_store_settings_bank_iban_check CHECK (((bank_iban IS NULL) OR (bank_iban ~ '^TR[0-9]{24}$'::text)));
@@ -5758,6 +5835,8 @@ alter table public.arc_shipments add constraint arc_shipments_order_id_fkey FORE
 
 alter table public.arc_shipments add constraint arc_shipments_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
+alter table public.arc_store_pages add constraint arc_store_pages_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
 alter table public.arc_store_settings add constraint arc_store_settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
 alter table public.arc_store_themes add constraint arc_store_themes_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
@@ -5815,6 +5894,8 @@ alter table public.arc_saved_views enable row level security;
 alter table public.arc_shipment_items enable row level security;
 
 alter table public.arc_shipments enable row level security;
+
+alter table public.arc_store_pages enable row level security;
 
 alter table public.arc_store_settings enable row level security;
 
@@ -6108,6 +6189,19 @@ create policy arc_shipments_member_all on public.arc_shipments as PERMISSIVE for
    FROM organization_memberships m
   WHERE ((m.organization_id = arc_shipments.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
 
+create policy arc_store_pages_select on public.arc_store_pages as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_store_pages.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active))));
+
+create policy arc_store_pages_write on public.arc_store_pages as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_store_pages.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_store_pages.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND m.is_active AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
+
 create policy "arc managers insert store settings" on public.arc_store_settings as PERMISSIVE for INSERT to authenticated
   with check ((EXISTS ( SELECT 1
    FROM organization_memberships membership
@@ -6397,6 +6491,11 @@ grant execute on function public.arc_storefront_org(p_host text) to service_role
 grant execute on function public.arc_storefront_org(p_host text) to anon;
 grant execute on function public.arc_storefront_org(p_host text) to authenticated;
 
+revoke all on function public.arc_storefront_pages(p_host text) from public;
+grant execute on function public.arc_storefront_pages(p_host text) to service_role;
+grant execute on function public.arc_storefront_pages(p_host text) to anon;
+grant execute on function public.arc_storefront_pages(p_host text) to authenticated;
+
 revoke all on function public.arc_storefront_payment_methods(p_host text) from public;
 grant execute on function public.arc_storefront_payment_methods(p_host text) to anon;
 grant execute on function public.arc_storefront_payment_methods(p_host text) to authenticated;
@@ -6445,6 +6544,11 @@ revoke all on function public.arc_storefront_search_index(p_host text, p_limit i
 grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) to service_role;
 grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) to anon;
 grant execute on function public.arc_storefront_search_index(p_host text, p_limit integer, p_offset integer) to authenticated;
+
+revoke all on function public.arc_storefront_seller(p_host text) from public;
+grant execute on function public.arc_storefront_seller(p_host text) to service_role;
+grant execute on function public.arc_storefront_seller(p_host text) to anon;
+grant execute on function public.arc_storefront_seller(p_host text) to authenticated;
 
 revoke all on function public.arc_storefront_settings(p_host text) from public;
 grant execute on function public.arc_storefront_settings(p_host text) to service_role;
