@@ -98,7 +98,10 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
     { etiket: "Sipariş", deger: adet(o.gecerliAdet), not: `${adet(o.siparisAdedi)} kayıt · ${adet(o.iptalAdet)} iptal/iade · son 6 ay`, simge: "kutu", ton: "brand", grafik: { tur: "cubuk", seri: seri((ay) => ay.adet, adet) } },
     { etiket: "Net ciro", deger: paraYaz(o.netCiro), not: "İptal ve iadeler düşülmüş · son 6 ay", simge: "para", ton: "success", grafik: { tur: "cubuk", seri: seri((ay) => ay.ciro, paraYaz) } },
     { etiket: "Ortalama sepet", deger: paraYaz(o.ortalamaSepet), not: `${adet(o.gecerliAdet)} geçerli siparişin ortalaması`, simge: "sepet", ton: "info", grafik: { tur: "halka", oran: o.siparisAdedi ? (o.gecerliAdet / o.siparisAdedi) * 100 : null, altyazi: "geçerli sipariş oranı" } },
-    { etiket: "Satılan adet", deger: adet(o.satilanAdet), not: "Geçerli siparişlerdeki toplam ürün", simge: "etiket", ton: "gold", grafik: { tur: "halka", oran: o.gecerliAdet ? (o.satilanAdet / o.gecerliAdet) * 100 : null, altyazi: "sipariş başına adet" } },
+    /* Halka bir ORAN gösteriyor: "sipariş başına adet" yüzde değil,
+       3 ürün/1 sipariş %300 çıkıp halkayı doldururdu. Yerine en çok
+       satanın kalem cirosundaki payı — kartın sorusuyla aynı konu. */
+    { etiket: "Satılan adet", deger: adet(o.satilanAdet), not: `Geçerli siparişlerde toplam ürün · sipariş başına ${(o.gecerliAdet ? o.satilanAdet / o.gecerliAdet : 0).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`, simge: "etiket", ton: "gold", grafik: { tur: "halka", oran: o.kalemCirosu && o.enCokSatan[0] ? (o.enCokSatan[0].ciro / o.kalemCirosu) * 100 : null, altyazi: "en çok satanın payı" } },
     { etiket: "İade", deger: paraYaz(o.iadeTutari), not: `${adet(o.iadeAdedi)} talep açıldı`, simge: "geri", ton: o.iadeTutari ? "warning" : "success", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.iadeTutari / o.brutCiro) * 100 : 0 } },
   ];
 
@@ -111,13 +114,20 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
     { etiket: "Dönem akışı", deger: paraYaz(o.netCiro), not: "Ürün + kargo − indirim − iade", simge: "para", ton: "brand", grafik: { tur: "selale", adimlar: [{ ad: "Ürün", deger: o.urunToplami, ton: "brand" }, { ad: "Kargo", deger: o.kargo, ton: "info" }, { ad: "İndirim", deger: -o.indirim, ton: "warning" }, { ad: "İade", deger: -o.iadeTutari, ton: "warning" }, { ad: "Net", deger: o.netCiro, ton: "success" }] } },
   ];
 
+  /*
+    PAYIN TABANI İNDİRİM ÖNCESİ TOPLAM (ürün + kargo). Net ciroya
+    oranlanınca ilk satır %100'ü aşıyordu (%103): indirim düşülmüş bir
+    tabana, düşülmemiş bir sayı bölünüyor. Taban indirim öncesi olunca
+    her satır aşağı doğru okunuyor: ürün %100, indirim %3, net %97.
+  */
+  const defterTabani = o.urunToplami + o.kargo;
   const ciroSatirlari: DefterSatiri[] = [
-    { etiket: "Ürün toplamı", ipucu: `${adet(o.satilanAdet)} ürün · kargo ve indirim hariç`, tutar: paraYaz(o.urunToplami), pay: payi(o.urunToplami, o.brutCiro), ton: "brand" },
-    { etiket: "Kargo", ipucu: "Müşteriden tahsil edilen kargo bedeli", tutar: paraYaz(o.kargo), pay: payi(o.kargo, o.brutCiro), ton: "info" },
-    { etiket: "İndirim", ipucu: "Kupon ve havale indirimi", tutar: dusum(o.indirim), pay: payi(o.indirim, o.brutCiro), ton: "warning" },
-    { etiket: "İade", ipucu: "Dönem siparişlerinden geri ödenen", tutar: dusum(o.iadeTutari), pay: payi(o.iadeTutari, o.brutCiro), ton: "warning" },
+    { etiket: "Ürün toplamı", ipucu: `${adet(o.satilanAdet)} ürün · kargo ve indirim hariç`, tutar: paraYaz(o.urunToplami), pay: payi(o.urunToplami, defterTabani), ton: "brand" },
+    { etiket: "Kargo", ipucu: "Müşteriden tahsil edilen kargo bedeli", tutar: paraYaz(o.kargo), pay: payi(o.kargo, defterTabani), ton: "info" },
+    { etiket: "İndirim", ipucu: "Kupon ve havale indirimi", tutar: dusum(o.indirim), pay: payi(o.indirim, defterTabani), ton: "warning" },
+    { etiket: "İade", ipucu: "Dönem siparişlerinden geri ödenen", tutar: dusum(o.iadeTutari), pay: payi(o.iadeTutari, defterTabani), ton: "warning" },
   ];
-  const ciroToplami: DefterSatiri = { etiket: "Net ciro", ipucu: "Ürün + kargo − indirim − iade", tutar: paraYaz(o.netCiro), pay: o.brutCiro ? payi(o.netCiro, o.brutCiro) : null, ton: "success" };
+  const ciroToplami: DefterSatiri = { etiket: "Net ciro", ipucu: "Ürün + kargo − indirim − iade", tutar: paraYaz(o.netCiro), pay: payi(o.netCiro, defterTabani), ton: "success" };
 
   const karSatirlari: DefterSatiri[] = [
     { etiket: "Kalem geliri", ipucu: `${adet(o.karliSiparis)} siparişin ürün satırları`, tutar: paraYaz(o.karTabani), pay: o.karTabani ? 100 : null, ton: "brand" },
@@ -203,7 +213,7 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
       <section className="rpt-card rpt-span-full">
         <header className="rpt-card-head"><div><h2>Ciro ve kâr dökümü</h2><p>Ciroyu oluşturan kalemler ile ürün maliyeti yan yana</p></div></header>
         <div className="rpt-ledgers">
-          <Defter baslik="Ciro dökümü" altyazi="Pay: brüt ciroya oranı" satirlar={ciroSatirlari} toplam={ciroToplami} />
+          <Defter baslik="Ciro dökümü" altyazi="Pay: indirim öncesi toplama (ürün + kargo) oranı" satirlar={ciroSatirlari} toplam={ciroToplami} />
           <Defter baslik="Kârlılık" altyazi="Pay: kalem gelirine oranı" satirlar={karSatirlari} toplam={karToplami} />
         </div>
       </section>
