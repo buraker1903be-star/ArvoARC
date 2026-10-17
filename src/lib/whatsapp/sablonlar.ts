@@ -52,6 +52,33 @@ export const WA_SABLONLARI: Record<string, WaSablon> = {
       "Merhaba {{1}}, {{2}} numaralı siparişiniz alındı. Tutar: {{3}}. Siparişiniz hazırlanmaya başladığında tekrar bilgilendirileceksiniz.",
     aciklama: "Sipariş oluştuğunda ve ödemesi alındığında.",
   },
+  siparis_hazirlaniyor: {
+    ad: "siparis_hazirlaniyor",
+    dil: "tr",
+    parametreler: ["musteri", "siparis_no"],
+    govde:
+      "Merhaba {{1}}, {{2}} numaralı siparişiniz hazırlanmaya başlandı. Kargoya verildiğinde tekrar bilgilendirileceksiniz.",
+    aciklama: "Sipariş \"hazırlanıyor\" durumuna alındığında.",
+  },
+  /*
+    Takip numarası OLMADAN kargoya verilen sipariş.
+
+    Personel takip numarasını girmeden durumu "kargoya verildi"
+    yapabiliyor ve o an e-posta gidiyordu ama WhatsApp gitmiyordu:
+    tek şablon (siparis_kargoda) takip numarası istiyor, olmayan
+    değerle de gönderilemiyor. Müşteri aynı olayı bir kanalda
+    öğrenip ötekinde öğrenemiyordu. Takip numarası sonradan
+    girildiğinde siparis_kargoda ayrıca gidiyor — bu mesaj onun
+    yerine değil, ondan önce.
+  */
+  siparis_kargolandi: {
+    ad: "siparis_kargolandi",
+    dil: "tr",
+    parametreler: ["musteri", "siparis_no"],
+    govde:
+      "Merhaba {{1}}, {{2}} numaralı siparişiniz kargoya verildi. Takip bilgileri kısa süre içinde sistemde görünür olacak.",
+    aciklama: "Takip numarası girilmeden kargoya verildiğinde.",
+  },
   siparis_kargoda: {
     ad: "siparis_kargoda",
     dil: "tr",

@@ -15,6 +15,7 @@ import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock"
 import { requireTenant } from "@/lib/tenant";
 import { getStoreBrand } from "@/lib/store-brand";
 import { siparisTelefonu, waSiparisBildirimi } from "@/lib/whatsapp/bildirim";
+import { durumWaAnahtari } from "@/lib/whatsapp/durum-anahtari";
 import { tarzyeriSepetiniDogrula } from "@/lib/supplier/tarzyeri-dogrulama";
 
 /*
@@ -78,13 +79,15 @@ export async function updateOrderStatus(formData:FormData){
       }
 
       /*
-        Aynı olayın WhatsApp'ı. E-postayla AYNI koşullar geçerli:
-        takip numarası girildiyse kargo bildirimi zaten gitti,
-        bildirim gerektirmeyen ara durumda mesaj üretilmiyor
-        (WA_ANAHTARI listesi o yüzden kısa). Müşteri onayı yoksa
-        gönderilmiyor, yalnızca kayda geçiyor.
+        Aynı olayın WhatsApp'ı. Karar burada DEĞİL
+        lib/whatsapp/durum-anahtari'nde: iki kanal ayrı yerlerde
+        yazıldığında ayrışıyordu — takip numarası girilmeden
+        "kargoya verildi" yapılan siparişte e-posta gidiyor,
+        WhatsApp gitmiyordu. Testi e-postanın gönderdiği her
+        durumda şablon olduğunu sabitliyor. Müşteri onayı yoksa
+        gönderilmiyor.
       */
-      const waAnahtari=status==="cancelled"?"siparis_iptal":status==="refunded"?"iade_tamamlandi":null;
+      const waAnahtari=durumWaAnahtari(status,{trackingSent});
       if(waAnahtari&&order){
         await waSiparisBildirimi({
           organizationId:organization.id,

@@ -26,7 +26,39 @@ Merhaba {{1}}, {{2}} numaralı siparişiniz alındı. Tutar: {{3}}. Siparişiniz
 
 ---
 
-## 2) siparis_kargoda
+## 2) siparis_hazirlaniyor
+**Parametreler:** 1 müşteri adı · 2 sipariş numarası
+
+```
+Merhaba {{1}}, {{2}} numaralı siparişiniz hazırlanmaya başlandı. Kargoya verildiğinde tekrar bilgilendirileceksiniz.
+```
+
+Örnek: Ayşe Yılmaz · AC261017-0042
+
+Sipariş panelde "Hazırlanıyor"a alındığında gider. E-posta bu durumda
+bilerek susuyor (ara durum bildirimi müşteriyi sonraki postaları da
+görmezden gelmeye alıştırıyor); WhatsApp müşterinin ayrıca onay verdiği
+ayrı bir kanal.
+
+---
+
+## 3) siparis_kargolandi
+**Parametreler:** 1 müşteri adı · 2 sipariş numarası
+
+```
+Merhaba {{1}}, {{2}} numaralı siparişiniz kargoya verildi. Takip bilgileri kısa süre içinde sistemde görünür olacak.
+```
+
+Örnek: Ayşe Yılmaz · AC261017-0042
+
+Takip numarası GİRİLMEDEN "kargoya verildi" yapıldığında gider. Takip
+numarası girilince ayrıca `siparis_kargoda` gidiyor; bu mesaj onun
+yerine değil, ondan önce. İkisi birden gitmiyor — takip numarası zaten
+girilmişse bu mesaj üretilmiyor.
+
+---
+
+## 4) siparis_kargoda
 **Parametreler:** 1 müşteri adı · 2 sipariş numarası · 3 kargo firması · 4 takip numarası
 
 ```
@@ -37,7 +69,7 @@ Merhaba {{1}}, {{2}} numaralı siparişiniz kargoya verildi. {{3}} · takip numa
 
 ---
 
-## 3) siparis_iptal
+## 5) siparis_iptal
 **Parametreler:** 1 müşteri adı · 2 sipariş numarası
 
 ```
@@ -48,7 +80,7 @@ Merhaba {{1}}, {{2}} numaralı siparişiniz iptal edildi. Ödemeniz alınmışsa
 
 ---
 
-## 4) iade_tamamlandi
+## 6) iade_tamamlandi
 **Parametreler:** 1 müşteri adı · 2 sipariş numarası
 
 ```
