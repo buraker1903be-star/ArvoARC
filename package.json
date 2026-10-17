@@ -18,7 +18,8 @@
     "schema:catalog": "node scripts/sema-katalog.mjs",
     "olc:iskelet": "node scripts/olc-iskelet.mjs",
     "olc:rehber": "node scripts/olc-rehber.mjs",
-    "check:rls": "node scripts/check-rls.mjs"
+    "check:rls": "node scripts/check-rls.mjs",
+    "check:ikizler": "node scripts/check-ikizler.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

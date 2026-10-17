@@ -226,6 +226,24 @@ hiçbir yerden okunmayan tablo (ArvoOS köprüsünün yazdığı kopyalar)
 yalnızca listelenir. Denetimin kendisi `tests/check-rls.test.ts` ile
 sabitlendi.
 
+**Kiracı ikizleri** (`npm run check:ikizler`): vitrin fonksiyonlarının
+iki ailesi var — çok kiracılı `arc_storefront_*` (adresten mağazayı
+çözer) ve ArvoCulture'a özel `get_arvoculture_storefront_*`. Gövdeleri
+aynı olmak zorunda; farklı olan yalnızca kiracının nasıl bulunduğu.
+Denetim ikisini kiracı çözümü ve yorumlar çıkarılmış hâlde
+karşılaştırıyor; ikizi olmayan yeni bir `arc_storefront_*` fonksiyonunu
+da bildiriyor (bilinçli istisnalar betikteki listede gerekçesiyle
+durur).
+
+Kural 17.10.2026'da üç yerde bozulmuş bulundu: arama dizini ve sitemap
+sayfalaması çok kiracılı ailede düzeltilmemişti (`limit 20000` ama
+PostgREST 1000'de kesiyor ve `p_offset` yok — ArvoCulture'da aynı hata
+müşterinin satın alabildiği ürünü arayıp bulamamasına yol açmıştı),
+varyant listesinin sınırı ikizde 200'e çıkarken burada 60'ta kalmıştı.
+Hiçbiri o gün canlıyı etkilemiyordu çünkü ikinci kiracı yoktu;
+açıldığında etkileyecekti. Bir fonksiyonu değiştirirken ikizini AYNI
+migration'da değiştirin.
+
 **Şema sözleşmesi** (`npm run check:schema`): koddaki tablo, sütun ve RPC
 adları canlı şemanın kataloğuyla (`supabase/schema/katalog.json`)
 karşılaştırılır. **Katalog gecikmesini hatadan ayırır** (16.10.2026): adı

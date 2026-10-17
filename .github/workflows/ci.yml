@@ -48,3 +48,11 @@ jobs:
       # stok hareketi ve iade stoğu bu yüzden canlıda ölüydü.
       - name: RLS politikaları
         run: npm run check:rls
+      # Vitrin fonksiyonlarının iki ailesi (çok kiracılı
+      # arc_storefront_* ve ArvoCulture'a özel get_arvoculture_*)
+      # gövdece aynı olmak zorunda. 17.10.2026'da ayrışmış
+      # bulundular: arama dizini ve sitemap ikizleri düzeltilirken
+      # dışarıda kalmış, varyant sınırı ikizde 200 olurken burada
+      # 60'ta kalmıştı. İkinci kiracı açılırken yaşanacaktı.
+      - name: Kiracı ikizleri
+        run: npm run check:ikizler
