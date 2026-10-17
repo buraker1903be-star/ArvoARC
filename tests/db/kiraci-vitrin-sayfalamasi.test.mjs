@@ -87,17 +87,34 @@ describe("kiracı vitrininde sayfalama", () => {
   }
 
   test("sayfa boyutu 1000'le sınırlı: PostgREST'in döndürdüğünden fazlası istenmiyor", async () => {
-    /* `limit 20000` diyen eski sürüm, PostgREST 1000'de kestiği için
-       eksik listeyi "tamam" sanıyordu. */
-    const satir = (await db.query(`
-      select pg_get_functiondef(p.oid) as tanim
-        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-       where n.nspname = 'public' and p.proname in ('arc_storefront_product_slugs', 'arc_storefront_search_index')
-    `)).rows;
-    assert.equal(satir.length, 2, "aşırı yükleme kalmamalı (eski imza düşürülmeli)");
-    for (const { tanim } of satir) {
-      assert.ok(tanim.includes("least(coalesce(p_limit, 1000), 1000)"), "sayfa boyutu 1000'le sınırlı değil");
-      assert.ok(!tanim.includes("20000"), "eski üst sınır duruyor");
+    /*
+      `limit 20000` diyen eski sürüm, PostgREST 1000'de kestiği için
+      eksik listeyi "tamam" sanıyordu.
+
+      ÖLÇÜT METİN DEĞİL DAVRANIŞ (20261017141944): bu test eskiden
+      pg_get_functiondef içinde `least(coalesce(p_limit, 1000), 1000)`
+      arıyordu. Gövdeler tek yere taşınıp iki aile sarmalayıcıya
+      inince metin sarmalayıcıda yok diye düştü — oysa kural
+      bozulmamıştı. Artık 1000'den fazla ürün kurulup fonksiyondan
+      5000 isteniyor; 1000 satır dönmeli.
+    */
+    await rol(db, "postgres");
+    await db.exec(`
+      insert into public.arc_products (id, organization_id, name, slug, description, status, source, created_at, updated_at, metadata)
+        select gen_random_uuid(), '${KURUM}', 'Yığın ' || i, 'yigin-' || i, '', 'active', 'native', now(), now() - (i || ' second')::interval, '{}'::jsonb
+          from generate_series(1, 1200) i;
+      insert into public.arc_product_variants
+        (id, organization_id, product_id, sku, title, price, currency, stock, attributes, created_at, updated_at, allow_backorder)
+        select gen_random_uuid(), p.organization_id, p.id, 'Y-' || p.slug, 'Tek', 10000, 'TRY', 50, '{}'::jsonb, now(), now(), false
+          from public.arc_products p
+         where p.organization_id = '${KURUM}' and p.slug like 'yigin-%';
+    `);
+
+    for (const fonksiyon of ["arc_storefront_product_slugs", "arc_storefront_search_index"]) {
+      const satirlar = await slugListesi(
+        `select slug from public.${fonksiyon}('${HOST}', 5000, 0)`,
+      );
+      assert.equal(satirlar.length, 1000, `${fonksiyon}: sayfa boyutu 1000'le sınırlı değil`);
     }
   });
 });
