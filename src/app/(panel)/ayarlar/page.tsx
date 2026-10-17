@@ -1,4 +1,5 @@
 import { requireTenant } from "@/lib/tenant";
+import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { ALT_ALAN_SONEKI, altAlanAdresi, magazaAdresi } from "@/lib/magaza-adresi";
 import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
 import { baglantiyiSina } from "@/lib/tryoto/ayar";
@@ -92,12 +93,12 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
           <article className="brand-asset">
             <div className="brand-preview logo-preview" role="img" aria-label="Mağaza logosu" style={logoUrl?{backgroundImage:`url("${logoUrl}")`}:undefined}>{!logoUrl&&<b>LOGO</b>}</div>
             <div><strong>Mağaza logosu</strong><small>PNG, JPG veya WEBP · en fazla 4 MB</small></div>
-            {canManage&&<><form action={uploadBrandAsset}><input type="hidden" name="kind" value="logo"/><input name="file" type="file" accept="image/png,image/jpeg,image/webp" required/><button className="panel-secondary" type="submit">Logo yükle</button></form>{logoUrl&&<form action={removeBrandAsset}><input type="hidden" name="kind" value="logo"/><button className="danger-button" type="submit">Logoyu kaldır</button></form>}</>}
+            {canManage&&<><form action={uploadBrandAsset}><input type="hidden" name="kind" value="logo"/><input name="file" type="file" accept="image/png,image/jpeg,image/webp" required/><button className="panel-primary" type="submit">Logo yükle</button></form>{logoUrl&&<form action={removeBrandAsset}><input type="hidden" name="kind" value="logo"/><button className="danger-button" type="submit">Logoyu kaldır</button></form>}</>}
           </article>
           <article className="brand-asset">
             <div className="brand-preview favicon-preview" role="img" aria-label="Mağaza faviconu" style={faviconUrl?{backgroundImage:`url("${faviconUrl}")`}:undefined}>{!faviconUrl&&<b>F</b>}</div>
             <div><strong>Favicon</strong><small>PNG, WEBP veya ICO · en fazla 1 MB</small></div>
-            {canManage&&<><form action={uploadBrandAsset}><input type="hidden" name="kind" value="favicon"/><input name="file" type="file" accept="image/png,image/webp,image/x-icon,image/vnd.microsoft.icon" required/><button className="panel-secondary" type="submit">Favicon yükle</button></form>{faviconUrl&&<form action={removeBrandAsset}><input type="hidden" name="kind" value="favicon"/><button className="danger-button" type="submit">Faviconu kaldır</button></form>}</>}
+            {canManage&&<><form action={uploadBrandAsset}><input type="hidden" name="kind" value="favicon"/><input name="file" type="file" accept="image/png,image/webp,image/x-icon,image/vnd.microsoft.icon" required/><button className="panel-primary" type="submit">Favicon yükle</button></form>{faviconUrl&&<form action={removeBrandAsset}><input type="hidden" name="kind" value="favicon"/><button className="danger-button" type="submit">Faviconu kaldır</button></form>}</>}
           </article>
         </div>
 
@@ -115,10 +116,10 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
           <label>Yayınlanan mağaza<span className="readonly-field">{magazaAdresi(settings)??"Henüz tanımlanmadı"}</span></label>
           <label>Ana marka rengi<span className="color-input"><input name="primary_color" type="color" defaultValue={settings?.primary_color??"#002045"}/><input value={settings?.primary_color??"#002045"} readOnly aria-label="Ana marka rengi kodu"/></span></label>
           <label>Vurgu rengi<span className="color-input"><input name="accent_color" type="color" defaultValue={settings?.accent_color??"#6f9548"}/><input value={settings?.accent_color??"#6f9548"} readOnly aria-label="Vurgu rengi kodu"/></span></label>
-          <label>Para birimi<select name="currency" defaultValue={settings?.currency??"TRY"}><option value="TRY">TRY · Türk Lirası</option><option value="USD">USD · ABD Doları</option><option value="EUR">EUR · Euro</option></select></label>
-          <label>Dil / bölge<select name="locale" defaultValue={settings?.locale??"tr-TR"}><option value="tr-TR">Türkçe · Türkiye</option><option value="en-US">English · United States</option></select></label>
+          <label>Para birimi<DurumSecici name="currency" etiket="Para birimi" bicim="alan" gonder={false} deger={String(settings?.currency??"TRY")} secenekler={[{deger:"TRY",etiket:"TRY · Türk Lirası"},{deger:"USD",etiket:"USD · ABD Doları"},{deger:"EUR",etiket:"EUR · Euro"}]}/></label>
+          <label>Dil / bölge<DurumSecici name="locale" etiket="Dil / bölge" bicim="alan" gonder={false} deger={String(settings?.locale??"tr-TR")} secenekler={[{deger:"tr-TR",etiket:"Türkçe · Türkiye"},{deger:"en-US",etiket:"English · United States"}]}/></label>
           <label>Düşük stok eşiği<input name="low_stock_threshold" type="number" min="0" max="10000" step="1" defaultValue={settings?.low_stock_threshold??5} required/></label>
-          <button className="panel-secondary" type="submit">Marka ayarlarını kaydet</button>
+          <button className="panel-primary" type="submit">Marka ayarlarını kaydet</button>
         </form>:<p className="list-hint">{yetkiYok("mağaza ayarları")}</p>}
       </section>
 
@@ -134,7 +135,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
           <label>Havale indirimi (%)<input name="bank_transfer_discount_percent" type="number" min="0" max="100" step="0.1" defaultValue={settings?.bank_transfer_discount_percent??3} required/></label>
           <label>Sipariş numarası öneki<input name="order_prefix" maxLength={6} pattern="[A-Za-z]{1,6}" defaultValue={settings?.order_prefix??"AC"} required/></label>
           <p className="list-hint">Sepet tutarı eşiği geçerse kargo alınmaz. Eşik, indirim uygulanmadan önceki ara toplamla karşılaştırılır. Önek her mağazada farklı olmalı: sipariş numaraları çakışırsa ödeme bildirimleri yanlış siparişe düşebilir.</p>
-          <button className="panel-secondary" type="submit">Satış ayarlarını kaydet</button>
+          <button className="panel-primary" type="submit">Satış ayarlarını kaydet</button>
         </form>:<p className="list-hint">{yetkiYok("mağaza ayarları")}</p>}
       </section>
 
@@ -148,13 +149,13 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
           <div className="domain-platform"><small>ArvoARC ana paneli</small><strong>arc.arvo-os.com</strong></div>
           {canManage&&<form action={updatePanelDomainSettings} className="domain-form">
             <label>Müşteriye özel panel alan adı<input name="panel_custom_domain" defaultValue={settings?.panel_custom_domain??""} placeholder="app.markaniz.com" required/></label>
-            <button className="panel-secondary" type="submit">Panel alan adını kaydet</button>
+            <button className="panel-primary" type="submit">Panel alan adını kaydet</button>
           </form>}
           {settings?.panel_custom_domain&&panelDomainStatus!=="active"&&<div className="dns-guide">
             <div><span>1</span><p><b>CNAME kaydı</b><code>{settings.panel_custom_domain} → 78128f864bd971a1.vercel-dns-017.com</code></p></div>
             <div><span>2</span><p><b>Vercel doğrulaması</b><small>Alan adı ArvoARC projesine eklenir ve DNS kaydı kontrol edilir.</small></p></div>
             <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli panel bağlantısı etkinleşir.</small></p></div>
-            {canManage&&<form action={verifyPanelDomain}><button className="panel-secondary" type="submit">DNS bağlantısını doğrula</button></form>}
+            {canManage&&<form action={verifyPanelDomain}><button className="panel-primary" type="submit">DNS bağlantısını doğrula</button></form>}
           </div>}
         </section>
 
@@ -166,13 +167,13 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
             <label>ARVO mağaza alt alan adı<div className="domain-input"><input name="storefront_subdomain" defaultValue={settings?.platform_subdomain??""} placeholder="magazaadi" pattern="[a-z0-9-]+"/><span>.{ALT_ALAN_SONEKI}</span></div></label>
             <div className="domain-divider"><span>veya özel alan adı</span></div>
             <label>Mağaza alan adı<input name="storefront_custom_domain" defaultValue={settings?.custom_domain??""} placeholder="markaniz.com"/></label>
-            <button className="panel-secondary" type="submit">Mağaza alan adını kaydet</button>
+            <button className="panel-primary" type="submit">Mağaza alan adını kaydet</button>
           </form>}
           {settings?.custom_domain&&domainStatus!=="active"&&<div className="dns-guide">
             <div><span>1</span><p><b>Vercel DNS kaydı</b><small>Vercel’in mağaza projesinde göstereceği CNAME veya A kaydını DNS sağlayıcınıza ekleyin.</small></p></div>
             <div><span>2</span><p><b>Mağaza yayını</b><code>https://{settings.custom_domain}</code></p></div>
             <div><span>3</span><p><b>Otomatik SSL</b><small>DNS doğrulandıktan sonra güvenli mağaza bağlantısı etkinleşir.</small></p></div>
-            {canManage&&<form action={verifyStorefrontDomain}><button className="panel-secondary" type="submit">DNS bağlantısını doğrula</button></form>}
+            {canManage&&<form action={verifyStorefrontDomain}><button className="panel-primary" type="submit">DNS bağlantısını doğrula</button></form>}
           </div>}
           <div className="domain-note"><b>Doğru ayrım</b><p><strong>{callbackHost}</strong> yönetim panelidir; {vitrinAdresi?<><strong>{vitrinAdresi}</strong> ise müşterilerin alışveriş yaptığı mağazadır.</>:"mağaza adresi ise müşterilerin alışveriş yaptığı yerdir ve yukarıdan bağlanır."}</p></div>
         </section>
@@ -203,13 +204,25 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
                     Liste çekilemediyse alan serbest metin olarak kalıyor —
                     kod elle de girilebilmeli. */}
                 {kargoBaglantisi.durum==="basarili"&&kargoBaglantisi.konumlar.length
-                  ?<select name="tryoto_pickup_location_code" defaultValue={settings?.tryoto_pickup_location_code??""}>
-                      <option value="">Kullanma · adresi her gönderide yaz</option>
-                      {/* Pasif konumlar da listede: gizlemek, kullanıcının OTO
-                          panelinde gördüğü konumu burada bulamamasına yol
-                          açıyordu. Pasif olduğu yazıyor, seçimi kullanıcının. */}
-                      {kargoBaglantisi.konumlar.map(konum=><option key={konum.kod} value={konum.kod}>{konum.ad} · {konum.kod}{konum.sehir?` · ${konum.sehir}`:""} ({konum.tur==="depo"?"depo":"şube"}{konum.aktif?"":" · PASİF"})</option>)}
-                    </select>
+                  ?/* Pasif konumlar da listede: gizlemek, kullanıcının OTO
+                      panelinde gördüğü konumu burada bulamamasına yol
+                      açıyordu. Pasif olduğu yazıyor, seçimi kullanıcının.
+                      Liste uzayabildiği için seçici ARANABİLİR. */
+                    <DurumSecici
+                      name="tryoto_pickup_location_code"
+                      etiket="Gönderici konumu"
+                      bicim="alan"
+                      aranabilir
+                      gonder={false}
+                      deger={settings?.tryoto_pickup_location_code??""}
+                      secenekler={[
+                        {deger:"",etiket:"Kullanma · adresi her gönderide yaz"},
+                        ...kargoBaglantisi.konumlar.map((konum)=>({
+                          deger:konum.kod,
+                          etiket:`${konum.ad} · ${konum.kod}${konum.sehir?` · ${konum.sehir}`:""} (${konum.tur==="depo"?"depo":"şube"}${konum.aktif?"":" · PASİF"})`,
+                        })),
+                      ]}
+                    />
                   :<input name="tryoto_pickup_location_code" defaultValue={settings?.tryoto_pickup_location_code??""} placeholder="OTO'da tanımlı konumun kodu (isteğe bağlı)" autoComplete="off"/>}
               </label>
               <div className="check-stack"><label className="check-inline"><input type="checkbox" name="tryoto_test_mode" defaultChecked={settings?.tryoto_test_mode??true}/> Test (sandbox) hesabı</label></div>
@@ -292,7 +305,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
           <p>Kart bilgileri ArvoARC sunucularına gelmeden PayTR’ın güvenli ödeme ekranında işlenir.</p>
           <div className="payment-fields">
             <label className="wide">Mağaza numarası<input name="paytr_merchant_id" defaultValue={settings?.paytr_merchant_id??""} placeholder="PayTR merchant_id" autoComplete="off"/></label>
-            <label>En yüksek taksit<select name="paytr_max_installment" defaultValue={settings?.paytr_max_installment??0}><option value="0">PayTR belirlesin</option>{[1,2,3,4,5,6,9,12].map(value=><option key={value} value={value}>{value} taksit</option>)}</select></label>
+            <label>En yüksek taksit<DurumSecici name="paytr_max_installment" etiket="En yüksek taksit" bicim="alan" gonder={false} deger={String(settings?.paytr_max_installment??0)} secenekler={[{deger:"0",etiket:"PayTR belirlesin"},...[1,2,3,4,5,6,9,12].map((value)=>({deger:String(value),etiket:`${value} taksit`}))]}/></label>
             <label>Mağaza anahtarı (merchant_key)<input name="paytr_merchant_key" type="password" placeholder={keysStored?"Kayıtlı · değiştirmek için yazın":"PayTR merchant_key"} autoComplete="new-password"/></label>
             <label>Mağaza salt (merchant_salt)<input name="paytr_merchant_salt" type="password" placeholder={keysStored?"Kayıtlı · değiştirmek için yazın":"PayTR merchant_salt"} autoComplete="new-password"/></label>
             <div className="check-stack"><label className="check-inline"><input type="checkbox" name="paytr_test_mode" defaultChecked={settings?.paytr_test_mode??true}/> Test modu</label><label className="check-inline"><input type="checkbox" name="paytr_no_installment" defaultChecked={settings?.paytr_no_installment}/> Taksiti kapat</label></div>
@@ -328,10 +341,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
               Doğru değer bankanın entegrasyon belgesinde yazıyor.
             */}
             <label>Hash sürümü
-              <select name="garanti_api_surumu" defaultValue={settings?.garanti_api_surumu??"v512"}>
-                <option value="v512">512 — SHA512 (yeni hesaplar)</option>
-                <option value="v0.01">v0.01 — SHA1 (eski hesaplar)</option>
-              </select>
+              <DurumSecici name="garanti_api_surumu" etiket="Hash sürümü" bicim="alan" gonder={false} deger={settings?.garanti_api_surumu??"v512"} secenekler={[{deger:"v512",etiket:"512 — SHA512 (yeni hesaplar)"},{deger:"v0.01",etiket:"v0.01 — SHA1 (eski hesaplar)"}]}/>
             </label>
             <label>Güvenlik düzeyi<input name="garanti_guvenlik_duzeyi" defaultValue={settings?.garanti_guvenlik_duzeyi??"3D_PAY_HOSTING"} placeholder="3D_PAY_HOSTING" autoComplete="off"/></label>
             <div className="check-stack">
@@ -353,10 +363,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
           */}
           <div className="payment-fields">
             <label className="wide">Kartla ödemede önce hangisi denensin
-              <select name="odeme_saglayicisi" defaultValue={settings?.odeme_saglayicisi??"paytr"}>
-                <option value="paytr">PayTR (Garanti yedek)</option>
-                <option value="garanti">Garanti Sanal POS (PayTR yedek)</option>
-              </select>
+              <DurumSecici name="odeme_saglayicisi" etiket="Kartla ödemede önce hangisi denensin" bicim="alan" gonder={false} deger={settings?.odeme_saglayicisi??"paytr"} secenekler={[{deger:"paytr",etiket:"PayTR (Garanti yedek)"},{deger:"garanti",etiket:"Garanti Sanal POS (PayTR yedek)"}]}/>
             </label>
           </div>
           <div className="security-note"><b>{garantiKeysStored?"Anahtarlarınız kayıtlı.":"Tahsilat kendi Garanti üye işyerinize yapılır."}</b><p>PROVAUT/PROVRFN şifreleri ve 3D anahtarı şifrelenerek saklanır, hiçbir ekranda geri gösterilmez. Değiştirmek için yeniden yazmanız yeterli; boş bırakırsanız kayıtlı olan korunur. Seçilen sağlayıcı hazır değilse ödeme öteki sağlayıcıyla açılır.</p></div>
