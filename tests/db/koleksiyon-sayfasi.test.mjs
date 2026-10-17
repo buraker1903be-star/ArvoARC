@@ -123,17 +123,31 @@ describe("koleksiyon rafı sayfalanıyor", () => {
     assert.ok(indirimli.every((satir) => satir.compare_at_price !== null));
   });
 
-  test("süzgeç seçenekleri süzgeçten ÖNCEKİ kümeden geliyor", async () => {
+  test("süzgeç seçenekleri AYRI fonksiyondan ve süzgeçten ÖNCEKİ kümeden", async () => {
     /*
-      Vitrin bunları süzülmüş listeden türetiyordu: "Beden: M"
-      seçildiğinde marka listesi yalnızca M'i olan markalara iniyor ve
-      müşteri seçimini genişletemiyordu.
+      Seçenekler sayfa sorgusunun içindeyken her görüntülemede
+      koleksiyonun bütün varyantları üzerinde yeniden hesaplanıyor
+      ve ağır kümede süre sınırını aşıyordu (20261017133904).
+      Ayrıca süzgeçten ÖNCEKİ kümeden gelmeleri gerekiyor: "Beden: M"
+      seçildiğinde marka listesi M'i olan markalara inerse müşteri
+      seçimini genişletemez.
     */
-    const suzulmus = await sayfa({ p_collection_slugs: ["erkek"], p_brand: "LR", p_limit: 5 });
-    const markalar = suzulmus[0].facet_brands;
-    assert.deepEqual([...markalar].sort(), ["ARVO", "LR"]);
-    assert.deepEqual([...suzulmus[0].facet_sizes].sort(), ["L", "M"]);
-    assert.equal(Number(suzulmus[0].collection_total), ADET);
+    const satir = (await db.query(
+      `select * from public.get_arvoculture_storefront_collection_facets(array['erkek']::text[], null)`,
+    )).rows[0];
+    assert.deepEqual([...satir.brands].sort(), ["ARVO", "LR"]);
+    assert.deepEqual([...satir.sizes].sort(), ["L", "M"]);
+    assert.equal(Number(satir.total_count), ADET);
+    assert.ok(Number(satir.max_price) > 0);
+  });
+
+  test("sayfa sorgusu beden listesini yalnızca kendi satırları için veriyor", async () => {
+    const satirlar = await sayfa({ p_collection_slugs: ["erkek"], p_limit: 3 });
+    assert.equal(satirlar.length, 3);
+    for (const satir of satirlar) {
+      assert.ok(Array.isArray(satir.sizes), "beden listesi dizi olmalı");
+      assert.ok(satir.sizes.length > 0, "bedeni olan üründe liste boş kalmamalı");
+    }
   });
 
   test("sıralama ölçütleri çalışıyor", async () => {
