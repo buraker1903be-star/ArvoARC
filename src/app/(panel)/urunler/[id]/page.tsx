@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { kimlikMi } from "@/lib/kimlik";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -229,7 +230,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
                 <label className="full-field">Ürün alt başlığı<input name="subtitle" defaultValue={meta.subtitle??""} maxLength={240} placeholder="Ürünün temel faydasını tek cümlede anlatın"/></label>
                 <label>Marka<input name="vendor" defaultValue={meta.vendor??""} maxLength={120} placeholder="Ürünün markası"/></label>
                 <label>Ürün türü<input name="type" defaultValue={meta.type??""} maxLength={120} placeholder="Örn. Kişisel bakım"/></label>
-                <label>Durum<select name="status" defaultValue={product.status}><option value="active">Aktif</option><option value="draft">Taslak</option><option value="archived">Arşivlenmiş</option></select></label>
+                <label>Durum<DurumSecici name="status" etiket="Durum" bicim="alan" gonder={false} deger={product.status} secenekler={[{deger:"active",etiket:"Aktif"},{deger:"draft",etiket:"Taslak"},{deger:"archived",etiket:"Arşivlenmiş"}]}/></label>
                 {/*
                   Zamanlama Durum'un YANINDA: ikisi aynı soruyu
                   cevaplıyor ("bu ürün ne zaman mağazada olacak") ve
@@ -247,7 +248,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
                 <label className="check-inline"><input type="checkbox" name="panelden_yonetiliyor" defaultChecked={meta.panelden_yonetiliyor===true}/> Panelden yönetiliyor <small>Shopify içe aktarımı bu ürüne dokunmaz</small></label>
                 <label>Etiketler<input name="tags" defaultValue={meta.tags??""} maxLength={500} placeholder="bakım, premium, yeni"/></label>
                 <label>Ürün rozeti<input name="badge" defaultValue={meta.badge??""} maxLength={40} placeholder="Örn. Yeni, Çok Satan, Özel Seri"/></label>
-                <label>Rozet rengi<select name="badge_tone" defaultValue={meta.badge_tone??"green"}><option value="green">ARVO Yeşili</option><option value="navy">Lacivert</option><option value="gold">Altın</option><option value="red">Kırmızı</option></select></label>
+                <label>Rozet rengi<DurumSecici name="badge_tone" etiket="Rozet rengi" bicim="alan" gonder={false} deger={meta.badge_tone??"green"} secenekler={[{deger:"green",etiket:"ARVO Yeşili"},{deger:"navy",etiket:"Lacivert"},{deger:"gold",etiket:"Altın"},{deger:"red",etiket:"Kırmızı"}]}/></label>
                 <label className="full-field">Ürün açıklaması<textarea name="description" defaultValue={product.description??""} rows={12} maxLength={20000} placeholder="Ürünün özelliklerini, faydalarını ve kullanım bilgisini detaylandırın."/></label>
               </div>
             </section>
@@ -260,14 +261,14 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
                 <label className="full-field">Google ürün kategorisi<input name="google_product_category" defaultValue={meta.google_product_category??""} maxLength={240} placeholder="Örn. Sağlık ve Güzellik > Kişisel Bakım"/></label>
                 <label>GTIN / Barkod<input name="gtin" defaultValue={meta.gtin??""} maxLength={32} inputMode="numeric" placeholder="EAN / UPC / ISBN"/></label>
                 <label>MPN / Üretici kodu<input name="mpn" defaultValue={meta.mpn??""} maxLength={80}/></label>
-                <label>Ürün durumu<select name="condition" defaultValue={meta.condition??"new"}><option value="new">Yeni</option><option value="refurbished">Yenilenmiş</option><option value="used">Kullanılmış</option></select></label>
+                <label>Ürün durumu<DurumSecici name="condition" etiket="Ürün durumu" bicim="alan" gonder={false} deger={meta.condition??"new"} secenekler={[{deger:"new",etiket:"Yeni"},{deger:"refurbished",etiket:"Yenilenmiş"},{deger:"used",etiket:"Kullanılmış"}]}/></label>
                 <label>Malzeme<input name="material" defaultValue={meta.material??""} maxLength={120}/></label>
                 <label>Renk<input name="color" defaultValue={meta.color??""} maxLength={120}/></label>
-                <label>Hedef cinsiyet<select name="gender" defaultValue={meta.gender??""}><option value="">Belirtilmemiş</option><option value="female">Kadın</option><option value="male">Erkek</option><option value="unisex">Unisex</option></select></label>
-                <label>Yaş grubu<select name="age_group" defaultValue={meta.age_group??""}><option value="">Belirtilmemiş</option><option value="newborn">Yenidoğan</option><option value="infant">Bebek</option><option value="toddler">Küçük çocuk</option><option value="kids">Çocuk</option><option value="adult">Yetişkin</option></select></label>
+                <label>Hedef cinsiyet<DurumSecici name="gender" etiket="Hedef cinsiyet" bicim="alan" gonder={false} deger={meta.gender??""} secenekler={[{deger:"",etiket:"Belirtilmemiş"},{deger:"female",etiket:"Kadın"},{deger:"male",etiket:"Erkek"},{deger:"unisex",etiket:"Unisex"}]}/></label>
+                <label>Yaş grubu<DurumSecici name="age_group" etiket="Yaş grubu" bicim="alan" gonder={false} deger={meta.age_group??""} secenekler={[{deger:"",etiket:"Belirtilmemiş"},{deger:"newborn",etiket:"Yenidoğan"},{deger:"infant",etiket:"Bebek"},{deger:"toddler",etiket:"Küçük çocuk"},{deger:"kids",etiket:"Çocuk"},{deger:"adult",etiket:"Yetişkin"}]}/></label>
               </div>
             </section>
-            <div className="product-editor-actions"><span>Değişiklikler ürün ve SEO bilgilerinde birlikte saklanır.</span><button className="ac-btn ac-btn-primary" type="submit">Tüm ürün bilgilerini kaydet</button></div>
+            <div className="kaydet-serit"><span>Değişiklikler ürün ve SEO bilgilerinde birlikte saklanır.</span><button className="panel-primary" type="submit">Tüm ürün bilgilerini kaydet</button></div>
           </form>:<div className="product-readonly"><h4>{meta.subtitle||product.name}</h4><div dangerouslySetInnerHTML={{__html:product.description||"Açıklama bulunmuyor."}}/>{meta.tags?<p><b>Etiketler:</b> {meta.tags}</p>:null}</div>}
         </section>
       </div>
@@ -307,10 +308,17 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
                   */}
                   <label className="vl-gorsel"><span className="vl-label">Görsel</span>
                     {imageEntries.length?(
-                      <select name="image_path" defaultValue={variant.image_path??""} aria-label="Varyant görseli">
-                        <option value="">Kapak</option>
-                        {imageEntries.map((image,index)=>image.path?<option key={image.path} value={image.path}>Görsel {index+1}</option>:null)}
-                      </select>
+                      /* Panelin seçicisi: satırdaki öteki alanlarla aynı
+                         boy ve köşe. Sıra numarası GALERİDEKİ sıradır,
+                         görseli olmayan satırlar elenmeden önce alınıyor. */
+                      <DurumSecici
+                        name="image_path"
+                        etiket="Varyant görseli"
+                        bicim="alan"
+                        gonder={false}
+                        deger={variant.image_path??""}
+                        secenekler={[{deger:"",etiket:"Kapak"},...imageEntries.map((image,index)=>({path:image.path,sira:index+1})).filter((g):g is {path:string;sira:number}=>Boolean(g.path)).map((g)=>({deger:g.path,etiket:`Görsel ${g.sira}`}))]}
+                      />
                     ):<small className="vl-gorsel-bos">Galeri boş</small>}
                   </label>
                   <label className="vl-sku"><span className="vl-label">SKU</span><input name="sku" defaultValue={variant.sku??""} required aria-label="SKU"/></label>

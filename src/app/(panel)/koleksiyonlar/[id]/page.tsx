@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { kimlikMi } from "@/lib/kimlik";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/tenant";
@@ -90,7 +91,7 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
             <div className="ac-head"><div><h3>Yayın ve SEO</h3><p>{members.length.toLocaleString("tr-TR")} ürün seçili</p></div></div>
             <div className="editor-field-grid">
               <label>Koleksiyon adı<input name="title" defaultValue={collection.title} required maxLength={160}/></label>
-              <label>Durum<select name="status" defaultValue={collection.status}><option value="active">Aktif</option><option value="draft">Taslak</option><option value="archived">Arşivlenmiş</option></select></label>
+              <label>Durum<DurumSecici name="status" etiket="Durum" bicim="alan" gonder={false} deger={collection.status} secenekler={[{deger:"active",etiket:"Aktif"},{deger:"draft",etiket:"Taslak"},{deger:"archived",etiket:"Arşivlenmiş"}]}/></label>
               <label className="full-field">Bağlantı<input name="slug" defaultValue={collection.slug} required maxLength={160}/></label>
               <label className="full-field">Açıklama<textarea name="description" defaultValue={collection.description} rows={6} maxLength={10000}/></label>
               <label className="full-field">SEO başlığı<input name="seo_title" defaultValue={collection.seo_title} maxLength={70}/></label>
@@ -106,7 +107,7 @@ export default async function CollectionDetail({params,searchParams}:{params:Pro
               {candidates.length?candidates.map(product=><PickerRow key={product.id} product={product} checked={false}/>):<p className="list-hint">{search?"Eşleşen ve koleksiyonda olmayan ürün yok.":"Eklenebilecek ürün yok."}</p>}
             </div>
           </section>
-          <div className="product-editor-actions"><span>Koleksiyon ve ürün sıralaması mağaza kataloğuna yansır.</span><button className="ac-btn ac-btn-primary" type="submit">Koleksiyonu kaydet</button></div>
+          <div className="kaydet-serit"><span>Koleksiyon ve ürün sıralaması mağaza kataloğuna yansır.</span><button className="panel-primary" type="submit">Koleksiyonu kaydet</button></div>
         </form>
       </>:<p className="list-hint">Bu koleksiyonu düzenleme yetkiniz bulunmuyor.</p>}
     </div>

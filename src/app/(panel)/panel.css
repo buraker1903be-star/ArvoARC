@@ -580,7 +580,9 @@ html[data-theme="dark"] .panel-root .product-card-badges .catalog-badge.navy{bac
   .panel-root .ac.table{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
   .panel-skeleton-metrics{grid-template-columns:1fr 1fr}
   /* Yapışkan kaydet çubukları sekme çubuğunun üstünde dursun. */
-  .panel-root :is(.product-editor-actions,.theme-savebar,.code-save){bottom:calc(66px + env(safe-area-inset-bottom))}
+  /* Kaydet şeridi telefonda alt gezinmenin üstünde durur (ad değişti:
+     .product-editor-actions → .kaydet-serit, 17.10.2026). */
+  .panel-root :is(.kaydet-serit,.theme-savebar,.code-save){bottom:calc(66px + env(safe-area-inset-bottom))}
   .global-progress{top:calc(64px + env(safe-area-inset-top))}
 
   .mobile-drawer-backdrop{
