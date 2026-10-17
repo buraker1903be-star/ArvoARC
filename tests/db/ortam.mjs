@@ -42,13 +42,19 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   fonksiyonun yetki satırını olduğu gibi taşıyor, imleç de ileri
   alındı.
 
-  17.10.2026 dökümü günün SEKİZ migration'ını da içeriyor: modül okuma
-  politikası, silinen siparişin satış hareketi, medya özeti, vitrinde
-  uygunluğun tek kurala bağlanması, kiracı vitrininin sayfalaması,
-  tedarikçi tamponunun eşik olarak uygulanması, sitemap'in yalnızca
-  indekslenebilir ürünü listelemesi ve koleksiyon rafının
-  sayfalanması. İmleç sonuncunun (20261017125314) bir ardında; döküm
-  yenilendiğinde aynı şekilde ileri alın.
+  17.10.2026 anlık görüntüsü günün on migration'ını içeriyor: modül
+  okuma politikası, silinen siparişin satış hareketi, medya özeti,
+  vitrinde uygunluğun tek kurala bağlanması, kiracı vitrininin
+  sayfalaması, tedarikçi tamponunun eşik olarak uygulanması,
+  sitemap'in yalnızca indekslenebilir ürünü listelemesi ve koleksiyon
+  rafının üç adımı (sayfalama, hızlandırma, ikiye ayrılma). İmleç
+  sonuncunun (20261017133904) bir ardında; döküm yenilendiğinde aynı
+  şekilde ileri alın.
+
+  İMLEÇ GERİDE KALIRSA NE OLUR: harness, görüntüde ZATEN olan bir
+  fonksiyonu eski gövdesiyle yeniden kurmaya çalışır. Dönüş tipi
+  daralmışsa "cannot change return type" ile bütün paket düşer
+  (20261017133904'ten sonra yaşandı).
 
   İmleci ileri almak testlerin dişini sökmüyor: kuralı artık
   migration dosyası değil DÖKÜM taşıyor, yani testler canlıda ne
@@ -57,7 +63,7 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   yanıtlanıyor (her migration'ı dosya yerinde ve yerinden alınmış
   hâlde koşturarak).
 */
-const ILK_UYGULANAN = "20261017125315";
+const ILK_UYGULANAN = "20261017133905";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;
