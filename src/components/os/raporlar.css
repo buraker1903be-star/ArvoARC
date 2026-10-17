@@ -1,0 +1,301 @@
+/*
+  Kaynak: ArvoOS/app/panel/finance/raporlar/reporting.css (17.10.2026).
+
+  ArvoARC'ın Raporlar sayfası ArvoOS'un aynısı olsun diye birebir
+  kopyalandı; birinde değişen öbürüne de taşınır. Dosya bu klasörde
+  (components/os) çünkü sabit renk/yarıçap denetimi ArvoOS kopyalarında
+  uygulanmıyor — iki kopyayı ayrıştırmamak için (scripts/check-css.mjs).
+
+  ARC'a ÖZGÜ EKLER en altta, ayrı bir bölümde: ArvoOS'ta karşılığı
+  olmayan kartlar (en çok satan ürün, satış kaynağı) oradan gelmiyor.
+*/
+/* ============================================================
+   RAPORLAR — iOS "Ekran Süresi / Sağlık" özet dili (page.tsx)
+   Renkler yalnızca panel-tokens.css'teki değişkenlerden.
+   Eski .report-* sınıfları panel-compact/premium'da genel kurallarla
+   ezildiği için bu sayfa kendi .rpt-* ad alanını kullanır.
+   ============================================================ */
+
+.rpt{--rpt-ease:cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;gap:18px;font-family:var(--font-body)}
+
+/* Tonlar */
+.rpt [data-tone]{--tone-bg:var(--surface-2);--tone-fg:var(--muted)}
+.rpt [data-tone="info"]{--tone-bg:var(--info-soft);--tone-fg:var(--info)}
+.rpt [data-tone="gold"]{--tone-bg:var(--accent-soft);--tone-fg:var(--accent-strong)}
+.rpt [data-tone="success"]{--tone-bg:var(--success-soft);--tone-fg:var(--success)}
+.rpt [data-tone="warning"]{--tone-bg:var(--warning-soft);--tone-fg:var(--warning)}
+.rpt [data-tone="danger"]{--tone-bg:var(--danger-soft);--tone-fg:var(--danger)}
+.rpt [data-tone="brand"]{--tone-bg:color-mix(in srgb,var(--brand-500) 14%,var(--surface));--tone-fg:var(--brand-600)}
+html[data-theme="dark"] .rpt [data-tone="brand"]{--tone-fg:var(--brand-200)}
+
+/* ---------- Başlık ---------- */
+.rpt-bas .talep-bas-eylem{flex-wrap:wrap}
+.rpt-print-button{display:inline-flex;align-items:center;gap:7px}
+.rpt-print-button svg{flex:none}
+
+/* ---------- Dönem seçici ---------- */
+.rpt-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:8px;border:1px solid var(--line);border-radius:20px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.rpt-segment{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;min-width:min(100%,340px);padding:4px;border-radius:14px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line-soft)}
+.rpt-segment a{display:grid;place-items:center;min-height:36px;padding:6px 14px;border-radius:10px;color:var(--muted);font-size:13.5px;font-weight:650;text-decoration:none;white-space:nowrap;transition:background-color .25s var(--rpt-ease),color .2s ease,box-shadow .25s var(--rpt-ease),transform .3s var(--rpt-ease)}
+.rpt-segment a:hover{color:var(--ink)}
+.rpt-segment a:active{transform:scale(.96)}
+.rpt-segment a.is-active{background:var(--surface-raised);color:var(--ink);box-shadow:0 1px 2px rgba(11,27,46,.08),0 4px 12px rgba(11,27,46,.07),0 0 0 1px var(--line)}
+.panel-root .rpt-range-form{display:flex;align-items:center;gap:8px;margin:0;padding:2px 4px 2px 12px;border-radius:14px}
+.panel-root .rpt-range-form.is-active{background:var(--accent-soft)}
+.rpt-range-label{color:var(--muted);font-size:13px;font-weight:600;white-space:nowrap}
+.rpt-range-form.is-active .rpt-range-label{color:var(--accent-strong)}
+.rpt-range-sep{color:var(--muted);font-size:13px}
+.panel-root .rpt-range-form input[type="date"]{min-height:38px;margin:0;padding:0 10px;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-variant-numeric:tabular-nums}
+.panel-root .rpt-range-form input[type="date"]:focus{outline:none;border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
+.panel-root .rpt-range-form button{min-height:38px}
+
+/* ---------- Widget grupları ---------- */
+.rpt-group{display:flex;flex-direction:column;gap:10px}
+.panel-root .rpt-group-title{margin:0 4px;color:var(--muted);font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.rpt-widgets{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.rpt-widget{position:relative;display:flex;flex-direction:column;gap:2px;min-width:0;min-height:142px;padding:16px 16px 14px;border:1px solid var(--line);border-radius:22px;background:var(--surface);box-shadow:var(--shadow-sm);color:var(--ink);overflow:hidden}
+.rpt-widget::after{content:"";position:absolute;inset:auto -30% -60% auto;width:140px;height:140px;border-radius:50%;background:var(--tone-bg);opacity:.5;pointer-events:none}
+.rpt-widget-icon{position:relative;z-index:1;display:grid;place-items:center;width:34px;height:34px;margin-bottom:12px;border-radius:11px;background:var(--tone-bg);color:var(--tone-fg)}
+.rpt-widget small{position:relative;z-index:1;color:var(--muted);font-size:13px;font-weight:600}
+.rpt-widget strong{position:relative;z-index:1;color:var(--ink);font-size:clamp(21px,1.75vw,27px);font-weight:700;line-height:1.15;letter-spacing:-.025em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.rpt-widget strong.is-toned{color:var(--tone-fg)}
+.rpt-widget-note{position:relative;z-index:1;margin-top:2px;color:var(--muted);font-size:12.5px;line-height:1.4}
+.rpt-meter{position:relative;z-index:1;display:block;height:6px;margin:8px 0 2px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.rpt-meter i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,color-mix(in srgb,var(--tone-fg) 60%,var(--surface)),var(--tone-fg));transform-origin:left;animation:rpt-fill .9s var(--rpt-ease) both}
+
+/* ---------- Kartlar ---------- */
+.rpt-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);gap:16px;align-items:start}
+.rpt-span-full{grid-column:1/-1}
+.rpt-card{display:flex;flex-direction:column;gap:16px;min-width:0;padding:20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.rpt-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.panel-root .rpt-card-head h2{margin:0;color:var(--ink);font-size:17px;font-weight:700;letter-spacing:-.015em}
+.panel-root .rpt-card-head p{margin:2px 0 0;color:var(--muted);font-size:13px;line-height:1.45}
+.rpt-card-link{flex:none;display:inline-flex;align-items:center;gap:2px;color:var(--accent);font-size:14px;font-weight:600;text-decoration:none}
+.rpt-card-link:hover{text-decoration:underline;text-underline-offset:3px}
+.rpt-stat{flex:none;text-align:right}
+.rpt-stat strong{display:block;color:var(--ink);font-size:28px;font-weight:700;line-height:1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.rpt-stat[data-tone] strong{color:var(--tone-fg)}
+.rpt-stat span{display:inline-block;margin-top:5px;color:var(--muted);font-size:12.5px;font-weight:600}
+.panel-root .rpt-empty-note{margin:0;padding:10px 12px;border-radius:12px;background:var(--surface-2);color:var(--muted);font-size:13px;line-height:1.5}
+
+/* Satış hunisi */
+.rpt-funnel{display:flex;flex-direction:column;margin:0;padding:0;list-style:none}
+.rpt-funnel-row{display:grid;grid-template-columns:140px minmax(0,1fr) 48px;align-items:center;gap:14px;min-height:52px}
+.rpt-funnel-label{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rpt-funnel-label b{color:var(--ink);font-size:14px;font-weight:650}
+.rpt-funnel-label span{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums}
+.rpt-funnel-track{height:14px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.rpt-funnel-track i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--brand-500),var(--brand-400));transform-origin:left;animation:rpt-fill .9s var(--rpt-ease) both}
+html[data-theme="dark"] .rpt-funnel-track i{background:linear-gradient(90deg,var(--brand-400),var(--brand-300))}
+.rpt-funnel li:nth-child(2) .rpt-funnel-track i{animation-delay:.05s}
+.rpt-funnel li:nth-child(3) .rpt-funnel-track i{animation-delay:.1s}
+.rpt-funnel li:nth-child(4) .rpt-funnel-track i{animation-delay:.15s}
+.rpt-funnel li.is-final .rpt-funnel-track i{background:linear-gradient(90deg,var(--accent-bright),var(--primary));animation-delay:.2s}
+.rpt-funnel-row strong{color:var(--ink);font-size:20px;font-weight:700;letter-spacing:-.02em;text-align:right;font-variant-numeric:tabular-nums}
+.rpt-funnel-step{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-left:154px;padding:2px 0 4px;color:var(--muted);font-size:12.5px}
+.rpt-funnel-step>span{color:var(--muted);font-size:12px}
+.rpt-funnel-step b{color:var(--ink-soft);font-weight:700;font-variant-numeric:tabular-nums}
+.rpt-funnel-step.is-weak b{color:var(--danger)}
+.rpt-funnel-step em{padding:1px 8px;border-radius:999px;background:var(--danger-soft);color:var(--danger);font-size:11.5px;font-style:normal;font-weight:700}
+
+/* Yönetici notları (iOS gruplanmış liste) */
+.rpt-insights{display:flex;flex-direction:column;margin:0 -4px;padding:0;list-style:none}
+.rpt-insights li{position:relative;display:flex;align-items:flex-start;gap:12px;padding:12px 4px}
+.rpt-insights li+li::before{content:"";position:absolute;top:0;left:48px;right:4px;height:1px;background:var(--line-soft)}
+.rpt-insight-icon{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--tone-bg);color:var(--tone-fg)}
+.rpt-insights b{display:block;color:var(--ink);font-size:14px;font-weight:650}
+.panel-root .rpt-insights p{margin:3px 0 0;color:var(--ink-soft);font-size:13.5px;line-height:1.5;overflow-wrap:anywhere}
+
+/* Kârlılık dökümü: tek yüzeyli tablolar */
+.rpt-ledgers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.rpt-ledger{min-width:0}
+.panel-root .rpt-ledger h3{margin:0 0 6px;color:var(--muted);font-size:12.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.rpt-table-wrap{overflow-x:auto}
+.rpt-table{width:100%;border-collapse:collapse;font-size:14px}
+.rpt-table caption{caption-side:bottom;padding-top:8px;color:var(--muted);font-size:12px;text-align:left}
+.rpt-table thead th{padding:8px 0;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:650;text-align:left}
+.rpt-table tbody th,.rpt-table tbody td,.rpt-table tfoot th,.rpt-table tfoot td{padding:11px 0;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+.rpt-table th[scope="row"]{padding-right:12px;text-align:left;font-weight:400}
+.rpt-table th[scope="row"] b{display:block;color:var(--ink);font-size:14px;font-weight:600}
+.rpt-table th[scope="row"] small{display:block;margin-top:1px;color:var(--muted);font-size:12px}
+.rpt-table .rpt-money{padding-left:12px;color:var(--ink);font-weight:600;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rpt-table thead .rpt-money{color:var(--muted);font-weight:650}
+.rpt-table tfoot th,.rpt-table tfoot td{border-bottom:0;border-top:1px solid var(--line)}
+.rpt-table tfoot .rpt-money{color:var(--tone-fg);font-size:16px;font-weight:700}
+.rpt-share{width:34%;min-width:120px}
+.rpt-share{white-space:nowrap}
+.rpt-share-bar{display:inline-block;width:calc(100% - 46px);height:6px;border-radius:999px;background:var(--surface-2);vertical-align:middle;overflow:hidden}
+.rpt-share-bar i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:var(--tone-fg);transform-origin:left;animation:rpt-fill .9s var(--rpt-ease) both}
+.rpt-share-value{display:inline-block;width:42px;margin-left:4px;color:var(--muted);font-size:12.5px;font-weight:600;text-align:right;vertical-align:middle;font-variant-numeric:tabular-nums}
+
+/* 6 aylık eğilim */
+.rpt-trend{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;height:200px;padding-top:4px}
+.rpt-trend-col{display:grid;grid-template-rows:minmax(0,1fr) auto auto;justify-items:center;gap:4px;min-width:0;text-align:center}
+.rpt-trend-bars{display:flex;align-items:flex-end;justify-content:center;gap:4px;width:100%;height:100%;border-bottom:1px solid var(--line-soft)}
+.rpt-trend-bars i{display:block;width:min(18px,40%);height:var(--h,3%);min-height:3px;border-radius:6px 6px 3px 3px;transform-origin:bottom;animation:rpt-grow .8s var(--rpt-ease) both}
+.rpt-trend-bars .is-lead,.rpt-legend .is-lead{background:linear-gradient(180deg,color-mix(in srgb,var(--brand-400) 70%,var(--surface)),var(--brand-500))}
+.rpt-trend-bars .is-sale,.rpt-legend .is-sale{background:linear-gradient(180deg,var(--accent-bright),var(--primary))}
+html[data-theme="dark"] .rpt-trend-bars .is-lead,html[data-theme="dark"] .rpt-legend .is-lead{background:linear-gradient(180deg,var(--brand-300),var(--brand-400))}
+.rpt-trend-col:nth-child(2) i{animation-delay:.04s}.rpt-trend-col:nth-child(3) i{animation-delay:.08s}
+.rpt-trend-col:nth-child(4) i{animation-delay:.12s}.rpt-trend-col:nth-child(5) i{animation-delay:.16s}
+.rpt-trend-col:nth-child(6) i{animation-delay:.2s}
+.rpt-trend-col b{margin-top:4px;color:var(--muted);font-size:12px;font-weight:600}
+.rpt-trend-col.is-current b{color:var(--accent-strong);font-weight:700}
+.rpt-trend-col span{color:var(--ink-soft);font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.rpt-legend{display:flex;gap:16px}
+.rpt-legend span{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px;font-weight:600}
+.rpt-legend i{width:10px;height:10px;border-radius:3px}
+
+/* Kayıp nedenleri */
+.rpt-lost{display:flex;flex-direction:column;gap:14px;margin:0;padding:0;list-style:none}
+.rpt-lost-top{display:flex;justify-content:space-between;gap:10px;margin-bottom:6px;font-size:13.5px}
+.rpt-lost-top b{min-width:0;color:var(--ink);font-weight:600;overflow-wrap:anywhere}
+.rpt-lost-top span{flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
+.rpt-lost-track{height:8px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.rpt-lost-track i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,color-mix(in srgb,var(--danger) 65%,var(--surface)),var(--danger));transform-origin:left;animation:rpt-fill .9s var(--rpt-ease) both}
+.rpt-empty{display:grid;justify-items:center;gap:6px;padding:26px 16px 30px;text-align:center}
+.rpt-empty .rpt-insight-icon{width:46px;height:46px;border-radius:14px}
+.rpt-empty b{margin-top:6px;color:var(--ink);font-size:15px;font-weight:700}
+.panel-root .rpt-empty p{max-width:300px;margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+
+@keyframes rpt-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes rpt-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+/* ---------- Duyarlı yerleşim ---------- */
+@media(max-width:1280px){
+  .rpt-widgets{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+}
+@media(max-width:1180px){
+  .rpt-grid{grid-template-columns:minmax(0,1fr)}
+  .rpt-ledgers{grid-template-columns:minmax(0,1fr);gap:20px}
+}
+@media(max-width:760px){
+  .rpt{gap:14px}
+  .rpt-toolbar{flex-direction:column;align-items:stretch;padding:6px;border-radius:18px}
+  .rpt-segment{min-width:0}
+  .panel-root .rpt-range-form{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);padding:6px}
+  .rpt-range-label{grid-column:1/-1}
+  .panel-root .rpt-range-form input[type="date"]{width:100%;min-width:0;font-size:16px}
+  .panel-root .rpt-range-form button{grid-column:1/-1;width:100%}
+  .rpt-widgets{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .rpt-widget{min-height:128px;padding:14px;border-radius:20px}
+  .rpt-widget:last-child:nth-child(odd){grid-column:1/-1;min-height:0}
+  .rpt-widget strong{font-size:21px}
+  .rpt-card{padding:16px;border-radius:20px}
+  .rpt-funnel-row{grid-template-columns:108px minmax(0,1fr) 36px;gap:10px}
+  .rpt-funnel-step{margin-left:118px}
+  .rpt-trend{gap:6px;height:170px}
+  .rpt-share{width:30%;min-width:96px}
+}
+@media(max-width:480px){
+  .rpt-funnel-row{grid-template-columns:92px minmax(0,1fr) 32px}
+  .rpt-funnel-step{margin-left:0}
+  .rpt-funnel-row strong{font-size:18px}
+  .rpt-table th[scope="row"] small{display:none}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .rpt-meter i,.rpt-funnel-track i,.rpt-share-bar i,.rpt-trend-bars i,.rpt-lost-track i{animation:none}
+  .rpt-segment a{transition:none}
+}
+
+/* ---------- Yazdırma / PDF ----------
+   Beyaz zemin, gölgesiz, gezinme ve dönem seçici yok. Koyu temada
+   yazdırılsa bile yüzey ve metin açık palete çekilir; grafik çubukları
+   arka plan olduğundan renkleri korunur (print-color-adjust). */
+@media print{
+  @page{margin:12mm}
+  .panel-root .rpt{
+    --surface:var(--n-0);--surface-2:var(--n-100);--surface-raised:var(--n-0);
+    --ink:var(--n-900);--ink-soft:var(--n-700);--muted:var(--n-500);--dim:var(--n-400);
+    --line:var(--n-200);--line-soft:var(--n-100);
+    gap:12px;color:var(--ink);-webkit-print-color-adjust:exact;print-color-adjust:exact
+  }
+  .panel-root .rpt [data-tone="brand"]{--tone-fg:var(--brand-600)}
+  .panel-root .rpt [data-tone="gold"]{--tone-fg:var(--primary)}
+  .panel-root .rpt [data-tone]{--tone-bg:color-mix(in srgb,var(--tone-fg,var(--n-500)) 12%,var(--n-0))}
+  .panel-root .rpt-toolbar,.panel-root .rpt-print-button,.panel-root .rpt-card-link{display:none!important}
+  .panel-root .rpt-bas .talep-bas-eylem{display:flex!important;width:auto}
+  .panel-root .rpt-widgets{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+  .panel-root .rpt-widget{min-height:0;padding:10px 12px;border-radius:14px}
+  .panel-root .rpt-widget::after{display:none}
+  .panel-root .rpt-widget-icon{width:26px;height:26px;margin-bottom:6px;border-radius:8px}
+  .panel-root .rpt-widget strong{font-size:17px}
+  .panel-root .rpt-widget small,.panel-root .rpt-widget-note{font-size:11px}
+  .panel-root .rpt-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .panel-root .rpt-ledgers{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .panel-root .rpt-card,.panel-root .rpt-widget,.panel-root .rpt-toolbar{background:var(--surface);box-shadow:none}
+  .panel-root .rpt-card{padding:14px;border-radius:14px;break-inside:avoid}
+  .panel-root .rpt-group,.panel-root .rpt-table tr{break-inside:avoid}
+  .panel-root .rpt-funnel-row{grid-template-columns:110px minmax(0,1fr) 36px}
+  .panel-root .rpt-funnel-step{margin-left:124px}
+  .panel-root .rpt-trend{height:150px}
+  .panel-root .rpt-meter i,.panel-root .rpt-funnel-track i,.panel-root .rpt-share-bar i,.panel-root .rpt-trend-bars i,.panel-root .rpt-lost-track i{animation:none}
+}
+
+/* ---------- Grafikli kartlar (2026-10) ----------
+   Her kartın altında kendi verisine uygun küçük grafik (page.tsx MiniGrafik).
+   Renk kartın tonundan (--tone-fg); yalnızca token. */
+.rpt-widget{gap:4px;min-height:0;padding:14px 16px;container-type:inline-size}
+/* Dar kartta (telefonda iki sütun) altı ay adı birbirine giriyordu: yalnızca içinde bulunulan ay yazılır. */
+@container (max-width:220px){.rpt-mini-cubuk>span:not(.is-current) small{visibility:hidden}}
+.rpt-widget-bas{position:relative;z-index:1;display:flex;align-items:center;gap:8px;min-width:0}
+.rpt-widget-bas .rpt-widget-icon{width:28px;height:28px;margin:0;border-radius:9px}
+.rpt-widget-bas small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rpt-mini{position:relative;z-index:1;height:64px;margin:6px 0 2px}
+/* Çubuk: son 6 ay */
+.rpt-mini-cubuk{display:flex;align-items:stretch;gap:5px}
+.rpt-mini-cubuk>span{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px}
+.rpt-mini-cubuk i{display:block;width:100%;height:var(--h,3%);max-height:calc(100% - 16px);border-radius:5px 5px 2px 2px;background:var(--tone-fg);opacity:.32;transform-origin:bottom;animation:rpt-cubuk .8s var(--rpt-ease) both}
+.rpt-mini-cubuk .is-current i{opacity:1}
+.rpt-mini-cubuk small{color:var(--muted);font-size:11px;line-height:1}
+.rpt-mini-cubuk .is-current small{color:var(--ink);font-weight:600}
+@keyframes rpt-cubuk{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+/* Halka ve gösterge */
+.rpt-mini-halka{display:flex;align-items:center;gap:10px}
+.rpt-mini-halka span{color:var(--muted);font-size:12px;line-height:1.3}
+.rpt-halka-iz{fill:none;stroke:var(--surface-2);stroke-width:6}
+.rpt-halka-dolu{fill:none;stroke:var(--tone-fg);stroke-width:6;stroke-linecap:round}
+.rpt-mini-halka text{fill:var(--ink);font-size:12px;font-weight:700;font-family:var(--font-body)}
+.rpt-mini-gosterge{display:flex;align-items:flex-end;justify-content:center}
+.rpt-mini-gosterge .rpt-halka-iz,.rpt-mini-gosterge .rpt-halka-dolu{stroke-width:10}
+/* Yığın: maliyet / kâr */
+.rpt-mini-yigin{display:flex;flex-direction:column;justify-content:center;gap:8px}
+.rpt-yigin-cubuk{display:flex;height:12px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.rpt-yigin-cubuk i{display:block;width:var(--w,0%);height:100%;background:var(--tone-fg)}
+.rpt-mini-lejant{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0;padding:0;list-style:none}
+.rpt-mini-lejant li{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12px}
+.rpt-mini-lejant li i{width:8px;height:8px;border-radius:50%;background:var(--tone-fg)}
+.rpt-mini-lejant b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+/* Şelale: tahsilattan düşülenler */
+.rpt-mini-selale{display:flex;flex-direction:column;justify-content:center;gap:4px;margin:6px 0 2px;padding:0;list-style:none}
+.rpt-mini-selale li{display:grid;grid-template-columns:76px minmax(0,1fr);align-items:center;gap:8px}
+.rpt-mini-selale li>span:first-child{color:var(--muted);font-size:11px;white-space:nowrap}
+.rpt-selale-iz{display:block;height:8px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.rpt-selale-iz i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:var(--tone-fg);transform-origin:left;animation:rpt-fill .9s var(--rpt-ease) both}
+
+/* ============================================================
+   ARC'A ÖZGÜ EKLER
+   ArvoOS'un raporunda karşılığı olmayan iki liste: ürün sıralaması
+   ve satış kaynağı. Biçim kartın geri kalanıyla aynı dilde (aynı
+   iz çubuğu, aynı punto), yeni bir dil açılmıyor.
+   ============================================================ */
+.rpt-urunler{display:flex;flex-direction:column;gap:2px;margin:0;padding:0;list-style:none;counter-reset:urun}
+.rpt-urunler li{display:grid;grid-template-columns:28px minmax(0,1.6fr) minmax(90px,1fr) 86px 110px;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line-soft)}
+.rpt-urunler li:last-child{border-bottom:0}
+.rpt-urun-sira{display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.rpt-urunler li:first-child .rpt-urun-sira{background:var(--accent-soft);color:var(--accent-strong)}
+.rpt-urun-ad{min-width:0}
+.rpt-urun-ad b{display:block;color:var(--ink);font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rpt-urun-ad small{display:block;margin-top:1px;color:var(--muted);font-size:12px}
+.rpt-urun-iz{display:block;height:8px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.rpt-urun-iz i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent-bright),var(--primary));transform-origin:left;animation:rpt-fill .9s var(--rpt-ease) both}
+.rpt-urun-adet{color:var(--muted);font-size:12.5px;text-align:right;font-variant-numeric:tabular-nums}
+.rpt-urunler strong{color:var(--ink);font-size:14.5px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.rpt-kaynaklar{display:flex;flex-direction:column;gap:12px;margin:0;padding:0;list-style:none}
+@media (max-width:860px){
+  /* Telefonda sıra ve ad üstte, çubuk ve tutar altta. */
+  .rpt-urunler li{grid-template-columns:28px minmax(0,1fr) auto;row-gap:6px}
+  .rpt-urun-iz{grid-column:2/-1}
+  .rpt-urun-adet{grid-column:2}
+}

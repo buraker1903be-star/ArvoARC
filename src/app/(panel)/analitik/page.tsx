@@ -1,262 +1,277 @@
 import Link from "next/link";
 import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
-import { countsAsRevenue, refundedAmount, revenueAmount } from "@/lib/order-flow";
-import { DAY, TR_OFFSET as TR, trDayStart } from "@/lib/tr-time";
-import { orderStatusOptions, sourceLabel } from "@/lib/commerce-labels";
+import { trLocalToIso } from "@/lib/tr-time";
 import { KNot } from "@/components/arvo-ui/k-ui";
-import "./analytics.css";
+import { gunYazisi, okumaBasi, raporDonemi, sonAltiAy } from "@/lib/rapor-donemi";
+import { gunAnahtari, raporOzeti, type RaporIadesi, type RaporKalemi, type RaporSiparisi } from "@/lib/rapor-istatistik";
+import {
+  Defter, GostergeKarti, Simge, cssDegisken, dusum, oranSinirla, paraYaz, payi, yuzde,
+  type DefterSatiri, type Gosterge, type SeriNoktasi,
+} from "@/components/os/rapor-parcalari";
+import { YazdirDugmesi } from "@/components/os/yazdir-dugmesi";
 import "@/components/arvo-ui/kayit-detay.css";
+import "@/components/os/raporlar.css";
 
-/* Gün ve ay sınırları Türkiye saatine göre (bkz. lib/tr-time). */
-const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
-const compact = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });
-const dayMonth = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", timeZone: "UTC" });
-const monthShort = new Intl.DateTimeFormat("tr-TR", { month: "short", timeZone: "UTC" });
+/*
+  RAPORLAR (17.10.2026 yeniden yazıldı).
 
-const PERIODS = [
-  ["7", "7 gün", "Son 7 gün", "Günlük"],
-  ["30", "30 gün", "Son 30 gün", "Günlük"],
-  ["90", "90 gün", "Son 90 gün", "Haftalık"],
-  ["365", "12 ay", "Son 12 ay", "Aylık"],
-] as const;
-type PeriodKey = (typeof PERIODS)[number][0];
+  Kaynak düzen: ArvoOS/app/panel/finance/raporlar. Kurum sahibinin
+  isteği "ArvoOS panelindeki raporlar sayfası gibi olsun": aynı dönem
+  seçici, aynı gösterge kartları, aynı defter tabloları, aynı huni.
+  İçerik ticarete çevrildi — ArvoOS satış hattını (lead → sözleşme)
+  raporluyor, burada sipariş akışı ve ciro var.
 
-type Bucket = { start: number; end: number; label: string; revenue: number; orders: number };
-
-const trMonthStart = (ms: number, offset: number) => {
-  const local = new Date(ms + TR);
-  return Date.UTC(local.getUTCFullYear(), local.getUTCMonth() + offset, 1) - TR;
-};
+  Eskisi "son 30 gün" gibi KAYAN pencerelerdi; muhasebe ayla konuşuyor,
+  dönem artık takvim ayı (lib/rapor-donemi). Bütün sayılar
+  lib/rapor-istatistik'te hesaplanıyor ve test ediliyor; bu dosya
+  yalnızca okuyup çiziyor.
+*/
 
 /* Render dışında: bileşen içinde saf olmayan çağrı yapılmasın. */
-function currentTime() {
+function suAn() {
   return Date.now();
 }
 
-function buildBuckets(period: PeriodKey, now: number) {
-  if (period === "365") {
-    const buckets: Bucket[] = Array.from({ length: 12 }, (_, index) => {
-      const start = trMonthStart(now, index - 11);
-      return { start, end: trMonthStart(now, index - 10), label: monthShort.format(new Date(start + TR)), revenue: 0, orders: 0 };
-    });
-    return { buckets, since: buckets[0].start, previousSince: trMonthStart(now, -23) };
-  }
-  const end = trDayStart(now) + DAY;
-  const size = period === "90" ? 7 : 1;
-  const count = period === "90" ? 13 : Number(period);
-  const since = end - size * count * DAY;
-  const buckets: Bucket[] = Array.from({ length: count }, (_, index) => {
-    const start = since + index * size * DAY;
-    return { start, end: start + size * DAY, label: size === 1 ? String(new Date(start + TR).getUTCDate()) : dayMonth.format(new Date(start + TR)), revenue: 0, orders: 0 };
-  });
-  return { buckets, since, previousSince: since - size * count * DAY };
-}
+const adet = (n: number) => n.toLocaleString("tr-TR");
 
-/* Değişim yüzdesi; önceki dönem sıfırsa karşılaştırma yapılamaz. */
-const delta = (current: number, previous: number) => (previous ? Math.round(((current - previous) / previous) * 100) : null);
-
-function Delta({ value, inverse = false }: { value: number | null; inverse?: boolean }) {
-  if (value === null) return <span className="an-delta">yeni</span>;
-  const good = inverse ? value < 0 : value > 0;
-  const bad = inverse ? value > 0 : value < 0;
-  return <span className="an-delta" data-dir={good ? "good" : bad ? "bad" : undefined}>{value > 0 ? "↑" : value < 0 ? "↓" : "→"} %{Math.abs(value)}</span>;
-}
-
-type OrderRow = { id: string; status: string; payment_status: string; total: number; source: string | null; refunded_amount: unknown; created_at: string };
-
-export default async function Analytics({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
+export default async function Raporlar({ searchParams }: { searchParams: Promise<{ aralik?: string; baslangic?: string; bitis?: string }> }) {
   const params = await searchParams;
   const { supabase, organization } = await requireTenant();
-  const period: PeriodKey = PERIODS.some(([key]) => key === params.p) ? (params.p as PeriodKey) : "30";
-  const [, , periodLabel, bucketKind] = PERIODS.find(([key]) => key === period)!;
-  const now = currentTime();
-  const { buckets, since, previousSince } = buildBuckets(period, now);
+  const simdi = suAn();
+  const donem = raporDonemi(params.aralik, params.baslangic, params.bitis, simdi);
+  const aylar = sonAltiAy(simdi);
+  /* Okuma penceresi Türkiye gece yarısından başlar; UTC'ye göre
+     kesmek ayın ilk siparişlerini dışarıda bırakırdı. */
+  const pencere = trLocalToIso(`${okumaBasi(donem, simdi)}T00:00`) ?? new Date(0).toISOString();
 
   /*
-    Seçilen dönem ve bir önceki eşit dönem birlikte okunur.
-    Siparişler 1000'lik sayfalarla okunuyor: tek istekte Supabase
-    1000 satırda kesiyor ve rakamlar sessizce eksik çıkıyordu.
+    Siparişler ve iade talepleri 1000'lik sayfalarla okunuyor: tek
+    istek Supabase'in satır tavanında kesilir ve rapor sessizce eksik
+    çıkardı — hem de paranın raporlandığı ekranda.
   */
-  const { rows: orders, truncated } = await fetchAllRows<OrderRow>((from, to) =>
-    supabase
-      .from("arc_orders")
-      .select("id,status,payment_status,total,source,refunded_amount:metadata->refunded_amount,created_at")
+  const [siparisSonucu, iadeSonucu] = await Promise.all([
+    fetchAllRows<RaporSiparisi>((bas, son) =>
+      supabase.from("arc_orders")
+        .select("id,status,payment_status,total,subtotal,shipping,source,discount:metadata->discount,transfer_discount:metadata->transfer_discount,refunded_amount:metadata->refunded_amount,created_at")
+        .eq("organization_id", organization.id)
+        .gte("created_at", pencere)
+        .order("created_at", { ascending: false })
+        .range(bas, son) as unknown as PromiseLike<{ data: RaporSiparisi[] | null; error: { message: string } | null }>),
+    fetchAllRows<RaporIadesi>((bas, son) =>
+      supabase.from("arc_return_requests")
+        .select("status,reason,refund_amount,created_at")
+        .eq("organization_id", organization.id)
+        .gte("created_at", pencere)
+        .order("created_at", { ascending: false })
+        .range(bas, son) as unknown as PromiseLike<{ data: RaporIadesi[] | null; error: { message: string } | null }>),
+  ]);
+
+  /*
+    Kalemler YALNIZCA dönemdeki siparişler için: kâr ve ürün sıralaması
+    onlardan çıkıyor. Kimlik listesi adrese yazıldığı için 150'lik
+    parçalara bölünüyor, her parça da kendi içinde sayfalanıyor
+    (150 siparişin kalemi 1000 satırı aşabiliyor).
+  */
+  const donemKimlikleri = siparisSonucu.rows
+    .filter((s) => { const gun = gunAnahtari(s.created_at); return gun >= donem.bas && gun <= donem.son; })
+    .slice(0, 3000)
+    .map((s) => s.id);
+  const parcalar = Array.from({ length: Math.ceil(donemKimlikleri.length / 150) }, (_, i) => donemKimlikleri.slice(i * 150, i * 150 + 150));
+  const kalemParcalari = await Promise.all(parcalar.map((parca) => fetchAllRows<RaporKalemi>((bas, son) =>
+    supabase.from("arc_order_items")
+      .select("order_id,product_name,sku,quantity,total,cost_price")
       .eq("organization_id", organization.id)
-      .gte("created_at", new Date(previousSince).toISOString())
-      .order("created_at", { ascending: false })
-      .range(from, to) as unknown as PromiseLike<{ data: OrderRow[] | null; error: { message: string } | null }>,
-  );
+      .in("order_id", parca)
+      .order("id")
+      .range(bas, son) as unknown as PromiseLike<{ data: RaporKalemi[] | null; error: { message: string } | null }>)));
+  const kalemler = kalemParcalari.flatMap((p) => p.rows);
 
-  const current = orders.filter((order) => Date.parse(order.created_at) >= since);
-  const previous = orders.filter((order) => Date.parse(order.created_at) < since);
-  const currentPaid = current.filter((order) => countsAsRevenue(order.status, order.payment_status));
-  const previousPaid = previous.filter((order) => countsAsRevenue(order.status, order.payment_status));
-  /* Net ciro kısmi iadeyi düşer; "İade" kısmi iadeleri de sayar. */
-  const sum = (list: OrderRow[]) => list.reduce((total, order) => total + revenueAmount(order), 0);
-  const refundedTotal = (list: OrderRow[]) => list.reduce((total, order) => total + refundedAmount(order), 0);
+  const o = raporOzeti(siparisSonucu.rows, kalemler, iadeSonucu.rows, donem, aylar);
+  const kesildi = siparisSonucu.truncated || iadeSonucu.truncated || kalemParcalari.some((p) => p.truncated);
 
-  const revenue = sum(currentPaid);
-  const previousRevenue = sum(previousPaid);
-  const average = currentPaid.length ? Math.round(revenue / currentPaid.length) : 0;
-  const previousAverage = previousPaid.length ? Math.round(previousRevenue / previousPaid.length) : 0;
-  const refunded = refundedTotal(current);
+  /* --- Sunum: yukarıdaki özetten türetiliyor, yeni hesap yok --- */
+  const seri = (sec: (ay: (typeof o.egilim)[number]) => number, bicim: (n: number) => string): SeriNoktasi[] =>
+    o.egilim.map((ay) => ({ ad: ay.ad, deger: sec(ay), etiket: bicim(sec(ay)), simdiki: ay.simdiki }));
 
-  for (const order of currentPaid) {
-    const at = Date.parse(order.created_at);
-    const bucket = buckets.find((item) => at >= item.start && at < item.end);
-    if (bucket) {
-      bucket.revenue += revenueAmount(order);
-      bucket.orders++;
-    }
-  }
-  const maxBucket = Math.max(...buckets.map((bucket) => bucket.revenue), 1);
-  const days = Math.max(1, Math.round((buckets[buckets.length - 1].end - since) / DAY));
-
-  const statusCounts = new Map<string, number>();
-  for (const order of current) statusCounts.set(order.status, (statusCounts.get(order.status) ?? 0) + 1);
-
-  const sources = new Map<string, { revenue: number; orders: number }>();
-  for (const order of currentPaid) {
-    const label = sourceLabel(order.source);
-    const entry = sources.get(label) ?? { revenue: 0, orders: 0 };
-    entry.revenue += revenueAmount(order);
-    entry.orders++;
-    sources.set(label, entry);
-  }
-  const sourceList = [...sources.entries()].sort((a, b) => b[1].revenue - a[1].revenue);
-
-  /*
-    Dönemin en çok satanları: yalnızca bu dönemdeki geçerli
-    siparişlerin kalemleri. Öncesinde kalemler dönemden bağımsız
-    ilk 5000 satırdan (pratikte 1000) hesaplanıyordu. Kimlik listesi
-    URL'ye yazıldığı için 150'lik parçalarla okunur.
-  */
-  const paidIds = currentPaid.slice(0, 3000).map((order) => order.id);
-  const chunks = Array.from({ length: Math.ceil(paidIds.length / 150) }, (_, index) => paidIds.slice(index * 150, index * 150 + 150));
-  /* 150 siparişin kalemi 1000 satırı aşabiliyor; her parça sayfalanarak okunur. */
-  type ItemRow = { product_name: string; sku: string; quantity: number; total: number };
-  const itemChunks = await Promise.all(chunks.map((chunk) => fetchAllRows<ItemRow>((from, to) =>
-    supabase.from("arc_order_items").select("product_name,sku,quantity,total").eq("organization_id", organization.id).in("order_id", chunk).order("id").range(from, to) as unknown as PromiseLike<{ data: ItemRow[] | null; error: { message: string } | null }>)));
-  const products = new Map<string, { name: string; sku: string; quantity: number; revenue: number }>();
-  for (const { rows } of itemChunks) {
-    for (const item of rows) {
-      const key = item.sku || item.product_name;
-      const entry = products.get(key);
-      if (entry) {
-        entry.quantity += item.quantity;
-        entry.revenue += item.total;
-      } else products.set(key, { name: item.product_name, sku: item.sku, quantity: item.quantity, revenue: item.total });
-    }
-  }
-  const topProducts = [...products.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 10);
-  const maxProduct = Math.max(...topProducts.map((item) => item.revenue), 1);
-  const itemsRevenue = [...products.values()].reduce((total, item) => total + item.revenue, 0);
-
-  const metrics = [
-    { label: "Net ciro", value: money.format(revenue / 100), change: delta(revenue, previousRevenue), note: "iptal ve iadeler hariç" },
-    { label: "Sipariş", value: currentPaid.length.toLocaleString("tr-TR"), change: delta(currentPaid.length, previousPaid.length), note: "geçerli sipariş" },
-    { label: "Ortalama sepet", value: money.format(average / 100), change: delta(average, previousAverage), note: "sipariş başına" },
-    { label: "İade", value: money.format(refunded / 100), change: delta(refunded, refundedTotal(previous)), note: "iade edilen tutar", inverse: true },
+  const satisKartlari: Gosterge[] = [
+    { etiket: "Sipariş", deger: adet(o.gecerliAdet), not: `${adet(o.siparisAdedi)} kayıt · ${adet(o.iptalAdet)} iptal/iade · son 6 ay`, simge: "kutu", ton: "brand", grafik: { tur: "cubuk", seri: seri((ay) => ay.adet, adet) } },
+    { etiket: "Net ciro", deger: paraYaz(o.netCiro), not: "İptal ve iadeler düşülmüş · son 6 ay", simge: "para", ton: "success", grafik: { tur: "cubuk", seri: seri((ay) => ay.ciro, paraYaz) } },
+    { etiket: "Ortalama sepet", deger: paraYaz(o.ortalamaSepet), not: `${adet(o.gecerliAdet)} geçerli siparişin ortalaması`, simge: "sepet", ton: "info", grafik: { tur: "halka", oran: o.siparisAdedi ? (o.gecerliAdet / o.siparisAdedi) * 100 : null, altyazi: "geçerli sipariş oranı" } },
+    { etiket: "Satılan adet", deger: adet(o.satilanAdet), not: "Geçerli siparişlerdeki toplam ürün", simge: "etiket", ton: "gold", grafik: { tur: "halka", oran: o.gecerliAdet ? (o.satilanAdet / o.gecerliAdet) * 100 : null, altyazi: "sipariş başına adet" } },
+    { etiket: "İade", deger: paraYaz(o.iadeTutari), not: `${adet(o.iadeAdedi)} talep açıldı`, simge: "geri", ton: o.iadeTutari ? "warning" : "success", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.iadeTutari / o.brutCiro) * 100 : 0 } },
   ];
 
-  /*
-    ArvoOS kalıbı (16.10.2026): başlık + dönem süzgeci, özet şeridi,
-    panel kartları. Grafik ve dağılım çubukları (an-*) bu sayfanın kendi
-    dili ve aynen kaldı.
-  */
-  return <main className="talep analiz-sayfasi">
-    <header className="talep-bas">
-      <div className="talep-bas-metin">
-        <small className="panel-kicker">Finans</small>
-        <h1>Raporlar</h1>
-        <p className="talep-bas-alt">{periodLabel} · önceki eşit dönemle karşılaştırmalı · iptal ve iadeler ciroya dâhil değil</p>
-      </div>
-      <nav className="ekip-suzgec talep-suzgec" aria-label="Dönem">
-        {PERIODS.map(([key, label]) => (
-          <Link prefetch={false} key={key} href={key === "30" ? "/analitik" : `/analitik?p=${key}`} className={period === key ? "is-active" : undefined} aria-current={period === key ? "page" : undefined}>{label}</Link>
-        ))}
-      </nav>
+  const karVar = o.kar !== null && o.maliyet !== null;
+  const karlilikKartlari: Gosterge[] = [
+    { etiket: "Brüt kâr", deger: karVar ? paraYaz(o.kar!) : "—", not: karVar ? `${adet(o.karliSiparis)} siparişte hesaplanabildi` : "Kalemlerin alış fiyatı girilmemiş", simge: "grafik", ton: !karVar ? "info" : o.kar! >= 0 ? "success" : "danger", tonlu: karVar, grafik: { tur: "yigin", parcalar: [{ ad: "Maliyet", deger: o.maliyet ?? 0, ton: "warning" }, { ad: "Kâr", deger: Math.max(0, o.kar ?? 0), ton: "success" }] } },
+    { etiket: "Kâr marjı", deger: o.marj === null ? "—" : yuzde(o.marj), not: "Hesaplanabilen siparişlerin kalem gelirine oranı", simge: "kivilcim", ton: "gold", grafik: { tur: "gosterge", oran: o.marj ?? 0 } },
+    { etiket: "Kargo geliri", deger: paraYaz(o.kargo), not: "Siparişlerde tahsil edilen kargo bedeli", simge: "kargo", ton: "info", grafik: { tur: "gosterge", oran: o.brutCiro ? (o.kargo / o.brutCiro) * 100 : 0 } },
+    { etiket: "İndirim", deger: paraYaz(o.indirim), not: "Kupon ve havale indirimi", simge: "etiket", ton: "warning", grafik: { tur: "gosterge", oran: o.urunToplami ? (o.indirim / o.urunToplami) * 100 : 0 } },
+    { etiket: "Dönem akışı", deger: paraYaz(o.netCiro), not: "Ürün + kargo − indirim − iade", simge: "para", ton: "brand", grafik: { tur: "selale", adimlar: [{ ad: "Ürün", deger: o.urunToplami, ton: "brand" }, { ad: "Kargo", deger: o.kargo, ton: "info" }, { ad: "İndirim", deger: -o.indirim, ton: "warning" }, { ad: "İade", deger: -o.iadeTutari, ton: "warning" }, { ad: "Net", deger: o.netCiro, ton: "success" }] } },
+  ];
+
+  const ciroSatirlari: DefterSatiri[] = [
+    { etiket: "Ürün toplamı", ipucu: `${adet(o.satilanAdet)} ürün · kargo ve indirim hariç`, tutar: paraYaz(o.urunToplami), pay: payi(o.urunToplami, o.brutCiro), ton: "brand" },
+    { etiket: "Kargo", ipucu: "Müşteriden tahsil edilen kargo bedeli", tutar: paraYaz(o.kargo), pay: payi(o.kargo, o.brutCiro), ton: "info" },
+    { etiket: "İndirim", ipucu: "Kupon ve havale indirimi", tutar: dusum(o.indirim), pay: payi(o.indirim, o.brutCiro), ton: "warning" },
+    { etiket: "İade", ipucu: "Dönem siparişlerinden geri ödenen", tutar: dusum(o.iadeTutari), pay: payi(o.iadeTutari, o.brutCiro), ton: "warning" },
+  ];
+  const ciroToplami: DefterSatiri = { etiket: "Net ciro", ipucu: "Ürün + kargo − indirim − iade", tutar: paraYaz(o.netCiro), pay: o.brutCiro ? payi(o.netCiro, o.brutCiro) : null, ton: "success" };
+
+  const karSatirlari: DefterSatiri[] = [
+    { etiket: "Kalem geliri", ipucu: `${adet(o.karliSiparis)} siparişin ürün satırları`, tutar: paraYaz(o.karTabani), pay: o.karTabani ? 100 : null, ton: "brand" },
+    { etiket: "Ürün maliyeti", ipucu: "Satış anında donmuş alış fiyatı", tutar: karVar ? dusum(o.maliyet!) : "—", pay: karVar ? payi(o.maliyet!, o.karTabani) : null, ton: "warning" },
+  ];
+  const karToplami: DefterSatiri = { etiket: "Brüt kâr", ipucu: "Kalem geliri − ürün maliyeti", tutar: karVar ? paraYaz(o.kar!) : "—", pay: o.marj, ton: !karVar ? "info" : o.kar! >= 0 ? "success" : "danger" };
+
+  const enBuyukHuni = Math.max(1, ...o.huni.map((h) => h.adet));
+  const enBuyukEgilim = Math.max(1, ...o.egilim.map((ay) => ay.adet));
+  const enBuyukSebep = Math.max(1, ...o.sebepler.map((s) => s.adet));
+  const enBuyukUrun = Math.max(1, ...o.enCokSatan.map((u) => u.ciro));
+  const egilimSiparis = o.egilim.reduce((t, ay) => t + ay.adet, 0);
+  const egilimCiro = o.egilim.reduce((t, ay) => t + ay.ciro, 0);
+  const bagli = (anahtar: string) => `/analitik?aralik=${anahtar}`;
+  const enIyiKaynak = o.kaynaklar[0];
+
+  return <div className="rpt">
+    <header className="talep-bas rpt-bas">
+      <div className="talep-bas-metin"><small className="panel-kicker">FİNANS</small><h1>Raporlar</h1></div>
+      <div className="talep-bas-eylem"><span className="status-pill rpt-range-pill" data-tone="gold">{donem.etiket}</span><YazdirDugmesi /></div>
     </header>
 
-    <div className="ac-stack">
-      {truncated ? <KNot ton="uyari">Bu dönemde 20.000’den fazla sipariş var; hesaplama en yeni 20.000 siparişle yapıldı.</KNot> : null}
+    {kesildi ? <KNot ton="uyari">Bu pencerede 20.000’den fazla kayıt var; rapor en yeni 20.000 kayıtla hesaplandı.</KNot> : null}
 
-      <nav className="kayit-serit talep-serit" aria-label="Dönem özeti">
-        <dl>
-          {metrics.map((metric) => (
-            <div key={metric.label}>
-              <dt>{metric.label}</dt>
-              <dd>{metric.value}</dd>
-              <small><Delta value={metric.change} inverse={metric.inverse} /> {metric.note}</small>
-            </div>
-          ))}
-        </dl>
+    <section className="rpt-toolbar" aria-label="Rapor dönemi">
+      <nav className="rpt-segment" aria-label="Hazır dönemler">
+        {([["bu_ay", "Bu Ay"], ["gecen_ay", "Geçen Ay"], ["bu_yil", "Bu Yıl"]] as const).map(([anahtar, etiket]) => (
+          <Link key={anahtar} prefetch={false} href={bagli(anahtar)} className={donem.anahtar === anahtar ? "is-active" : undefined} aria-current={donem.anahtar === anahtar ? "page" : undefined}>{etiket}</Link>
+        ))}
       </nav>
+      <form className={`rpt-range-form${donem.anahtar === "ozel" ? " is-active" : ""}`} method="get">
+        <input type="hidden" name="aralik" value="ozel" />
+        <span className="rpt-range-label">Özel aralık</span>
+        <input name="baslangic" type="date" defaultValue={donem.anahtar === "ozel" ? donem.bas : undefined} required aria-label="Başlangıç tarihi" />
+        <span className="rpt-range-sep" aria-hidden="true">–</span>
+        <input name="bitis" type="date" defaultValue={donem.anahtar === "ozel" ? donem.son : undefined} required aria-label="Bitiş tarihi" />
+        <button className="panel-secondary" type="submit">Uygula</button>
+      </form>
+    </section>
 
-      <div className="an-grid">
-        <article className="panel-card an-kart an-chart">
-          <div className="an-head">
-            <div><h3>Ciro</h3><p>{bucketKind} · son çubuk içinde bulunulan dönem</p></div>
-            <div className="an-stat"><strong>{money.format(revenue / 100)}</strong><span>Günlük ortalama {money.format(revenue / days / 100)}</span></div>
-          </div>
-          <div className="an-bars" data-dense={buckets.length > 14 ? "" : undefined} style={{ "--n": buckets.length } as React.CSSProperties} role="img" aria-label={`${periodLabel} ciro grafiği`}>
-            {buckets.map((bucket, index) => (
-              <div className={`an-bar${bucket.revenue ? "" : " is-empty"}${index === buckets.length - 1 ? " is-last" : ""}`} key={bucket.start} title={`${bucket.label}: ${money.format(bucket.revenue / 100)} · ${bucket.orders} sipariş`}>
-                <span className="an-bar-value">{bucket.revenue && buckets.length <= 14 ? compact.format(bucket.revenue / 100) : ""}</span>
-                <span className="an-bar-fill" style={{ "--h": `${Math.max(2, Math.round((bucket.revenue / maxBucket) * 100))}%` } as React.CSSProperties} />
-                <small>{bucket.label}</small>
+    <section className="rpt-group" aria-labelledby="rpt-satis">
+      <h2 className="rpt-group-title" id="rpt-satis">Satış</h2>
+      <div className="rpt-widgets">{satisKartlari.map((k) => <GostergeKarti key={k.etiket} gosterge={k} />)}</div>
+    </section>
+    <section className="rpt-group" aria-labelledby="rpt-karlilik">
+      <h2 className="rpt-group-title" id="rpt-karlilik">Kârlılık ve dönem akışı</h2>
+      <div className="rpt-widgets">{karlilikKartlari.map((k) => <GostergeKarti key={k.etiket} gosterge={k} />)}</div>
+    </section>
+
+    <div className="rpt-grid">
+      <section className="rpt-card">
+        <header className="rpt-card-head">
+          <div><h2>Sipariş akışı</h2><p>Siparişin alınmasından kargoya verilmesine kadar her adımda kalan</p></div>
+          <Link href="/siparisler" className="rpt-card-link">Siparişleri aç<span aria-hidden="true"> ›</span></Link>
+        </header>
+        <ol className="rpt-funnel">
+          {o.huni.map((adim, sira) => {
+            const gecis = o.gecisler[sira];
+            const zayif = Boolean(gecis && o.enZayifGecis && gecis.nereden === o.enZayifGecis.nereden && o.siparisAdedi > 0);
+            return <li key={adim.anahtar} className={sira === o.huni.length - 1 ? "is-final" : undefined}>
+              <div className="rpt-funnel-row">
+                <div className="rpt-funnel-label"><b>{adim.etiket}</b><span>{o.siparisAdedi ? yuzde((adim.adet / o.siparisAdedi) * 100) : "—"} · dönemin tamamı</span></div>
+                <div className="rpt-funnel-track"><i style={cssDegisken("--w", `${Math.max(4, (adim.adet / enBuyukHuni) * 100)}%`)} /></div>
+                <strong>{adet(adim.adet)}</strong>
               </div>
-            ))}
-          </div>
-        </article>
+              {gecis ? <div className={`rpt-funnel-step${zayif ? " is-weak" : ""}`}><span aria-hidden="true">↓</span><b>{gecis.oran === null ? "—" : yuzde(gecis.oran)}</b> sonraki adıma geçti{zayif ? <em>En zayıf geçiş</em> : null}</div> : null}
+            </li>;
+          })}
+        </ol>
+        {o.siparisAdedi ? null : <p className="rpt-empty-note">Bu dönemde sipariş yok; akış oranları ilk siparişle birlikte oluşur.</p>}
+      </section>
 
-        <article className="panel-card an-kart">
-          <div className="an-head"><div><h3>Sipariş durumları</h3><p>{current.length.toLocaleString("tr-TR")} sipariş · {periodLabel.toLocaleLowerCase("tr-TR")}</p></div></div>
-          <ul className="an-dist">
-            {orderStatusOptions.map(([status, label]) => {
-              const count = statusCounts.get(status) ?? 0;
-              return (
-                <li key={status}>
-                  <div className="an-dist-top"><span>{label}</span><b>{count.toLocaleString("tr-TR")}</b></div>
-                  <div className="an-track"><i style={{ "--w": `${current.length ? (count / current.length) * 100 : 0}%` } as React.CSSProperties} /></div>
-                </li>
-              );
-            })}
-          </ul>
-        </article>
+      <section className="rpt-card">
+        <header className="rpt-card-head"><div><h2>Bu dönem ne söylüyor?</h2><p>Yönetici için dört kısa not</p></div></header>
+        <ul className="rpt-insights">
+          <li data-tone="warning"><span className="rpt-insight-icon"><Simge ad="uyari" boy={17} /></span><div><b>En zayıf adım</b><p>{o.enZayifGecis ? `${o.enZayifGecis.nereden} → ${o.enZayifGecis.nereye} geçişi ${yuzde(o.enZayifGecis.oran)}.` : "Yeterli veri yok."}</p></div></li>
+          <li data-tone="gold"><span className="rpt-insight-icon"><Simge ad="grafik" boy={17} /></span><div><b>Kârlılık</b><p>{karVar ? `${paraYaz(o.karTabani)} kalem gelirinin maliyeti ${paraYaz(o.maliyet!)}; brüt marj ${yuzde(o.marj ?? 0)}.` : "Kâr hesaplanamıyor: kalemlerin alış fiyatı girilmemiş."}</p></div></li>
+          <li data-tone={o.iadeTutari ? "danger" : "success"}><span className="rpt-insight-icon"><Simge ad="geri" boy={17} /></span><div><b>İade yükü</b><p>{o.iadeTutari ? `${paraYaz(o.iadeTutari)} iade edildi; brüt cironun ${yuzde((o.iadeTutari / Math.max(1, o.brutCiro)) * 100)}'i.` : "Bu dönemde iade edilen tutar yok."}</p></div></li>
+          <li data-tone="info"><span className="rpt-insight-icon"><Simge ad="kisi" boy={17} /></span><div><b>Satış kaynağı</b><p>{enIyiKaynak ? `Ciro en çok ${enIyiKaynak.etiket} üzerinden geldi: ${paraYaz(enIyiKaynak.ciro)} (${adet(enIyiKaynak.adet)} sipariş).` : "Bu dönemde geçerli sipariş yok."}</p></div></li>
+        </ul>
+      </section>
 
-        <article className="panel-card an-kart an-top">
-          <div className="an-head"><div><h3>En çok satan ürünler</h3><p>Ciroya göre ilk 10 · {periodLabel.toLocaleLowerCase("tr-TR")}</p></div></div>
-          {topProducts.length ? (
-            <ol className="an-top-list">
-              {topProducts.map((product, index) => (
-                <li key={product.sku || product.name}>
-                  <span className="an-rank">{index + 1}</span>
-                  <span><b>{product.name}</b><small>{product.sku || "SKU yok"} · payı %{itemsRevenue ? Math.round((product.revenue / itemsRevenue) * 100) : 0}</small></span>
-                  <div className="an-track is-gold"><i style={{ "--w": `${(product.revenue / maxProduct) * 100}%` } as React.CSSProperties} /></div>
-                  <span className="an-qty">{product.quantity.toLocaleString("tr-TR")} adet</span>
-                  <strong>{money.format(product.revenue / 100)}</strong>
-                </li>
-              ))}
-            </ol>
-          ) : <p className="an-empty">Bu dönemde satılan ürün yok.</p>}
-        </article>
+      <section className="rpt-card rpt-span-full">
+        <header className="rpt-card-head"><div><h2>Ciro ve kâr dökümü</h2><p>Ciroyu oluşturan kalemler ile ürün maliyeti yan yana</p></div></header>
+        <div className="rpt-ledgers">
+          <Defter baslik="Ciro dökümü" altyazi="Pay: brüt ciroya oranı" satirlar={ciroSatirlari} toplam={ciroToplami} />
+          <Defter baslik="Kârlılık" altyazi="Pay: kalem gelirine oranı" satirlar={karSatirlari} toplam={karToplami} />
+        </div>
+      </section>
 
-        <article className="panel-card an-kart">
-          <div className="an-head"><div><h3>Satış kaynağı</h3><p>Ciroya göre dağılım</p></div></div>
-          {sourceList.length ? (
-            <ul className="an-dist">
-              {sourceList.map(([label, entry]) => (
-                <li key={label}>
-                  <div className="an-dist-top"><span>{label} · {entry.orders.toLocaleString("tr-TR")} sipariş</span><b>{money.format(entry.revenue / 100)}</b></div>
-                  <div className="an-track is-gold"><i style={{ "--w": `${revenue ? (entry.revenue / revenue) * 100 : 0}%` } as React.CSSProperties} /></div>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="an-empty">Bu dönemde geçerli sipariş yok.</p>}
-        </article>
-      </div>
+      <section className="rpt-card">
+        <header className="rpt-card-head">
+          <div><h2>6 aylık eğilim</h2><p>Aylara göre sipariş ve net ciro</p></div>
+          <div className="rpt-stat"><strong>{adet(egilimSiparis)}</strong><span>sipariş · {paraYaz(egilimCiro)}</span></div>
+        </header>
+        <div className="rpt-trend" role="img" aria-label={`Altı aylık grafik: ${o.egilim.map((ay) => `${ay.ad} ${ay.adet} sipariş, ${paraYaz(ay.ciro)}`).join("; ")}`}>
+          {o.egilim.map((ay) => {
+            const enBuyukCiro = Math.max(1, ...o.egilim.map((x) => x.ciro));
+            return <div key={ay.bas} className={`rpt-trend-col${ay.simdiki ? " is-current" : ""}`}>
+              <div className="rpt-trend-bars">
+                <i className="is-lead" style={cssDegisken("--h", `${Math.max(3, oranSinirla((ay.adet / enBuyukEgilim) * 100))}%`)} title={`${adet(ay.adet)} sipariş`} />
+                <i className="is-sale" style={cssDegisken("--h", `${Math.max(3, oranSinirla((ay.ciro / enBuyukCiro) * 100))}%`)} title={paraYaz(ay.ciro)} />
+              </div>
+              <b>{ay.ad}</b>
+              <span>{adet(ay.adet)} · {paraYaz(ay.ciro)}</span>
+            </div>;
+          })}
+        </div>
+        <div className="rpt-legend"><span><i className="is-lead" />Sipariş</span><span><i className="is-sale" />Ciro</span></div>
+        {egilimSiparis ? null : <p className="rpt-empty-note">Son 6 ayda geçerli sipariş kaydı yok.</p>}
+      </section>
+
+      <section className="rpt-card">
+        <header className="rpt-card-head">
+          <div><h2>Neden iade edildi?</h2><p>Bu dönemde açılan iade talepleri</p></div>
+          <div className="rpt-stat" data-tone={o.iadeAdedi ? "danger" : "success"}><strong>{adet(o.iadeAdedi)}</strong><span>talep</span></div>
+        </header>
+        {o.sebepler.length ? <ul className="rpt-lost">
+          {o.sebepler.map((satir) => <li key={satir.sebep}>
+            <div className="rpt-lost-top"><b>{satir.sebep}</b><span>{adet(satir.adet)} talep</span></div>
+            <div className="rpt-lost-track"><i style={cssDegisken("--w", `${(satir.adet / enBuyukSebep) * 100}%`)} /></div>
+          </li>)}
+        </ul> : <div className="rpt-empty" data-tone="success">
+          <span className="rpt-insight-icon"><Simge ad="kalp" boy={20} /></span>
+          <b>İade talebi yok</b>
+          <p>Bu dönemde müşteriler iade talebi açmadı.</p>
+        </div>}
+      </section>
+
+      <section className="rpt-card rpt-span-full">
+        <header className="rpt-card-head">
+          <div><h2>En çok satan ürünler</h2><p>Kalem cirosuna göre ilk 10</p></div>
+          <Link href="/urunler" className="rpt-card-link">Katalogu aç<span aria-hidden="true"> ›</span></Link>
+        </header>
+        {o.enCokSatan.length ? <ol className="rpt-urunler">
+          {o.enCokSatan.map((urun, sira) => <li key={urun.sku || urun.ad}>
+            <span className="rpt-urun-sira">{sira + 1}</span>
+            <span className="rpt-urun-ad"><b>{urun.ad}</b><small>{urun.sku || "SKU yok"} · payı {yuzde(o.kalemCirosu ? (urun.ciro / o.kalemCirosu) * 100 : 0)}</small></span>
+            <span className="rpt-urun-iz"><i style={cssDegisken("--w", `${(urun.ciro / enBuyukUrun) * 100}%`)} /></span>
+            <span className="rpt-urun-adet">{adet(urun.adet)} adet</span>
+            <strong>{paraYaz(urun.ciro)}</strong>
+          </li>)}
+        </ol> : <p className="rpt-empty-note">Bu dönemde satılan ürün yok.</p>}
+      </section>
+
+      <section className="rpt-card rpt-span-full">
+        <header className="rpt-card-head"><div><h2>Satış kaynağı</h2><p>Net ciroya göre dağılım · {gunYazisi(donem.bas)} – {gunYazisi(donem.son)}</p></div></header>
+        {o.kaynaklar.length ? <ul className="rpt-kaynaklar">
+          {o.kaynaklar.map((kaynak) => <li key={kaynak.etiket}>
+            <div className="rpt-lost-top"><b>{kaynak.etiket}</b><span>{adet(kaynak.adet)} sipariş · {paraYaz(kaynak.ciro)}</span></div>
+            <div className="rpt-lost-track"><i style={cssDegisken("--w", `${o.netCiro ? (kaynak.ciro / o.netCiro) * 100 : 0}%`)} /></div>
+          </li>)}
+        </ul> : <p className="rpt-empty-note">Bu dönemde geçerli sipariş yok.</p>}
+      </section>
     </div>
-  </main>;
+  </div>;
 }
