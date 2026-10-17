@@ -50,9 +50,16 @@ const ELLE_CIFTLER = [
   kurumuyla çağırıyor; `arc_storefront_payment_methods` karşılığını
   mağaza ayarlarından okuyor; `arc_storefront_org` kiracı çözümünün
   kendisi.
+
+  `arc_storefront_order_status` kiracıyı ALAN ADINDAN ÇÖZMÜYOR:
+  müşterinin bağlantısındaki anahtar tek bir siparişi buluyor, sipariş
+  de kendi mağazasını taşıyor. Alan adı sormak hiçbir şeyi
+  korumazdı — anahtar zaten tek mağazaya ait. İkizi olmaması bu
+  yüzden eksiklik değil, tasarım.
 */
 const IKIZSIZ_SERBEST = new Set([
   "arc_storefront_create_order",
+  "arc_storefront_order_status",
   "arc_storefront_org",
   "arc_storefront_payment_methods",
 ]);
