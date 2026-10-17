@@ -1,101 +1,131 @@
-import { mesajGovdesi, type WaDegerleri } from "@/lib/whatsapp/sablonlar";
+import { kapiMesaji, type WaDegerleri } from "@/lib/whatsapp/sablonlar";
 
 /*
-  WHATSAPP CLOUD API GÖNDERİCİSİ.
+  ARVOOS'UN WHATSAPP KAPISINA GÖNDERİM.
 
-  Meta Cloud API doğrudan kullanılıyor (aracı yok): token platformun,
-  gönderen numara MAĞAZANIN. Kurulum ikiye ayrıldı çünkü ikisinin
-  gizlilik derecesi farklı:
+  ÖNCEDEN BURADAN DOĞRUDAN META'YA ÇAĞRI YAPILIYORDU
+  (graph.facebook.com/v21.0/<numara>/messages) ve token ArvoARC'ın
+  kendi ortam değişkenindeydi. Yanlıştı: ArvoOS'ta 21–27 Eylül
+  2026'da yazılmış ortak bir kapı var (lib/whatsapp-gateway.ts +
+  app/api/bridge/whatsapp) ve izin verdiği ürünler arasında "arc"
+  zaten yazılı. ArvoOS'un değişmezi: "WhatsApp'a doğrudan çağrı
+  yapılmaz. Dört ürün de kapıdan geçer: tek yerde erişim anahtarı,
+  tek yerde mesaj kaydı, tek yerde hata haritası."
 
-   * WHATSAPP_ACCESS_TOKEN — ortam değişkeni, platforma ait, sır.
-     Asla günlüğe, hata mesajına ya da panele yazılmaz.
-   * whatsapp_phone_number_id — mağaza ayarında, sır değil, kiracı
-     başına. PayTR anahtarlarında olduğu gibi şifreli bir sütuna
-     gerek yok; bu değer bir kimlik, bir anahtar değil.
+  Doğrudan çağrının üç somut bedeli vardı:
+   * İkinci bir token — sızma yüzeyi iki katı, yenileme iki yerde.
+   * İkinci bir mesaj kütüğü (arc_whatsapp_messages), ArvoOS'taki
+     whatsapp_messages'ın kopyası. "Mesaj gitti mi" sorusunun iki
+     ayrı yanıtı olurdu.
+   * GELEN mesaj hiçbir yere düşmüyordu. Kapıdan geçince müşterinin
+     yanıtı ArvoOS'un CRM gelen kutusuna düşüyor ve personel 24
+     saatlik pencerede serbest metinle cevap verebiliyor.
 
-  Kiracı kendi WhatsApp İşletme Hesabını getirmek isterse token da
-  mağaza başına ve şifreli olmak zorunda (PayTR kalıbı,
-  lib/sir-sifreleme). O gün gelene kadar tek token, birden çok numara.
+  NUMARA KURUMA BAĞLI, MAĞAZA AYARINA DEĞİL. Kurum WhatsApp
+  numarasını ArvoOS panelinden bağlıyor (Ayarlar → Entegrasyonlar);
+  kapı token'ı şifreli saklıyor ve hangi ürünün istediğine bakmadan
+  o kurumun numarasını kullanıyor. Numara bağlı değilse Arvo'nun
+  ortak numarasına düşüyor ve bunu `fellBackToArvo` ile söylüyor.
 
-  HATA YUTULMUYOR. Sonuç üç hâlden biri: gönderildi, yapılandırılmadı,
-  başarısız. Çağıran taraf hangisini önemsediğine kendi karar veriyor —
-  sipariş akışını WhatsApp yüzünden durdurmak doğru olmaz, ama
-  "gönderildi" diye yazıp göndermemek de olmaz: her deneme
-  arc_whatsapp_messages'a yazılıyor.
+  HATA YUTULMUYOR. Sonuç üç hâlden biri: gönderildi,
+  yapılandırılmadı, başarısız. Çağıran taraf hangisini önemsediğine
+  kendi karar veriyor — sipariş akışını WhatsApp yüzünden durdurmak
+  doğru olmaz, ama "gönderildi" diye yazıp göndermemek de olmaz.
 */
 
-const SURUM = "v21.0";
-
 export type WaSonuc =
-  | { durum: "gonderildi"; mesajId: string }
+  | { durum: "gonderildi"; mesajId: string; arvoNumarasinaDustu: boolean }
   | { durum: "yapilandirilmadi"; sebep: string }
   | { durum: "basarisiz"; hata: string };
 
-export const waTokenVar = () => Boolean(process.env.WHATSAPP_ACCESS_TOKEN?.trim());
+/** Kapının adresi; sonundaki eğik çizgi varsa atılıyor. */
+const kapiAdresi = () => (process.env.ARVOOS_BRIDGE_URL ?? "").trim().replace(/\/+$/, "");
+
+/** Köprü sırrı; ArvoOS'taki PRODUCT_BRIDGE_SECRET ile aynı değer. */
+const kapiSirri = () => (process.env.PRODUCT_BRIDGE_SECRET ?? "").trim();
+
+export const waKapisiVar = () => Boolean(kapiAdresi() && kapiSirri());
+
+type KapiYaniti = {
+  sender?: string;
+  fellBackToArvo?: boolean;
+  results?: { ref?: string | null; to?: string; sent?: boolean; waMessageId?: string | null; error?: string | null }[];
+  error?: string;
+};
 
 /**
- * Şablon mesajı gönderir. Numara ve parametreler
- * lib/whatsapp/sablonlar içinde doğrulanıyor.
+ * Şablon mesajını kuruma bağlı numaradan gönderir.
+ *
+ * `organizationId` ArvoOS'taki kurum kimliğiyle AYNI olmalı — ArvoARC'ın
+ * `organizations` tablosu ArvoOS köprüsünün yazdığı kopya olduğu için
+ * zaten aynı kimlik taşınıyor (ArvoOS lib/arc-bridge.ts).
  */
 export async function waSablonGonder(input: {
-  phoneNumberId: string | null | undefined;
+  organizationId: string;
   anahtar: string;
   numara: string | null | undefined;
   degerler: WaDegerleri;
 }): Promise<WaSonuc> {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
-  if (!token) return { durum: "yapilandirilmadi", sebep: "WHATSAPP_ACCESS_TOKEN tanımlı değil" };
-
-  const numaraId = String(input.phoneNumberId ?? "").trim();
-  if (!numaraId) {
-    return {
-      durum: "yapilandirilmadi",
-      sebep: "Mağaza ayarında WhatsApp numara kimliği (whatsapp_phone_number_id) yok",
-    };
+  const adres = kapiAdresi();
+  const sir = kapiSirri();
+  if (!adres || !sir) {
+    const eksik = [!adres && "ARVOOS_BRIDGE_URL", !sir && "PRODUCT_BRIDGE_SECRET"].filter(Boolean).join(", ");
+    return { durum: "yapilandirilmadi", sebep: `WhatsApp kapısı tanımlı değil (${eksik})` };
   }
+  if (!input.organizationId) return { durum: "basarisiz", hata: "Kurum kimliği boş; kapı mağazanın numarasını bulamaz." };
 
-  const hazir = mesajGovdesi(input.anahtar, input.numara ?? "", input.degerler);
+  const hazir = kapiMesaji(input.anahtar, input.numara ?? "", input.degerler);
   if ("hata" in hazir) return { durum: "basarisiz", hata: hazir.hata };
 
   let yanit: Response;
   try {
-    yanit = await fetch(`https://graph.facebook.com/${SURUM}/${encodeURIComponent(numaraId)}/messages`, {
+    yanit = await fetch(`${adres}/api/bridge/whatsapp`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(hazir.body),
-      /* Sipariş akışının içinden çağrılıyor; Meta yanıt vermezse
+      headers: { "Content-Type": "application/json", "x-arvo-bridge-secret": sir },
+      body: JSON.stringify({
+        product: "arc",
+        organizationId: input.organizationId,
+        /* Müşteri mesajı MAĞAZADAN almalı, "Arvo"dan değil. Kurumun
+           numarası bağlı değilse kapı Arvo'nunkine düşüyor ve bunu
+           söylüyor; sonuçta görünsün diye taşınıyor. */
+        sender: "organization",
+        messages: [{ ref: input.anahtar, ...hazir.mesaj }],
+      }),
+      /* Sipariş akışının içinden çağrılıyor; kapı yanıt vermezse
          akış beklemesin. */
       signal: AbortSignal.timeout(10_000),
     });
   } catch (sebep) {
-    return { durum: "basarisiz", hata: `Meta'ya ulaşılamadı: ${(sebep as Error).message}` };
+    return { durum: "basarisiz", hata: `WhatsApp kapısına ulaşılamadı: ${(sebep as Error).message}` };
   }
 
   const metin = await yanit.text().catch(() => "");
-  if (!yanit.ok) {
-    /*
-      Meta'nın hata gövdesi okunur bir mesaj taşıyor
-      ("Template name does not exist in the translation"). Token
-      gövdede geçmiyor; yine de yalnızca mesaj alanı alınıyor ve
-      uzunluk kırpılıyor — tam gövde günlüğe yazılırsa istek
-      başlıkları da sızabilir.
-    */
-    let mesaj = metin.slice(0, 300);
-    try {
-      const golge = JSON.parse(metin) as { error?: { message?: string; code?: number } };
-      if (golge.error?.message) mesaj = `${golge.error.message}${golge.error.code ? ` (kod ${golge.error.code})` : ""}`;
-    } catch {
-      /* JSON değilse kırpılmış metin kalıyor. */
-    }
-    return { durum: "basarisiz", hata: `Meta ${yanit.status}: ${mesaj}` };
+  let golge: KapiYaniti = {};
+  try {
+    golge = JSON.parse(metin) as KapiYaniti;
+  } catch {
+    /* JSON değilse aşağıdaki durum koduna göre karar veriliyor. */
   }
 
-  try {
-    const golge = JSON.parse(metin) as { messages?: { id?: string }[] };
-    const id = golge.messages?.[0]?.id;
-    if (!id) return { durum: "basarisiz", hata: "Meta yanıtında mesaj kimliği yok" };
-    return { durum: "gonderildi", mesajId: id };
-  } catch {
-    return { durum: "basarisiz", hata: "Meta yanıtı okunamadı" };
+  /*
+    Kapı kısmi başarısızlıkta 207 döndürüyor; tek mesaj gönderdiğimiz
+    için 207 doğrudan "gitmedi" demek. 200 bile olsa results[0].sent
+    okunuyor — "istek başarılı" ile "mesaj gitti" ayrı şeyler.
+  */
+  if (!yanit.ok && yanit.status !== 207) {
+    const sebep = golge.error ?? metin.slice(0, 300) ?? "";
+    /* 503 = kapı açık ama anahtar/numara eksik: kusur değil, kurulum. */
+    if (yanit.status === 503) return { durum: "yapilandirilmadi", sebep: sebep || "Kapı yapılandırılmamış" };
+    return { durum: "basarisiz", hata: `Kapı ${yanit.status}: ${sebep}` };
   }
+
+  const ilk = golge.results?.[0];
+  if (!ilk) return { durum: "basarisiz", hata: "Kapı yanıtında sonuç yok" };
+  if (!ilk.sent) return { durum: "basarisiz", hata: ilk.error ?? "Mesaj gönderilemedi" };
+
+  return {
+    durum: "gonderildi",
+    mesajId: ilk.waMessageId ?? "",
+    arvoNumarasinaDustu: golge.fellBackToArvo === true,
+  };
 }

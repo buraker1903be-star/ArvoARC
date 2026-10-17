@@ -80,7 +80,7 @@ export async function sendOrderConfirmation(
     sızmamalı (lib/whatsapp/bildirim hiçbir zaman fırlatmıyor).
     Müşteri onayı yoksa gönderilmiyor, yalnızca kayda geçiyor.
   */
-  await waSiparisBildirimi(supabase, {
+  await waSiparisBildirimi({
     organizationId: order.organization_id,
     orderId,
     anahtar: "siparis_alindi",

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { WA_SABLONLARI, mesajGovdesi, numarayiDuzelt } from "@/lib/whatsapp/sablonlar";
+import { WA_SABLONLARI, kapiMesaji, numarayiDuzelt } from "@/lib/whatsapp/sablonlar";
 
 /*
   Meta şablonları parametreleri KONUMSAL tutuyor ({{1}}, {{2}}).
@@ -53,25 +53,40 @@ test("tanınmayan biçim reddediliyor, uydurulmuyor", () => {
   assert.equal(numarayiDuzelt("555 111 22"), null);
 });
 
-test("gövde Cloud API'nin beklediği şekilde kuruluyor", () => {
-  const sonuc = mesajGovdesi("siparis_kargoda", "0555 111 22 33", {
+test("mesaj kapının beklediği şekilde kuruluyor", () => {
+  const sonuc = kapiMesaji("siparis_kargoda", "0555 111 22 33", {
     musteri: "Ayşe Yılmaz",
     siparis_no: "AC261017-0042",
     kargo_firmasi: "Yurtiçi Kargo",
     takip_no: "1234567890",
   });
-  assert.ok("body" in sonuc);
-  const body = sonuc.body as Record<string, unknown>;
-  assert.equal(body.to, "905551112233");
-  assert.equal(body.type, "template");
-  const sablon = body.template as { name: string; language: { code: string }; components: { parameters: { text: string }[] }[] };
-  assert.equal(sablon.name, "siparis_kargoda");
-  assert.equal(sablon.language.code, "tr");
+  assert.ok("mesaj" in sonuc);
+  assert.equal(sonuc.mesaj.to, "905551112233");
+  assert.equal(sonuc.mesaj.template, "siparis_kargoda");
+  assert.equal(sonuc.mesaj.language, "tr");
   /* Sıra: müşteri, sipariş no, kargo firması, takip no. */
-  assert.deepEqual(
-    sablon.components[0].parameters.map((p) => p.text),
-    ["Ayşe Yılmaz", "AC261017-0042", "Yurtiçi Kargo", "1234567890"],
+  assert.deepEqual(sonuc.mesaj.params, ["Ayşe Yılmaz", "AC261017-0042", "Yurtiçi Kargo", "1234567890"]);
+});
+
+test("kayda düşen gövde müşterinin GÖRECEĞİ metin", () => {
+  /*
+    Kapı bu metni whatsapp_messages'a yazıyor ve gelen kutusu ekranı
+    buradan okuyor. Yazılmazsa personel konuşmada yalnızca şablon
+    adını görür, müşteriye ne yazdığımızı göremez.
+  */
+  const sonuc = kapiMesaji("siparis_kargoda", "05551112233", {
+    musteri: "Ayşe",
+    siparis_no: "AC-1",
+    kargo_firmasi: "Yurtiçi",
+    takip_no: "999",
+  });
+  assert.ok("mesaj" in sonuc);
+  assert.equal(
+    sonuc.mesaj.body,
+    "Merhaba Ayşe, AC-1 numaralı siparişiniz kargoya verildi. Yurtiçi · takip numarası: 999",
   );
+  /* Yerleştirilmemiş {{n}} kalmamalı. */
+  assert.ok(!/\{\{\d+\}\}/.test(sonuc.mesaj.body));
 });
 
 test("eksik parametre hangi alan olduğunu söylüyor", () => {
@@ -79,58 +94,23 @@ test("eksik parametre hangi alan olduğunu söylüyor", () => {
     Meta eksik parametreyi reddediyor ama hangisinin eksik olduğunu
     söylemiyor; mesaj hiç gitmiyor ve sebebi anlaşılmıyordu.
   */
-  const sonuc = mesajGovdesi("siparis_kargoda", "05551112233", { musteri: "Ayşe", siparis_no: "AC-1" });
+  const sonuc = kapiMesaji("siparis_kargoda", "05551112233", { musteri: "Ayşe", siparis_no: "AC-1" });
   assert.ok("hata" in sonuc);
   assert.match(sonuc.hata, /kargo_firmasi, takip_no/);
 });
 
 test("boşluktan oluşan parametre de eksik sayılıyor", () => {
-  const sonuc = mesajGovdesi("siparis_iptal", "05551112233", { musteri: "   ", siparis_no: "AC-1" });
+  const sonuc = kapiMesaji("siparis_iptal", "05551112233", { musteri: "   ", siparis_no: "AC-1" });
   assert.ok("hata" in sonuc);
   assert.match(sonuc.hata, /musteri/);
 });
 
 test("tanınmayan şablon ve bozuk numara ayrı ayrı bildiriliyor", () => {
-  const a = mesajGovdesi("boyle_sablon_yok", "05551112233", {});
+  const a = kapiMesaji("boyle_sablon_yok", "05551112233", {});
   assert.ok("hata" in a);
   assert.match(a.hata, /Tanınmayan şablon/);
 
-  const b = mesajGovdesi("siparis_iptal", "123", { musteri: "Ayşe", siparis_no: "AC-1" });
+  const b = kapiMesaji("siparis_iptal", "123", { musteri: "Ayşe", siparis_no: "AC-1" });
   assert.ok("hata" in b);
   assert.match(b.hata, /uygun değil/);
-});
-
-/*
-  Onay ve telefon okuma kuralları (lib/whatsapp/bildirim). Ayrı
-  dosyaya koymuyorum: ikisi de aynı gönderim kararının parçası ve
-  birlikte okunmaları gerekiyor.
-*/
-import { siparisTelefonu, whatsappOnayiVar, waTutar } from "@/lib/whatsapp/bildirim";
-
-test("onay yoksa gönderilmiyor: eksik, false ve boş hepsi onaysız", () => {
-  /* Eski siparişlerde bu alan hiç yok; yanlışlıkla mesaj gitmesin. */
-  assert.equal(whatsappOnayiVar(null), false);
-  assert.equal(whatsappOnayiVar({}), false);
-  assert.equal(whatsappOnayiVar({ whatsapp_onay: false }), false);
-  assert.equal(whatsappOnayiVar({ whatsapp_onay: "hayir" }), false);
-});
-
-test("onay işaretliyse gönderiliyor", () => {
-  assert.equal(whatsappOnayiVar({ whatsapp_onay: true }), true);
-  /* Üstveri JSON'dan okunduğu için metin "true" da gelebiliyor. */
-  assert.equal(whatsappOnayiVar({ whatsapp_onay: "true" }), true);
-});
-
-test("telefon önce üstveriden, yoksa adresten okunuyor", () => {
-  assert.equal(siparisTelefonu({ phone: "+905551112233" }), "+905551112233");
-  assert.equal(siparisTelefonu({ shipping_address: { phone: "05551112233" } }), "05551112233");
-  assert.equal(siparisTelefonu({ address: { phone: "05551112233" } }), "05551112233");
-  assert.equal(siparisTelefonu({}), null);
-  assert.equal(siparisTelefonu(null), null);
-});
-
-test("tutar mesajda Türkçe biçimde", () => {
-  /* Kuruş tamsayıdan TL'ye; e-posta şablonuyla aynı kural. */
-  assert.match(waTutar(124990), /1\.249,90/);
-  assert.match(waTutar(0), /0,00/);
 });

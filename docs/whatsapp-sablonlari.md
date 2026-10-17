@@ -59,18 +59,45 @@ Merhaba {{1}}, {{2}} numaralı siparişinizin iadesi tamamlandı. Tutarın kart�
 
 ---
 
-# Bana iletmen gerekenler
+# Kurulum: token ArvoARC'a DEĞİL ArvoOS'a giriliyor
 
-1. **Telefon numarası kimliği** (WhatsApp Manager → API Kurulumu → "Phone number ID").
-   Sır değil; sohbete yazabilirsin, mağaza ayarına işlerim.
+ArvoARC Meta'ya doğrudan çağrı yapmıyor; dört ürünün ortak kapısı
+ArvoOS'ta (`app/api/bridge/whatsapp`). Numara da ürüne değil **kuruma**
+bağlı: ArvoCulture hem ArvoOS hem ArvoARC kullandığı için **tek numara
+ikisini birden taşıyor**, şablonlar aynı WhatsApp İşletme Hesabında
+yan yana duruyor (ArvoOS'un beşi: `teklif_hazir`, `sozlesme_imza`,
+`odeme_baglantisi`, `deneme_suresi_son_gun`, `abonelik_yenileme` —
+çakışma yok).
 
-2. **Kalıcı erişim token'ı** — SIR. Sohbete YAZMA. Vercel → ArvoARC projesi →
-   Settings → Environment Variables:
-   - Ad: `WHATSAPP_ACCESS_TOKEN`
-   - Değer: token
-   - Ortam: Production (ve istersen Preview)
-   Ekledikten sonra yeniden dağıtım gerekiyor; "ekledim" demen yeterli.
+## 1) Numarayı ArvoOS panelinden bağla
 
-3. Şablonlar **onaylandı** mı? Meta onayı genellikle birkaç dakika–saat.
-   Onaylanmadan gönderim "Template name does not exist" ile düşer ve bu
-   gönderim günlüğünde görünür.
+**Ayarlar → Entegrasyonlar → WhatsApp**, ilgili kurum seçiliyken üç değer:
+
+| Alan | Meta'da nerede |
+|---|---|
+| WABA ID | WhatsApp → API Setup, numaranın üstünde |
+| Phone number ID | Aynı ekran, "From" numarasının altında |
+| Access token | System User ile üretilen kalıcı token |
+
+Panel kaydederken Meta'ya doğrulatıyor ve token'ı şifreli yazıyor
+(`whatsapp_accounts.access_token_enc`). **Token sohbete yazılmaz,
+Vercel'e de girilmez.**
+
+## 2) ArvoARC'ın kapıya ulaşması
+
+ArvoARC projesinde iki ortam değişkeni:
+
+- `ARVOOS_BRIDGE_URL` = `https://arvo-os.com` — sır değil.
+- `PRODUCT_BRIDGE_SECRET` = ArvoOS'taki **aynı** değer — **SIR**.
+  Meta token'ı değil ama kapının kapısı: eline geçen biri o kurumun
+  numarasından müşterilerine mesaj gönderebilir. Sohbete yazılmaz,
+  yalnızca Vercel ortam değişkenine girilir.
+
+İkisi eksikse sipariş akışı normal çalışır, yalnızca WhatsApp mesajı
+gitmez ve sebebi sunucu günlüğüne yazılır.
+
+## 3) Şablon onayı
+
+Meta onayı genellikle birkaç dakika–saat. Onaylanmadan gönderim
+"Template name does not exist" ile düşer; hata kapının mesaj kaydına
+(`whatsapp_messages`) yazılır ve ArvoOS'ta görünür.

@@ -86,7 +86,7 @@ export async function updateOrderStatus(formData:FormData){
       */
       const waAnahtari=status==="cancelled"?"siparis_iptal":status==="refunded"?"iade_tamamlandi":null;
       if(waAnahtari&&order){
-        await waSiparisBildirimi(supabase,{
+        await waSiparisBildirimi({
           organizationId:organization.id,
           orderId,
           anahtar:waAnahtari,

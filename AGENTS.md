@@ -77,6 +77,21 @@ davranış da yazılır ("Önceden … okunuyordu"). Yeni kod bu üsluba uyar.
   tahsil ettiğinden farklı tutar görür (17 Eylül 2026'da oldu). Vitrinin
   okuduğu ayarlar `get_arvoculture_storefront_settings` ile açılır; bu
   fonksiyonun döndürdüğü alanlar vitrinin sözleşmesidir.
+- **WhatsApp'a doğrudan çağrı yapılmaz.** Dört ürün de ArvoOS'taki
+  ortak kapıdan geçer (`ARVOOS_BRIDGE_URL` + `PRODUCT_BRIDGE_SECRET`
+  → ArvoOS `app/api/bridge/whatsapp`); izin verilen ürünler
+  listesinde `"arc"` zaten yazılı. Gönderen numara MAĞAZA AYARINDA
+  DEĞİL KURUMDA: kurum numarasını ArvoOS panelinden bağlıyor
+  (Ayarlar → Entegrasyonlar) ve token orada şifreli duruyor.
+  17.10.2026'da burada doğrudan `graph.facebook.com` çağrısı, ArvoARC'a
+  ait ikinci bir token ve `arc_whatsapp_messages` adında ikinci bir
+  mesaj kütüğü yazılmıştı; ArvoOS'ta aynı işi yapan kapı 21–27 Eylül'den
+  beri duruyordu. Bedeli: iki token (sızma yüzeyi iki katı), "mesaj
+  gitti mi" sorusunun iki ayrı yanıtı ve GELEN mesajın hiçbir yere
+  düşmemesi — kapıdan geçince müşterinin yanıtı ArvoOS'un CRM gelen
+  kutusuna düşüyor ve personel 24 saatlik pencerede cevap verebiliyor.
+  Yeni bir bildirim eklerken şablonu `lib/whatsapp/sablonlar.ts`'e
+  yazın, gönderimi `waSiparisBildirimi` üzerinden yapın.
 - **E-postaya giren her kullanıcı metni HTML'e kaçışla girer** (müşteri adı,
   not, adres).
 - **Panel kenar çubuğu HER İKİ TEMADA DA KOYU.** `--sidebar-from` ve

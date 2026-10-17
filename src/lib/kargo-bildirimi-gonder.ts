@@ -123,7 +123,7 @@ export async function kargoBildirimiGonder(
         parametresi de dolu. Müşteri onayı yoksa gönderilmiyor,
         yalnızca kayda geçiyor.
       */
-      await waSiparisBildirimi(supabase, {
+      await waSiparisBildirimi({
         organizationId,
         orderId,
         anahtar: "siparis_kargoda",

@@ -109,45 +109,75 @@ export function numarayiDuzelt(ham: string | null | undefined): string | null {
   return null;
 }
 
+/** Şablon gövdesindeki {{1}}, {{2}}… yerine değerleri koyar. */
+function govdeyiDoldur(sablon: WaSablon, sirali: string[]): string {
+  return sablon.govde.replace(/\{\{(\d+)\}\}/g, (tam, sira) => sirali[Number(sira) - 1] ?? tam);
+}
+
+/** ArvoOS'un WhatsApp kapısına gönderilecek tek mesaj. */
+export type KapiMesaji = {
+  /** E.164, yalnızca rakam. */
+  to: string;
+  /** Meta'daki onaylı şablonun adı. */
+  template: string;
+  /** Konumsal parametreler; {{1}} ilk eleman. */
+  params: string[];
+  language: string;
+  /**
+   * Müşterinin GÖRECEĞİ metin, parametreler yerleştirilmiş hâlde.
+   *
+   * Kapı bunu mesaj kaydına yazıyor ve ArvoOS'un gelen kutusu
+   * ekranı buradan okuyor. Yazılmazsa personel konuşmada yalnızca
+   * şablon adını görür ("siparis_kargoda"), müşteriye ne yazdığımızı
+   * göremez.
+   */
+  body: string;
+};
+
 /**
- * Şablonu Cloud API'nin beklediği gövdeye çevirir.
+ * Şablonu kapının beklediği mesaja çevirir.
+ *
+ * ÖNCEDEN BURADA CLOUD API GÖVDESİ KURULUYORDU ve mesaj doğrudan
+ * graph.facebook.com'a gidiyordu. Yanlıştı: ArvoOS'ta dört ürünün
+ * ortak WhatsApp kapısı var (lib/whatsapp-gateway.ts) ve oranın
+ * değişmezi "ürünler Meta'ya değil kapıya çağırır" diyor — tek
+ * yerde erişim anahtarı, tek yerde mesaj kaydı, tek yerde hata
+ * haritası. Doğrudan çağrı ayrıca numarayı mağaza ayarından
+ * okuyordu; oysa numara KURUMA bağlı ve ArvoOS'ta duruyor.
  *
  * Eksik parametre SESSİZCE boş gönderilmiyor: Meta eksik parametreyi
  * reddediyor ve mesaj hiç gitmiyor, ama hangi değerin eksik olduğunu
  * söylemiyor. Burada adını veriyoruz.
  */
-export function mesajGovdesi(
+export function kapiMesaji(
   anahtar: string,
   numara: string,
   degerler: WaDegerleri,
-): { body: Record<string, unknown> } | { hata: string } {
+): { mesaj: KapiMesaji } | { hata: string } {
   const sablon = WA_SABLONLARI[anahtar];
   if (!sablon) return { hata: `Tanınmayan şablon: ${anahtar}` };
 
+  /*
+    Numara burada E.164'e çevriliyor ama kapı KENDİ denetimini de
+    yapıyor ve yalnızca Türkiye cep numarasını kabul ediyor
+    (lib/whatsapp-send: /^5\d{9}$/). Yurt dışı numaralı bir sipariş
+    buradan geçer, kapıdan "numara geçersiz" diye döner — sessiz
+    değil, sonucu çağırana yazılı olarak ulaşır.
+  */
   const duzgun = numarayiDuzelt(numara);
   if (!duzgun) return { hata: `Telefon numarası WhatsApp için uygun değil: ${numara || "(boş)"}` };
 
   const eksik = sablon.parametreler.filter((ad) => !String(degerler[ad] ?? "").trim());
   if (eksik.length) return { hata: `Şablon parametresi eksik (${anahtar}): ${eksik.join(", ")}` };
 
+  const sirali = sablon.parametreler.map((ad) => String(degerler[ad]).trim());
   return {
-    body: {
-      messaging_product: "whatsapp",
+    mesaj: {
       to: duzgun,
-      type: "template",
-      template: {
-        name: sablon.ad,
-        language: { code: sablon.dil },
-        components: [
-          {
-            type: "body",
-            parameters: sablon.parametreler.map((ad) => ({
-              type: "text",
-              text: String(degerler[ad]).trim(),
-            })),
-          },
-        ],
-      },
+      template: sablon.ad,
+      params: sirali,
+      language: sablon.dil,
+      body: govdeyiDoldur(sablon, sirali),
     },
   };
 }
