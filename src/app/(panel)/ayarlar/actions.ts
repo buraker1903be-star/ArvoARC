@@ -10,6 +10,7 @@ import { altAlanAdresi } from "@/lib/magaza-adresi";
 import { ensureVercelProjectDomain,verifyVercelProjectDomain } from "@/lib/vercel-domains";
 import { encryptSecret,paymentCredentialsConfigured } from "@/lib/payment-credentials";
 import { jetonlariUnut } from "@/lib/tryoto/istemci";
+import { whatsappNumarasiniKaldir,whatsappNumarasiniKaydet,whatsappNumarasiniSina } from "@/lib/whatsapp-hesap";
 
 const roles=new Set(["owner","admin","manager"]);
 /*
@@ -422,4 +423,54 @@ export async function updateShippingIntegration(formData:FormData){
      unutulmazsa sonraki gönderi yanlış hesapta açılırdı. */
   if(yenilemeAnahtari)jetonlariUnut(organization.id);
   revalidatePath("/ayarlar");return await bildirimliDonus("/ayarlar",{basari:basariMetni("shipping")});
+}
+
+/*
+  WHATSAPP NUMARASI (Entegrasyonlar bölümü).
+
+  Kayıt ArvoOS'ta; buradan köprüye yazılıyor (lib/whatsapp-hesap).
+  Yetki iki kademeli: burada rol denetleniyor, ArvoOS'ta da aynı
+  kişinin o kurumda gerçekten yetkili olduğu yeniden denetleniyor —
+  ürünün sözüne güvenmek, ürün sırrı sızdığında herkesin numarasını
+  değiştirebilmesi demekti.
+
+  ERİŞİM ANAHTARI HİÇ KAYDEDİLMİYOR BURADA: forma yazılan değer
+  doğrudan köprüye gidiyor, ArvoARC'ın veritabanına ya da günlüğüne
+  düşmüyor.
+*/
+export async function saveWhatsappNumber(formData:FormData){
+  const {organization,membership,user}=await requireTenant();
+  if(!PAYMENT_ROLES.has(membership.role))return await bildirimliDonus("/ayarlar?bolum=entegrasyon",{hata:hataMetni("forbidden")});
+
+  const wabaId=String(formData.get("waba_id")??"").replace(/\s/g,"");
+  const phoneNumberId=String(formData.get("phone_number_id")??"").replace(/\s/g,"");
+  const accessToken=String(formData.get("access_token")??"").trim();
+  if(!wabaId||!phoneNumberId||!accessToken){
+    return await bildirimliDonus("/ayarlar?bolum=entegrasyon",{hata:"WABA kimliği, numara kimliği ve erişim anahtarının üçü de gerekli."});
+  }
+
+  const sonuc=await whatsappNumarasiniKaydet(organization.id,user.id,{wabaId,phoneNumberId,accessToken});
+  revalidatePath("/ayarlar");
+  return await bildirimliDonus("/ayarlar?bolum=entegrasyon",
+    sonuc.tamam?{basari:"WhatsApp numarası bağlandı."}:{hata:sonuc.hata});
+}
+
+export async function verifyWhatsappNumber(){
+  const {organization,membership,user}=await requireTenant();
+  if(!PAYMENT_ROLES.has(membership.role))return await bildirimliDonus("/ayarlar?bolum=entegrasyon",{hata:hataMetni("forbidden")});
+  const sonuc=await whatsappNumarasiniSina(organization.id,user.id);
+  revalidatePath("/ayarlar");
+  if(!sonuc.tamam)return await bildirimliDonus("/ayarlar?bolum=entegrasyon",{hata:sonuc.hata});
+  /* Doğrulanamadı da bir yanıt: durum kaydedildi, sebebi gösteriliyor. */
+  return await bildirimliDonus("/ayarlar?bolum=entegrasyon",
+    sonuc.dogrulandi?{basari:"Numara Meta tarafından doğrulandı."}:{hata:`Numara doğrulanamadı: ${sonuc.ayrinti??"sebep bildirilmedi"}`});
+}
+
+export async function removeWhatsappNumber(){
+  const {organization,membership,user}=await requireTenant();
+  if(!PAYMENT_ROLES.has(membership.role))return await bildirimliDonus("/ayarlar?bolum=entegrasyon",{hata:hataMetni("forbidden")});
+  const sonuc=await whatsappNumarasiniKaldir(organization.id,user.id);
+  revalidatePath("/ayarlar");
+  return await bildirimliDonus("/ayarlar?bolum=entegrasyon",
+    sonuc.tamam?{basari:"WhatsApp bağlantısı kaldırıldı."}:{hata:sonuc.hata});
 }

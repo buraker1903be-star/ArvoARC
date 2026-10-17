@@ -1,7 +1,8 @@
 import { requireTenant } from "@/lib/tenant";
 import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { ALT_ALAN_SONEKI, altAlanAdresi, magazaAdresi } from "@/lib/magaza-adresi";
-import { removeBrandAsset,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain } from "./actions";
+import { removeBrandAsset,removeWhatsappNumber,saveWhatsappNumber,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain,verifyWhatsappNumber } from "./actions";
+import { whatsappDurumu,whatsappKapisiVar } from "@/lib/whatsapp-hesap";
 import { baglantiyiSina } from "@/lib/tryoto/ayar";
 import Link from "next/link";
 // Ayar formlarının iç biçimi (settings-*, payment-*, domain-*) hâlâ eski dosyalarda.
@@ -23,6 +24,7 @@ export const AYAR_BOLUMLERI = [
   ["alan-adi", "Alan adları"],
   ["kargo", "Kargo"],
   ["odeme", "Ödeme"],
+  ["entegrasyon", "Entegrasyonlar"],
 ] as const;
 type AyarBolumu = (typeof AYAR_BOLUMLERI)[number][0];
 import { yetkiYok } from "@/lib/yetki-metni";
@@ -35,7 +37,7 @@ const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending
 export default async function Settings({searchParams}:{searchParams:Promise<{bolum?:string}>}){
   const {bolum:bolumParametresi}=await searchParams;
   const bolum:AyarBolumu=AYAR_BOLUMLERI.some(([k])=>k===bolumParametresi)?(bolumParametresi as AyarBolumu):"marka";
-  const {supabase,organization,membership}=await requireTenant();
+  const {supabase,organization,membership,user}=await requireTenant();
   const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,garanti_enabled,garanti_test_mode,garanti_isyeri_no,garanti_terminal_no,garanti_api_surumu,garanti_guvenlik_duzeyi,garanti_yari_guvenli_kabul,garanti_provizyon_sifresi_enc,garanti_magaza_anahtari_enc,garanti_iade_sifresi_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const canManage=["owner","admin","manager"].includes(membership.role);
@@ -46,6 +48,12 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
   const garantiKeysStored=Boolean(settings?.garanti_provizyon_sifresi_enc&&settings?.garanti_magaza_anahtari_enc);
   /* Bağlantı yalnızca yetkiliye sınanıyor: OTO'ya gereksiz istek atmamak
      ve firma listesini görmeye yetkisi olmayana göstermemek için. */
+  /* Durum yalnızca Entegrasyonlar açıkken sorulur: her ayar açılışında
+     ArvoOS'a istek atmak gereksiz. Okunamazsa bölüm sebebini gösterir,
+     sayfa düşmez. */
+  const whatsapp=canManagePayments&&bolum==="entegrasyon"&&whatsappKapisiVar()
+    ?await whatsappDurumu(organization.id,user.id)
+    :null;
   const kargoBaglantisi=canManagePayments&&bolum==="kargo"
     ?await baglantiyiSina(organization.id,settings)
     :{durum:"kapali" as const};
@@ -379,6 +387,67 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
         </article>
         <button className="panel-primary payment-save" type="submit">Ödeme ayarlarını kaydet</button>
       </form>:<p className="list-hint">{yetkiYok("ödeme hesapları (IBAN, PayTR)", "sahiplik")}</p>}
+    </section>
+    </>:null}
+
+    {bolum==="entegrasyon"?<>
+    {/*
+      ENTEGRASYONLAR — WHATSAPP NUMARASI.
+
+      Numara kaydı ArvoOS'ta duruyor (gönderim kapısı onu oradan
+      buluyor, erişim anahtarı ArvoOS'un şifreleme anahtarıyla
+      saklanıyor) ama bağlama ekranı BURADA olmak zorunda: ArvoARC
+      hizmeti alan müşterinin ArvoOS paneli olmayabilir ve o müşteri
+      numarasını hiçbir yerden bağlayamıyordu — sipariş bildirimleri
+      kendisine kapalı kalıyordu (17.10.2026).
+
+      Erişim anahtarı hiçbir yerde gösterilmiyor; kayıtlı olup
+      olmadığı bile yalnızca "bağlı" bilgisinden anlaşılıyor.
+    */}
+    <section className="panel-card settings-section payment-section">
+      <div className="head"><div><small>MESAJLAŞMA</small><h3>WhatsApp numarası</h3><p>Sipariş durumu bildirimleri bu numaradan gider. Müşteri mesajı mağazanızın adıyla alır.</p></div><span>MAĞAZAYA ÖZEL</span></div>
+      {!canManagePayments
+        ?<p className="list-hint">{yetkiYok("WhatsApp numarası", "sahiplik")}</p>
+        :!whatsappKapisiVar()
+          ?<p className="list-hint">ArvoOS köprüsü bu kurulumda tanımlı değil (<code>ARVOOS_BRIDGE_URL</code>, <code>PRODUCT_BRIDGE_SECRET</code>). Bölüm bağlanamaz.</p>
+          :whatsapp&&!whatsapp.tamam
+            ?<p className="list-hint">Durum okunamadı: {whatsapp.hata}</p>
+            :<>
+              {whatsapp?.tamam&&whatsapp.durum?.connected
+                ?<article className="payment-method">
+                  <div className="payment-title"><div><small>BAĞLI NUMARA</small><h4>{whatsapp.durum.displayPhone??"—"}</h4></div><span className="list-hint">{whatsapp.durum.verifiedName??""}</span></div>
+                  <p>
+                    Durum: <b>{whatsapp.durum.status==="connected"?"Bağlı":whatsapp.durum.status==="disabled"?"Devre dışı":"Doğrulanmadı"}</b>
+                    {whatsapp.durum.lastError?<> · Son hata: {whatsapp.durum.lastError}</>:null}
+                  </p>
+                  {/* İki ayrı form: "sına" ve "kaldır" aynı formda olsaydı
+                      Enter tuşu hangisini çalıştıracağı belirsiz kalırdı. */}
+                  <div className="payment-fields">
+                    <form action={verifyWhatsappNumber}><button className="panel-secondary" type="submit">Bağlantıyı sına</button></form>
+                    <form action={removeWhatsappNumber}><button className="panel-secondary" type="submit">Bağlantıyı kaldır</button></form>
+                  </div>
+                </article>
+                :<p className="list-hint">Numara bağlı değil. Bildirimler gönderilmiyor.</p>}
+
+              <form action={saveWhatsappNumber} className="payment-form">
+                <article className="payment-method">
+                  <div className="payment-title"><div><small>META BİLGİLERİ</small><h4>{whatsapp?.tamam&&whatsapp.durum?.connected?"Numarayı değiştir":"Numarayı bağla"}</h4></div></div>
+                  <p>Değerleri Meta for Developers → WhatsApp → <b>API Setup</b> ekranından alırsınız. Erişim anahtarı kaydedilirken Meta’ya doğrulatılır; yanlışsa kaydedilmez.</p>
+                  <div className="payment-fields">
+                    <label>WhatsApp İşletme Hesabı kimliği (WABA ID)<input name="waba_id" inputMode="numeric" placeholder="1627688618463162" defaultValue={whatsapp?.tamam?whatsapp.durum?.wabaId??"":""}/></label>
+                    <label>Telefon numarası kimliği (Phone number ID)<input name="phone_number_id" inputMode="numeric" placeholder="1177709272083942" defaultValue={whatsapp?.tamam?whatsapp.durum?.phoneNumberId??"":""}/></label>
+                    <label className="wide">Kalıcı erişim anahtarı
+                      {/* Kayıtlı anahtar GÖSTERİLMİYOR, yalnızca yeniden
+                          yazılabiliyor: ArvoOS onu şifreli saklıyor ve
+                          hiçbir yanıtta döndürmüyor. */}
+                      <input name="access_token" type="password" autoComplete="new-password" placeholder={whatsapp?.tamam&&whatsapp.durum?.connected?"Kayıtlı · değiştirmek için yazın":"System User ile üretilen kalıcı token"}/>
+                    </label>
+                  </div>
+                  <p className="list-hint">Anahtar yalnızca ArvoOS’ta şifreli saklanır; bu panelde ve günlüklerde hiçbir zaman görünmez.</p>
+                </article>
+                <button className="panel-primary payment-save" type="submit">WhatsApp numarasını kaydet</button>
+              </form>
+            </>}
     </section>
     </>:null}
     </div>
