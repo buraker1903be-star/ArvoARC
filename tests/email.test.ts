@@ -87,7 +87,17 @@ test("ödenmiş siparişin iptalinde iade bilgisi korunur", () => {
 });
 
 test("ara durumlar e-posta üretmez", () => {
-  for (const status of ["pending", "confirmed", "processing", "shipped", "delivered"]) {
+  /*
+    "processing" 17.10.2026'da bu listeden ÇIKTI: ödeme ile kargo
+    arasında günler geçebiliyor ve o boşlukta "siparişim ne oldu"
+    sorusu geliyordu. Kurum sahibinin kararı; aynı olay WhatsApp'tan
+    da gidiyor ve iki kanalın ayrışmaması isteniyor.
+
+    Kalanlar sessiz kalmaya devam ediyor: "pending" ve "confirmed"
+    müşteri için sipariş anından ayırt edilemiyor, "shipped" ve
+    "delivered" ise ArvoARC'ta hiç olmayan durumlar.
+  */
+  for (const status of ["pending", "confirmed", "shipped", "delivered"]) {
     assert.equal(statusUpdateEmail(status, "#AC-1", "Elif", TEST_BRAND), null, status);
   }
 });
@@ -129,4 +139,23 @@ test("adresi olmayan mağazada düğme hiç yok", () => {
   assert.ok(!html.includes("Siparişimi görüntüle"), "düğme çizilmemeli");
   assert.ok(!html.includes("null/hesap"), "boş adres bağlantıya sızmamalı");
   assert.ok(html.includes("#AC-9"), "e-postanın kalanı yerinde");
+});
+
+test("düğme, anahtar varsa giriş istemeyen sayfaya gidiyor", () => {
+  /*
+    /hesap oturum istiyor ve müşterilerin çoğu misafir sipariş
+    veriyor: "Siparişimi görüntüle" onları giriş ekranına çıkarıyordu.
+    Anahtar verildiğinde /siparis/<anahtar> açılıyor.
+  */
+  const anahtar = "063396f0cc1b4a971e13315aac29c323";
+  const mail = statusUpdateEmail("processing", "#AC-1", "Elif", TEST_BRAND, { publicToken: anahtar });
+  assert.ok(mail?.html.includes(`${TEST_BRAND.siteUrl}/siparis/${anahtar}`));
+  assert.ok(!mail?.html.includes(`${TEST_BRAND.siteUrl}/hesap`));
+});
+
+test("anahtar yoksa eski davranış korunuyor", () => {
+  /* Anahtarı olmayan eski siparişler hâlâ /hesap'a gitsin. */
+  const mail = statusUpdateEmail("fulfilled", "#AC-1", "Elif", TEST_BRAND);
+  assert.ok(mail?.html.includes(`${TEST_BRAND.siteUrl}/hesap`));
+  assert.ok(!mail?.html.includes("/siparis/"));
 });

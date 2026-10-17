@@ -73,7 +73,7 @@ export async function updateOrderStatus(formData:FormData){
       const trackingSent=Boolean((order?.metadata as {tracking_number?:string}|null)?.tracking_number);
       /* Ödenmemiş siparişin iptalinde iade vaadi yerine "tutar alınmadı" yazılır. */
       const unpaid=!["paid","partially_refunded","refunded"].includes(paymentStatus);
-      const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz",await getStoreBrand(supabase,organization.id),{trackingSent,unpaid});
+      const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz",await getStoreBrand(supabase,organization.id),{trackingSent,unpaid,publicToken:order?.public_token});
       if(order?.customer_email&&mail){
         await sendEmail({to:order.customer_email,...mail});
       }

@@ -60,8 +60,14 @@ test("hazırlanıyor durumu müşteriye bildiriliyor", () => {
     "siparişim ne oldu" sorusu geliyordu.
   */
   assert.equal(durumWaAnahtari("processing"), "siparis_hazirlaniyor");
-  /* E-posta bu durumda bilerek susuyor; WhatsApp onaya bağlı ayrı bir kanal. */
-  assert.equal(statusUpdateEmail("processing", "#AC-1", "Elif", TEST_BRAND), null);
+  /*
+    E-posta da gidiyor. Bir süre yalnızca WhatsApp'tan gitti; 17.10.2026'da
+    kurum sahibi ikisinin de gitmesine karar verdi.
+  */
+  assert.equal(
+    statusUpdateEmail("processing", "#AC-1", "Elif", TEST_BRAND)?.subject,
+    "Siparişiniz hazırlanıyor · #AC-1",
+  );
 });
 
 test("takip numarası girildiyse ikinci kargo mesajı gitmiyor", () => {

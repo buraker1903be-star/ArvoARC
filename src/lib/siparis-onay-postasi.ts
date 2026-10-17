@@ -64,6 +64,7 @@ export async function sendOrderConfirmation(
       city: rawAddress.city ?? undefined,
       postal: rawAddress.postal ?? rawAddress.zip ?? undefined,
     },
+    publicToken: order.public_token,
   });
 
   await sendEmail({

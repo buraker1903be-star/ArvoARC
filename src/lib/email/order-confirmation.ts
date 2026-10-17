@@ -40,9 +40,18 @@ const brandFooter = (brand: StoreBrand) =>
   adres ArvoCulture'dı ve "Siparişimi görüntüle" başka bir markanın
   sitesine gidip "sipariş bulunamadı" diyordu.
 */
-const hesapDugmesi = (brand: StoreBrand, ustBosluk = "0") =>
+/*
+  ANAHTAR VARSA HERKESE AÇIK SAYFAYA, YOKSA HESABA.
+
+  /hesap oturum istiyor ve müşterilerin çoğu misafir olarak sipariş
+  veriyor: düğme onları giriş duvarına çıkarıyordu — e-postayı açan
+  kişi "siparişimi görüntüle"ye basıp giriş ekranı görüyordu.
+  arc_orders.public_token ile /siparis/<anahtar> oturum istemiyor.
+  Anahtar yoksa (eski siparişler) eski davranış korunuyor.
+*/
+const hesapDugmesi = (brand: StoreBrand, ustBosluk = "0", anahtar?: string | null) =>
   brand.siteUrl
-    ? `<a href="${escapeHtml(brand.siteUrl)}/hesap"
+    ? `<a href="${escapeHtml(brand.siteUrl)}${anahtar ? `/siparis/${escapeHtml(anahtar)}` : "/hesap"}"
            style="display:inline-block;margin:${ustBosluk} 0 0;padding:13px 26px;border-radius:999px;background:#10120f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;">
           Siparişimi görüntüle
         </a>`
@@ -58,6 +67,7 @@ export function orderConfirmationHtml({
   shipping,
   total,
   address,
+  publicToken,
 }: {
   brand: StoreBrand;
   orderNumber: string;
@@ -73,6 +83,8 @@ export function orderConfirmationHtml({
     city?: string;
     postal?: string;
   } | null;
+  /** Siparişin paylaşım anahtarı; düğme giriş istemeyen sayfaya gitsin. */
+  publicToken?: string | null;
 }) {
   const rows = items
     .map(
@@ -179,7 +191,7 @@ export function orderConfirmationHtml({
 
     <tr>
       <td style="padding:28px;">
-        ${hesapDugmesi(brand)}
+        ${hesapDugmesi(brand, "0", publicToken)}
       </td>
     </tr>
 
@@ -209,7 +221,13 @@ export function orderConfirmationHtml({
  * ulaşmadığını öğrenemiyordu. Kart ödemesinde bu bilgiyi PayTR
  * onayıyla giden e-posta zaten veriyor.
  */
-export function paymentReceivedEmail(orderNumber: string, customerName: string, amount: number, brand: StoreBrand) {
+export function paymentReceivedEmail(
+  orderNumber: string,
+  customerName: string,
+  amount: number,
+  brand: StoreBrand,
+  anahtar?: string | null,
+) {
   return {
     subject: `Ödemeniz alındı · ${orderNumber}`,
     html: `<!DOCTYPE html>
@@ -229,7 +247,7 @@ export function paymentReceivedEmail(orderNumber: string, customerName: string, 
           Sipariş numaranız <strong style="color:#10120f;"> ${escapeHtml(orderNumber)}</strong>
         </td></tr>
       </table>
-      ${hesapDugmesi(brand, "20px")}
+      ${hesapDugmesi(brand, "20px", anahtar)}
     </td></tr>
   </table>
   <p style="max-width:520px;margin:16px auto 0;font-size:11px;line-height:1.6;color:#8b8f85;text-align:center;">
@@ -443,6 +461,21 @@ export function shippingNoticeHtml({
   gitmiyordu.
 */
 const STATUS_MESSAGES: Record<string, { title: string; body: string }> = {
+  /*
+    "Hazırlanıyor" bir ara durum ama müşteriyi İLGİLENDİREN bir ara
+    durum: ödeme ile kargo arasında günler geçebiliyor ve o boşlukta
+    "siparişim ne oldu" sorusu geliyordu. Yukarıdaki "ara durumda
+    gürültü yapma" kuralının istisnası değil, uygulaması — `pending`
+    ve `confirmed` hâlâ sessiz, çünkü onlar müşteri için sipariş
+    anından ayırt edilemiyor.
+
+    17.10.2026'da kurum sahibinin kararıyla açıldı; aynı olay
+    WhatsApp'tan da gidiyor ve iki kanalın ayrışmaması isteniyor.
+  */
+  processing: {
+    title: "Siparişiniz hazırlanıyor",
+    body: "Siparişiniz hazırlanmaya başlandı. Kargoya verildiğinde takip bilgileriyle birlikte tekrar bilgilendirileceksiniz.",
+  },
   fulfilled: {
     title: "Siparişiniz kargoya verildi",
     body: "Siparişiniz kargoya teslim edildi. Takip bilgileri kısa süre içinde sistemde görünür olacak.",
@@ -468,18 +501,29 @@ export function statusUpdateEmail(
   orderNumber: string,
   customerName: string,
   brand: StoreBrand,
-  options: { trackingSent?: boolean; unpaid?: boolean } = {},
+  options: {
+    trackingSent?: boolean;
+    unpaid?: boolean;
+    /** Siparişin paylaşım anahtarı; düğme giriş istemeyen sayfaya gitsin. */
+    publicToken?: string | null;
+  } = {},
 ) {
   const message = status === "cancelled" && options.unpaid ? UNPAID_CANCELLED : STATUS_MESSAGES[status];
   // Bildirim gerektirmeyen durumda e-posta üretilmez.
   if (!message) return null;
   // Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti; ikincisi gürültü.
   if (status === "fulfilled" && options.trackingSent) return null;
-  return noticeEmail(message, orderNumber, customerName, brand);
+  return noticeEmail(message, orderNumber, customerName, brand, options.publicToken);
 }
 
 /** Tek paragraflık bildirim e-postası: durum güncellemesi ve kısmi iade aynı şablonu kullanır. */
-function noticeEmail(message: { title: string; body: string }, orderNumber: string, customerName: string, brand: StoreBrand) {
+function noticeEmail(
+  message: { title: string; body: string },
+  orderNumber: string,
+  customerName: string,
+  brand: StoreBrand,
+  anahtar?: string | null,
+) {
   return {
     subject: `${message.title} · ${orderNumber}`,
     html: `<!DOCTYPE html>
@@ -511,7 +555,7 @@ function noticeEmail(message: { title: string; body: string }, orderNumber: stri
           </tr>
         </table>
 
-        ${hesapDugmesi(brand, "20px")}
+        ${hesapDugmesi(brand, "20px", anahtar)}
       </td>
     </tr>
   </table>
@@ -537,6 +581,7 @@ export function partialRefundEmail({
   customerName,
   amount,
   shipped,
+  publicToken,
 }: {
   brand: StoreBrand;
   orderNumber: string;
@@ -544,12 +589,13 @@ export function partialRefundEmail({
   amount: number;
   /** Sipariş kargoya verildiyse "kalan ürünler gönderilecek" cümlesi yazılmaz. */
   shipped: boolean;
+  publicToken?: string | null;
 }) {
   const body = [
     `Siparişiniz için ${money(amount)} tutarında iade işlemi başlatıldı. Tutarın kartınıza yansıma süresi bankanıza bağlıdır; genellikle birkaç iş günü sürer.`,
     shipped ? "" : "Siparişinizin kalan ürünleri hazırlanıp kargoya verilmeye devam edecek.",
   ].filter(Boolean).join(" ");
-  return noticeEmail({ title: "Kısmi iadeniz başlatıldı", body }, orderNumber, customerName, brand);
+  return noticeEmail({ title: "Kısmi iadeniz başlatıldı", body }, orderNumber, customerName, brand, publicToken);
 }
 
 /**

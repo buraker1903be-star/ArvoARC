@@ -7,6 +7,8 @@ import { requireTenant } from "@/lib/tenant";
 import { getStoreBrand, type StoreBrand } from "@/lib/store-brand";
 import { sendEmail } from "@/lib/email/resend";
 import { statusUpdateEmail } from "@/lib/email/order-confirmation";
+import { siparisTelefonu, waSiparisBildirimi } from "@/lib/whatsapp/bildirim";
+import { durumWaAnahtari } from "@/lib/whatsapp/durum-anahtari";
 import { isOrderClosed } from "@/lib/commerce-labels";
 import { ARSIVLENEBILIR_DURUMLAR, nextOrderStep } from "@/lib/order-flow";
 import { backUrl } from "@/lib/back-url";
@@ -93,16 +95,60 @@ export async function createOrder(formData: FormData) {
   });
 }
 
-/* Müşteri bildirimi; gönderim hatası durum güncellemesini geçersiz kılmaz. */
-async function notifyStatus(order: { order_number: string; customer_name: string | null; customer_email: string | null; metadata?: unknown; payment_status?: string | null }, status: string, brand: StoreBrand) {
-  if (!order.customer_email) return;
+/*
+  Müşteri bildirimi; gönderim hatası durum güncellemesini geçersiz
+  kılmaz.
+
+  E-POSTA VE WHATSAPP BİRLİKTE. 17.10.2026'ya kadar burada yalnızca
+  e-posta vardı: tek siparişin ekranından durum değiştirilince iki
+  kanal da çalışıyor, TOPLU işlemden ya da bu yoldan değiştirilince
+  yalnızca e-posta gidiyordu. Aynı olayın bir kanalda duyulup
+  ötekinde duyulmaması, kanalların ayrı yerlerde kurulmasının her
+  seferinde ürettiği kusur — karar artık ortak
+  (lib/whatsapp/durum-anahtari).
+*/
+async function notifyStatus(
+  order: {
+    id?: string;
+    order_number: string;
+    customer_name: string | null;
+    customer_email: string | null;
+    metadata?: unknown;
+    payment_status?: string | null;
+    public_token?: string | null;
+  },
+  status: string,
+  brand: StoreBrand,
+  organizationId?: string,
+) {
   try {
     /* Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti. */
     const trackingSent = Boolean((order.metadata as { tracking_number?: string } | null)?.tracking_number);
     /* Ödenmemiş siparişin iptalinde iade vaadi yerine "tutar alınmadı" yazılır. */
     const unpaid = Boolean(order.payment_status) && !["paid", "partially_refunded", "refunded"].includes(order.payment_status ?? "");
-    const mail = statusUpdateEmail(status, order.order_number, order.customer_name || "değerli müşterimiz", brand, { trackingSent, unpaid });
-    if (mail) await sendEmail({ to: order.customer_email, ...mail });
+    const mail = statusUpdateEmail(status, order.order_number, order.customer_name || "değerli müşterimiz", brand, {
+      trackingSent,
+      unpaid,
+      publicToken: order.public_token,
+    });
+    /* E-posta adresi olmayan sipariş olabiliyor; WhatsApp yine denensin. */
+    if (mail && order.customer_email) await sendEmail({ to: order.customer_email, ...mail });
+
+    const waAnahtari = durumWaAnahtari(status, { trackingSent });
+    if (waAnahtari && organizationId) {
+      await waSiparisBildirimi({
+        organizationId,
+        orderId: order.id ?? null,
+        anahtar: waAnahtari,
+        numara: siparisTelefonu(order.metadata),
+        metadata: order.metadata,
+        degerler: {
+          musteri: order.customer_name || "değerli müşterimiz",
+          siparis_no: order.order_number,
+        },
+        paylasimAnahtari: order.public_token,
+      });
+    }
   } catch (mailError) {
     console.error("Durum bildirimi gönderilemedi:", order.order_number, mailError);
   }
@@ -149,7 +195,7 @@ async function durumIlerlet(orderId: string, status: string): Promise<IslemSonuc
 
   const { data: order } = await supabase
     .from("arc_orders")
-    .select("status,payment_status,order_number,customer_name,customer_email,metadata")
+    .select("id,status,payment_status,order_number,customer_name,customer_email,metadata,public_token")
     .eq("organization_id", organization.id)
     .eq("id", orderId)
     .single();
@@ -180,7 +226,7 @@ async function durumIlerlet(orderId: string, status: string): Promise<IslemSonuc
 
   if (error) return { hata: hataMetni("save-failed") };
 
-  await notifyStatus(order, status, await getStoreBrand(supabase, membership.organization_id));
+  await notifyStatus(order, status, await getStoreBrand(supabase, membership.organization_id), membership.organization_id);
 
   revalidatePath("/");
   revalidatePath("/siparisler");
@@ -300,7 +346,7 @@ async function havaleIptal(orderId: string): Promise<IslemSonucu> {
   if (!MANAGERS.includes(membership.role)) return { hata: hataMetni("forbidden") };
   const { data: order } = await supabase
     .from("arc_orders")
-    .select("status,payment_status,metadata,order_number,customer_name,customer_email,updated_at")
+    .select("id,status,payment_status,metadata,order_number,customer_name,customer_email,updated_at,public_token")
     .eq("organization_id", organization.id)
     .eq("id", orderId)
     .maybeSingle();
@@ -322,7 +368,7 @@ async function havaleIptal(orderId: string): Promise<IslemSonucu> {
   });
   if (error) return { hata: hataMetni("save-failed") };
 
-  await notifyStatus(order, "cancelled", await getStoreBrand(supabase, membership.organization_id));
+  await notifyStatus(order, "cancelled", await getStoreBrand(supabase, membership.organization_id), membership.organization_id);
 
   revalidatePath("/");
   revalidatePath("/operasyon");
@@ -376,7 +422,7 @@ async function topluDurumCekirdek(rawIds: string[], status: string): Promise<Isl
 
   const { data: orders, error } = await supabase
     .from("arc_orders")
-    .select("id,status,payment_status,order_number,customer_name,customer_email,metadata")
+    .select("id,status,payment_status,order_number,customer_name,customer_email,metadata,public_token")
     .eq("organization_id", organization.id)
     .in("id", ids);
   if (error) return { hata: hataMetni("save-failed") };
@@ -394,7 +440,7 @@ async function topluDurumCekirdek(rawIds: string[], status: string): Promise<Isl
   }
 
   const toplu = await getStoreBrand(supabase, membership.organization_id);
-  await Promise.all(updated.map((order) => notifyStatus(order, status, toplu)));
+  await Promise.all(updated.map((order) => notifyStatus(order, status, toplu, membership.organization_id)));
 
   revalidatePath("/");
   revalidatePath("/siparisler");
