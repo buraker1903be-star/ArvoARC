@@ -71,6 +71,13 @@ const IKIZSIZ_SERBEST = new Set([
   */
   "arc_storefront_my_orders",
   "arc_storefront_my_returns",
+  /*
+    Birincil adres sorusu kiracıya özel olamaz: yanıtı zaten
+    kiracının kendi ayarından geliyor ve ArvoCulture'a özel bir
+    ikizi "hangi adres ArvoCulture'ın" demek olurdu — bilinen şeyi
+    soran bir fonksiyon.
+  */
+  "arc_storefront_primary_host",
 ]);
 
 /*
