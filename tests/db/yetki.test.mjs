@@ -41,6 +41,9 @@ const ANON = [
     listede duruyor: vitrin uygulaması geçene kadar canlıdalar.
   */
   "public.arc_storefront_org",
+  /* Birincil adres: vitrin kanonik adresi bundan kuruyor; adres
+     zaten herkese görünür bir bilgi. */
+  "public.arc_storefront_primary_host",
   "public.arc_storefront_collection_products",
   "public.arc_storefront_collection_products_page",
   "public.arc_storefront_collection_facets",

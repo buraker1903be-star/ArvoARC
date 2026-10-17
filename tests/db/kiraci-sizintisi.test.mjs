@@ -137,6 +137,14 @@ const PLAN = [
 
   { ad: "arc_storefront_org", kip: "deger", alan: "id",
     sql: "select public.arc_storefront_org($1::text) as id", a: A, b: B },
+  /*
+    Birincil adres: her mağaza KENDİ adresini duymalı. Yanlış
+    eşleşme, A'nın sayfalarının B'nin adresini kanonik ilan etmesi
+    demek olurdu — arama motoruna "bu sayfalar aslında ötekinin"
+    diyen bir etiket.
+  */
+  { ad: "arc_storefront_primary_host", kip: "deger", alan: "adres",
+    sql: "select public.arc_storefront_primary_host($1::text) as adres", a: A_HOST, b: B_HOST },
   { ad: "arc_storefront_product_count", kip: "deger", alan: "adet",
     sql: "select public.arc_storefront_product_count($1::text) as adet", a: 1, b: 1 },
   { ad: "arc_storefront_settings", kip: "deger", alan: "shipping_fee",

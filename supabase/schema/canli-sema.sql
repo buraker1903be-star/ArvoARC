@@ -1,4 +1,4 @@
--- Canlı şema dışa aktarımı: 2026-10-17
+-- Canlı şema dışa aktarımı: 2026-10-18
 -- scripts/sema-disa-aktar.sql ile üretildi. Elle düzenlemeyin.
 -- Sıra: tipler, sekanslar, tablolar, fonksiyonlar, varsayılanlar,
 -- kısıtlar, yabancı anahtarlar, indeksler, görünümler, RLS, politikalar,
@@ -399,7 +399,8 @@ create table if not exists public.arc_store_settings (
   garanti_magaza_anahtari_enc text,
   garanti_api_surumu text not null,
   garanti_guvenlik_duzeyi text not null,
-  garanti_yari_guvenli_kabul boolean not null
+  garanti_yari_guvenli_kabul boolean not null,
+  storefront_mode text not null
 );
 
 create table if not exists public.arc_store_themes (
@@ -3185,6 +3186,25 @@ AS $function$
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.arc_storefront_primary_host(p_host text)
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select case
+           when s.domain_verified_at is not null and s.custom_domain is not null
+             then lower(s.custom_domain)
+           when s.platform_subdomain is not null
+             then lower(s.platform_subdomain) || '.shop.arvo-os.com'
+           else null
+         end
+  from public.arc_store_settings s
+  where s.organization_id = public.arc_storefront_org(p_host)
+  limit 1;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.arc_storefront_product(p_host text, p_slug text)
  RETURNS TABLE(slug text, name text, description text, subtitle text, vendor text, product_type text, price bigint, compare_at_price bigint, available boolean, image_paths jsonb)
  LANGUAGE sql
@@ -5140,6 +5160,8 @@ alter table public.arc_store_settings alter column primary_color set default '#0
 
 alter table public.arc_store_settings alter column shipping_fee set default 12000;
 
+alter table public.arc_store_settings alter column storefront_mode set default 'hosted'::text;
+
 alter table public.arc_store_settings alter column tami_enabled set default false;
 
 alter table public.arc_store_settings alter column tami_test_mode set default true;
@@ -5455,6 +5477,8 @@ alter table public.arc_store_settings add constraint arc_store_settings_primary_
 alter table public.arc_store_settings add constraint arc_store_settings_shipping_check CHECK (((shipping_fee >= 0) AND (free_shipping_threshold >= 0)));
 
 alter table public.arc_store_settings add constraint arc_store_settings_store_name_check CHECK (((char_length(store_name) >= 1) AND (char_length(store_name) <= 160)));
+
+alter table public.arc_store_settings add constraint arc_store_settings_storefront_mode_check CHECK ((storefront_mode = ANY (ARRAY['hosted'::text, 'external'::text])));
 
 alter table public.arc_store_settings add constraint arc_store_settings_storefront_url_check CHECK (((storefront_url IS NULL) OR (storefront_url ~ '^https://[A-Za-z0-9.-]+(?::[0-9]+)?(?:/.*)?$'::text)));
 
@@ -6377,6 +6401,11 @@ revoke all on function public.arc_storefront_payment_methods(p_host text) from p
 grant execute on function public.arc_storefront_payment_methods(p_host text) to anon;
 grant execute on function public.arc_storefront_payment_methods(p_host text) to authenticated;
 grant execute on function public.arc_storefront_payment_methods(p_host text) to service_role;
+
+revoke all on function public.arc_storefront_primary_host(p_host text) from public;
+grant execute on function public.arc_storefront_primary_host(p_host text) to service_role;
+grant execute on function public.arc_storefront_primary_host(p_host text) to anon;
+grant execute on function public.arc_storefront_primary_host(p_host text) to authenticated;
 
 revoke all on function public.arc_storefront_product(p_host text, p_slug text) from public;
 grant execute on function public.arc_storefront_product(p_host text, p_slug text) to service_role;
