@@ -1,4 +1,5 @@
 import { DAY, NEW_DAYS, RISK_DAYS, type Customer } from "@/app/(panel)/musteriler/customer-data";
+import { trToday } from "@/lib/tr-time";
 
 /*
   MÜŞTERİ LİSTESİNİN SAĞINDAKİ İSTATİSTİKLER (16.10.2026).
@@ -60,4 +61,35 @@ export function musteriIstatistikleri(musteriler: Customer[], an: number) {
     ilkBesPayi: toplamHarcama ? Math.round((ilkBes / toplamHarcama) * 100) : null,
     enCokHarcayan: enCokHarcayan.map((musteri) => ({ ad: musteri.name, harcama: musteri.spent })),
   };
+}
+
+/*
+  AYLIK SERİLER (17.10.2026). Kutudaki sayı tek başına "iyi mi kötü mü"
+  söylemiyor; altı aylık çubuk söylüyor. Ay sınırı TÜRKİYE GÜNÜYLE:
+  ayın ilk gününde 00:00–03:00 arasında ilk siparişini veren müşteri
+  UTC'ye göre önceki aya düşerdi (AGENTS.md).
+
+  Saf; testi tests/musteri-istatistik.test.ts.
+*/
+export type AyDilimi = { bas: string; son: string; ad: string; simdiki: boolean };
+
+const ayinIcinde = (damga: number, ay: AyDilimi) => {
+  const gun = trToday(damga);
+  return gun >= ay.bas && gun <= ay.son;
+};
+
+/** Her ayda İLK siparişini veren müşteri sayısı. */
+export function aylikYeniMusteri(musteriler: Customer[], aylar: AyDilimi[]) {
+  return aylar.map((ay) => ({
+    ...ay,
+    adet: musteriler.filter((musteri) => ayinIcinde(musteri.firstOrderAt, ay)).length,
+  }));
+}
+
+/** Tek müşterinin aylık net harcaması (kuruş). */
+export function aylikHarcama(siparisler: { an: number; tutar: number }[], aylar: AyDilimi[]) {
+  return aylar.map((ay) => ({
+    ...ay,
+    tutar: siparisler.filter((siparis) => ayinIcinde(siparis.an, ay)).reduce((toplam, siparis) => toplam + siparis.tutar, 0),
+  }));
 }

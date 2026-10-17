@@ -5,7 +5,8 @@ import { MobilSatir } from "@/components/arvo-ui/mobil-satir";
 import { SatirTiklama } from "@/components/arvo-ui/satir-tiklama";
 import { rozetTonu } from "@/lib/rozet-tonu";
 import { IstatistikKarti, degisimYazisi, kisaPara, tamPara } from "@/components/arvo-ui/istatistik-karti";
-import { musteriIstatistikleri } from "@/lib/musteri-istatistik";
+import { aylikYeniMusteri, musteriIstatistikleri } from "@/lib/musteri-istatistik";
+import { sonAltiAy } from "@/lib/rapor-donemi";
 import { gorunumSorgusu, MUSTERI_SEGMENTLERI, MUSTERI_SIRALAMALARI } from "@/lib/kayitli-gorunum";
 import { gorunumleriOku } from "../gorunumler/oku";
 import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
@@ -80,6 +81,13 @@ export default async function Customers({ searchParams }: { searchParams: Promis
   const visible = sorted.slice(from, from + PAGE_SIZE);
 
   const istatistik = musteriIstatistikleri(customers, now);
+  /* Altı aylık yeni müşteri serisi: ay sınırları Raporlar sayfasıyla
+     aynı yerden (lib/rapor-donemi), iki ekran aynı ayı göstersin. */
+  const yeniSerisi = aylikYeniMusteri(customers, sonAltiAy(now)).map((ay) => ({ ad: ay.ad, deger: ay.adet, etiket: `${ay.adet} yeni müşteri`, simdiki: ay.simdiki }));
+  /* Satırdaki harcama çubuğu SAYFANIN en yükseğine göre: tablo
+     sıralıyken gözün "kim ne kadar" sorusunu okumadan cevaplaması
+     için. Tabandaki 1, sıfır harcamada bölmeyi engelliyor. */
+  const enYuksekHarcama = Math.max(1, ...visible.map((musteri) => musteri.spent));
   const filtreli = Boolean(search) || segment !== "all";
 
   /* ArvoOS'un liste kalıbı (16.10.2026): başlık, segment şeridi, süzgeç ve tablo tek kartta. */
@@ -158,6 +166,7 @@ export default async function Customers({ searchParams }: { searchParams: Promis
                       </td>
                       <td className="crm-col-amount" data-label="Net harcama">
                         <b>{money.format(customer.spent / 100)}</b>
+                        <i className="musteri-pay" aria-hidden="true"><b style={{ width: `${customer.spent > 0 ? Math.max(3, (customer.spent / enYuksekHarcama) * 100) : 0}%` }} /></i>
                         <small className="crm-cell-sub">ort. {money.format(customer.paidOrders ? customer.spent / customer.paidOrders / 100 : 0)}</small>
                       </td>
                       <td data-label="Son sipariş">
@@ -214,11 +223,13 @@ export default async function Customers({ searchParams }: { searchParams: Promis
           {
             ad: "Tekrar eden",
             deger: istatistik.tekrarOrani === null ? "—" : `%${istatistik.tekrarOrani}`,
+            oran: istatistik.tekrarOrani,
             alt: `${istatistik.tekrarEden.toLocaleString("tr-TR")} müşteri · ${istatistik.tekSiparis.toLocaleString("tr-TR")} tek sipariş`,
           },
           {
             ad: `Yeni · ${NEW_DAYS} gün`,
             deger: istatistik.yeni.toLocaleString("tr-TR"),
+            seri: yeniSerisi,
             alt: degisimYazisi(istatistik.yeniDegisim, `önceki ${NEW_DAYS} güne göre`) ?? "ilk siparişini verdi",
             ton: istatistik.yeniDegisim !== null && istatistik.yeniDegisim < 0 ? "uyari" : istatistik.yeniDegisim !== null ? "arti" : undefined,
           },
@@ -226,7 +237,8 @@ export default async function Customers({ searchParams }: { searchParams: Promis
           {
             ad: "Uzun süredir yok",
             deger: istatistik.riskli.toLocaleString("tr-TR"),
-            alt: `son siparişi ${RISK_DAYS} günden eski`,
+            oran: istatistik.toplam ? Math.round((istatistik.riskli / istatistik.toplam) * 100) : null,
+            alt: `müşterilerin %${istatistik.toplam ? Math.round((istatistik.riskli / istatistik.toplam) * 100) : 0}'i · son siparişi ${RISK_DAYS} günden eski`,
             ton: istatistik.riskli ? "uyari" : undefined,
           },
         ]}

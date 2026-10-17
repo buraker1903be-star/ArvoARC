@@ -6,6 +6,9 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { requireTenant } from "@/lib/tenant";
 import { anahtarSuzgeci, currentTime, customerTags, DAY, daysAgo, type Customer } from "../customer-data";
 import { KKart, KListe, KNot, KOge } from "@/components/arvo-ui/k-ui";
+import { MiniSeri } from "@/components/arvo-ui/mini-seri";
+import { aylikHarcama } from "@/lib/musteri-istatistik";
+import { sonAltiAy } from "@/lib/rapor-donemi";
 import { rozetTonu } from "@/lib/rozet-tonu";
 // Yan kartların tanım listesi ve favori ürünler (customer-dl, customer-fav) hâlâ orada.
 import "../customers.css";
@@ -96,6 +99,20 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
     kaynakSayilari.set(kaynak, (kaynakSayilari.get(kaynak) ?? 0) + 1);
   }
   const kaynaklar = [...kaynakSayilari.entries()].sort((a, b) => b[1] - a[1]);
+
+  /*
+    ALTI AYLIK HARCAMA. Kartta "ortalama N günde bir" yazıyordu ama
+    müşterinin SEYRİ — artıyor mu, kesildi mi — hiçbir yerde yoktu.
+    Ay sınırları Raporlar sayfasıyla aynı yerden (lib/rapor-donemi).
+  */
+  const harcamaSerisi = aylikHarcama(
+    paidOrders.map((order) => ({
+      an: Date.parse(order.created_at),
+      tutar: revenueAmount({ ...order, refunded_amount: (order.metadata as { refunded_amount?: unknown } | null)?.refunded_amount }),
+    })),
+    sonAltiAy(now),
+  ).map((ay) => ({ ad: ay.ad, deger: ay.tutar, etiket: money.format(ay.tutar / 100), simdiki: ay.simdiki }));
+  const altiAylikToplam = harcamaSerisi.reduce((toplam, ay) => toplam + ay.deger, 0);
 
   const latestMeta = (latestOrder.metadata ?? {}) as OrderMeta;
   const address = latestMeta.shipping_address ?? latestMeta.billing;
@@ -194,6 +211,10 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
           </KKart>
 
           <KKart baslik="Alışveriş alışkanlığı">
+            {/* Seyir önce: kartın geri kalanı tek tek gerçekler, bu
+                dördünü bir arada gösteriyor. */}
+            <MiniSeri seri={harcamaSerisi} etiket="Son altı ayın harcaması" />
+            <p className="customer-muted musteri-seri-not">Son 6 ayda {money.format(altiAylikToplam / 100)}{altiAylikToplam ? "" : " · bu dönemde sipariş yok"}</p>
             <dl className="customer-dl">
               <div><dt>Sipariş sıklığı</dt><dd>{cadence ? `Ortalama ${cadence.toLocaleString("tr-TR")} günde bir` : "Tek sipariş"}</dd></div>
               <div><dt>En yüksek sepet</dt><dd>{money.format(enYuksekSepet / 100)}</dd></div>

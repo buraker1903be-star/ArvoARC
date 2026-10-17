@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { musteriIstatistikleri } from "@/lib/musteri-istatistik";
+import { aylikHarcama, aylikYeniMusteri, musteriIstatistikleri } from "@/lib/musteri-istatistik";
 import type { Customer } from "@/app/(panel)/musteriler/customer-data";
 
 const AN = Date.parse("2026-10-16T12:00:00+03:00");
@@ -76,4 +76,17 @@ test("müşteri yokken oranlar null, ortalama sıfır", () => {
   assert.equal(s.tekrarOrani, null);
   assert.equal(s.ilkBesPayi, null);
   assert.equal(s.musteriBasina, 0);
+});
+
+test("aylık yeni müşteri: ay sınırı Türkiye günüyle", () => {
+  const aylar = [
+    { bas: "2026-09-01", son: "2026-09-30", ad: "Eyl", simdiki: false },
+    { bas: "2026-10-01", son: "2026-10-31", ad: "Eki", simdiki: true },
+  ];
+  const m = (ilk: string): Customer => ({ key: ilk, name: "A", email: "", orders: 1, paidOrders: 1, spent: 0, firstOrderAt: Date.parse(ilk), lastOrderAt: Date.parse(ilk) });
+  /* UTC 30 Eylül 21:30 = Türkiye 1 Ekim 00:30 → EKİM. */
+  const sonuc = aylikYeniMusteri([m("2026-09-15T10:00:00Z"), m("2026-09-30T21:30:00Z")], aylar);
+  assert.deepEqual(sonuc.map((a) => a.adet), [1, 1]);
+  const harcama = aylikHarcama([{ an: Date.parse("2026-10-05T09:00:00Z"), tutar: 1_000 }, { an: Date.parse("2026-10-09T09:00:00Z"), tutar: 500 }], aylar);
+  assert.deepEqual(harcama.map((a) => a.tutar), [0, 1_500]);
 });

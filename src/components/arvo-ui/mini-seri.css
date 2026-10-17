@@ -1,0 +1,19 @@
+/*
+  Mini seri ve ölçer (mini-seri.tsx). Renk kutunun bulunduğu kartın
+  vurgusundan; yalnızca jeton kullanılıyor.
+*/
+.mini-seri{display:flex;align-items:stretch;gap:3px;height:34px;margin-top:var(--sp-2)}
+.mini-seri>span{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px}
+.mini-seri i{
+  display:block;width:100%;height:var(--h,4%);max-height:calc(100% - 12px);
+  border-radius:3px 3px 1px 1px;background:var(--primary);opacity:.3
+}
+.mini-seri .is-simdiki i{opacity:1}
+.mini-seri small{color:var(--muted);font-size:9.5px;line-height:1}
+.mini-seri .is-simdiki small{color:var(--ink);font-weight:var(--fw-semibold)}
+.mini-olcer{
+  display:block;height:4px;margin-top:var(--sp-2);overflow:hidden;
+  border-radius:var(--r-pill);background:var(--surface-raised)
+}
+.mini-olcer i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:var(--primary)}
+.mini-olcer[data-ton="uyari"] i{background:var(--warning)}

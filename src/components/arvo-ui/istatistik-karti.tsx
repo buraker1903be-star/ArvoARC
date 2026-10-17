@@ -1,10 +1,24 @@
+import { MiniOlcer, MiniSeri, type SeriNoktasi } from "./mini-seri";
+
 /*
   Liste sayfalarının (talepler, teklifler, sözleşmeler) sağındaki
   istatistik kartı. Üstte dört sayı kutusu, altında çubuklu dağılımlar.
   Hesaplar lib/liste-istatistik.ts'te; bu bileşen yalnızca çizer.
 */
 
-export type IstatistikKutusu = { ad: string; deger: string; alt?: string; ton?: "arti" | "uyari" };
+/*
+  Kutuya İSTEĞE BAĞLI küçük grafik (17.10.2026): `seri` altı aylık
+  çubuk, `oran` ince ölçer. Veren sayfa görür, vermeyen sayfa eskisi
+  gibi kalır — dört liste aynı bileşeni kullanıyor.
+*/
+export type IstatistikKutusu = {
+  ad: string;
+  deger: string;
+  alt?: string;
+  ton?: "arti" | "uyari";
+  seri?: SeriNoktasi[];
+  oran?: number | null;
+};
 export type IstatistikGrubu = { baslik: string; satirlar: { ad: string; adet: number; etiket?: string }[] };
 
 const TON_SINIFI = { arti: "cari-arti", uyari: "talep-uyari" } as const;
@@ -21,6 +35,8 @@ export function IstatistikKarti({ kapsam, kutular, gruplar }: { kapsam: string; 
           <div key={kutu.ad}>
             <dt>{kutu.ad}</dt>
             <dd className={kutu.ton === "uyari" ? TON_SINIFI.uyari : undefined}>{kutu.deger}</dd>
+            {kutu.oran !== undefined ? <MiniOlcer oran={kutu.oran} ton={kutu.ton === "uyari" ? "uyari" : undefined} /> : null}
+            {kutu.seri ? <MiniSeri seri={kutu.seri} etiket={kutu.ad} /> : null}
             {kutu.alt ? <small className={kutu.ton === "arti" ? TON_SINIFI.arti : kutu.ton === "uyari" ? TON_SINIFI.uyari : undefined}>{kutu.alt}</small> : null}
           </div>
         ))}

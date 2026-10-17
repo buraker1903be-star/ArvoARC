@@ -8,3 +8,6 @@
 .os-root .musteri-izgara{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:var(--sp-4);align-items:start}
 .os-root .musteri-yan{display:grid;gap:var(--sp-4)}
 @media (max-width:900px){.os-root .musteri-izgara{grid-template-columns:1fr}}
+
+/* Altı aylık harcama çubuğunun altındaki tek satır not. */
+.os-root .musteri-detay .musteri-seri-not{margin:var(--sp-2) 0 var(--sp-3);font-size:var(--fs-sm)}

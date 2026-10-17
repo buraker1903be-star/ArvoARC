@@ -5,3 +5,20 @@
 .os-root .musteri-listesi .crm-cell-sub{display:block;margin-top:2px;color:var(--muted);font-size:var(--fs-micro);font-weight:var(--fw-regular)}
 .os-root .musteri-listesi .musteri-etiketler{display:flex;flex-wrap:wrap;gap:4px}
 .os-root .musteri-listesi .kayit-serit .is-uyari dd a{color:var(--warning)}
+
+/*
+  HARCAMA ÇUBUĞU (17.10.2026). Tablo harcamaya göre sıralı ama aradaki
+  FARK görünmüyordu: ilk satırla onuncu satır arasında on kat olabilir
+  ve sayıları tek tek okumak gerekiyordu. Çubuk sayfanın en yükseğine
+  göre; satırı 3px uzatıyor.
+*/
+.os-root .musteri-listesi .musteri-pay{
+  display:block;width:100%;max-width:120px;height:3px;margin:3px 0 1px;margin-left:auto;
+  overflow:hidden;border-radius:var(--r-pill);background:var(--surface-2)
+}
+.os-root .musteri-listesi .musteri-pay>b{display:block;height:100%;border-radius:inherit;background:var(--primary);opacity:.55}
+.os-root .musteri-listesi tr:hover .musteri-pay>b{opacity:.85}
+@media (max-width:900px){
+  /* Telefonda satır MobilSatir'a dönüyor; çubuk orada yok. */
+  .os-root .musteri-listesi .musteri-pay{display:none}
+}
