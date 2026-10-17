@@ -212,6 +212,38 @@ describe("kiracı sızıntısı", () => {
     });
   }
 
+  test("çekirdek fonksiyonlar anon'a kapalı", async () => {
+    /*
+      Gövdeler `arc_vitrin_*(p_organization_id, …)` içinde tek kez
+      duruyor ve iki aile ince sarmalayıcı (20261017141416). Çekirdek
+      kurum kimliğini PARAMETRE aldığı için anon'a açılırsa
+      tarayıcıdan başka bir mağazanın kimliği geçilip verisi
+      okunabilir — kiracı çözümü atlanmış olur. Bu test o kapıyı
+      kapalı tutuyor ve yeni çekirdek eklendikçe kendiliğinden
+      kapsıyor.
+    */
+    /*
+      Liste VERİTABANINDAN okunuyor, anlık görüntü dosyasından değil:
+      harness migration'ları görüntünün üstüne uyguluyor, yani yeni
+      bir çekirdek görüntü eşitlenmeden önce de kapsanıyor.
+    */
+    await islem(db, async () => {
+      await tohum();
+      await rol(db, "anon");
+      const cekirdekler = (
+        await db.query(`
+          select p.proname as ad, has_function_privilege('anon', p.oid, 'EXECUTE') as acik
+            from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname like 'arc_vitrin_%'
+        `)
+      ).rows;
+      assert.ok(cekirdekler.length > 0, "çekirdek aile boş: desen kaybolmuş olabilir");
+      for (const { ad, acik } of cekirdekler) {
+        assert.equal(acik, false, `${ad} anon'a açık: kiracı çözümü atlanabilir`);
+      }
+    });
+  });
+
   test("arc_storefront_create_order siparişi adresin mağazasına yazıyor", async () => {
     await islem(db, async () => {
       await tohum();
