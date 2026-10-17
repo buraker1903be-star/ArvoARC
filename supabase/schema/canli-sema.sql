@@ -1792,7 +1792,7 @@ begin
       raise exception 'Geçersiz sepet kalemi';
     end if;
 
-    select v.id, v.price, v.stock, v.allow_backorder, p.name
+    select v.id, v.price, v.stock, v.allow_backorder, v.supplier, p.name
       into v_variant
     from public.arc_product_variants v
     join public.arc_products p
@@ -1811,8 +1811,35 @@ begin
       raise exception 'Ürün bulunamadı: %', v_key;
     end if;
 
+    /*
+      MİKTAR DENETİMİ TEDARİKÇİ ÜRÜNÜNDE allow_backorder'A BAKMIYOR
+      (17.10.2026).
+
+      Eski kural yalnızca "stok yetmiyor VE stoksuz satış kapalı"
+      diyordu. Tedarikçi varyantında bu koşul HİÇ sağlanmıyor:
+      arc_product_variants.allow_backorder sütununun varsayılanı true
+      ve tedarikçi içe aktarımı o alanı hiç yazmıyor. Sonuç: stoğu 10
+      olan tedarikçi varyantına 20 adet sipariş geçiyor ve stok
+      -10'a iniyordu. Tedarikçi o adedi gönderemez; farkı mağaza
+      karşılar.
+      (Kalem başına üst sınır zaten 20; yani 10 stoklu üründen 20
+      adet istemek yukarıdaki denetimden geçiyordu.)
+
+      Üstelik satılabilirlik kuralı da o alana bakmıyor:
+      arc_variant_available tedarikçi ürününde yalnızca tampona
+      bakıyor. Yani miktar denetimi, satılabilirlik denetiminden
+      daha gevşekti.
+
+      KENDİ ÜRÜNÜMÜZDE KURAL DEĞİŞMEDİ: stoksuz satış açıkken
+      stoktan fazlası satılabilir — bu mağazanın bilinçli tercihi.
+      Değişen yalnızca tedarikçi ürünü, çünkü orada o alan bir
+      tercih değil, yazılmamış bir varsayılan.
+    */
     if v_variant.stock < v_qty
-       and not coalesce(v_variant.allow_backorder, false) then
+       and (
+         v_variant.supplier is not null
+         or not coalesce(v_variant.allow_backorder, false)
+       ) then
       raise exception 'Yetersiz stok: %', v_variant.name;
     end if;
 
