@@ -223,7 +223,7 @@ export default async function Raporlar({ searchParams }: { searchParams: Promise
             const zayif = Boolean(gecis && o.enZayifGecis && gecis.nereden === o.enZayifGecis.nereden && o.siparisAdedi > 0);
             return <li key={adim.anahtar} className={sira === o.huni.length - 1 ? "is-final" : undefined}>
               <div className="rpt-funnel-row">
-                <div className="rpt-funnel-label"><b>{adim.etiket}</b><span>Dönemdeki siparişlerin {o.siparisAdedi ? yuzde((adim.adet / o.siparisAdedi) * 100) : "—"}'i</span></div>
+                <div className="rpt-funnel-label"><b>{adim.etiket}</b><span>{`Dönemdeki siparişlerin ${o.siparisAdedi ? yuzde((adim.adet / o.siparisAdedi) * 100) : "—"}'i`}</span></div>
                 <div className="rpt-funnel-track"><i style={cssDegisken("--w", `${Math.max(4, (adim.adet / enBuyukHuni) * 100)}%`)} /></div>
                 <strong>{adet(adim.adet)}</strong>
               </div>

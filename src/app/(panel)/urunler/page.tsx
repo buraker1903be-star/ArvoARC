@@ -8,6 +8,7 @@ import { yayinOzeti } from "@/lib/yayin-plani";
 import { Pencere } from "@/components/os/pencere";
 import { GorunumKaydet, KayitliGorunumler } from "@/components/panel/kayitli-gorunumler";
 import { gorunumleriOku } from "../gorunumler/oku";
+import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
 import { gorunumSorgusu, URUN_DURUMLARI, URUN_KAYNAKLARI } from "@/lib/kayitli-gorunum";
 import { ProductTable, type ProductRow } from "./product-table";
 // Yeni ürün ve toplu durum formlarının biçimi (catalog-form) hâlâ orada.
@@ -108,12 +109,25 @@ export default async function Products({ searchParams }: { searchParams: Promise
     anlatabiliyor. Boş ekran ikisine farklı şey söylediği için
     süzgeçsiz bir sayım gerekiyor — head:true, satır taşımıyor.
   */
-  const [listResult, variantCountResult, bestSellerResult, katalogSayimi, gorunumler, ...countResults] = await Promise.all([
+  /*
+    KATALOG SAĞLIĞI SAYIMLARI (17.10.2026). Sağdaki istatistik kartı
+    listeden DEĞİL kendi sayımlarından besleniyor: sayfalanmış elli
+    satırdan hesaplanan bir "tükendi" sayısı, sayfanın tükenmişi olur.
+    Hepsi head:true — satır taşımıyor, sayı dönüyor.
+  */
+  const varyantSayimi = () => supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id);
+  const [listResult, variantCountResult, bestSellerResult, katalogSayimi, gorunumler, tukenmisSayimi, stoksuzSatisSayimi, maliyetsizSayimi, tedarikciSayimi, ...countResults] = await Promise.all([
     listQuery.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
-    supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
+    varyantSayimi(),
     supabase.from("arc_collections").select("id").eq("organization_id", organization.id).eq("title", "Çok Satanlar").eq("status", "active").maybeSingle(),
     supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id),
     gorunumleriOku(supabase, organization.id, "urunler"),
+    /* Satılamaz varyant: stok bitmiş VE stoksuz satış kapalı. */
+    varyantSayimi().lte("stock", 0).eq("allow_backorder", false),
+    varyantSayimi().eq("allow_backorder", true),
+    /* Maliyeti olmayan varyantta kâr hesaplanamıyor (lib/siparis-kari). */
+    varyantSayimi().is("cost_price", null),
+    supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).not("supplier", "is", null),
     ...STATUS_TABS.map(([key]) => countQuery(key)),
   ]);
 
@@ -127,6 +141,19 @@ export default async function Products({ searchParams }: { searchParams: Promise
   if (katalogSayimi.error) throw new Error(katalogSayimi.error.message);
 
   const counts = Object.fromEntries(STATUS_TABS.map(([key], index) => [key, countResults[index]?.count ?? 0])) as Record<StatusKey, number>;
+  /*
+    Sayım düşerse SIFIR GÖSTERİLMİYOR: "tükenmiş varyant yok" demek,
+    olmayan bir iyi haber vermek olurdu (lib/panel-bildirim'deki aynı
+    gerekçe). Okunamayan sayı kartta "—" çıkıyor.
+  */
+  const sayim = (sonuc: { count: number | null; error: { message: string } | null }) => (sonuc.error ? null : sonuc.count ?? 0);
+  const varyantToplam = sayim(variantCountResult);
+  const tukenmis = sayim(tukenmisSayimi);
+  const stoksuzSatis = sayim(stoksuzSatisSayimi);
+  const maliyetsiz = sayim(maliyetsizSayimi);
+  const tedarikciUrunu = sayim(tedarikciSayimi);
+  const sayiYaz = (deger: number | null) => (deger === null ? "—" : deger.toLocaleString("tr-TR"));
+  const oranYaz = (deger: number | null, taban: number | null) => (deger === null || !taban ? null : Math.round((deger / taban) * 100));
   const total = listResult.count ?? counts[statusFilter];
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const products = listResult.data ?? [];
@@ -242,7 +269,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
         <div className="talep-bas-metin">
           <small className="panel-kicker">Katalog</small>
           <h1>Ürünler</h1>
-          <p className="talep-bas-alt">{counts.all.toLocaleString("tr-TR")} ürün · {(variantCountResult.count ?? 0).toLocaleString("tr-TR")} varyant{search ? ` · “${search}”` : ""}</p>
+          <p className="talep-bas-alt">{counts.all.toLocaleString("tr-TR")} ürün · {sayiYaz(varyantToplam)} varyant{search ? ` · “${search}”` : ""}</p>
         </div>
         {canManage ? (
           <div className="talep-bas-eylem">
@@ -263,6 +290,9 @@ export default async function Products({ searchParams }: { searchParams: Promise
         </dl>
       </nav>
 
+      {/* Solda liste, sağda katalog sağlığı: siparişler ve müşteriler
+          ekranıyla aynı ızgara. */}
+      <div className="talep-izgara personel-iki ekip-izgara">
       <section className="panel-card talep-bilgi" aria-label="Ürün listesi">
         <div className="ekip-suzgec talep-suzgec">
           {SOURCES.map(([key, label]) => (
@@ -316,6 +346,42 @@ export default async function Products({ searchParams }: { searchParams: Promise
           ) : null}
         </ProductTable>
       </section>
+
+      <IstatistikKarti
+        kapsam="katalogun tamamı · süzgeçten bağımsız"
+        kutular={[
+          { ad: "Aktif ürün", deger: counts.active.toLocaleString("tr-TR"), oran: counts.all ? Math.round((counts.active / counts.all) * 100) : null, alt: `${counts.all.toLocaleString("tr-TR")} ürünün %${counts.all ? Math.round((counts.active / counts.all) * 100) : 0}'i yayında` },
+          { ad: "Varyant", deger: sayiYaz(varyantToplam), alt: varyantToplam !== null && counts.all ? `ürün başına ${(varyantToplam / counts.all).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}` : "ürün başına —" },
+          {
+            /* "Tükendi" = stoğu bitmiş VE stoksuz satışı kapalı varyant:
+               satılamaz olan bu. Stoksuz satış açıkken stok 0 olağan
+               (LR ürünlerinin tamamı öyle). */
+            ad: "Satılamaz varyant",
+            deger: sayiYaz(tukenmis),
+            oran: oranYaz(tukenmis, varyantToplam),
+            alt: `stoğu bitmiş · stoksuz satış ${sayiYaz(stoksuzSatis)} varyantta açık`,
+            ton: tukenmis ? "uyari" : undefined,
+          },
+          {
+            ad: "Maliyeti eksik",
+            deger: sayiYaz(maliyetsiz),
+            oran: oranYaz(maliyetsiz, varyantToplam),
+            alt: "alış fiyatı yok · kâr hesaplanamıyor",
+            ton: maliyetsiz ? "uyari" : undefined,
+          },
+        ]}
+        gruplar={[
+          { baslik: "Duruma göre", satirlar: STATUS_TABS.filter(([key]) => key !== "all").map(([key, label]) => ({ ad: label, adet: counts[key as StatusKey], etiket: counts[key as StatusKey].toLocaleString("tr-TR") })) },
+          {
+            baslik: "Kaynağa göre",
+            satirlar: tedarikciUrunu === null ? [] : [
+              { ad: "Kendi ürünümüz", adet: Math.max(0, counts.all - tedarikciUrunu), etiket: Math.max(0, counts.all - tedarikciUrunu).toLocaleString("tr-TR") },
+              { ad: "Tedarikçi", adet: tedarikciUrunu, etiket: tedarikciUrunu.toLocaleString("tr-TR") },
+            ],
+          },
+        ]}
+      />
+      </div>
 
       {pencere === "yeni" ? (
         <Pencere key="yeni" ust="Katalog" baslik="Yeni ürün" kapatAdresi={listHref(state, {})} genis={false}>
