@@ -3,6 +3,8 @@ import { requireTenant } from "@/lib/tenant";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { KListe, KOge } from "@/components/arvo-ui/k-ui";
 import { Pencere } from "@/components/os/pencere";
+import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
+import { yuzdeEkli } from "@/lib/turkce-ek";
 import { createCollection } from "./actions";
 // Yeni koleksiyon formunun biçimi (catalog-form) hâlâ orada.
 import "../catalog.css";
@@ -42,6 +44,22 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
   const visible=filter==="all"?searched:searched.filter(item=>item.status===filter);
   const href=(patch:{q?:string;filter?:StatusKey})=>{const next={q:search,filter,...patch};const params=new URLSearchParams();if(next.q)params.set("q",next.q);if(next.filter!=="all")params.set("filter",next.filter);const text=params.toString();return text?`/koleksiyonlar?${text}`:"/koleksiyonlar";};
 
+  /*
+    RAF SAĞLIĞI (17.10.2026). Koleksiyon bir RAF: boş olanı vitrinde
+    boş bir sayfa demek. Sayılar bellekteki listeden değil, listenin
+    TAMAMINDAN (süzgeçten bağımsız) — sayfadaki arama sonucunun
+    ortalaması "koleksiyon başına ürün" olmazdı.
+  */
+  const bosKoleksiyon = all.filter((item) => (counts.get(item.id) ?? 0) === 0).length;
+  const shopifyKaynakli = all.filter((item) => item.source === "shopify").length;
+  const aktifKoleksiyon = all.filter((item) => item.status === "active").length;
+  const toplamEsleme = memberships.length;
+  const enKalabalik = [...all]
+    .map((item) => ({ ad: item.title, adet: counts.get(item.id) ?? 0 }))
+    .sort((a, b) => b.adet - a.adet)
+    .slice(0, 6);
+  const oran = (deger: number) => (all.length ? Math.round((deger / all.length) * 100) : null);
+
   /* ArvoOS kalıbı (16.10.2026): başlık, durum şeridi, iOS listesi; yeni koleksiyon pencerede. */
   const pencere=canManage&&query.pencere==="yeni";
   const yeniAdres=`${href({})}${href({}).includes("?")?"&":"?"}pencere=yeni`;
@@ -68,6 +86,8 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
         </dl>
       </nav>
 
+      {/* Solda liste, sağda raf sağlığı: katalogun öteki ekranlarıyla aynı ızgara. */}
+      <div className="talep-izgara personel-iki ekip-izgara">
       <section className="panel-card talep-bilgi" aria-label="Koleksiyon listesi">
         <div className="ekip-suzgec talep-suzgec">
           <form className="talep-ara" role="search">
@@ -106,13 +126,42 @@ export default async function Collections({searchParams}:{searchParams:Promise<{
         )}
       </section>
 
+      <IstatistikKarti
+        kapsam="koleksiyonların tamamı · süzgeçten bağımsız"
+        kutular={[
+          { ad: "Aktif", deger: aktifKoleksiyon.toLocaleString("tr-TR"), oran: oran(aktifKoleksiyon), alt: `${all.length.toLocaleString("tr-TR")} koleksiyonun ${yuzdeEkli(oran(aktifKoleksiyon) ?? 0)} yayında` },
+          {
+            /* Boş raf vitrinde boş bir sayfa demek; listede de
+               "boş raf" diye işaretli. */
+            ad: "Boş koleksiyon",
+            deger: bosKoleksiyon.toLocaleString("tr-TR"),
+            oran: oran(bosKoleksiyon),
+            alt: "içinde ürün yok · vitrinde boş sayfa",
+            ton: bosKoleksiyon ? "uyari" : undefined,
+          },
+          { ad: "Koleksiyon başına", deger: all.length ? (toplamEsleme / all.length).toLocaleString("tr-TR", { maximumFractionDigits: 1 }) : "—", alt: `${toplamEsleme.toLocaleString("tr-TR")} eşleme · ürün birden çok rafta olabilir` },
+          { ad: "Shopify kaynaklı", deger: shopifyKaynakli.toLocaleString("tr-TR"), oran: oran(shopifyKaynakli), alt: "içe aktarımdan gelen raflar" },
+        ]}
+        gruplar={[
+          { baslik: "En kalabalık raflar", satirlar: enKalabalik.map((item) => ({ ad: item.ad, adet: item.adet, etiket: `${item.adet.toLocaleString("tr-TR")} ürün` })) },
+        ]}
+      />
+      </div>
+
       {pencere?(
         <Pencere key="yeni" ust="Katalog" baslik="Yeni koleksiyon" kapatAdresi={href({})} genis={false}>
           <p className="koleksiyon-pencere-alt">Oluşturduktan sonra ürünleri ve SEO bilgilerini düzenleyicide eklersiniz.</p>
+          {/* Alanlar panelin ortak kuralından, altta ortak kaydet şeridi
+              (17.10.2026: katalog pencereleriyle birlikte). */}
           <form action={createCollection} className="catalog-form">
-            <label>Koleksiyon adı<input name="title" required maxLength={160} placeholder="Örn. En Çok Satanlar" className="ac-input"/></label>
-            <label>Bağlantı adı<input name="slug" maxLength={160} placeholder="en-cok-satanlar" className="ac-input"/></label>
-            <div className="catalog-form-actions"><button className="ac-btn ac-btn-primary" type="submit">Koleksiyon oluştur</button></div>
+            <div className="catalog-form-grid">
+              <label>Koleksiyon adı<input name="title" required maxLength={160} placeholder="Örn. En Çok Satanlar" autoComplete="off"/></label>
+              <label>Bağlantı adı<input name="slug" maxLength={160} placeholder="en-cok-satanlar" autoComplete="off"/></label>
+            </div>
+            <div className="kaydet-serit">
+              <span>Ürünler ve SEO bilgileri düzenleyicide eklenir.</span>
+              <button className="panel-primary" type="submit">Koleksiyon oluştur</button>
+            </div>
           </form>
         </Pencere>
       ):null}
