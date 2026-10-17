@@ -141,6 +141,30 @@ describe("koleksiyon rafı sayfalanıyor", () => {
     assert.ok(Number(satir.max_price) > 0);
   });
 
+  test("süzgeçsiz toplam rafın saydığı kümeyle aynı", async () => {
+    /*
+      Raf varyant tablosuna INNER JOIN ile bağlı; sayaç varyant
+      aramayınca süzgeç yokken bile "N / M ürün" başlığı çıkıyordu
+      ve müşteriye olmayan bir süzgeci haber veriyordu
+      (20261017134855). Varyantsız ürün buraya o yüzden eklendi:
+      'baglanti-denemesi' koleksiyona hiç bağlanmadı ama
+      'varyantsiz-urun' bağlandı.
+    */
+    await db.exec(`
+      insert into public.arc_products (id, organization_id, name, slug, description, status, source, created_at, updated_at, metadata) values
+        (gen_random_uuid(), '${KURUM}', 'Varyantsız', 'varyantsiz-urun', '', 'active', 'native', now(), now(), '{}'::jsonb);
+      insert into public.arc_collection_products (organization_id, collection_id, product_id, "position", created_at) values
+        ('${KURUM}', (select id from public.arc_collections where slug='erkek' and organization_id='${KURUM}'),
+         (select id from public.arc_products where slug='varyantsiz-urun' and organization_id='${KURUM}'), 500, now());
+    `);
+
+    const raf = await sayfa({ p_collection_slugs: ["erkek"], p_limit: 200 });
+    const secenek = (await db.query(
+      `select total_count from public.get_arvoculture_storefront_collection_facets(array['erkek']::text[], null)`,
+    )).rows[0];
+    assert.equal(Number(secenek.total_count), Number(raf[0].total_count));
+  });
+
   test("sayfa sorgusu beden listesini yalnızca kendi satırları için veriyor", async () => {
     const satirlar = await sayfa({ p_collection_slugs: ["erkek"], p_limit: 3 });
     assert.equal(satirlar.length, 3);
