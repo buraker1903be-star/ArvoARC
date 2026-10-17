@@ -186,7 +186,7 @@ export default async function SuppliersPage() {
             ad: "Satılamaz varyant",
             deger: sayiYaz(tedarikSatilamaz),
             oran: oranYaz(tedarikSatilamaz, tedarikVaryant),
-            alt: "stoğu bitmiş · stoksuz satışı kapalı",
+            alt: "stoğu bitmiş · vitrinde satın alınamaz",
             ton: tedarikSatilamaz ? "uyari" : undefined,
           },
           {
