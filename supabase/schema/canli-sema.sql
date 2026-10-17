@@ -84,6 +84,16 @@ create table if not exists public.arc_discounts (
   updated_at timestamp with time zone not null
 );
 
+create table if not exists public.arc_email_templates (
+  organization_id uuid not null,
+  template_key text not null,
+  subject text not null,
+  body text not null,
+  updated_by uuid,
+  created_at timestamp with time zone not null,
+  updated_at timestamp with time zone not null
+);
+
 create table if not exists public.arc_import_batches (
   id uuid not null,
   organization_id uuid not null,
@@ -4795,6 +4805,14 @@ alter table public.arc_discounts alter column usage_count set default 0;
 
 alter table public.arc_discounts alter column value set default 0;
 
+alter table public.arc_email_templates alter column body set default ''::text;
+
+alter table public.arc_email_templates alter column created_at set default now();
+
+alter table public.arc_email_templates alter column subject set default ''::text;
+
+alter table public.arc_email_templates alter column updated_at set default now();
+
 alter table public.arc_import_batches alter column created_at set default now();
 
 alter table public.arc_import_batches alter column error_rows set default 0;
@@ -5131,6 +5149,12 @@ alter table public.arc_discounts add constraint arc_discounts_usage_limit_check 
 
 alter table public.arc_discounts add constraint arc_discounts_value_check CHECK ((value >= 0));
 
+alter table public.arc_email_templates add constraint arc_email_templates_key_check CHECK ((template_key = ANY (ARRAY['processing'::text, 'fulfilled'::text, 'cancelled'::text, 'cancelled_unpaid'::text, 'refunded'::text])));
+
+alter table public.arc_email_templates add constraint arc_email_templates_length_check CHECK (((char_length(subject) <= 200) AND (char_length(body) <= 2000)));
+
+alter table public.arc_email_templates add constraint arc_email_templates_pkey PRIMARY KEY (organization_id, template_key);
+
 alter table public.arc_import_batches add constraint arc_import_batches_error_rows_check CHECK ((error_rows >= 0));
 
 alter table public.arc_import_batches add constraint arc_import_batches_imported_rows_check CHECK ((imported_rows >= 0));
@@ -5391,6 +5415,8 @@ CREATE INDEX arc_discounts_org_status_idx ON public.arc_discounts USING btree (o
 
 CREATE INDEX arc_discounts_org_type_idx ON public.arc_discounts USING btree (organization_id, discount_type);
 
+CREATE INDEX arc_email_templates_org_idx ON public.arc_email_templates USING btree (organization_id);
+
 CREATE INDEX arc_import_batches_org_created_idx ON public.arc_import_batches USING btree (organization_id, created_at DESC);
 
 CREATE INDEX arc_import_errors_batch_idx ON public.arc_import_errors USING btree (batch_id, created_at);
@@ -5511,6 +5537,8 @@ alter table public.arc_customer_favourites add constraint arc_customer_favourite
 
 alter table public.arc_discounts add constraint arc_discounts_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
+alter table public.arc_email_templates add constraint arc_email_templates_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
 alter table public.arc_import_batches add constraint arc_import_batches_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 alter table public.arc_import_batches add constraint arc_import_batches_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
@@ -5602,6 +5630,8 @@ alter table public.arc_customer_addresses enable row level security;
 alter table public.arc_customer_favourites enable row level security;
 
 alter table public.arc_discounts enable row level security;
+
+alter table public.arc_email_templates enable row level security;
 
 alter table public.arc_import_batches enable row level security;
 
@@ -5735,6 +5765,19 @@ create policy "arc members read discounts" on public.arc_discounts as PERMISSIVE
   using ((EXISTS ( SELECT 1
    FROM organization_memberships m
   WHERE ((m.organization_id = arc_discounts.organization_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.is_active = true)))));
+
+create policy arc_managers_write_email_templates on public.arc_email_templates as PERMISSIVE for ALL to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_email_templates.organization_id) AND (m.user_id = auth.uid()) AND m.is_active AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))))
+  with check ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_email_templates.organization_id) AND (m.user_id = auth.uid()) AND m.is_active AND (m.role = ANY (ARRAY['owner'::membership_role, 'admin'::membership_role, 'manager'::membership_role]))))));
+
+create policy arc_members_read_email_templates on public.arc_email_templates as PERMISSIVE for SELECT to authenticated
+  using ((EXISTS ( SELECT 1
+   FROM organization_memberships m
+  WHERE ((m.organization_id = arc_email_templates.organization_id) AND (m.user_id = auth.uid()) AND m.is_active))));
 
 create policy "arc managers manage import batches" on public.arc_import_batches as PERMISSIVE for ALL to authenticated
   using ((EXISTS ( SELECT 1

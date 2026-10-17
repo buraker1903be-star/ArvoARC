@@ -65,6 +65,15 @@
       "usage_limit",
       "value"
     ],
+    "arc_email_templates": [
+      "body",
+      "created_at",
+      "organization_id",
+      "subject",
+      "template_key",
+      "updated_at",
+      "updated_by"
+    ],
     "arc_import_batches": [
       "completed_at",
       "created_at",

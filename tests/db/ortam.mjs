@@ -65,7 +65,7 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   yanıtlanıyor (her migration'ı dosya yerinde ve yerinden alınmış
   hâlde koşturarak).
 */
-const ILK_UYGULANAN = "20261017152720";
+const ILK_UYGULANAN = "20261017182111";
 
 /*
   PGLITE'TA PGCRYPTO YOK.
