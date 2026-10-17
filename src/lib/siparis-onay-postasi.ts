@@ -22,7 +22,7 @@ export async function sendOrderConfirmation(
   const { data: order } = await supabase
     .from("arc_orders")
     .select(
-      "order_number, customer_name, customer_email, subtotal, shipping, total, metadata, organization_id",
+      "order_number, customer_name, customer_email, subtotal, shipping, total, metadata, organization_id, public_token",
     )
     .eq("id", orderId)
     .single();
@@ -91,6 +91,7 @@ export async function sendOrderConfirmation(
       siparis_no: order.order_number,
       tutar: waTutar(order.total ?? 0),
     },
+    paylasimAnahtari: order.public_token,
   });
 }
 

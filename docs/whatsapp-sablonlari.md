@@ -91,6 +91,40 @@ Merhaba {{1}}, {{2}} numaralı siparişinizin iadesi tamamlandı. Tutarın kart�
 
 ---
 
+## Hepsinde "Siparişi görüntüle" düğmesi var
+
+Altı şablonun da altında bir URL düğmesi duruyor:
+
+```
+Metin : Siparişi görüntüle
+Adres : https://arvoculture.com/siparis/{{1}}
+```
+
+`{{1}}` siparişin paylaşım anahtarı (`arc_orders.public_token`); kod
+`waSiparisBildirimi`'ne `paylasimAnahtari` olarak veriyor, kapı da
+şablonun düğme bileşenine yerleştiriyor.
+
+**Neden düğme, neden gövdede değil:** Meta şablon parametrelerinde
+satır sonu yasak, yani ürünler mesajın içinde alt alta
+listelenemiyor; her yeni bilgi için metni değiştirip yeniden onaya
+sokmak da sürdürülebilir değil. Mesaj kısa kalıyor, ayrıntı tek bir
+sayfada duruyor.
+
+**Adres kiracıya özel ve bu bilinçli.** Şablonlar kiracının kendi
+WhatsApp İşletme Hesabında duruyor, dolayısıyla taban adres de onun
+alan adı olabiliyor. Kendi numarasını bağlamamış bir kiracı
+eklendiğinde durum değişir: o kurumun mesajı Arvo'nun ortak
+numarasından ve Arvo'nun WABA'sındaki şablonla gider, orada taban
+adres sabit olmak zorundadır. ArvoOS'ta bunun altyapısı hazır
+(`app/b/[tur]/[token]` → kurumun alan adına 307), yalnızca `siparis`
+türünün eklenmesi gerekir.
+
+**Kod düğmesiz şablonla ÇALIŞMAZ:** şablonda düğme yokken parametre
+göndermek Meta tarafından reddedilir. Şablonu düzenleyip onay
+beklerken kodu yayına almayın.
+
+---
+
 # Kurulum: token ArvoARC'a DEĞİL ArvoOS'a giriliyor
 
 ArvoARC Meta'ya doğrudan çağrı yapmıyor; dört ürünün ortak kapısı

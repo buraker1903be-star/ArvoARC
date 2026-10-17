@@ -68,7 +68,7 @@ export async function updateOrderStatus(formData:FormData){
   /* Yalnızca durum gerçekten değiştiyse: yalnızca ödemeyi düzeltmek için yapılan kayıt aynı e-postayı tekrar göndermez. */
   if(!error&&status!==ownedOrder.status){
     try{
-      const {data:order}=await supabase.from("arc_orders").select("order_number,customer_name,customer_email,metadata").eq("id",orderId).single();
+      const {data:order}=await supabase.from("arc_orders").select("order_number,customer_name,customer_email,metadata,public_token").eq("id",orderId).single();
       /* Takip numarası girildiyse takip bilgili kargo e-postası zaten gitti. */
       const trackingSent=Boolean((order?.metadata as {tracking_number?:string}|null)?.tracking_number);
       /* Ödenmemiş siparişin iptalinde iade vaadi yerine "tutar alınmadı" yazılır. */
@@ -96,6 +96,7 @@ export async function updateOrderStatus(formData:FormData){
           numara:siparisTelefonu(order.metadata),
           metadata:order.metadata,
           degerler:{musteri:order.customer_name||"değerli müşterimiz",siparis_no:order.order_number??""},
+          paylasimAnahtari:order.public_token,
         });
       }
     }catch(mailError){

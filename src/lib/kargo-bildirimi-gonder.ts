@@ -47,7 +47,7 @@ export async function kargoBildirimiGonder(
 ): Promise<number> {
   try {
     const [{ data: order }, { data: gonderiler }] = await Promise.all([
-      supabase.from("arc_orders").select("order_number,customer_name,customer_email,metadata")
+      supabase.from("arc_orders").select("order_number,customer_name,customer_email,metadata,public_token")
         .eq("organization_id", organizationId).eq("id", orderId).maybeSingle(),
       supabase.from("arc_shipments")
         .select("id,sequence,status,tracking_number,tracking_url,carrier_code,carrier_name,customer_notified_at,arc_shipment_items(order_item_id,quantity)")
@@ -135,6 +135,7 @@ export async function kargoBildirimiGonder(
           kargo_firmasi: gonderi.carrier_name?.trim() || "Kargo",
           takip_no: takipNo,
         },
+        paylasimAnahtari: order.public_token as string | null,
       });
 
       /*

@@ -65,6 +65,19 @@ export async function waSablonGonder(input: {
   anahtar: string;
   numara: string | null | undefined;
   degerler: WaDegerleri;
+  /**
+   * Siparişin paylaşım anahtarı (`arc_orders.public_token`).
+   *
+   * Şablonun dinamik URL düğmesine ekleniyor: düğmenin adresi
+   * Meta'da `.../siparis/{{1}}` olarak sabit, değişen son parça bu.
+   * Mesajın gövdesinde değil düğmede, çünkü şablon parametrelerinde
+   * satır sonu yasak ve gövdeye adres yazmak mesajı uzatıyor.
+   *
+   * Yoksa düğme parametresi gönderilmiyor; şablonda düğme varsa
+   * Meta mesajı reddeder, o yüzden anahtar üretilemeyen bir siparişte
+   * bu alan boş GEÇİLMEZ, çağıran taraf hiç göndermez.
+   */
+  paylasimAnahtari?: string | null;
 }): Promise<WaSonuc> {
   const adres = kapiAdresi();
   const sir = kapiSirri();
@@ -89,7 +102,13 @@ export async function waSablonGonder(input: {
            numarası bağlı değilse kapı Arvo'nunkine düşüyor ve bunu
            söylüyor; sonuçta görünsün diye taşınıyor. */
         sender: "organization",
-        messages: [{ ref: input.anahtar, ...hazir.mesaj }],
+        messages: [
+          {
+            ref: input.anahtar,
+            ...hazir.mesaj,
+            ...(input.paylasimAnahtari ? { urlButtonParam: input.paylasimAnahtari } : {}),
+          },
+        ],
       }),
       /* Sipariş akışının içinden çağrılıyor; kapı yanıt vermezse
          akış beklemesin. */

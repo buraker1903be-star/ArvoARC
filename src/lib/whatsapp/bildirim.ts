@@ -77,6 +77,8 @@ export async function waSiparisBildirimi(input: {
   numara: string | null | undefined;
   metadata: unknown;
   degerler: WaDegerleri;
+  /** Siparişin paylaşım anahtarı; mesajdaki "Siparişi görüntüle" düğmesi. */
+  paylasimAnahtari?: string | null;
 }): Promise<Durum> {
   const kim = `[whatsapp ${input.anahtar} sipariş=${input.orderId ?? "-"}]`;
 
@@ -91,6 +93,7 @@ export async function waSiparisBildirimi(input: {
       anahtar: input.anahtar,
       numara: input.numara,
       degerler: input.degerler,
+      paylasimAnahtari: input.paylasimAnahtari,
     });
 
     if (sonuc.durum === "gonderildi") {
