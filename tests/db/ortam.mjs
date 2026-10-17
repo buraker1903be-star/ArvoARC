@@ -42,12 +42,22 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   fonksiyonun yetki satırını olduğu gibi taşıyor, imleç de ileri
   alındı.
 
-  17.10.2026 dökümü günün ÜÇ migration'ını da içeriyor: modül okuma
-  politikası, silinen siparişin satış hareketi ve medya özeti
-  fonksiyonu. İmleç sonuncunun (20261017111816) bir ardında; döküm
+  17.10.2026 dökümü günün SEKİZ migration'ını da içeriyor: modül okuma
+  politikası, silinen siparişin satış hareketi, medya özeti, vitrinde
+  uygunluğun tek kurala bağlanması, kiracı vitrininin sayfalaması,
+  tedarikçi tamponunun eşik olarak uygulanması, sitemap'in yalnızca
+  indekslenebilir ürünü listelemesi ve koleksiyon rafının
+  sayfalanması. İmleç sonuncunun (20261017125314) bir ardında; döküm
   yenilendiğinde aynı şekilde ileri alın.
+
+  İmleci ileri almak testlerin dişini sökmüyor: kuralı artık
+  migration dosyası değil DÖKÜM taşıyor, yani testler canlıda ne
+  varsa onu sınıyor. Düşürdüğü tek şey "migration dosyası bu kuralı
+  gerçekten kuruyor mu" sorusu; o soru uygulanmadan önce
+  yanıtlanıyor (her migration'ı dosya yerinde ve yerinden alınmış
+  hâlde koşturarak).
 */
-const ILK_UYGULANAN = "20261017111817";
+const ILK_UYGULANAN = "20261017125315";
 
 const SUPABASE_KABUGU = `
 create role anon nologin;
