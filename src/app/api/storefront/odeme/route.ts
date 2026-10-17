@@ -125,6 +125,16 @@ export async function POST(request: Request) {
   const items = rawItems.map(parseItem).filter((item): item is Item => item !== null);
   /* Vitrin notu gönderiyordu ama hiç kaydedilmiyordu. */
   const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) : "";
+  /*
+    WHATSAPP ONAYI. Vitrindeki ödeme formunda müşterinin işaretlediği
+    kutucuk; İŞARETSİZ başlıyor. WhatsApp politikası işletmenin
+    başlattığı mesaj için onay istiyor ve onay siparişin kaydında
+    duruyor — bildirim gönderilirken oradan okunuyor
+    (lib/whatsapp/bildirim). Gelmediğinde false: eski vitrin
+    sürümünden gelen istek onaysız sayılıyor, yanlışlıkla mesaj
+    gitmesin.
+  */
+  const whatsappOnay = body.whatsappOnay === true;
 
   /*
     Banka havalesi. Sipariş oluşuyor ama PayTR'a gidilmiyor;
@@ -401,6 +411,22 @@ export async function POST(request: Request) {
       })
       .eq("id", order.order_id);
   };
+
+  /*
+    WHATSAPP ONAYI SİPARİŞİN KAYDINA. Sipariş fonksiyonunun imzasını
+    değiştirmek yerine burada yazılıyor: imza değişikliği vitrinin
+    çağrılarını aynı anda güncellemeyi gerektirirdi ve iki tarafın
+    dağıtımı eşzamanlı değil.
+
+    mergeMetadata ile — doğrudan update, teslimat adresini ve kupon
+    bilgisini silerdi (yukarıdaki nota bakın; o hata bir kez yaşandı).
+    Yazılamazsa sipariş durmuyor, onay yokmuş gibi davranılıyor:
+    sessizce mesaj GÖNDERMEK kabul edilemez, göndermemek edilebilir.
+  */
+  if (whatsappOnay) {
+    const { error: onayHatasi } = await mergeMetadata({ whatsapp_onay: true });
+    if (onayHatasi) console.error("WhatsApp onayı yazılamadı:", onayHatasi.message);
+  }
 
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0";

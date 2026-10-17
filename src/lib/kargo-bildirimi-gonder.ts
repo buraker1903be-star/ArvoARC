@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/lib/email/resend";
 import { shipmentNoticeHtml } from "@/lib/email/shipment-notification";
 import { getStoreBrand } from "@/lib/store-brand";
+import { siparisTelefonu, waSiparisBildirimi } from "@/lib/whatsapp/bildirim";
 import { takipAdresi } from "@/lib/kargo-firmalari";
 import { bildirilmeliMi, paketEtiketi, type BildirimGonderisi } from "@/lib/kargo-bildirimi";
 
@@ -46,7 +47,7 @@ export async function kargoBildirimiGonder(
 ): Promise<number> {
   try {
     const [{ data: order }, { data: gonderiler }] = await Promise.all([
-      supabase.from("arc_orders").select("order_number,customer_name,customer_email")
+      supabase.from("arc_orders").select("order_number,customer_name,customer_email,metadata")
         .eq("organization_id", organizationId).eq("id", orderId).maybeSingle(),
       supabase.from("arc_shipments")
         .select("id,sequence,status,tracking_number,tracking_url,carrier_code,carrier_name,customer_notified_at,arc_shipment_items(order_item_id,quantity)")
@@ -114,6 +115,26 @@ export async function kargoBildirimiGonder(
         html,
         from: brand.from,
         replyTo: brand.replyTo,
+      });
+
+      /*
+        Aynı paketin WhatsApp'ı. Takip numarası burada kesin var
+        (bildirilmeliMi onu şart koşuyor), yani şablonun dört
+        parametresi de dolu. Müşteri onayı yoksa gönderilmiyor,
+        yalnızca kayda geçiyor.
+      */
+      await waSiparisBildirimi(supabase, {
+        organizationId,
+        orderId,
+        anahtar: "siparis_kargoda",
+        numara: siparisTelefonu(order.metadata),
+        metadata: order.metadata,
+        degerler: {
+          musteri: (order.customer_name as string) || "değerli müşterimiz",
+          siparis_no: (order.order_number as string) ?? "",
+          kargo_firmasi: gonderi.carrier_name?.trim() || "Kargo",
+          takip_no: takipNo,
+        },
       });
 
       /*

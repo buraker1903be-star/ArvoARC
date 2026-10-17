@@ -99,3 +99,38 @@ test("tanınmayan şablon ve bozuk numara ayrı ayrı bildiriliyor", () => {
   assert.ok("hata" in b);
   assert.match(b.hata, /uygun değil/);
 });
+
+/*
+  Onay ve telefon okuma kuralları (lib/whatsapp/bildirim). Ayrı
+  dosyaya koymuyorum: ikisi de aynı gönderim kararının parçası ve
+  birlikte okunmaları gerekiyor.
+*/
+import { siparisTelefonu, whatsappOnayiVar, waTutar } from "@/lib/whatsapp/bildirim";
+
+test("onay yoksa gönderilmiyor: eksik, false ve boş hepsi onaysız", () => {
+  /* Eski siparişlerde bu alan hiç yok; yanlışlıkla mesaj gitmesin. */
+  assert.equal(whatsappOnayiVar(null), false);
+  assert.equal(whatsappOnayiVar({}), false);
+  assert.equal(whatsappOnayiVar({ whatsapp_onay: false }), false);
+  assert.equal(whatsappOnayiVar({ whatsapp_onay: "hayir" }), false);
+});
+
+test("onay işaretliyse gönderiliyor", () => {
+  assert.equal(whatsappOnayiVar({ whatsapp_onay: true }), true);
+  /* Üstveri JSON'dan okunduğu için metin "true" da gelebiliyor. */
+  assert.equal(whatsappOnayiVar({ whatsapp_onay: "true" }), true);
+});
+
+test("telefon önce üstveriden, yoksa adresten okunuyor", () => {
+  assert.equal(siparisTelefonu({ phone: "+905551112233" }), "+905551112233");
+  assert.equal(siparisTelefonu({ shipping_address: { phone: "05551112233" } }), "05551112233");
+  assert.equal(siparisTelefonu({ address: { phone: "05551112233" } }), "05551112233");
+  assert.equal(siparisTelefonu({}), null);
+  assert.equal(siparisTelefonu(null), null);
+});
+
+test("tutar mesajda Türkçe biçimde", () => {
+  /* Kuruş tamsayıdan TL'ye; e-posta şablonuyla aynı kural. */
+  assert.match(waTutar(124990), /1\.249,90/);
+  assert.match(waTutar(0), /0,00/);
+});

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getStoreBrand } from "@/lib/store-brand";
 import { orderConfirmationHtml } from "@/lib/email/order-confirmation";
 import { sendEmail } from "@/lib/email/resend";
+import { siparisTelefonu, waSiparisBildirimi, waTutar } from "@/lib/whatsapp/bildirim";
 
 /*
   SİPARİŞ ONAY E-POSTASI. PayTR bildirim ucunun içinden çıkarıldı:
@@ -71,6 +72,25 @@ export async function sendOrderConfirmation(
     to: order.customer_email,
     subject: `${brand.name} · siparişiniz alındı · ${order.order_number}`,
     html,
+  });
+
+  /*
+    Aynı olayın WhatsApp'ı. Postadan SONRA ve ayrı: bildirim
+    gönderimi postanın gitmesini engellememeli, hatası da buraya
+    sızmamalı (lib/whatsapp/bildirim hiçbir zaman fırlatmıyor).
+    Müşteri onayı yoksa gönderilmiyor, yalnızca kayda geçiyor.
+  */
+  await waSiparisBildirimi(supabase, {
+    organizationId: order.organization_id,
+    orderId,
+    anahtar: "siparis_alindi",
+    numara: siparisTelefonu(order.metadata),
+    metadata: order.metadata,
+    degerler: {
+      musteri: order.customer_name || "değerli müşterimiz",
+      siparis_no: order.order_number,
+      tutar: waTutar(order.total ?? 0),
+    },
   });
 }
 

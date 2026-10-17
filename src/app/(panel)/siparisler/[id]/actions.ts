@@ -14,6 +14,7 @@ import { iadeDagilimi, refundOutcome } from "@/lib/refund";
 import { claimOrderLock, releaseOrderLock, withoutLock } from "@/lib/order-lock";
 import { requireTenant } from "@/lib/tenant";
 import { getStoreBrand } from "@/lib/store-brand";
+import { siparisTelefonu, waSiparisBildirimi } from "@/lib/whatsapp/bildirim";
 import { tarzyeriSepetiniDogrula } from "@/lib/supplier/tarzyeri-dogrulama";
 
 /*
@@ -74,6 +75,25 @@ export async function updateOrderStatus(formData:FormData){
       const mail=statusUpdateEmail(status,order?.order_number??"",order?.customer_name||"değerli müşterimiz",await getStoreBrand(supabase,organization.id),{trackingSent,unpaid});
       if(order?.customer_email&&mail){
         await sendEmail({to:order.customer_email,...mail});
+      }
+
+      /*
+        Aynı olayın WhatsApp'ı. E-postayla AYNI koşullar geçerli:
+        takip numarası girildiyse kargo bildirimi zaten gitti,
+        bildirim gerektirmeyen ara durumda mesaj üretilmiyor
+        (WA_ANAHTARI listesi o yüzden kısa). Müşteri onayı yoksa
+        gönderilmiyor, yalnızca kayda geçiyor.
+      */
+      const waAnahtari=status==="cancelled"?"siparis_iptal":status==="refunded"?"iade_tamamlandi":null;
+      if(waAnahtari&&order){
+        await waSiparisBildirimi(supabase,{
+          organizationId:organization.id,
+          orderId,
+          anahtar:waAnahtari,
+          numara:siparisTelefonu(order.metadata),
+          metadata:order.metadata,
+          degerler:{musteri:order.customer_name||"değerli müşterimiz",siparis_no:order.order_number??""},
+        });
       }
     }catch(mailError){
       console.error("Durum bildirimi gönderilemedi:",mailError);
