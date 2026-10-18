@@ -205,7 +205,16 @@ const PLAN = [
   YAZAN FONKSİYONLAR ayrı sınanıyor: yan etkileri var ve oturum
   gerektiriyorlar. Aşağıdaki iki test onları kapsıyor.
 */
-const YAZANLAR = new Set(["arc_storefront_create_order", "arc_storefront_return_request"]);
+const YAZANLAR = new Set([
+  "arc_storefront_create_order",
+  "arc_storefront_return_request",
+  /* Ziyaret sayacı: adresten kurumu çözüyor ve yalnızca YAZIYOR,
+     hiçbir şey döndürmüyor — plandaki "A'nın adresi yalnızca A'yı
+     getiriyor" kalıbına okunacak bir çıktısı yok. Kiracı ayrımı
+     kendi dosyasında sınanıyor (canli-ziyaret.test.mjs:
+     "bilinmeyen adres hiçbir şey yazmıyor"). */
+  "arc_storefront_visit",
+]);
 
 /*
   ANAHTARLA ÇALIŞANLAR: kiracıyı ADRESTEN değil, müşterinin

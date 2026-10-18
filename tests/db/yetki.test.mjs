@@ -89,6 +89,14 @@ const ANON = [
     silinirse hukuki sayfalar yedek sabitlere düşer.
   */
   "public.arc_storefront_seller",
+  /*
+    ZİYARET SAYACI anon'a açık: vitrin kendi sunucusundan
+    çağırıyor ve elindeki anahtar anon. Yazdığı şey bir sayaç —
+    en kötü ihtimalle gürültü üretir, okunabilir bir veri
+    sızdırmaz; hiçbir şey de DÖNDÜRMÜYOR. Hız sınırı
+    fonksiyonun içinde (dakikada 30).
+  */
+  "public.arc_storefront_visit",
   "public.get_storefront_seller",
 ];
 

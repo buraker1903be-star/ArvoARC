@@ -27,9 +27,13 @@ test("Siparişler alt menüsüz; Operasyon başlatıcıda, Müşteriler Finans'�
   assert.ok(s.includes("/operasyon"), "başlatıcı ve Ctrl+K");
   assert.ok(s.includes("/musteriler"), "Finans'ın bölümü olarak Ctrl+K'da");
   const finans = u.find((x) => x.key === "finans")!;
-  /* Sıra kurum sahibinin tarifi: önce Müşteriler, sonra Raporlar. */
-  assert.deepEqual(finans.bolumler?.map((b) => b.href), ["/musteriler", "/analitik"]);
-  assert.deepEqual(finans.bolumler?.map((b) => b.label), ["Müşteriler", "Raporlar"]);
+  /*
+    Sıra kurum sahibinin tarifi: önce Müşteriler, sonra Raporlar.
+    Canlı en sonda — Raporlar SATIN ALMIŞ müşteriyi anlatıyor,
+    Canlı ondan önceki adımı (kim bakıyor, nereden, neye).
+  */
+  assert.deepEqual(finans.bolumler?.map((b) => b.href), ["/musteriler", "/analitik", "/analitik/canli"]);
+  assert.deepEqual(finans.bolumler?.map((b) => b.label), ["Müşteriler", "Raporlar", "Canlı"]);
   /* Dock simgesi ilk bölümü açar (öbür uygulamalarda da öyle). */
   assert.equal(finans.href, finans.bolumler?.[0].href);
   /* Müşteriler artık ayrı bir uygulama DEĞİL: iki yerde durursa

@@ -107,6 +107,12 @@ export function arcUygulamalari(rozet?: { operasyon?: number; iade?: number }): 
       bolumler: [
         { key: "musteriler", href: "/musteriler", label: "Müşteriler" },
         { key: "analitik", href: "/analitik", label: "Raporlar" },
+        /*
+          CANLI RAPORLARIN YANINDA. Raporlar siparişi anlatıyor —
+          yani SATIN ALMIŞ müşteriyi; canlı ekran ondan önceki
+          adımı gösteriyor: kim bakıyor, nereden, neye.
+        */
+        { key: "canli", href: "/analitik/canli", label: "Canlı" },
       ],
     },
     {
