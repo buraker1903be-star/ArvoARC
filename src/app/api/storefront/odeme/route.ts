@@ -1,4 +1,4 @@
-import { HAVALE_ETIKETI } from "@/lib/payment-method";
+import { HAVALE_ETIKETI, KART_ETIKETI } from "@/lib/payment-method";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { storePaytrConfig, type PaytrStoreConfig } from "@/lib/paytr/config";
@@ -557,6 +557,10 @@ export async function POST(request: Request) {
 
     if (alanlar) {
       const { error: garantiMetaError } = await mergeMetadata({
+        /* Yöntem AÇIKÇA yazılıyor: ekranlar yokluğu "kart" olarak
+           okuyordu, yani kayıt eksikliği ile kart aynı şeye
+           iniyordu (lib/payment-method). */
+        payment_method: KART_ETIKETI,
         odeme_saglayicisi: "garanti",
         garanti_order_id: order.order_id,
         garanti_test_modu: garantiAyar.testModu,
@@ -660,7 +664,12 @@ export async function POST(request: Request) {
     numara deseniyle aramak yerine birebir bulur.
   */
   const merchantOid = order.order_number.replace(/[^A-Za-z0-9]/g, "");
-  const { error: metaError } = await mergeMetadata({ paytr_merchant_oid: merchantOid, ...(note ? { notes: note } : {}) });
+  const { error: metaError } = await mergeMetadata({
+    /* Yöntem açıkça yazılıyor; gerekçe lib/payment-method. */
+    payment_method: KART_ETIKETI,
+    paytr_merchant_oid: merchantOid,
+    ...(note ? { notes: note } : {}),
+  });
   if (metaError) console.error("Sipariş üstverisi kaydedilemedi:", metaError);
 
   // PayTR sepet formatı: [[ad, birim fiyat, adet], ...]

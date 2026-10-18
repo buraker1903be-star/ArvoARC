@@ -199,7 +199,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
               <legend>Vitrin nerede?</legend>
               <label className="check-inline">
                 <input type="radio" name="storefront_mode" value="hosted" defaultChecked={disVitrin!==true}/>
-                <span><b>ArvoARC'ta</b> — mağazayı biz barındırıyoruz</span>
+                <span><b>ArvoARC&apos;ta</b> — mağazayı biz barındırıyoruz</span>
               </label>
               <label className="check-inline">
                 <input type="radio" name="storefront_mode" value="external" defaultChecked={disVitrin===true}/>
@@ -209,7 +209,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
             {!disVitrin&&<label>ARVO mağaza alt alan adı<div className="domain-input"><input name="storefront_subdomain" defaultValue={settings?.platform_subdomain??""} placeholder="magazaadi" pattern="[a-z0-9-]+"/><span>.{ALT_ALAN_SONEKI}</span></div></label>}
             {!disVitrin&&<div className="domain-divider"><span>veya özel alan adı</span></div>}
             <label>{disVitrin?"Sitenizin alan adı":"Mağaza alan adı"}<input name="storefront_custom_domain" defaultValue={settings?.custom_domain??""} placeholder="markaniz.com"/></label>
-            {disVitrin&&<p className="list-hint">Bu adres yalnızca <b>tanıma</b> için kaydedilir: siparişin hangi mağazaya yazılacağını ve API'mizin hangi siteye açılacağını belirler. DNS'inize dokunulmaz.</p>}
+            {disVitrin&&<p className="list-hint">Bu adres yalnızca <b>tanıma</b> için kaydedilir: siparişin hangi mağazaya yazılacağını ve API&apos;mizin hangi siteye açılacağını belirler. DNS&apos;inize dokunulmaz.</p>}
             <button className="panel-primary" type="submit">Mağaza alan adını kaydet</button>
           </form>}
           {settings?.custom_domain&&domainStatus!=="active"&&(disVitrin

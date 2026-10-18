@@ -27,10 +27,27 @@ export function isBankTransfer(metadata: unknown) {
 */
 export const HAVALE_ETIKETI = "Banka havalesi / EFT";
 
+/*
+  KART ETİKETİ DE YAZILIYOR (18.10.2026).
+
+  Kartlı siparişler metadata'ya ödeme yöntemi YAZMIYORDU; ekranlar
+  `payment_method ?? "Kredi kartı"` diyerek yokluğu "kart" olarak
+  okuyordu. Yani "kart" ile "yöntem hiç kaydedilmemiş" aynı şeye
+  iniyordu: yeni bir yöntem eklenip yazılmayı unutursa sessizce
+  KART görünür ve muhasebe tarafında yanlış durur — manuel
+  siparişlerde tam bu olmuştu.
+
+  Yeni siparişler yöntemi açıkça taşıyor. Eski satırlarda alan boş
+  kalıyor ve ekranlardaki `?? "Kredi kartı"` yedeği onlar için
+  duruyor; geçmişi bu varsayımla yeniden yazmak, varsayımı veriye
+  dönüştürmek olurdu.
+*/
+export const KART_ETIKETI = "Kredi kartı";
+
 export const MANUEL_ODEME_TURLERI = [
   { deger: "Nakit", etiket: "Nakit" },
   { deger: HAVALE_ETIKETI, etiket: "Banka havalesi / EFT" },
-  { deger: "Kredi kartı", etiket: "Kredi kartı" },
+  { deger: KART_ETIKETI, etiket: "Kredi kartı" },
 ] as const;
 
 /** Formdan gelen değeri izinli etiketlere eşler; tanımadığını atar. */
