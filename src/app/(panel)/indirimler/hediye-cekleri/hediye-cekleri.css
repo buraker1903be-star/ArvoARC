@@ -50,3 +50,22 @@
 .cek-tablo tr[data-pasif] b {
   color: var(--muted);
 }
+
+.cek-eylemler {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Silme en sessiz eylem: yalnızca üzerine gelince kırmızıya
+   dönüyor. Harcanmış çekte düğme HİÇ çizilmiyor — kapalı bir
+   düğme "neden olmuyor" sorusunu doğurur, olmayan düğme
+   doğurmaz; sebebi zaten kapatma akışında yazıyor. */
+.cek-sil {
+  color: var(--muted);
+}
+
+.cek-sil:hover {
+  color: var(--danger, #a3342a);
+  border-color: currentColor;
+}

@@ -148,3 +148,96 @@ export async function toggleGiftCard(formData: FormData) {
     basari: basariMetni(sonraki === "active" ? "enabled" : "disabled"),
   });
 }
+
+/*
+  SİLME — YALNIZCA HİÇ KULLANILMAMIŞ ÇEKTE.
+
+  Yanlış tanımlanan çek (kod hatası, fazla sıfır) silinebilmeli;
+  "kapat" orada yanlış cevap, çünkü ortada kapatılacak bir şey
+  değil, OLMAMASI gereken bir kayıt var.
+
+  Ama harcanmış çek silinemez: `arc_gift_card_uses` kaydı
+  `on delete cascade` ile gider ve "bu para nereye gitti" sorusu
+  yanıtsız kalır. O çek yalnızca KAPATILIR — bir daha geçmez,
+  geçmişi durur.
+
+  Ölçüt yükleme hareketi DEĞİL harcama: tanımlama da kütüğe bir
+  satır yazıyor (negatif) ve ona bakılsaydı hiçbir çek
+  silinemezdi.
+*/
+export async function deleteGiftCard(formData: FormData) {
+  const { organization, membership } = await requireTenant();
+  if (!IZINLI_ROLLER.has(membership.role)) {
+    return await bildirimliDonus(geriAdresi(formData), {
+      hata: hataMetni("forbidden"),
+    });
+  }
+
+  const id = temiz(formData, "id", 80);
+  if (!id) {
+    return await bildirimliDonus(geriAdresi(formData), {
+      hata: hataMetni("invalid"),
+    });
+  }
+
+  const servis = createServiceClient();
+
+  /* Mağaza kapsamı burada da: id tahmin edilerek başka mağazanın
+     çeki silinemesin. */
+  const { data: cek, error: okumaHatasi } = await servis
+    .from("arc_gift_cards")
+    .select("id")
+    .eq("id", id)
+    .eq("organization_id", organization.id)
+    .maybeSingle();
+
+  if (okumaHatasi) {
+    return await bildirimliDonus(geriAdresi(formData), {
+      hata: hataMetni(okumaHatasi.code ?? okumaHatasi.message),
+    });
+  }
+  if (!cek) {
+    return await bildirimliDonus(geriAdresi(formData), {
+      hata: hataMetni("not-found"),
+    });
+  }
+
+  const { count, error: kullanimHatasi } = await servis
+    .from("arc_gift_card_uses")
+    .select("id", { count: "exact", head: true })
+    .eq("gift_card_id", id)
+    .gt("amount", 0);
+
+  /*
+    Kullanım SAYILAMADIYSA silmiyoruz. "Sayamadım" ile "hiç
+    kullanılmamış" aynı şey değil ve ikisini birbirine karıştırmak
+    harcanmış bir çekin izini silmek demek.
+  */
+  if (kullanimHatasi) {
+    return await bildirimliDonus(geriAdresi(formData), {
+      hata: hataMetni(kullanimHatasi.code ?? kullanimHatasi.message),
+    });
+  }
+  if ((count ?? 0) > 0) {
+    return await bildirimliDonus(geriAdresi(formData), {
+      hata: hataMetni("used-card"),
+    });
+  }
+
+  const { error } = await servis
+    .from("arc_gift_cards")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", organization.id);
+
+  if (error) {
+    return await bildirimliDonus(geriAdresi(formData), {
+      hata: hataMetni(error.code ?? error.message),
+    });
+  }
+
+  revalidatePath("/indirimler/hediye-cekleri");
+  return await bildirimliDonus(geriAdresi(formData), {
+    basari: basariMetni("deleted"),
+  });
+}

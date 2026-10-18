@@ -3,7 +3,8 @@ import { requireTenant } from "@/lib/tenant";
 import { createServiceClient } from "@/lib/paytr/service-client";
 import { Pencere } from "@/components/os/pencere";
 import { IstatistikKarti } from "@/components/arvo-ui/istatistik-karti";
-import { createGiftCard, toggleGiftCard } from "./actions";
+import { createGiftCard, deleteGiftCard, toggleGiftCard } from "./actions";
+import { ConfirmSubmit } from "@/components/panel/confirm-submit";
 import "@/components/arvo-ui/k-ui";
 import "@/components/arvo-ui/crm.css";
 import "@/components/arvo-ui/kayit-detay.css";
@@ -142,6 +143,15 @@ export default async function HediyeCekleri({
                   const dolmus = suresiDolmus(cek);
                   const bitti = cek.balance <= 0;
                   const kapali = cek.status !== "active";
+                  /*
+                    Harcanmış çek SİLİNEMEZ: kütük kaydı cascade ile
+                    gider ve "bu para nereye gitti" sorusu yanıtsız
+                    kalır. Bakiye yüklenenden küçükse harcama olmuş
+                    demektir — bakiye yalnızca siparişte düşüyor.
+                    Sunucu ayrıca kütüğe bakıyor; buradaki ölçüt
+                    düğmeyi göstermek için.
+                  */
+                  const kullanilmis = cek.balance < cek.initial_amount;
                   return (
                     <tr key={cek.id} data-pasif={kapali || dolmus || bitti ? "" : undefined}>
                       <td>
@@ -184,17 +194,38 @@ export default async function HediyeCekleri({
                             yanıtsız kalırdı. Kapatılan çek ödemede
                             geçmiyor ama geçmişi duruyor.
                           */}
-                          <form action={toggleGiftCard}>
-                            <input type="hidden" name="id" value={cek.id} />
-                            <input
-                              type="hidden"
-                              name="next_status"
-                              value={kapali ? "active" : "disabled"}
-                            />
-                            <button className="panel-secondary" type="submit">
-                              {kapali ? "Aç" : "Kapat"}
-                            </button>
-                          </form>
+                          <div className="cek-eylemler">
+                            <form action={toggleGiftCard}>
+                              <input type="hidden" name="id" value={cek.id} />
+                              <input
+                                type="hidden"
+                                name="next_status"
+                                value={kapali ? "active" : "disabled"}
+                              />
+                              <button className="panel-secondary" type="submit">
+                                {kapali ? "Aç" : "Kapat"}
+                              </button>
+                            </form>
+
+                            {/*
+                              SİLME YALNIZCA HİÇ KULLANILMAMIŞ ÇEKTE.
+                              Yanlış tanımlanan çekte (kod hatası, fazla
+                              sıfır) "kapat" yanlış cevap: ortada
+                              kapatılacak bir şey değil, OLMAMASI gereken
+                              bir kayıt var.
+                            */}
+                            {kullanilmis ? null : (
+                              <form action={deleteGiftCard}>
+                                <input type="hidden" name="id" value={cek.id} />
+                                <ConfirmSubmit
+                                  className="panel-secondary cek-sil"
+                                  message={`“${cek.code}” kalıcı olarak silinsin mi?\n\n${para.format(cek.initial_amount / 100)} tutarındaki bu çek hiç kullanılmamış.\n\nBu işlem geri alınamaz.`}
+                                >
+                                  Sil
+                                </ConfirmSubmit>
+                              </form>
+                            )}
+                          </div>
                         </td>
                       ) : null}
                     </tr>

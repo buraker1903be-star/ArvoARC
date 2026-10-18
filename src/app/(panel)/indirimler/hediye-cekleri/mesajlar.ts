@@ -16,12 +16,15 @@ export const ERRORS: Record<string, string> = {
   "past-date": "Son kullanım tarihi bugünden sonra olmalı.",
   "23505": "Bu kod başka bir hediye çekinde kullanılıyor.",
   "not-found": "Hediye çeki bulunamadı. Başka bir mağazaya ait olabilir.",
+  "used-card":
+    "Bu çek siparişte kullanılmış; silinemez. Kapatırsanız bir daha geçmez ama geçmişi durur.",
   invalid: "İstek anlaşılamadı. Sayfayı yenileyip tekrar deneyin.",
 };
 
 export const BASARILAR: Record<string, string> = {
   created: "Hediye çeki tanımlandı.",
   disabled: "Hediye çeki kapatıldı.",
+  deleted: "Hediye çeki silindi.",
   enabled: "Hediye çeki yeniden açıldı.",
 };
 
