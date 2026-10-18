@@ -30,10 +30,10 @@ before(async () => {
   `);
 });
 
-const yaz = (yol, ip, slug = null) =>
+const yaz = (yol, ip, slug = null, kaynak = null) =>
   db.query(
-    `select public.arc_storefront_visit($1::text, $2::text, $3::text, 'TR', 'Istanbul', 41.0, 29.0, $4::text)`,
-    [KONAK, yol, slug, ip],
+    `select public.arc_storefront_visit($1::text, $2::text, $3::text, 'TR', 'Istanbul', 41.0, 29.0, $4::text, $5::text)`,
+    [KONAK, yol, slug, ip, kaynak],
   );
 
 const sayi = async () =>
@@ -78,5 +78,26 @@ describe("canlı ziyaret kaydı", () => {
     for (let i = 0; i < 40; i += 1) await yaz(`/s/${i}`, "5.5.5.5");
     /* Sınır 30: aynı karmadan fazlası bot sayılıyor. */
     assert.equal(await sayi() - once, 30);
+  });
+});
+
+describe("ziyaret kaynağı", () => {
+  test("kaynak küçük harfe iniyor: aynı platform iki satır olmuyor", async () => {
+    await yaz("/k1", "7.7.7.1", null, "Instagram");
+    await yaz("/k2", "7.7.7.2", null, "instagram");
+    const { rows } = await db.query(
+      `select distinct source from public.arc_visits where path like '/k%'`,
+    );
+    assert.deepEqual(rows.map((r) => r.source), ["instagram"]);
+  });
+
+  test("kaynaksız ziyaret boş kalıyor, uydurulmuyor", async () => {
+    /* Adres çubuğuna yazarak gelen ziyaretin kaynağı yok; bir
+       etiket koymak onu platform gibi gösterirdi. */
+    await yaz("/k3", "7.7.7.3");
+    const { rows } = await db.query(
+      `select source from public.arc_visits where path = '/k3'`,
+    );
+    assert.equal(rows[0].source, null);
   });
 });

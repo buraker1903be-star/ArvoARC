@@ -1,6 +1,7 @@
 import "server-only";
 import { requireTenant } from "@/lib/tenant";
 import { createServiceClient } from "@/lib/paytr/service-client";
+import { kaynakAdi } from "@/lib/ziyaret-kaynagi";
 
 /**
  * Canlı ziyaret verisi.
@@ -29,6 +30,8 @@ export type CanliVeri = {
   ulkeler: Array<{ ad: string; adet: number }>;
   sehirler: Array<{ ad: string; adet: number }>;
   urunler: Array<{ slug: string; ad: string; adet: number }>;
+  /** Hangi platformdan gelindiği (Google, Instagram, Doğrudan…). */
+  kaynaklar: Array<{ ad: string; adet: number }>;
   okunamadi: boolean;
 };
 
@@ -39,6 +42,7 @@ const BOS: CanliVeri = {
   ulkeler: [],
   sehirler: [],
   urunler: [],
+  kaynaklar: [],
   okunamadi: true,
 };
 
@@ -72,7 +76,7 @@ export async function canliVeriOku(): Promise<CanliVeri> {
   */
   const { data, error } = await servis
     .from("arc_visits")
-    .select("path, product_slug, country, city, lat, lon, ip_hash, created_at")
+    .select("path, product_slug, country, city, lat, lon, ip_hash, source, created_at")
     .eq("organization_id", organization.id)
     .gte("created_at", gunOnce)
     .order("created_at", { ascending: false })
@@ -91,6 +95,7 @@ export async function canliVeriOku(): Promise<CanliVeri> {
     lat: number | null;
     lon: number | null;
     ip_hash: string | null;
+    source: string | null;
     created_at: string;
   };
   const satirlar = (data ?? []) as Satir[];
@@ -143,6 +148,15 @@ export async function canliVeriOku(): Promise<CanliVeri> {
     gunluk: satirlar.length,
     ulkeler: enCok(
       satirlar.map((s) => s.country),
+      6,
+    ),
+    /*
+      Ham kaynak ("l.instagram.com") okunabilir ada çevriliyor
+      ÖNCE, sayım sonra: yoksa aynı platform üç ayrı satıra
+      bölünürdü (lib/ziyaret-kaynagi).
+    */
+    kaynaklar: enCok(
+      satirlar.map((s) => kaynakAdi(s.source)),
       6,
     ),
     sehirler: enCok(

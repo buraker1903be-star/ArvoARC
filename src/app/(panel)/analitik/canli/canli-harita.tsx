@@ -129,6 +129,15 @@ export function CanliHarita({ ilk }: { ilk: CanliVeri }) {
           }))}
           bos="Henüz ürün sayfası açılmamış."
         />
+        {/* Kaynak ürünlerden SONRA, ülkelerden ÖNCE: "nereden
+            geldi" sorusu "hangi ülkeden" sorusundan daha sık
+            soruluyor. */}
+        <Liste
+          baslik="Nereden geldi"
+          alt="son 24 saat"
+          satirlar={veri.kaynaklar.map((k) => ({ ad: k.ad, adet: k.adet }))}
+          bos="Kaynak bilgisi gelmemiş."
+        />
         <Liste
           baslik="Ülkeler"
           alt="son 24 saat"
