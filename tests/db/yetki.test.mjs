@@ -76,6 +76,13 @@ const ANON = [
   */
   "public.arc_storefront_shipping_zones",
   /*
+    Yurtdışına gönderilemeyen ürünlerin slug listesi anon'a açık:
+    vitrin yurtdışı modunda o kartları gizliyor. Dönen şey ürün
+    adresinden başka bir şey değil ve o adresler zaten herkese açık
+    sayfalarda.
+  */
+  "public.arc_storefront_blocked_products",
+  /*
     Ödeme yöntemleri: vitrin, gösterebileceği yöntemleri ödeme adımından
     ÖNCE bilmeli. Yalnızca boolean dönüyor, PayTR anahtarları değil.
   */
@@ -104,6 +111,7 @@ const ANON = [
     fonksiyonun içinde (dakikada 30).
   */
   "public.arc_storefront_visit",
+  "public.get_arvoculture_storefront_blocked_products",
   "public.get_arvoculture_storefront_shipping_zones",
   "public.get_storefront_seller",
 ];

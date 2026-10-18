@@ -105,6 +105,16 @@ async function tohum() {
     insert into public.arc_shipping_zones (organization_id, label, countries, fee_cents, free_over_cents, sira) values
       ('${A}', 'A Bölgesi', '{}', 2500, 0, 0),
       ('${B}', 'B Bölgesi', '{}', 3900, 0, 0);
+
+    /*
+      Yurtdışına gönderilemeyen ürün işareti MEVCUT ürünlere konuyor,
+      yeni ürün eklenmiyor: tohuma ikinci bir ürün koymak ürün
+      listelerinin beklediği tek satırı ikiye çıkarıyor ve plandaki
+      öteki on iki satırı düşürüyordu. İşaret listelemeyi
+      etkilemiyor — süzgeç vitrinde, yurtdışı modunda.
+    */
+    update public.arc_products set international_blocked = true
+     where organization_id in ('${A}', '${B}');
   `);
 }
 
@@ -169,6 +179,13 @@ const PLAN = [
     siparişi YANLIŞ tutarla hesaplanır — sipariş fonksiyonu bu
     tarifeyi kuruşa çeviriyor.
   */
+  /*
+    Engelli ürün listesi: A'nın adresinden B'nin ürünü görünürse o
+    kart B'nin vitrininde değil A'nın vitrininde gizlenirdi.
+  */
+  { ad: "arc_storefront_blocked_products", kip: "satir", alan: "slug",
+    sql: "select slug from public.arc_storefront_blocked_products($1::text)",
+    a: "a-urun", b: "b-urun" },
   { ad: "arc_storefront_shipping_zones", kip: "deger", alan: "fee_cents",
     sql: "select fee_cents from public.arc_storefront_shipping_zones($1::text)", a: 2500, b: 3900 },
   { ad: "arc_storefront_payment_methods", kip: "deger", alan: "bank_transfer_discount_percent",
