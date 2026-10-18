@@ -6,9 +6,43 @@
    boş kalan bir panel — üçünden de kaçınıldı.
    ========================================================== */
 
+/*
+  TEK EKRAN DÜZENİ.
+
+  Harita solda kalan yüksekliği alıyor, listeler sağda kendi
+  içinde kayıyor. Önce ikisi alt alta tek sütundu ve sayfa
+  ekrandan taşıyordu — oysa canlı ekran açık bırakılıp arada göz
+  atılan bir sayfa; kaydırmak zorunda kalmak onu "bakılan"
+  olmaktan çıkarıyor.
+*/
 .canli {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
   gap: var(--sp-4);
+  align-items: stretch;
+}
+
+.canli-harita-kart {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Harita kalan yüksekliği alıyor ve oranını koruyarak sığıyor:
+   `height:auto` + genişlik verseydik uzun ekranda taşardı. */
+.canli-harita-kart .canli-harita {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Listeler sütunu kendi içinde kayıyor; sayfa kaymıyor. */
+.canli-listeler {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .canli-bas {
@@ -99,7 +133,7 @@
 
 .canli-listeler {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-auto-rows: max-content;
   gap: var(--sp-4);
 }
 
@@ -175,5 +209,18 @@
   .canli-dalga,
   .canli-nabiz[data-calisiyor]::before {
     animation: none;
+  }
+}
+
+/* Dar ekranda tek sütun ve kural gevşiyor: kayit-detay.css'teki
+   tek-ekran kuralı da 1200 pikselin altında kapanıyor. */
+@media (max-width: 1200px) {
+  .canli {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .canli-listeler {
+    overflow: visible;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   }
 }

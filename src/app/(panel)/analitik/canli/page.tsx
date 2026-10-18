@@ -25,7 +25,17 @@ export default async function CanliSayfa() {
   const ilk = await canliVeriOku();
 
   return (
-    <main className="talep cari ekip talepler teklifler liste-sayfa canli-sayfa">
+    /*
+      TEK EKRAN, SAYFA KAYMAZ. Panelin kuralı bu (kayit-detay.css
+      → main.tek-ekran): kayıt detayları ekran boyunda durup
+      sütunlarını kendi içinde kaydırıyor. Canlı ekran özellikle
+      buna uygun — açık bırakılıp arada göz atılan bir sayfa;
+      kaydırmak zorunda kalmak onu "bakılan" olmaktan çıkarır.
+
+      Harita ve listeler bu yüzden ızgaranın İÇİNDE ve ızgara
+      kalan yüksekliği alıyor.
+    */
+    <main className="crm-page-stack talep tek-ekran canli-sayfa">
       <header className="talep-bas">
         <div className="talep-bas-metin">
           <small className="panel-kicker">Finans</small>

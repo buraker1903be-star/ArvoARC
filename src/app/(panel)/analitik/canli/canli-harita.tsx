@@ -56,7 +56,7 @@ export function CanliHarita({ ilk }: { ilk: CanliVeri }) {
   }, []);
 
   return (
-    <div className="canli">
+    <div className="talep-izgara canli">
       <section className="panel-card canli-harita-kart">
         <header className="canli-bas">
           <div>

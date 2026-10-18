@@ -31,20 +31,48 @@ const yuvarla = (n) => Math.round(n);
 */
 const ESIK = 1.2;
 
+/*
+  180° MERİDYENİ. Rusya, Fiji ve Antarktika gibi ülkelerin
+  halkaları boylamın iki ucu arasında atlıyor: -179 → +179.
+  Düz silindirik projeksiyonda bu, x'in 0'dan 1000'e sıçraması
+  demek ve araya haritayı boydan boya kesen yatay bir çizgi
+  çiziliyor (canlıda görüldü).
+
+  Böyle bir sıçramada halka KAPATILIP yeni bir parça
+  başlatılıyor: iki kıta parçası ayrı ayrı çiziliyor, aradaki
+  uydurma çizgi hiç doğmuyor.
+*/
+const SICRAMA = 180;
+
 function halka(noktalar) {
   const parcalar = [];
+  let suanki = [];
   let sx = null;
   let sy = null;
+  let sonLon = null;
+
+  const bitir = () => {
+    /* Üç noktadan az kalan parça bir şey çizmiyor. */
+    if (suanki.length > 2) parcalar.push(suanki.join("") + "Z");
+    suanki = [];
+    sx = null;
+    sy = null;
+  };
+
   for (const [lon, lat] of noktalar) {
+    if (sonLon !== null && Math.abs(lon - sonLon) > SICRAMA) bitir();
+    sonLon = lon;
+
     const px = yuvarla(x(lon));
     const py = yuvarla(y(lat));
     if (sx !== null && Math.abs(px - sx) < ESIK && Math.abs(py - sy) < ESIK) continue;
-    parcalar.push(`${sx === null ? "M" : "L"}${px} ${py}`);
+    suanki.push(`${sx === null ? "M" : "L"}${px} ${py}`);
     sx = px;
     sy = py;
   }
-  /* Üç noktadan az kalan halka bir şey çizmiyor. */
-  return parcalar.length > 2 ? parcalar.join("") + "Z" : "";
+  bitir();
+
+  return parcalar.join("");
 }
 
 const ozellikler = topo.feature(dunya, dunya.objects.countries).features;
