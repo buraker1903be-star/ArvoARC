@@ -6,10 +6,8 @@
    durum rozeti.
    ========================================================== */
 
-.cek-duzen {
-  display: grid;
-  gap: var(--plt-s5, 24px);
-}
+/* Izgara İndirimler'inkiyle ortak (`ekip-izgara`); burada
+   yalnızca çeke özgü satır biçimleri var. */
 
 .cek-tablo td small {
   display: block;

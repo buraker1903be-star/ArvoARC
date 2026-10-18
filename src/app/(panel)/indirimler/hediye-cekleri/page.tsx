@@ -94,25 +94,37 @@ export default async function HediyeCekleri({
   ).length;
 
   return (
-    <main className="panel-main">
-      <header className="panel-head">
-        <div>
+    /*
+      Sayfa kabuğu İNDİRİMLER'inkiyle aynı sınıfları taşıyor
+      (`talep-bas` / `talep-bas-eylem`). Önce uydurma sınıflar
+      yazılmıştı (`panel-main`, `panel-head`): hiçbir kurala
+      uymadıkları için başlık sola yığılıyor ve eylem düğmesi
+      sağ üst yerine metnin altında kalıyordu.
+    */
+    <main className="talep cari ekip talepler teklifler liste-sayfa indirim-sayfasi">
+      <header className="talep-bas">
+        <div className="talep-bas-metin">
+          <small className="panel-kicker">
+            <Link prefetch={false} href="/indirimler">İndirimler</Link>
+          </small>
           <h1>Hediye çekleri</h1>
-          <p>
+          <p className="talep-bas-alt">
             Çek bir indirim değil, bakiyedir: müşteri yine kartla ya da
             havaleyle öder, yalnızca daha azını.
           </p>
         </div>
-        {yonetebilir ? (
-          <Link
-            prefetch={false}
-            scroll={false}
-            className="panel-primary"
-            href="/indirimler/hediye-cekleri?pencere=yeni"
-          >
-            Yeni hediye çeki
-          </Link>
-        ) : null}
+        <div className="talep-bas-eylem">
+          {yonetebilir ? (
+            <Link
+              prefetch={false}
+              scroll={false}
+              className="panel-primary"
+              href="/indirimler/hediye-cekleri?pencere=yeni"
+            >
+              + Yeni hediye çeki
+            </Link>
+          ) : null}
+        </div>
       </header>
 
       {cekler.length === 0 ? (
@@ -125,8 +137,8 @@ export default async function HediyeCekleri({
           </p>
         </div>
       ) : (
-        <div className="cek-duzen">
-          <section className="panel-card">
+        <div className="talep-izgara personel-iki ekip-izgara cek-duzen">
+          <section className="panel-card talep-bilgi" aria-label="Hediye çeki listesi">
             <table className="crm-data-table cek-tablo">
               <thead>
                 <tr>
