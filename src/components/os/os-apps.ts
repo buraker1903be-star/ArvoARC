@@ -71,7 +71,22 @@ export function arcUygulamalari(rozet?: { operasyon?: number; iade?: number }): 
       yollar: ["/siparisler/iadeler"],
       ...(iade ? { rozet: iade } : {}),
     },
-    { key: "indirimler", label: "İndirimler", href: "/indirimler", ikon: "indirim", yollar: ["/indirimler"] },
+    {
+      /*
+        HEDİYE ÇEKİ İNDİRİMİN BÖLÜMÜ.
+
+        Çek teknik olarak indirim değil, bakiye — ama mağaza
+        sahibi onu aradığı yer "kampanya araçları". Dock'a ikinci
+        bir simge koymak yerine bölüm yapıldı: aynı simge, üstte
+        iki sekme (Katalog ve Finans'taki kalıp).
+      */
+      key: "indirimler", label: "İndirimler", href: "/indirimler", ikon: "indirim",
+      yollar: ["/indirimler"],
+      bolumler: [
+        { key: "kampanyalar", href: "/indirimler", label: "Kampanyalar" },
+        { key: "hediye-cekleri", href: "/indirimler/hediye-cekleri", label: "Hediye çekleri" },
+      ],
+    },
     /*
       MÜŞTERİLER FİNANS'IN ALTINDA (16.10.2026, kurum sahibinin kararı).
       Ekran para tarafını anlatıyor: ömür boyu net harcama, ortalama

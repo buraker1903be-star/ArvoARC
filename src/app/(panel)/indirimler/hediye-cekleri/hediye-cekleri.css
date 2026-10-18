@@ -1,0 +1,52 @@
+/* ==========================================================
+   HEDİYE ÇEKLERİ LİSTESİ
+
+   İndirimler ekranıyla aynı kalıp (crm-data-table); burada
+   yalnızca çeke özgü iki şey var: kodun tek aralıklı yazımı ve
+   durum rozeti.
+   ========================================================== */
+
+.cek-duzen {
+  display: grid;
+  gap: var(--plt-s5, 24px);
+}
+
+.cek-tablo td small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Kod kopyalanıp müşteriye gönderiliyor: tek aralıklı yazı
+   karakterleri ayırt ettiriyor (O/0, I/l). */
+.cek-kod {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+}
+
+.cek-rozet {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line, #d8d8e0);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.cek-rozet[data-durum="acik"] {
+  border-color: color-mix(in srgb, var(--ok, #2f6b46) 40%, transparent);
+  color: var(--ok, #2f6b46);
+}
+
+/* Tükenmiş, süresi dolmuş ve kapalı çek AYRI rozetler: üçü de
+   "kullanılamaz" ama sebepleri farklı ve operasyoncunun yapacağı
+   şey de farklı (süre uzatma, yeniden açma, yeni çek). */
+.cek-rozet[data-durum="bitti"],
+.cek-rozet[data-durum="dolmus"],
+.cek-rozet[data-durum="kapali"] {
+  color: var(--muted);
+}
+
+.cek-tablo tr[data-pasif] b {
+  color: var(--muted);
+}
