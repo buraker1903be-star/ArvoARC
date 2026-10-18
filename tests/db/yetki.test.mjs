@@ -115,8 +115,9 @@ const PANEL = [
   "public.arc_storefront_my_returns",
   /*
     Hediye çekleri de aynı alanda: süzgeç oturumdaki e-posta,
-    oturumsuz çağrı boş döner. Çek TANIMLAMA (arc_gift_card_issue)
-    bilerek burada DEĞİL — para yaratan bir çağrı, yalnızca
+    oturumsuz çağrı boş döner. Çekin PARA hareketleri bilerek
+    burada DEĞİL (arc_gift_card_issue, _apply, _refund): üçü de
+    bakiye yaratıyor ya da hareket ettiriyor, yalnızca
     service_role'a açık.
   */
   "public.arc_storefront_my_gift_cards",

@@ -57,6 +57,34 @@ export async function updateOrderStatus(formData:FormData){
   const {error}=await supabase.rpc("arc_update_order_status",{p_order_id:orderId,p_status:status,p_payment_status:paymentStatus});
 
   /*
+    İPTALDE HEDİYE ÇEKİ BAKİYESİ GERİ DÖNER.
+
+    Çek sipariş OLUŞURKEN harcanıyor (ödeme ucu); sipariş iptal
+    edilirse ortada teslim edilmiş bir şey yok ve bakiyenin
+    müşteride kalması gerekir. Tutar verilmiyor: tamamı dönüyor.
+
+    Fonksiyon aynı sipariş için ikinci kez çağrılınca sıfır
+    döndürüyor (kütükteki net harcama sıfırlanmış olur), yani
+    durumu iki kez "iptal" yapmak bakiyeyi iki kez şişirmiyor.
+
+    İade durumunda BURADAN dönülmüyor: para iadesi akışı çekin
+    payını kendisi hesaplıyor (iadeler/actions.ts) ve oradaki
+    hesap kalemlere bakıyor — burada tamamını geri vermek,
+    kısmi iadede fazla bakiye yazardı.
+  */
+  if(!error&&status==="cancelled"&&ownedOrder.status!=="cancelled"){
+    const {error:cekHatasi}=await supabase.rpc("arc_gift_card_refund",{
+      p_organization_id:organization.id,
+      p_order_id:orderId,
+      p_amount:null,
+    });
+    /* Hata iptali düşürmüyor: sipariş iptal edilmiş olmalı. Bakiye
+       dönmediyse günlüğe yazılıyor; operasyoncu panelden elle
+       ekleyebilir. */
+    if(cekHatasi)console.error("İptalde hediye çeki bakiyesi geri verilemedi:",orderId,cekHatasi.message);
+  }
+
+  /*
     Durum bildirimi.
 
     Yalnızca müşteriyi ilgilendiren durumlarda gönderilir:

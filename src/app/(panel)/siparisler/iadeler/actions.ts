@@ -328,6 +328,53 @@ export async function resolveReturn(formData: FormData) {
   }
 
   /*
+    HEDİYE ÇEKİNİN PAYI DA GERİ DÖNÜYOR.
+
+    Sağlayıcıdan iade edilebilecek tavan siparişin `total` alanı ve
+    o alan ÇEK DÜŞÜLDÜKTEN SONRAKİ tutar (ödeme ucu öyle yazıyor).
+    Yani kalemlerin gerçek değeri tavandan büyükse, aradaki fark
+    tam olarak çekin ödediği kısımdır:
+
+      gerçek değer  = kalemler + iade edilen kargo  (breakdown.raw)
+      sağlayıcıdan  = min(gerçek değer, total)      (breakdown.amount)
+      ÇEKE DÖNECEK  = gerçek değer - sağlayıcıdan
+
+    Önce GERÇEK PARA, sonra çek: müşterinin lehine olan sıra.
+    Oransal dağıtım yapılmıyor — yuvarlama artığı üretir ve
+    müşteriye açıklaması zor olurdu.
+
+    Hata iadeyi DÜŞÜRMÜYOR: para zaten sağlayıcıdan döndü, çek
+    payı dönmediyse bakiye müşterinin elinde eksik kalır ve bu
+    günlüğe yazılır — iadeyi geri almak çok daha kötü olurdu.
+  */
+  const cekeDonecek = Math.max(
+    0,
+    (breakdown.itemsTotal > 0
+      ? breakdown.itemsTotal + breakdown.shippingRefund
+      : order.total) - breakdown.amount,
+  );
+  let cekeDonen = 0;
+  if (cekeDonecek > 0) {
+    const { data: cekSonuc, error: cekHatasi } = await supabase.rpc(
+      "arc_gift_card_refund",
+      {
+        p_organization_id: organization.id,
+        p_order_id: request.order_id,
+        p_amount: cekeDonecek,
+      },
+    );
+    if (cekHatasi) {
+      console.error(
+        "Hediye çeki bakiyesi geri verilemedi:",
+        order.order_number,
+        cekHatasi.message,
+      );
+    } else {
+      cekeDonen = Number(cekSonuc ?? 0);
+    }
+  }
+
+  /*
     Sipariş detayındaki iade akışıyla aynı kural (refundOutcome):
     tamamı iade edilen sipariş kapanır, kısmi iadede sipariş olduğu
     adımda kalır. İki akış aynı siparişi farklı duruma bırakmamalı.
@@ -343,6 +390,14 @@ export async function resolveReturn(formData: FormData) {
         refunded_amount: refundedTotal,
         refund_count: (Number(orderMeta.refund_count ?? 0) || 0) + 1,
         refund_reference: result.reference ?? null,
+        /* Çeke dönen tutar siparişin kaydında da duruyor: kütük
+           tek kaynak ama sipariş ekranı kütüğü okumuyor. */
+        ...(cekeDonen > 0
+          ? {
+              gift_card_refunded:
+                (Number(orderMeta.gift_card_refunded ?? 0) || 0) + cekeDonen,
+            }
+          : {}),
       },
       updated_at: new Date().toISOString(),
     })

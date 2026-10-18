@@ -152,3 +152,75 @@ describe("asgari sepet tutarı", () => {
     assert.equal(await bakiye(KURUM, "CEK-ASGARI"), 0);
   });
 });
+
+describe("hediye çekinin iadesi", () => {
+  /*
+    Çekle ödenen sipariş iptal ya da iade edilince bakiye geri
+    dönmeliydi; dönmüyordu. Kütük tek kaynak: ne harcandığı ve ne
+    geri verildiği o siparişe ait hareketlerin toplamı.
+  */
+  const S_IADE = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  const S_BOS = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+
+  before(async () => {
+    await db.exec(`
+      insert into public.arc_orders
+        (id, organization_id, order_number, status, payment_status, subtotal, shipping, total, currency, created_at, updated_at, metadata) values
+        ('${S_IADE}', '${KURUM}', 'AC-IADE', 'pending', 'paid', 100000, 0, 100000, 'TRY', now(), now(), '{}'::jsonb),
+        ('${S_BOS}',  '${KURUM}', 'AC-BOS',  'pending', 'paid', 100000, 0, 100000, 'TRY', now(), now(), '{}'::jsonb);
+      insert into public.arc_gift_cards
+        (organization_id, code, initial_amount, balance, recipient_email) values
+        ('${KURUM}', 'CEK-IADE', 60000, 60000, 'a@b.c');
+    `);
+  });
+
+  const iade = async (org, siparis, tutar) =>
+    Number(
+      (
+        await db.query(
+          `select public.arc_gift_card_refund($1::uuid, $2::uuid, $3::bigint) as t`,
+          [org, siparis, tutar],
+        )
+      ).rows[0].t,
+    );
+
+  test("kısmi iade yalnızca istenen kadarını geri veriyor", async () => {
+    assert.equal(await uygula(KURUM, S_IADE, "CEK-IADE", 60000), 60000);
+    assert.equal(await bakiye(KURUM, "CEK-IADE"), 0);
+
+    assert.equal(await iade(KURUM, S_IADE, 20000), 20000);
+    assert.equal(await bakiye(KURUM, "CEK-IADE"), 20000);
+  });
+
+  test("harcanandan fazlası geri verilemiyor", async () => {
+    /* Kalan net harcama 40.000; 99.999 istense de o kadarı döner. */
+    assert.equal(await iade(KURUM, S_IADE, 99999), 40000);
+    assert.equal(await bakiye(KURUM, "CEK-IADE"), 60000);
+  });
+
+  test("tamamı iade edilmiş çekte ikinci iade sıfır", async () => {
+    assert.equal(await iade(KURUM, S_IADE, 10000), 0);
+    assert.equal(await bakiye(KURUM, "CEK-IADE"), 60000);
+  });
+
+  test("çek kullanılmamış siparişte iade sıfır", async () => {
+    assert.equal(await iade(KURUM, S_BOS, 10000), 0);
+  });
+
+  test("tutar verilmezse tamamı döner (iptal)", async () => {
+    const siparis = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    await db.exec(`
+      insert into public.arc_orders
+        (id, organization_id, order_number, status, payment_status, subtotal, shipping, total, currency, created_at, updated_at, metadata)
+      values ('${siparis}', '${KURUM}', 'AC-IPTAL', 'pending', 'paid', 100000, 0, 100000, 'TRY', now(), now(), '{}'::jsonb);
+      insert into public.arc_gift_cards
+        (organization_id, code, initial_amount, balance, recipient_email)
+      values ('${KURUM}', 'CEK-IPTAL', 30000, 30000, 'a@b.c');
+    `);
+    assert.equal(await uygula(KURUM, siparis, "CEK-IPTAL", 30000), 30000);
+    assert.equal(await bakiye(KURUM, "CEK-IPTAL"), 0);
+
+    assert.equal(await iade(KURUM, siparis, null), 30000);
+    assert.equal(await bakiye(KURUM, "CEK-IPTAL"), 30000);
+  });
+});
