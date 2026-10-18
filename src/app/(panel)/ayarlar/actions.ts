@@ -248,6 +248,78 @@ export async function updatePaymentSettings(formData:FormData){
   revalidatePath("/ayarlar");return await bildirimliDonus("/ayarlar",{basari:basariMetni("payments")});
 }
 
+/*
+  MARKA GÖRSELİ DEĞİŞİNCE VİTRİN DE GÖRSÜN (18.10.2026).
+
+  Vitrin logoyu `arc_store_themes` (mode='published') içindeki
+  `config.logo_url`'den okuyor. Burası ise `arc_store_settings`'teki
+  `logo_path`'i yazıyor ve ESKİ DOSYAYI SİLİYOR. İkisi arasında bağ
+  yoktu: yayındaki tema yalnızca Tema → Yayınla ile yeniden
+  kuruluyordu.
+
+  Sonuç canlıda görüldü: ArvoCulture Ayarlar'dan logosunu
+  değiştirdi, eski dosya silindi, vitrin eski adresi göstermeye
+  devam etti ve her sayfanın başında 404 veren bir görsel kaldı.
+  Tarayıcı önbelleği olan biz fark etmedik; yeni ziyaretçi kırık
+  simge görüyordu.
+
+  Logosunu değiştiren HER kiracı bunu yaşardı. Bu yüzden görsel
+  değişikliği yayındaki temaya da yansıtılıyor.
+
+  Yalnızca bu iki alan yazılıyor: taslakta bekleyen başka
+  değişiklikler YAYINA ÇIKMAMALI — kiracı onları henüz
+  yayınlamamış olabilir.
+
+  Yayında tema satırı yoksa sessizce geçiliyor: mağaza henüz
+  temasını yayınlamamış demektir ve ilk yayında değer zaten
+  ayarlardan kuruluyor (tema/actions → publishDraft).
+*/
+async function markaGorselleriniYayinaYansit(
+  supabase: Awaited<ReturnType<typeof requireTenant>>["supabase"],
+  organizationId: string,
+) {
+  const [{ data: settings }, { data: published }] = await Promise.all([
+    supabase
+      .from("arc_store_settings")
+      .select("logo_path,favicon_path")
+      .eq("organization_id", organizationId)
+      .maybeSingle(),
+    supabase
+      .from("arc_store_themes")
+      .select("config")
+      .eq("organization_id", organizationId)
+      .eq("mode", "published")
+      .maybeSingle(),
+  ]);
+
+  if (!published) return;
+
+  const adres = (yol: string | null | undefined) =>
+    yol
+      ? supabase.storage.from("organization-assets").getPublicUrl(yol).data
+          .publicUrl
+      : undefined;
+
+  const config = {
+    ...((published.config ?? {}) as Record<string, unknown>),
+    logo_url: adres(settings?.logo_path),
+    favicon_url: adres(settings?.favicon_path),
+  };
+
+  const { error } = await supabase
+    .from("arc_store_themes")
+    .update({ config, updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("mode", "published");
+
+  /* Yazılamazsa akış durdurulmuyor: dosya yüklendi ve ayar
+     kaydedildi, yayına yansımaması ikincil bir kusur. Ama sessiz
+     de kalmıyor. */
+  if (error) {
+    console.error("Marka görseli yayına yansıtılamadı:", error.message);
+  }
+}
+
 export async function uploadBrandAsset(formData:FormData){
   const {supabase,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))return await bildirimliDonus("/ayarlar",{hata:hataMetni("forbidden")});
@@ -269,6 +341,7 @@ export async function uploadBrandAsset(formData:FormData){
   if(updateError){await supabase.storage.from("organization-assets").remove([path]);return await bildirimliDonus("/ayarlar",{hata:hataMetni(updateError.message)});}
   /* Eski dosya yalnızca mağazanın kendi klasöründeyse silinir (kaldırma işlemindeki kuralla aynı). */
   if(oldPath&&oldPath.startsWith(`${organization.id}/`))await supabase.storage.from("organization-assets").remove([oldPath]);
+  await markaGorselleriniYayinaYansit(supabase,organization.id);
   revalidatePath("/ayarlar");return await bildirimliDonus("/ayarlar",{basari:basariMetni(kind)});
 }
 
@@ -283,6 +356,9 @@ export async function removeBrandAsset(formData:FormData){
   const {error}=await supabase.from("arc_store_settings").update({[column]:null,updated_at:new Date().toISOString()}).eq("organization_id",organization.id);
   if(error)return await bildirimliDonus("/ayarlar",{hata:hataMetni(error.message)});
   if(path)await supabase.storage.from("organization-assets").remove([path]);
+  /* Kaldırma da yayına yansıyor: yoksa vitrin silinmiş dosyayı
+     göstermeye devam eder — yükleme hatasının aynısı. */
+  await markaGorselleriniYayinaYansit(supabase,organization.id);
   revalidatePath("/ayarlar");return await bildirimliDonus("/ayarlar",{basari:basariMetni(`${kind}-removed`)});
 }
 
