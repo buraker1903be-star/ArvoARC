@@ -69,6 +69,13 @@ const ANON = [
   "public.arc_storefront_search_index",
   "public.arc_storefront_settings",
   /*
+    KARGO TARİFESİ anon'a açık: yurtdışı müşterisi ülkesini seçtiği
+    anda ücreti görmek zorunda ve tutarı ArvoARC hesaplasa da ekranda
+    aynı rakam çıkmalı. Dönen şey mağazanın kendi ilan ettiği
+    tarife — ürün fiyatı gibi herkese açık bir bilgi.
+  */
+  "public.arc_storefront_shipping_zones",
+  /*
     Ödeme yöntemleri: vitrin, gösterebileceği yöntemleri ödeme adımından
     ÖNCE bilmeli. Yalnızca boolean dönüyor, PayTR anahtarları değil.
   */
@@ -97,6 +104,7 @@ const ANON = [
     fonksiyonun içinde (dakikada 30).
   */
   "public.arc_storefront_visit",
+  "public.get_arvoculture_storefront_shipping_zones",
   "public.get_storefront_seller",
 ];
 

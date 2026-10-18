@@ -22,9 +22,22 @@ before(async () => {
     values ('${KURUM}', 'ArvoCulture', 'arvoculture', 'retail', 'active', 'starter', now(), now(), 'active', '#000000')
     on conflict (id) do nothing;
 
-    insert into public.arc_store_settings (organization_id, store_name, order_prefix, shipping_fee, free_shipping_threshold)
-    values ('${KURUM}', 'ArvoCulture', 'AC', 12000, 200000)
+    /*
+      MOD AÇIK VE TARİFE TANIMLI: bu dosyanın sınadığı şey ÜRÜN
+      engeli, kargo tarifesi değil. 20261018223636'dan beri yurtdışı
+      siparişi mod kapalıyken ya da bölgesi tanımsızken hiç geçmiyor;
+      tohum bunları vermezse "işaretsiz ürün yurtdışına gidebiliyor"
+      testi, ürün engeline değil o yeni kurala takılırdı.
+    */
+    insert into public.arc_store_settings
+      (organization_id, store_name, order_prefix, shipping_fee, free_shipping_threshold,
+       international_enabled, usd_rate, usd_margin_percent)
+    values ('${KURUM}', 'ArvoCulture', 'AC', 12000, 200000, true, 40, 5)
     on conflict (organization_id) do nothing;
+
+    -- Boş ülke listesi = "öteki her yer".
+    insert into public.arc_shipping_zones (organization_id, label, countries, fee_cents, free_over_cents, sira)
+    values ('${KURUM}', 'Dünya', '{}', 2500, 0, 0);
 
     insert into public.arc_products
       (id, organization_id, name, slug, description, status, source, created_at, updated_at, metadata, international_blocked) values

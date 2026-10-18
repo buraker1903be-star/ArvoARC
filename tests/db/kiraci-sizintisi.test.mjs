@@ -100,6 +100,11 @@ async function tohum() {
     insert into public.arc_discounts (organization_id, name, code, discount_type, value, status, combinable, metadata) values
       ('${A}', 'A Kuponu', 'AKOD', 'percentage', 10, 'active', false, '{}'::jsonb),
       ('${B}', 'B Kuponu', 'BKOD', 'percentage', 20, 'active', false, '{}'::jsonb);
+
+    -- Yurtdışı kargo tarifesi: iki mağazanın ücreti AYRI.
+    insert into public.arc_shipping_zones (organization_id, label, countries, fee_cents, free_over_cents, sira) values
+      ('${A}', 'A Bölgesi', '{}', 2500, 0, 0),
+      ('${B}', 'B Bölgesi', '{}', 3900, 0, 0);
   `);
 }
 
@@ -159,6 +164,13 @@ const PLAN = [
     sql: "select public.arc_storefront_product_count($1::text) as adet", a: 1, b: 1 },
   { ad: "arc_storefront_settings", kip: "deger", alan: "shipping_fee",
     sql: "select shipping_fee from public.arc_storefront_settings($1::text)", a: 11100, b: 22200 },
+  /*
+    Kargo tarifesi: A'nın adresinden B'nin ücreti görünürse yurtdışı
+    siparişi YANLIŞ tutarla hesaplanır — sipariş fonksiyonu bu
+    tarifeyi kuruşa çeviriyor.
+  */
+  { ad: "arc_storefront_shipping_zones", kip: "deger", alan: "fee_cents",
+    sql: "select fee_cents from public.arc_storefront_shipping_zones($1::text)", a: 2500, b: 3900 },
   { ad: "arc_storefront_payment_methods", kip: "deger", alan: "bank_transfer_discount_percent",
     sql: "select bank_transfer_discount_percent from public.arc_storefront_payment_methods($1::text)", a: 7, b: 3 },
   { ad: "arc_storefront_facets", kip: "deger", alan: "brands",
