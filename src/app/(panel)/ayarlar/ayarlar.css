@@ -69,3 +69,79 @@
 .vitrin-kipi .check-inline + .check-inline {
   margin-top: var(--s2, 8px);
 }
+
+/* ==========================================================
+   YURTDIŞI SATIŞ (19.10.2026)
+
+   Kargo bölgeleri satır satır düzenleniyor: ayrı bir detay
+   sayfası açmak, üç alanlık bir kayıt için fazla yol demekti.
+   ========================================================== */
+
+.settings-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.os-root .settings-switch input {
+  width: auto;
+  min-height: 0;
+}
+
+.bolge-liste {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 var(--sp-4);
+  padding: 0;
+  list-style: none;
+}
+
+.bolge-liste li {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.bolge-satir {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) 7rem 8rem auto;
+  gap: 10px;
+  align-items: end;
+  flex: 1;
+  min-width: 0;
+}
+
+.bolge-satir label {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.bolge-yeni {
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+}
+
+/* Silme en sessiz eylem; bölge silmek geri alınamıyor ama
+   tarifeyi yeniden yazmak da kolay — onay kutusu fazla olurdu. */
+.bolge-sil {
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .bolge-liste li {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bolge-satir {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

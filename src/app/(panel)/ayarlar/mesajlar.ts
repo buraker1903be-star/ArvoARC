@@ -22,9 +22,20 @@ export const SAVED:Record<string,string>={
   domain:"Mağaza alan adı kaydedildi.",
   "panel-domain-verified":"Panel alan adı doğrulandı; güvenli bağlantı etkin.",
   "storefront-domain-verified":"Mağaza alan adı doğrulandı; güvenli bağlantı etkin.",
+  saved:"Yurtdışı satış ayarları kaydedildi.",
+  deleted:"Kargo bölgesi silindi.",
 };
+export const YURTDISI_HATALARI = {
+  "invalid-usd-rate": "Dolar kuru sıfırdan büyük ve makul bir sayı olmalı.",
+  "invalid-usd-margin": "Kâr payı %0 ile %500 arasında olmalı.",
+  "usd-rate-required":
+    "Yurtdışı satışı açmadan önce dolar kurunu girin: kuru olmayan vitrin fiyat gösteremez.",
+  "invalid-zone": "Bölge adı ve ücret geçerli olmalı.",
+} as const;
+
 export const ERRORS:Record<string,string>={
   forbidden: yetkiYok("mağaza ayarları"),
+  ...YURTDISI_HATALARI,
   "invalid-bank-transfer":"Havale için banka adı, hesap sahibi ve TR ile başlayan 26 haneli IBAN gerekli.",
   "paytr-merchant-required":"PayTR’ı açmak için mağaza numarası gerekli.",
   "garanti-merchant-required":"Garanti’yi açmak için işyeri (firma) kodu ve terminal numarası gerekli.",

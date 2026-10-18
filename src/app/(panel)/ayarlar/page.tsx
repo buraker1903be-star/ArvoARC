@@ -25,6 +25,7 @@ export const AYAR_BOLUMLERI = [
   ["satis", "Satış"],
   ["alan-adi", "Alan adları"],
   ["kargo", "Kargo"],
+  ["yurtdisi", "Yurtdışı satış"],
   ["odeme", "Ödeme"],
   ["entegrasyon", "Entegrasyonlar"],
   ["eposta", "E-posta şablonları"],
@@ -32,6 +33,7 @@ export const AYAR_BOLUMLERI = [
 ] as const;
 type AyarBolumu = (typeof AYAR_BOLUMLERI)[number][0];
 import { yetkiYok } from "@/lib/yetki-metni";
+import { updateInternationalSettings, saveShippingZone, deleteShippingZone } from "./actions";
 
 const statusLabel:Record<string,string>={not_configured:"Bağlı değil",pending_dns:"DNS bekleniyor",verifying:"Doğrulanıyor",active:"Aktif",failed:"Bağlantı hatası"};
 
@@ -42,7 +44,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
   const {bolum:bolumParametresi}=await searchParams;
   const bolum:AyarBolumu=AYAR_BOLUMLERI.some(([k])=>k===bolumParametresi)?(bolumParametresi as AyarBolumu):"marka";
   const {supabase,organization,membership,user}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,storefront_mode,domain_verification_token,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,garanti_enabled,garanti_test_mode,garanti_isyeri_no,garanti_terminal_no,garanti_api_surumu,garanti_guvenlik_duzeyi,garanti_yari_guvenli_kabul,garanti_provizyon_sifresi_enc,garanti_magaza_anahtari_enc,garanti_iade_sifresi_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,storefront_mode,domain_verification_token,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,garanti_enabled,garanti_test_mode,garanti_isyeri_no,garanti_terminal_no,garanti_api_surumu,garanti_guvenlik_duzeyi,garanti_yari_guvenli_kabul,garanti_provizyon_sifresi_enc,garanti_magaza_anahtari_enc,garanti_iade_sifresi_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country,international_enabled,usd_rate,usd_margin_percent").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const disVitrin=settings?.storefront_mode==="external";
   const canManage=["owner","admin","manager"].includes(membership.role);
@@ -69,6 +71,16 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
     :[];
   const sayfaKayitlari=new Map(sayfaSatirlari.map((s)=>[s.page_key as string,{baslik:s.title as string,govde:s.body as string}]));
   const sablonKayitlari=new Map(sablonSatirlari.map((s)=>[s.template_key as string,{baslik:s.subject as string,govde:s.body as string}]));
+  /* Kargo bölgeleri yalnızca o bölüm açıkken okunuyor: ayarlar
+     sayfası sekiz bölüm ve her açılışta hepsinin verisini çekmek
+     en sık açılan "marka" bölümünü yavaşlatırdı. */
+  const bolgeler = bolum==="yurtdisi"
+    ? ((await supabase.from("arc_shipping_zones")
+        .select("id,label,countries,fee_cents,free_over_cents,sira")
+        .eq("organization_id",organization.id)
+        .order("sira")).data ?? [])
+    : [];
+
   const kargoBaglantisi=canManagePayments&&bolum==="kargo"
     ?await baglantiyiSina(organization.id,settings)
     :{durum:"kapali" as const};
@@ -162,6 +174,83 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
         </form>:<p className="list-hint">{yetkiYok("mağaza ayarları")}</p>}
       </section>
 
+    </>:null}
+    {bolum==="yurtdisi"?<>
+      <section className="panel-card settings-section">
+        <header>
+          <h2>Yurtdışı satış</h2>
+          <p>İngilizce vitrin, dolar fiyatı ve bölgeye göre kargo tarifesi.</p>
+        </header>
+        {canManage?<form action={updateInternationalSettings} className="settings-form">
+          <label className="settings-switch">
+            <input type="checkbox" name="international_enabled" defaultChecked={settings?.international_enabled===true}/>
+            <span>Yurtdışı satışı açık</span>
+          </label>
+          <label>Dolar kuru (1 USD = ? ₺)<input name="usd_rate" type="text" inputMode="decimal" autoComplete="off" defaultValue={settings?.usd_rate??""} placeholder="42,50"/></label>
+          <label>Kâr payı (%)<input name="usd_margin_percent" type="number" min="0" max="500" step="0.5" defaultValue={settings?.usd_margin_percent??0}/></label>
+          {/*
+            Kur CANLI DEĞİL ve bu bilerek: dış bir kur servisine
+            bağlanmak, servis düştüğü gün fiyatın ne olacağı
+            sorusunu doğuruyor — yedek kura düşmek sessizce yanlış
+            fiyat, satışı durdurmak ciro kaybı.
+          */}
+          <p className="list-hint">
+            Kur ve kâr payı dolar fiyatını birlikte belirliyor:
+            <b> TL fiyat ÷ kur × (1 + kâr payı)</b>. Kur canlı
+            çekilmiyor; siz değiştirene kadar sabit kalır. Kuru
+            girmeden yurtdışı satışı açılamaz — fiyat
+            gösteremeyen bir vitrin, kapalı vitrinden kötüdür.
+          </p>
+          <button className="panel-primary" type="submit">Yurtdışı ayarlarını kaydet</button>
+        </form>:<p className="list-hint">{yetkiYok("mağaza ayarları")}</p>}
+      </section>
+
+      <section className="panel-card settings-section">
+        <header>
+          <h2>Kargo bölgeleri</h2>
+          <p>Yurtdışı kargo ücreti bölgeye göre; tutarlar dolar.</p>
+        </header>
+
+        {bolgeler.length>0?<ul className="bolge-liste">
+          {bolgeler.map((b)=>(
+            <li key={b.id}>
+              <form action={saveShippingZone} className="bolge-satir">
+                <input type="hidden" name="id" value={b.id}/>
+                <label>Bölge<input name="label" defaultValue={b.label} required/></label>
+                <label>Ülkeler<input name="countries" defaultValue={(b.countries??[]).join(", ")} placeholder="DE, FR, NL"/></label>
+                <label>Ücret ($)<input name="fee" type="text" inputMode="decimal" defaultValue={(b.fee_cents/100).toFixed(2)}/></label>
+                <label>Ücretsiz eşiği ($)<input name="free_over" type="text" inputMode="decimal" defaultValue={(b.free_over_cents/100).toFixed(2)}/></label>
+                {canManage?<button className="panel-secondary" type="submit">Kaydet</button>:null}
+              </form>
+              {canManage?<form action={deleteShippingZone}>
+                <input type="hidden" name="id" value={b.id}/>
+                <button className="panel-secondary bolge-sil" type="submit">Sil</button>
+              </form>:null}
+            </li>
+          ))}
+        </ul>:<p className="list-hint">Henüz bölge tanımlanmadı.</p>}
+
+        {canManage?<form action={saveShippingZone} className="bolge-satir bolge-yeni">
+          <label>Bölge<input name="label" placeholder="Avrupa" required/></label>
+          <label>Ülkeler<input name="countries" placeholder="DE, FR, NL"/></label>
+          <label>Ücret ($)<input name="fee" type="text" inputMode="decimal" placeholder="15,00"/></label>
+          <label>Ücretsiz eşiği ($)<input name="free_over" type="text" inputMode="decimal" placeholder="150,00"/></label>
+          <button className="panel-primary" type="submit">Bölge ekle</button>
+        </form>:null}
+
+        {/*
+          ÜLKESİZ BÖLGE ŞART. Tarifesi olmayan ülkeye satış
+          yapılamıyor (lib/kargo-bolgesi: ücret sıfır değil YOK);
+          genel bir bölge olmadan yurtdışı satışı listedeki ülkelerle
+          sınırlı kalır.
+        */}
+        <p className="list-hint">
+          Ülke listesi <b>boş</b> bırakılan bölge &quot;öteki her
+          yer&quot; demek. Böyle bir bölge yoksa listede olmayan
+          ülkelere kargo ücreti hesaplanamaz ve o ülkelere satış
+          yapılamaz.
+        </p>
+      </section>
     </>:null}
     {bolum==="alan-adi"?<>
       <section className="domain-stack">

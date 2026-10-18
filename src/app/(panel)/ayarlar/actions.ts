@@ -735,3 +735,163 @@ export async function saveStorePage(formData:FormData){
   revalidatePath("/ayarlar");
   return await bildirimliDonus("/ayarlar?bolum=sayfalar",{basari:"Sayfa kaydedildi."});
 }
+
+
+/*
+  YURTDIŞI SATIŞ AYARLARI (19.10.2026)
+
+  Kur ve kâr payı PANELDEN; canlı kur servisi yok. Servis düştüğü
+  gün fiyatın ne olacağı sorusu yanıtsız kalıyordu: yedek kura
+  düşmek sessizce yanlış fiyat, satışı durdurmak ciro kaybı.
+
+  MOD AÇILMADAN ÖNCE KUR ŞART. Kuru olmayan bir yurtdışı vitrini
+  fiyat gösteremez; "açık ama fiyatsız" bir mağaza, kapalı
+  mağazadan kötüdür.
+*/
+export async function updateInternationalSettings(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  if (!roles.has(membership.role)) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni("forbidden"),
+    });
+  }
+
+  const acik = formData.get("international_enabled") === "on";
+  /* Kur ondalıklı ve Türkçe yazımla girilebiliyor: "42,50". */
+  const kurHam = String(formData.get("usd_rate") ?? "").trim().replace(",", ".");
+  const kur = kurHam ? Number(kurHam) : 0;
+  const karHam = String(formData.get("usd_margin_percent") ?? "0").trim().replace(",", ".");
+  const kar = Number(karHam);
+
+  if (kurHam && (!Number.isFinite(kur) || kur <= 0 || kur > 10000)) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni("invalid-usd-rate"),
+    });
+  }
+  if (!Number.isFinite(kar) || kar < 0 || kar > 500) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni("invalid-usd-margin"),
+    });
+  }
+  /* Kursuz açılamıyor: fiyat gösteremeyen bir vitrin açmak,
+     müşteriye boş bir mağaza göstermek olurdu. */
+  if (acik && (!kur || kur <= 0)) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni("usd-rate-required"),
+    });
+  }
+
+  const { error } = await supabase.from("arc_store_settings").upsert({
+    organization_id: organization.id,
+    ...(await magazaAdiTabani(supabase, organization.id, organization.name)),
+    international_enabled: acik,
+    usd_rate: kur > 0 ? kur : null,
+    usd_margin_percent: kar,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni(error.code ?? error.message),
+    });
+  }
+  revalidatePath("/ayarlar");
+  return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+    basari: basariMetni("saved"),
+  });
+}
+
+/*
+  KARGO BÖLGESİ EKLEME / GÜNCELLEME.
+
+  Ülke kodları serbest metin olarak giriliyor ("DE, FR, NL") ve
+  burada ayrıştırılıyor: panelde dizi alanı tutmak, iki yüz ülkelik
+  bir seçici çizmek demekti. BOŞ BIRAKILAN liste "öteki her yer"
+  anlamına geliyor ve bu bilerek: tarifesiz kalan ülkeye satış
+  yapılamıyor, yani genel bir bölge olmadan yurtdışı satışı eksik
+  kalır.
+*/
+export async function saveShippingZone(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  if (!roles.has(membership.role)) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni("forbidden"),
+    });
+  }
+
+  const id = String(formData.get("id") ?? "").trim();
+  const label = String(formData.get("label") ?? "").trim().slice(0, 80);
+  /* Dolar sent: yurtdışı fiyatları dolar (lib/kargo-bolgesi). */
+  const ucret = Math.round(Number(String(formData.get("fee") ?? "0").replace(",", ".")) * 100);
+  const esik = Math.round(Number(String(formData.get("free_over") ?? "0").replace(",", ".")) * 100);
+  const ulkeler = String(formData.get("countries") ?? "")
+    .split(/[,\s]+/)
+    .map((k) => k.trim().toUpperCase())
+    .filter((k) => /^[A-Z]{2}$/.test(k));
+
+  if (!label || !Number.isFinite(ucret) || ucret < 0 || !Number.isFinite(esik) || esik < 0) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni("invalid-zone"),
+    });
+  }
+
+  const satir = {
+    organization_id: organization.id,
+    label,
+    countries: ulkeler,
+    fee_cents: ucret,
+    free_over_cents: esik,
+    updated_at: new Date().toISOString(),
+  };
+
+  /* Mağaza kapsamı güncellemede de KOŞULDA: id tahmin edilerek
+     başka mağazanın tarifesi değiştirilemesin. */
+  const { error } = id
+    ? await supabase
+        .from("arc_shipping_zones")
+        .update(satir)
+        .eq("id", id)
+        .eq("organization_id", organization.id)
+    : await supabase.from("arc_shipping_zones").insert(satir);
+
+  if (error) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni(error.code ?? error.message),
+    });
+  }
+  revalidatePath("/ayarlar");
+  return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+    basari: basariMetni("saved"),
+  });
+}
+
+export async function deleteShippingZone(formData: FormData) {
+  const { supabase, organization, membership } = await requireTenant();
+  if (!roles.has(membership.role)) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni("forbidden"),
+    });
+  }
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni("invalid-zone"),
+    });
+  }
+
+  const { error } = await supabase
+    .from("arc_shipping_zones")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", organization.id);
+
+  if (error) {
+    return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+      hata: hataMetni(error.code ?? error.message),
+    });
+  }
+  revalidatePath("/ayarlar");
+  return await bildirimliDonus("/ayarlar?bolum=yurtdisi", {
+    basari: basariMetni("deleted"),
+  });
+}
