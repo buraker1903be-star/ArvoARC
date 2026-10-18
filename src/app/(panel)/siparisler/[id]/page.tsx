@@ -405,7 +405,21 @@ export default async function OrderDetail({params,searchParams}:{params:Promise<
   const odemeSecenekleri=paymentStatusOptions.map(([deger,etiket])=>({deger,etiket,ton:statusTone(deger)}));
 
   return (
-    <main className="crm-page-stack talep opd opd-v3 tek-ekran siparis-detay">
+    /*
+      EKRAN KİLİDİ KALKTI (18.10.2026, kurum sahibi: "kargo sekmesi
+      karta sığmıyor, dikey ve yatay kaydırmalı oluyor, istemiyorum").
+
+      Sayfa `tek-ekran` ile görüntü yüksekliğine sabitleniyor ve
+      sütunlar KENDİ İÇİNDE kayıyordu. Kargo sekmesi sütundan uzun
+      olunca sonuç iki kaydırma çubuğuydu: kartın içinde dikey,
+      taşan içerik yüzünden yatay — "Takip no ile kaydet" düğmesi
+      ve adet kutusu kırpılıyordu.
+
+      Sayfa artık içeriği kadar uzuyor ve tek bir kaydırma var:
+      sayfanınki. Kilit, uzun içerikte kullanıcıyı iki ayrı
+      kaydırma arasında gidip gelmeye zorluyordu.
+    */
+    <main className="crm-page-stack talep opd opd-v3 siparis-detay">
       <AnindaYedek />
       <header className="talep-bas">
         <div className="talep-bas-metin">

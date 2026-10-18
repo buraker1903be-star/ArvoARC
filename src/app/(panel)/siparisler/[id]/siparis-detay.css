@@ -329,3 +329,51 @@
 .siparis-detay .kargo-eski-takip span{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .siparis-detay .kargo-eski-takip code{padding:1px 6px;border-radius:var(--r-xs);background:var(--surface);font-size:12px}
 .siparis-detay .kargo-eski-takip a{margin-left:auto;color:var(--accent);font-size:12px;text-decoration:none}
+
+/* ==========================================================
+   SAYFA İÇERİĞİ KADAR UZUYOR (18.10.2026)
+
+   `tek-ekran` kaldırıldı (bkz. page.tsx) ama sütunların ve sekme
+   panelinin KENDİ tavanları ortak dosyada duruyor:
+     .talep-akis-panel{max-height:calc(100dvh - 370px);overflow:auto}
+     .talep-izgara>:is(.talep-bilgi,.talep-musteri){max-height:…;overflow:auto}
+   Bu sayfada ikisi de kapanıyor; yoksa kilit kalkmış ama kart
+   içinde kaydırma sürüyor olurdu.
+   ========================================================== */
+
+.os-root .siparis-detay .talep-akis-panel {
+  max-height: none;
+  min-height: 0;
+  overflow: visible;
+}
+
+.os-root .siparis-detay .talep-izgara > :is(.talep-bilgi, .talep-musteri) {
+  max-height: none;
+  overflow: visible;
+}
+
+/*
+  YATAY TAŞMA. Sekme panelindeki `overflow:auto` taşan içeriği
+  kaydırılabilir yapıyordu; kaynağı ise esnek kutuların
+  varsayılan `min-width:auto` değeri — içerik kutudan dar
+  olamıyor ve sütunu genişletiyor. Zincirin her halkasına
+  min-width:0 veriliyor.
+*/
+.os-root .siparis-detay .talep-izgara > .talep-akis,
+.siparis-detay .siparis-sekme,
+.siparis-detay .kargo-paneli,
+.siparis-detay .kargo-bolum {
+  min-width: 0;
+}
+
+/* Takip numarası ve uzun ürün adı satırı GENİŞLETMİYOR: kırpmak
+   yerine sarıyor. */
+.siparis-detay .kargo-paneli :is(b, span, small, em) {
+  overflow-wrap: anywhere;
+}
+
+/* Ürün adı yine tek satır ve üç nokta; sarma kuralı onu
+   bozmasın. */
+.siparis-detay .kargo-yeni-kalemler span {
+  overflow-wrap: normal;
+}
