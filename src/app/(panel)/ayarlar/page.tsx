@@ -211,6 +211,28 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
           <p>Yurtdışı kargo ücreti bölgeye göre; tutarlar dolar.</p>
         </header>
 
+        {/*
+          İKİ KURAL BURADA SÖYLENİYOR, çünkü ikisi de yurt içi
+          tarifesine bakan birini şaşırtır:
+
+          1. Girilen ücret TABAN. Müşteri onu öteki tutarlar gibi kâr
+             payıyla görüyor (15 $ ve %5 kâr payı → 15,75 $). Kargoyu
+             kâr payı eklenmeden göstermek sepette iki farklı çevrim
+             kuralı demekti ve iki kuralın ayrışması bu depodaki en
+             pahalı kusurların kalıbı.
+          2. Yukarıdaki TL eşiği ve "Ücretsiz Kargo" kuponu yurtdışında
+             GEÇMİYOR. İkisi de yurt içi maliyetine göre konmuş sözler;
+             yurtdışı tarifesi onun on katı ve biri çalışırsa mağaza
+             sipariş başına yüzlerce lirayı sessizce üstlenir. Yurtdışı
+             eşiği yalnızca aşağıdaki bölge eşiği.
+        */}
+        <p className="list-hint">
+          Girilen ücret <b>taban</b>: müşteri onu kâr payıyla görüyor
+          (15 $ + %5 → 15,75 $). Yurt içi ücretsiz kargo eşiği ve
+          “Ücretsiz Kargo” kuponu yurtdışında <b>geçmiyor</b>; yurtdışı
+          eşiği yalnızca bölgenin kendi eşiğidir.
+        </p>
+
         {bolgeler.length>0?<ul className="bolge-liste">
           {bolgeler.map((b)=>(
             <li key={b.id}>
