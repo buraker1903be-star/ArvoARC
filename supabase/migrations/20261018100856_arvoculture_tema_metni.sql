@@ -53,6 +53,16 @@ declare
   v_config jsonb;
   v_eksik text[];
 begin
+  /* ArvoCulture kurumu yoksa blok hiç çalışmıyor: `npm run test:db`
+     migration'ları boş bir PGlite veritabanına kuruyor ve orada bu
+     mağaza yok. Canlıda davranış aynı — kurum orada var, blok yine
+     sınıyor. */
+  if not exists (
+    select 1 from public.organizations o where o.slug = 'arvoculture'
+  ) then
+    return;
+  end if;
+
   select t.config into v_config
   from public.arc_store_themes t
   join public.organizations o on o.id = t.organization_id
