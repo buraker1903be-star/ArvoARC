@@ -74,6 +74,28 @@
       "updated_at",
       "updated_by"
     ],
+    "arc_gift_card_uses": [
+      "amount",
+      "created_at",
+      "gift_card_id",
+      "id",
+      "note",
+      "order_id"
+    ],
+    "arc_gift_cards": [
+      "balance",
+      "code",
+      "created_at",
+      "expires_at",
+      "id",
+      "initial_amount",
+      "note",
+      "organization_id",
+      "recipient_email",
+      "recipient_name",
+      "status",
+      "updated_at"
+    ],
     "arc_import_batches": [
       "completed_at",
       "created_at",
@@ -501,6 +523,7 @@
     "arc_fill_order_tax",
     "arc_find_address",
     "arc_first_text",
+    "arc_gift_card_issue",
     "arc_log_order_event",
     "arc_medya_listesi",
     "arc_medya_ozeti",
@@ -523,6 +546,7 @@
     "arc_storefront_deals",
     "arc_storefront_discounts",
     "arc_storefront_facets",
+    "arc_storefront_my_gift_cards",
     "arc_storefront_my_orders",
     "arc_storefront_my_returns",
     "arc_storefront_order_status",
