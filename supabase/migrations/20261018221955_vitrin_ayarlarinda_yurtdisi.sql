@@ -17,10 +17,17 @@
   vitrine vermek, oranın bir gün yanlışlıkla fiyat göstermesine
   açık kapı bırakırdı: kapalı mod demek "dolar yok" demek.
 
-  Dönüş tipi değiştiği için önce drop.
+  DÖNÜŞ TİPİ DEĞİŞTİĞİ İÇİN ÜÇÜ DE AÇIKÇA DÜŞÜYOR.
+
+  Önce yalnızca çekirdek `cascade` ile düşürülmüştü ve sarmalayıcılar
+  AYAKTA KALDI: Postgres, bir SQL fonksiyonunun gövdesinde çağırdığı
+  başka bir fonksiyon için bağımlılık kaydı tutmuyor. Sonuç canlıda
+  görüldü — "cannot change return type of existing function".
 */
 
-drop function if exists public.arc_vitrin_ayarlar(uuid) cascade;
+drop function if exists public.arc_storefront_settings(text);
+drop function if exists public.get_arvoculture_storefront_settings();
+drop function if exists public.arc_vitrin_ayarlar(uuid);
 
 create or replace function public.arc_vitrin_ayarlar(p_organization_id uuid)
 returns table (
@@ -57,7 +64,7 @@ $function$;
 revoke all on function public.arc_vitrin_ayarlar(uuid) from public, anon, authenticated;
 grant execute on function public.arc_vitrin_ayarlar(uuid) to service_role;
 
-/* Sarmalayıcılar `cascade` ile düştü; aynı gövdeyle geri geliyorlar. */
+/* Sarmalayıcılar yukarıda düşürüldü; aynı gövdeyle geri geliyorlar. */
 
 create or replace function public.arc_storefront_settings(p_host text)
 returns table (

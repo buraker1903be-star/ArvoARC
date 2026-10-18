@@ -199,13 +199,68 @@ describe("çok kiracılı vitrin", () => {
     });
   });
 
-  test("migration ikinci kez çalıştırılabiliyor", async () => {
+  /*
+    BU DOSYA ARTIK BÜTÜN HÂLİYLE YENİDEN UYGULANAMAZ — ve uygulanmaması
+    DOĞRU OLAN.
+
+    Önceden burada "migration ikinci kez çalıştırılabiliyor" testi vardı:
+    dosya baştan sona yeniden uygulanıyor, sonuç değişmiyordu. Depodaki
+    ölçü bu çünkü migration'lar SQL Editor'den ELLE uygulanıyor ve aynı
+    dosyanın iki kez yapıştırılması gerçek bir olay.
+
+    19.10.2026'da bu geçerliliğini yitirdi: 20261018221955 `arc_storefront_settings`
+    fonksiyonuna üç yurtdışı alanı ekledi, yani DÖNÜŞ TİPİNİ değiştirdi.
+    Postgres `create or replace` ile dönüş tablosunu değiştirmeye izin
+    vermiyor (42P13) ve bu dosyadaki eski dört sütunlu tanım artık
+    yeniden uygulanamıyor.
+
+    Dosyaya bir `drop function if exists` ekleyip yeniden uygulanabilir
+    kılmak KOLAY ama yanlış olurdu: o zaman üç haftalık dosyayı
+    yapıştıran kişi vitrinin ayar sözleşmesini sessizce dört sütuna
+    DÜŞÜRÜRDÜ — dolar fiyatı ve yurtdışı modu, hiçbir yerde hata
+    görünmeden kaybolurdu. Bu depodaki en pahalı kusurların ortak özelliği
+    sessiz olmalarıydı. 42P13 ile gürültülü patlamak, sessizce geri
+    almaktan iyidir.
+
+    Ölçülen şey bu yüzden değişti: dosyanın yeniden uygulanması
+    REDDEDİLMELİ ve reddedilme sebebi tam olarak o fonksiyon olmalı.
+    Başka bir satırda patlıyorsa ortada başka bir çakışma var.
+  */
+  test("eskiyen dosya yeniden uygulanamıyor, sessizce geri almıyor", async () => {
     await islem(db, async () => {
       await tohum();
       await rol(db, "postgres");
-      await db.exec(fs.readFileSync(MIGRATION, "utf8"));
+      let hata = null;
+      try {
+        await db.exec(fs.readFileSync(MIGRATION, "utf8"));
+      } catch (e) {
+        hata = e;
+      }
+      assert.ok(hata, "dosya bütün hâliyle yeniden uygulanamamalı");
+      assert.equal(hata.code, "42P13", `beklenen 42P13, gelen: ${hata.code} — ${hata.message}`);
+      assert.match(String(hata.hint ?? ""), /arc_storefront_settings/);
+    });
+  });
+
+  /*
+    Sözleşmenin güncel hâli: yedi sütun. Yukarıdaki test "eski dosya
+    uygulanamıyor" diyor; bu test de onu uygulanabilir kılmak için
+    fonksiyonun geri alınmadığını sabitliyor.
+  */
+  test("ayar fonksiyonu yurtdışı alanlarını döndürüyor", async () => {
+    await islem(db, async () => {
+      await tohum();
       await rol(db, "anon");
-      assert.deepEqual(await urunler("salona.com"), ["a-urunu"]);
+      const { rows } = await db.query(
+        `select * from public.arc_storefront_settings('salona.com')`,
+      );
+      assert.equal(rows.length, 1);
+      for (const alan of ["international_enabled", "usd_rate", "usd_margin_percent"]) {
+        assert.ok(alan in rows[0], `${alan} dönmeli`);
+      }
+      /* Mod kapalı: kur da gelmiyor. */
+      assert.equal(rows[0].international_enabled, false);
+      assert.equal(rows[0].usd_rate, null);
     });
   });
 });
