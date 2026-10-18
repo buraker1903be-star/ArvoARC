@@ -122,6 +122,9 @@ export async function POST(request: Request) {
   const phone = String(body.phone ?? "").trim();
   const address = body.address ?? {};
   const couponCode = body.couponCode ? String(body.couponCode).trim() : null;
+  /* Hediye çeki kodu. Tutar İSTEMCİDEN GELMİYOR: ne kadar
+     düşüleceğine sunucu karar veriyor (arc_gift_card_apply). */
+  const giftCardCode = body.giftCardCode ? String(body.giftCardCode).trim() : null;
   const rawItems: unknown[] = Array.isArray(body.items) ? body.items : [];
   const items = rawItems.map(parseItem).filter((item): item is Item => item !== null);
   /* Vitrin notu gönderiyordu ama hiç kaydedilmiyordu. */
@@ -394,6 +397,38 @@ export async function POST(request: Request) {
     kupon bilgisi siliniyor, panelde ve onay e-postasında adres
     boş görünüyordu. Artık mevcut değerlerle birleşiyor.
   */
+  /*
+    HEDİYE ÇEKİ EN SONA UYGULANIR.
+
+    Sipariş fonksiyonu kuponu ve kargoyu hesaplayıp bitiriyor ama
+    HAVALE İNDİRİMİ aşağıda, bu uçta uygulanıyor. Çeki daha erken
+    düşseydik müşterinin çekinden hak ettiğinden fazlası yakılır,
+    tahsil edilen tutar da yanlış çıkardı. Bu yüzden her dal kendi
+    ÖDENECEK tutarını bulduktan sonra çağırıyor.
+
+    Fonksiyon aynı sipariş için ikinci kez çağrılınca bakiyeye
+    dokunmuyor, ilk uygulanan tutarı döndürüyor: müşteri PayTR
+    ekranını kapatıp tekrar deneyebiliyor.
+
+    Hata yutulmuyor ama siparişi de düşürmüyor: çek uygulanamazsa
+    müşteri tam tutarı öder ve bakiyesi yerinde kalır — tersi,
+    parasını harcayıp indirimi görmemek olurdu.
+  */
+  const cekUygula = async (tavan: number): Promise<number> => {
+    if (!giftCardCode || tavan <= 0) return 0;
+    const { data, error } = await supabase.rpc("arc_gift_card_apply", {
+      p_organization_id: organizationId,
+      p_order_id: order.order_id,
+      p_code: giftCardCode,
+      p_max: tavan,
+    });
+    if (error) {
+      console.error("Hediye çeki uygulanamadı:", order.order_number, error.message);
+      return 0;
+    }
+    return Number(data ?? 0);
+  };
+
   const mergeMetadata = async (extra: Record<string, unknown>, fields: Record<string, unknown> = {}) => {
     const { data: current, error: readError } = await supabase.from("arc_orders").select("metadata").eq("id", order.order_id).single();
     /*
@@ -467,21 +502,53 @@ export async function POST(request: Request) {
     const discount = Math.round((goodsAfterCoupon * discountPercent) / 100);
     const transferTotal = Math.max(goodsAfterCoupon - discount, 0) + shipping;
 
+    /* Çek havale indiriminden SONRA: ödenecek gerçek tutar bu. */
+    const cek = await cekUygula(transferTotal);
+    const transferOdenecek = Math.max(transferTotal - cek, 0);
+
     const { error: transferError } = await mergeMetadata(
       {
         payment_method: HAVALE_ETIKETI,
         transfer_discount: discount,
         transfer_discount_percent: discountPercent,
+        ...(cek > 0
+          ? { gift_card_code: giftCardCode, gift_card_amount: cek }
+          : {}),
         ...(note ? { notes: note } : {}),
       },
       /* tax: 0 → KDV tetikleyicisi (arc_fill_order_tax) indirimli tutardan yeniden hesaplıyor.
          Yazılmasa KDV indirimsiz tutarın vergisi olarak kalıyordu (20261016122046). */
-      { total: transferTotal, tax: 0, payment_status: "pending", status: "pending" },
+      { total: transferOdenecek, tax: 0, payment_status: "pending", status: "pending" },
     );
 
     /* Güncelleme olmadıysa indirim uygulanmadı; vitrine gerçek tutar döner. */
     if (transferError) console.error("Havale indirimi kaydedilemedi:", transferError);
-    const payable = transferError ? order.total : transferTotal;
+    const payable = transferError ? order.total : transferOdenecek;
+
+    /*
+      ÇEK SİPARİŞİ TAMAMEN KARŞILADIYSA gönderilecek havale yok.
+      Sipariş, kartlı ödemenin kullandığı AYNI yoldan kapanıyor
+      (arc_settle_storefront_order): stok, bildirim ve sipariş
+      olayları orada. Burada elle "paid" yazmak o işleri atlardı.
+    */
+    if (!transferError && payable === 0) {
+      const { error: kapatmaHatasi } = await supabase.rpc(
+        "arc_settle_storefront_order",
+        {
+          p_order_id: order.order_id,
+          p_paid: true,
+          p_payment_reference: `hediye-ceki:${giftCardCode}`,
+          p_failure_reason: null,
+        },
+      );
+      if (kapatmaHatasi) {
+        console.error(
+          "Çekle kapanan sipariş kapatılamadı:",
+          order.order_number,
+          kapatmaHatasi.message,
+        );
+      }
+    }
 
     /*
       Havale kaydı yazılamadıysa e-posta gönderilmez: sipariş havale
@@ -522,6 +589,60 @@ export async function POST(request: Request) {
     );
   }
 
+  /*
+    KARTLI ÖDEMEDE DE ÇEK ÖNCE DÜŞÜLÜR: sağlayıcıya giden tutar
+    müşterinin gerçekten ödeyeceği tutar olmalı. Çek siparişi
+    tamamen karşılıyorsa sağlayıcıya hiç gidilmiyor — 0 TL için
+    açılan bir ödeme oturumu zaten reddedilirdi.
+  */
+  const kartCeki = await cekUygula(order.total);
+  const odenecek = Math.max(order.total - kartCeki, 0);
+
+  if (kartCeki > 0) {
+    const { error: cekMetaHatasi } = await mergeMetadata(
+      { gift_card_code: giftCardCode, gift_card_amount: kartCeki },
+      { total: odenecek, tax: 0 },
+    );
+    if (cekMetaHatasi) {
+      console.error(
+        "Hediye çeki siparişe yazılamadı:",
+        order.order_number,
+        cekMetaHatasi.message,
+      );
+    }
+  }
+
+  if (odenecek === 0) {
+    const { error: kapatmaHatasi } = await supabase.rpc(
+      "arc_settle_storefront_order",
+      {
+        p_order_id: order.order_id,
+        p_paid: true,
+        p_payment_reference: `hediye-ceki:${giftCardCode}`,
+        p_failure_reason: null,
+      },
+    );
+    if (kapatmaHatasi) {
+      console.error(
+        "Çekle kapanan sipariş kapatılamadı:",
+        order.order_number,
+        kapatmaHatasi.message,
+      );
+      return NextResponse.json(
+        { error: "order_failed", message: "Sipariş kapatılamadı." },
+        { status: 502, headers },
+      );
+    }
+    return NextResponse.json(
+      {
+        orderNumber: order.order_number,
+        total: 0,
+        paymentMethod: "hediye-ceki",
+      },
+      { headers },
+    );
+  }
+
   // --- 2. Ödeme oturumu aç -----------------------------------
 
   /*
@@ -544,7 +665,7 @@ export async function POST(request: Request) {
     const donusAdresi = `${panelKokeni}/api/storefront/garanti-donus`;
     const alanlar = formAlanlari(garantiAyar.kimlik, garantiAyar.guvenlikDuzeyi, garantiAyar.testModu, {
       siparisNo: order.order_id,
-      tutarKurus: order.total,
+      tutarKurus: odenecek,
       /* Başarı ve hata aynı uca gidiyor: ikisini de imza denetiminden
          geçirmek gerekiyor ve "hata" adresine gelen bir isteğin
          gerçekten bankadan geldiğini de doğrulamak zorundayız. */
@@ -609,7 +730,7 @@ export async function POST(request: Request) {
           saglayici: "garanti",
           odemeFormu: { adres: garantiAyar.uclar.form, alanlar },
           orderNumber: order.order_number,
-          total: order.total,
+          total: odenecek,
         },
         { headers },
       );
@@ -684,7 +805,7 @@ export async function POST(request: Request) {
     user_ip: ip,
     merchant_oid: merchantOid,
     email,
-    payment_amount: String(order.total), // kuruş
+    payment_amount: String(odenecek), // kuruş
     user_basket: basket,
     no_installment: "0",
     max_installment: "0",
@@ -748,7 +869,7 @@ export async function POST(request: Request) {
     {
       token: result.token,
       orderNumber: order.order_number,
-      total: order.total,
+      total: odenecek,
       iframeUrl: `https://www.paytr.com/odeme/guvenli/${result.token}`,
     },
     { headers },
