@@ -432,6 +432,18 @@
       "sync_total",
       "updated_at"
     ],
+    "arc_visits": [
+      "city",
+      "country",
+      "created_at",
+      "id",
+      "ip_hash",
+      "lat",
+      "lon",
+      "organization_id",
+      "path",
+      "product_slug"
+    ],
     "organization_memberships": [
       "is_active",
       "joined_at",
@@ -526,6 +538,7 @@
     "arc_first_text",
     "arc_gift_card_apply",
     "arc_gift_card_issue",
+    "arc_gift_card_refund",
     "arc_log_order_event",
     "arc_medya_listesi",
     "arc_medya_ozeti",
@@ -567,6 +580,7 @@
     "arc_storefront_seller",
     "arc_storefront_settings",
     "arc_storefront_variants",
+    "arc_storefront_visit",
     "arc_total_stock_units",
     "arc_update_order_status",
     "arc_variant_available",
