@@ -79,8 +79,10 @@ async function writeDraft(formData:FormData){
     order_manifest:section("manifest")?.order??20,order_worlds:section("worlds")?.order??30,order_featured:section("featured")?.order??40,
     order_campaign:section("campaign")?.order??50,order_values:section("values")?.order??60,
     manifest_title:text(formData,"manifest_title",140),manifest_description:text(formData,"manifest_description",360),
-    apparel_title:text(formData,"apparel_title",100),apparel_description:text(formData,"apparel_description",180),
-    beauty_title:text(formData,"beauty_title",100),beauty_description:text(formData,"beauty_description",180),
+    /* Bağlantılar `href()` ile süzülüyor: mağaza dışına çıkan bir
+       adres ana sayfadan müşteriyi başka siteye götürürdü. */
+    apparel_title:text(formData,"apparel_title",100),apparel_description:text(formData,"apparel_description",180),apparel_href:href(text(formData,"apparel_href",240)),
+    beauty_title:text(formData,"beauty_title",100),beauty_description:text(formData,"beauty_description",180),beauty_href:href(text(formData,"beauty_href",240)),
     trust_one:text(formData,"trust_one",80),trust_two:text(formData,"trust_two",80),trust_three:text(formData,"trust_three",80),trust_four:text(formData,"trust_four",80),
     footer_tagline:text(formData,"footer_tagline",240),instagram_url:text(formData,"instagram_url",240),facebook_url:text(formData,"facebook_url",240)
   };
@@ -124,7 +126,11 @@ export async function uploadThemeAsset(formData:FormData){
   if(formData.has("section_layout_json"))await writeDraft(formData);
   const {supabase,user,organization,membership}=await requireTenant();
   if(!roles.has(membership.role))return await bildirimliDonus("/tema",{hata:hataMetni("forbidden")});
-  const slot=["hero_image","campaign_image"].includes(text(formData,"slot",30))?text(formData,"slot",30):"";
+  /* "Ana koleksiyonlar" bölümünün iki görseli de buradan geçiyor:
+     bölüm panelde vardı ama görsel alanı yoktu ve vitrin bölümü
+     hiç çizmiyordu — başlık ve açıklama yazılabiliyor, hiçbir yerde
+     görünmüyordu. */
+  const slot=["hero_image","campaign_image","apparel_image","beauty_image"].includes(text(formData,"slot",30))?text(formData,"slot",30):"";
   const file=formData.get("file");
   if(!slot||!(file instanceof File)||!file.size||file.size>4*1024*1024||!themeAssetTypes[file.type])return await bildirimliDonus("/tema",{hata:hataMetni("invalid-theme-image")});
   const {data:draft,error:draftError}=await supabase.from("arc_store_themes").select("config,version").eq("organization_id",organization.id).eq("mode","draft").maybeSingle();

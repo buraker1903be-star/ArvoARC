@@ -8,8 +8,11 @@ import { saveAndPublishTheme, saveThemeDraft, uploadThemeAsset } from "./actions
 type LayoutItem = { id: string; type: string; enabled: boolean };
 export type Theme = Record<string, string | number | boolean | undefined | LayoutItem[]>;
 type Field = { key: string; label: string; type?: "textarea" | "number"; min?: number; max?: number };
-type ImageSlot = { slot: "hero_image" | "campaign_image"; label: string };
-type Section = { type: string; label: string; group: "Şablon" | "Altbilgi"; fields: Field[]; image?: ImageSlot };
+type ImageSlot = { slot: "hero_image" | "campaign_image" | "apparel_image" | "beauty_image"; label: string };
+/* `images` çoğul: "Ana koleksiyonlar" bölümünün İKİ görseli var
+   (giyim ve bakım). Tekil `image` duruyor — hero ve kampanyada tek
+   yuva var ve onları çoğula çevirmek bir şey kazandırmazdı. */
+type Section = { type: string; label: string; group: "Şablon" | "Altbilgi"; fields: Field[]; image?: ImageSlot; images?: ImageSlot[] };
 type Device = "desktop" | "tablet" | "mobile";
 
 const catalog: Section[] = [
@@ -25,7 +28,12 @@ const catalog: Section[] = [
   { type: "manifest", label: "Marka manifestosu", group: "Şablon", fields: [{ key: "manifest_title", label: "Başlık" }, { key: "manifest_description", label: "Açıklama", type: "textarea" }] },
   {
     type: "worlds", label: "Ana koleksiyonlar", group: "Şablon",
-    fields: [{ key: "apparel_title", label: "Giyim başlığı" }, { key: "apparel_description", label: "Giyim açıklaması" }, { key: "beauty_title", label: "Bakım başlığı" }, { key: "beauty_description", label: "Bakım açıklaması" }],
+    /* Görsel yuvaları SONRADAN eklendi: bölüm panelde vardı, başlık
+       ve açıklama yazılabiliyordu ama görseli yoktu ve vitrin
+       bölümü hiç çizmiyordu — yazılan metin hiçbir yerde
+       görünmüyordu. */
+    images: [{ slot: "apparel_image", label: "Giyim görseli" }, { slot: "beauty_image", label: "Bakım görseli" }],
+    fields: [{ key: "apparel_title", label: "Giyim başlığı" }, { key: "apparel_description", label: "Giyim açıklaması" }, { key: "apparel_href", label: "Giyim bağlantısı" }, { key: "beauty_title", label: "Bakım başlığı" }, { key: "beauty_description", label: "Bakım açıklaması" }, { key: "beauty_href", label: "Bakım bağlantısı" }],
   },
   {
     type: "featured", label: "Çok satanlar", group: "Şablon",
@@ -282,7 +290,9 @@ export function ThemeEditor({ initial, store }: { initial: Theme; store: string 
                   : <input type={field.type ?? "text"} min={field.min} max={field.max} value={String(config[field.key] ?? "")} onChange={(event) => update(field.key, field.type === "number" ? Number(event.target.value) : event.target.value)} />}
               </label>
             ))}
-            {active.image ? <ImageUpload image={active.image} url={typeof config[`${active.image.slot}_url`] === "string" ? String(config[`${active.image.slot}_url`]) : ""} /> : null}
+            {[...(active.image ? [active.image] : []), ...(active.images ?? [])].map((yuva) => (
+              <ImageUpload key={yuva.slot} image={yuva} url={typeof config[`${yuva.slot}_url`] === "string" ? String(config[`${yuva.slot}_url`]) : ""} />
+            ))}
           </section>
         ) : (
           <>

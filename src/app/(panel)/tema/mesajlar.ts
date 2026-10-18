@@ -18,6 +18,8 @@ export const BASARILAR: Record<string, string> = {
   published: "Tema yayına alındı.",
   hero: "Görsel yüklendi.",
   banner: "Görsel yüklendi.",
+  apparel_image: "Görsel yüklendi.",
+  beauty_image: "Görsel yüklendi.",
 };
 
 export const hataMetni = (kod: string): string =>
