@@ -223,7 +223,11 @@ const ANAHTARLILAR = new Set(["arc_storefront_order_status"]);
   sınanıyorlar; sızıntı sorusu burada "A'dan alışveriş yapmış
   müşteri B'nin vitrininde ne görüyor" biçimini alıyor.
 */
-const OTURUMLULAR = new Set(["arc_storefront_my_orders", "arc_storefront_my_returns"]);
+const OTURUMLULAR = new Set([
+  "arc_storefront_my_orders",
+  "arc_storefront_my_returns",
+  "arc_storefront_my_gift_cards",
+]);
 
 describe("kiracı sızıntısı", () => {
   test("plan ailenin TAMAMINI kapsıyor", () => {

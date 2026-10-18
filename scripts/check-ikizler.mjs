@@ -72,6 +72,13 @@ const IKIZSIZ_SERBEST = new Set([
   "arc_storefront_my_orders",
   "arc_storefront_my_returns",
   /*
+    Hediye çekleri de hesap alanı ve ArvoCulture'a özel bir
+    karşılığı HİÇ OLMADI: tablo (arc_gift_cards) çok kiracılı
+    doğdu, ilk okuyucusu bu fonksiyon. İkiz yazmak yalnızca
+    denetimi memnun etmek için ikinci bir fonksiyon açmak olurdu.
+  */
+  "arc_storefront_my_gift_cards",
+  /*
     Birincil adres sorusu kiracıya özel olamaz: yanıtı zaten
     kiracının kendi ayarından geliyor ve ArvoCulture'a özel bir
     ikizi "hangi adres ArvoCulture'ın" demek olurdu — bilinen şeyi

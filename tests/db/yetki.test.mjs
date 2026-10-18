@@ -113,6 +113,13 @@ const PANEL = [
   */
   "public.arc_storefront_my_orders",
   "public.arc_storefront_my_returns",
+  /*
+    Hediye çekleri de aynı alanda: süzgeç oturumdaki e-posta,
+    oturumsuz çağrı boş döner. Çek TANIMLAMA (arc_gift_card_issue)
+    bilerek burada DEĞİL — para yaratan bir çağrı, yalnızca
+    service_role'a açık.
+  */
+  "public.arc_storefront_my_gift_cards",
   /* Medya kitaplığı: panel okuması, anon'a kapalı. */
   "public.arc_medya_listesi",
   "public.arc_medya_ozeti",
