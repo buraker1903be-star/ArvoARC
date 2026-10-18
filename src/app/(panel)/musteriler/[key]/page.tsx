@@ -4,6 +4,7 @@ import { orderBadge, sourceLabel } from "@/lib/commerce-labels";
 import { countsAsRevenue, revenueAmount } from "@/lib/order-flow";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { requireTenant } from "@/lib/tenant";
+import { createServiceClient } from "@/lib/paytr/service-client";
 import { anahtarSuzgeci, currentTime, customerTags, DAY, daysAgo, type Customer } from "../customer-data";
 import { KKart, KListe, KNot, KOge } from "@/components/arvo-ui/k-ui";
 import { MiniSeri } from "@/components/arvo-ui/mini-seri";
@@ -144,6 +145,45 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
   const topProducts = [...favourites.values()].sort((a, b) => b.quantity - a.quantity || b.total - a.total).slice(0, 5);
 
   /*
+    HEDİYE ÇEKLERİ.
+
+    Çek listesi kendi ekranında duruyordu ve operasyoncu "bu
+    müşterinin çeki var mı" sorusunu ancak oraya gidip kodu
+    aratarak yanıtlıyordu — oysa soru hep müşteri konuşulurken
+    soruluyor ("iadesi gecikti, çek verelim mi?").
+
+    SERVİS ANAHTARIYLA: arc_gift_cards RLS açık ve POLİTİKASIZ,
+    çağıranın yetkisiyle okunursa sessizce boş döner. Mağaza
+    kapsamı sorguda. E-postası olmayan müşteride hiç sorulmuyor:
+    çek e-postaya bağlanıyor.
+  */
+  type CekSatiri = { id: string; code: string; balance: number; initial_amount: number; status: string; expires_at: string | null; minimum_subtotal: number | null };
+  const cekler: CekSatiri[] = customerEmail
+    ? ((
+        await createServiceClient()
+          .from("arc_gift_cards")
+          .select("id, code, balance, initial_amount, status, expires_at, minimum_subtotal")
+          .eq("organization_id", organization.id)
+          .eq("recipient_email", customerEmail.toLowerCase())
+          .order("created_at", { ascending: false })
+          .limit(20)
+      ).data ?? [])
+    : [];
+
+  const cekBakiyesi = cekler.reduce(
+    (toplam, cek) =>
+      cek.status === "active" &&
+      (cek.expires_at === null || Date.parse(cek.expires_at) >= now)
+        ? toplam + cek.balance
+        : toplam,
+    0,
+  );
+
+  /* Form önceden dolsun: operasyoncu e-postayı elle yazarken
+     yanlış yazarsa çek müşteriye hiç görünmez. */
+  const cekAdresi = `/indirimler/hediye-cekleri?pencere=yeni&eposta=${encodeURIComponent(customerEmail)}&ad=${encodeURIComponent(customerName)}`;
+
+  /*
     ArvoOS'un kayıt detayı kalıbı (16.10.2026): başlık, özet şeridi, solda
     geçmiş (iOS listesi), sağda kartlar. Sipariş geçmişi eskiden kendi
     ızgarasıydı (customers.css → co-*); artık konsolun liste satırı.
@@ -222,6 +262,51 @@ export default async function CustomerDetail({ params }: { params: Promise<{ key
               {iadeEdilen > 0 ? <div><dt>İade edilen</dt><dd>{money.format(iadeEdilen / 100)}</dd></div> : null}
               <div><dt>Sipariş kaynağı</dt><dd>{kaynaklar.map(([ad, adet]) => `${ad} (${adet})`).join(" · ")}</dd></div>
             </dl>
+          </KKart>
+
+          <KKart
+            baslik="Hediye çekleri"
+            aciklama={cekBakiyesi > 0 ? `${money.format(cekBakiyesi / 100)} kullanılabilir bakiye` : undefined}
+          >
+            {cekler.length ? (
+              <ul className="customer-fav musteri-cekler">
+                {cekler.map((cek) => {
+                  const dolmus = cek.expires_at !== null && Date.parse(cek.expires_at) < now;
+                  const kullanilabilir = cek.status === "active" && cek.balance > 0 && !dolmus;
+                  return (
+                    <li key={cek.id} data-pasif={kullanilabilir ? undefined : ""}>
+                      <span>
+                        <b>{cek.code}</b>
+                        <small>
+                          {cek.status !== "active"
+                            ? "Kapalı"
+                            : dolmus
+                              ? "Süresi doldu"
+                              : cek.balance <= 0
+                                ? "Tükendi"
+                                : cek.minimum_subtotal && cek.minimum_subtotal > 0
+                                  ? `${money.format(cek.minimum_subtotal / 100)} ve üzeri`
+                                  : "Koşulsuz"}
+                        </small>
+                      </span>
+                      <strong>{money.format(cek.balance / 100)}</strong>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="customer-muted">
+                {customerEmail
+                  ? "Bu müşteriye tanımlı hediye çeki yok."
+                  : "E-posta bilgisi olmadan çek tanımlanamaz: çek e-postaya bağlanıyor."}
+              </p>
+            )}
+
+            {customerEmail ? (
+              <Link prefetch={false} className="panel-secondary musteri-cek-ekle" href={cekAdresi}>
+                Hediye çeki tanımla
+              </Link>
+            ) : null}
           </KKart>
 
           <KKart baslik="En çok aldığı ürünler">

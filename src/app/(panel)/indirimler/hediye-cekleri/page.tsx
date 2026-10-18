@@ -55,11 +55,14 @@ type Cek = {
 export default async function HediyeCekleri({
   searchParams,
 }: {
-  searchParams: Promise<{ pencere?: string }>;
+  /* `eposta` ve `ad`: müşteri detayından gelindiğinde form
+     önceden dolsun — operasyoncu e-postayı elle yazarken yanlış
+     yazarsa çek müşteriye HİÇ görünmez. */
+  searchParams: Promise<{ pencere?: string; eposta?: string; ad?: string }>;
 }) {
   const { organization, membership } = await requireTenant();
   const yonetebilir = ["owner", "admin", "manager"].includes(membership.role);
-  const { pencere } = await searchParams;
+  const { pencere, eposta, ad } = await searchParams;
 
   const servis = createServiceClient();
   const { data, error } = await servis
@@ -294,12 +297,18 @@ export default async function HediyeCekleri({
                 <div className="discount-form-grid">
                   <label>
                     Alıcı e-postası
-                    <input name="recipient_email" type="email" maxLength={160} placeholder="musteri@ornek.com" />
+                    <input
+                      name="recipient_email"
+                      type="email"
+                      maxLength={160}
+                      placeholder="musteri@ornek.com"
+                      defaultValue={eposta ?? ""}
+                    />
                     <small>Çek bu hesapta görünür.</small>
                   </label>
                   <label>
                     Alıcı adı
-                    <input name="recipient_name" maxLength={160} />
+                    <input name="recipient_name" maxLength={160} defaultValue={ad ?? ""} />
                   </label>
                   <label className="wide">
                     Not (yalnızca panelde görünür)

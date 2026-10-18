@@ -11,3 +11,28 @@
 
 /* Altı aylık harcama çubuğunun altındaki tek satır not. */
 .os-root .musteri-detay .musteri-seri-not{margin:var(--sp-2) 0 var(--sp-3);font-size:var(--fs-sm)}
+
+/* ==========================================================
+   MÜŞTERİNİN HEDİYE ÇEKLERİ
+
+   Çek listesi kendi ekranında duruyordu ve operasyoncu "bu
+   müşterinin çeki var mı" sorusunu ancak oraya gidip kodu
+   aratarak yanıtlıyordu — oysa soru hep müşteri konuşulurken
+   soruluyor ("iadesi gecikti, çek verelim mi?").
+   ========================================================== */
+
+.musteri-cekler b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.03em;
+}
+
+/* Kullanılamayan çek listeden düşmüyor: operasyoncu "ben buna çek
+   vermiştim" dediğinde onu görebilmeli. */
+.musteri-cekler li[data-pasif] {
+  opacity: 0.55;
+}
+
+.musteri-cek-ekle {
+  display: inline-block;
+  margin-top: 12px;
+}
