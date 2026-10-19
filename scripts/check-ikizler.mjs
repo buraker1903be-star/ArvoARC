@@ -26,7 +26,13 @@
 import { readFileSync } from "node:fs";
 
 const semaYolu = process.argv[2] ?? "supabase/schema/canli-sema.sql";
-const sema = readFileSync(semaYolu, "utf8");
+/*
+  Satır sonu \n'e indiriliyor: Windows'ta git (core.autocrlf) dosyayı
+  CRLF ile açıyor ve aşağıdaki desen \n beklediği için HİÇBİR fonksiyon
+  eşleşmiyordu. Denetim "0 çift gövdece aynı" deyip yeşil geçiyordu —
+  ölçtüğü bir şey yokken (19.10.2026, iş bilgisayarında ölçüldü).
+*/
+const sema = readFileSync(semaYolu, "utf8").replace(/\r\n/g, "\n");
 
 const FONKSIYON = /CREATE OR REPLACE FUNCTION public\.([a-z_]+)\(([\s\S]*?)\)\n([\s\S]*?)\n\$function\$\n;/g;
 const fonksiyonlar = new Map();

@@ -90,7 +90,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--success, #2f6b46);
+  background: var(--success);
 }
 
 .canli-nabiz[data-calisiyor]::before {
@@ -117,12 +117,12 @@
 }
 
 .canli-nokta {
-  fill: var(--primary, #4f7df3);
+  fill: var(--primary);
 }
 
 /* Son iki dakikanın ziyareti: noktanın çevresinde bir halka. */
 .canli-dalga {
-  fill: var(--primary, #4f7df3);
+  fill: var(--primary);
   animation: canli-dalga 2.4s ease-out infinite;
 }
 
@@ -179,7 +179,7 @@
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: var(--r-sm);
-  background: color-mix(in srgb, var(--primary, #4f7df3) 12%, transparent);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .canli-liste li span {

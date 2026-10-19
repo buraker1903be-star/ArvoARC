@@ -25,15 +25,15 @@
 .cek-rozet {
   display: inline-block;
   padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--line, #d8d8e0);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
   font-size: 12px;
   white-space: nowrap;
 }
 
 .cek-rozet[data-durum="acik"] {
-  border-color: color-mix(in srgb, var(--ok, #2f6b46) 40%, transparent);
-  color: var(--ok, #2f6b46);
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  color: var(--success);
 }
 
 /* Tükenmiş, süresi dolmuş ve kapalı çek AYRI rozetler: üçü de
@@ -64,6 +64,6 @@
 }
 
 .cek-sil:hover {
-  color: var(--danger, #a3342a);
+  color: var(--danger);
   border-color: currentColor;
 }
