@@ -35,6 +35,7 @@ import {
   jsonCikar,
   koleksiyonIstemi,
   urunIstemi,
+  yankiTutuyor,
 } from "../src/lib/ceviri/dogrula.ts";
 
 const kok = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -57,10 +58,20 @@ const arg = (ad, varsayilan) => {
 const KURU = process.argv.includes("--kuru");
 const KOLEKSIYON = process.argv.includes("--koleksiyon");
 const ADET = Number(arg("adet", 50));
-/* PARTİ BOYU KÜÇÜK: küçük modeller uzun listelerde slug'ları
-   karıştırıyor ve bütün parti çöpe gidiyor. On ürün, bir hatada en
-   fazla on ürün kaybı demek. */
-const PARTI = Number(arg("parti", 10));
+/*
+  PARTİ BOYU BEŞ — canlıda ölçüldü.
+
+  Önce ondu ve 7b model o uzunlukta kalemleri KARIŞTIRIYORDU:
+  partinin ortasındaki kayda başka bir kalemin cevabı yazılıyordu.
+  Yankı denetimi bunu artık yakalıyor (yanlış yazmak yerine
+  atlıyor) ama beş kalemde karışma belirgin biçimde azalıyor, yani
+  daha çok kayıt ilk turda geçiyor.
+
+  Tek tek sormak en güvenilir ama 3.268 ürün için çok yavaş; beş,
+  hız ile doğruluk arasındaki denge. İkinci tur zaten tek tek
+  soruyor.
+*/
+const PARTI = Number(arg("parti", 5));
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anahtar = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -231,6 +242,26 @@ async function calistir() {
       }
 
       const kaynakAd = KOLEKSIYON ? kayit.title : kayit.name;
+
+      /*
+        YANKI DENETİMİ — YANLIŞ KALEME YAZMAYI ENGELLİYOR.
+
+        Canlıda ölçüldü: sıraya dayalı eşleşmede 7b model partideki
+        BAŞKA kalemin cevabını veriyordu ("Yağlar" → "Women's
+        T-Shirts", "Duş Jelleri" → "Bath Mats"). Kırk dokuz
+        koleksiyonun çoğu yanlış yazıldı ve geri alınması gerekti.
+
+        Model artık kaynağı da geri yazıyor; tutmuyorsa kalem
+        karışmış demektir ve çeviri reddediliyor. Atlamak yanlış
+        yazmaktan iyidir: atlanan kayıt Türkçe adıyla görünüyor,
+        yanlış yazılan kayıt müşteriye BAŞKA bir ürünün adını
+        gösteriyor.
+      */
+      if (!yankiTutuyor(kaynakAd, satir.source)) {
+        atlanan.push(`${kayit.slug}:yanıt karıştı`);
+        if (tur === 1) yeniden.push(kayit);
+        continue;
+      }
       /*
         HEDEF GRUP DENETİMİ AÇIK (son parametre): kaynak adı
         "Çocuk"/"Kadın"/"Erkek" ile başlıyorsa çeviri karşılığını

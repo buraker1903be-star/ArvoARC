@@ -69,6 +69,49 @@ const HEDEF_GRUPLAR: Array<[RegExp, string[]]> = [
   [/^erkek/i, ["men", "man"]],
 ];
 
+/*
+  YANKI DENETİMİ — YANLIŞ KALEME YAZMAYI ENGELLİYOR.
+
+  NEDEN VAR (canlıda ölçüldü, 22.10.2026): kimlik SAYI yapıldıktan
+  sonra eşleşme sıraya dayandı ve 7b model partideki BAŞKA kalemin
+  cevabını veriyordu. Yazılanlar arasında "Yağlar" → "Women's
+  T-Shirts", "Duş Jelleri" → "Bath Mats", "El Kremleri" →
+  "Cuticles" vardı. Kırk dokuz koleksiyonun çoğu yanlış yazıldı ve
+  geri alınması gerekti.
+
+  Önceki tasarım (slug ile eşleşme) bu hatayı GÖRÜYORDU: model
+  slug'ı çevirdiğinde kayıt "yanıtta yok" diye atlanıyordu. Sayıya
+  geçmek görünür bir hatayı (atlama) GÖRÜNMEZ bir hataya (yanlış
+  veri) çevirdi — bu depoda en pahalı kusur sınıfı tam olarak bu.
+
+  Çözüm: model çeviriyle birlikte KAYNAĞI da geri yazıyor. Yankı
+  girdiyle tutmuyorsa kalem karışmış demektir ve çeviri
+  reddediliyor. Atlamak yanlış yazmaktan iyidir: atlanan ürün
+  Türkçe adıyla görünüyor, yanlış yazılan ürün müşteriye başka bir
+  ürünün adını gösteriyor.
+*/
+
+/** Karşılaştırma için: boşluk ve harf durumu duyarsız. */
+const sadeMetin = (metin: string) =>
+  metin.trim().toLocaleLowerCase("tr").replace(/\s+/g, " ");
+
+/**
+ * Modelin yankıladığı kaynak, gönderilen kaynakla aynı mı?
+ *
+ * TAM EŞİTLİK ARANMIYOR: model tireyi ya da çift boşluğu
+ * normalleştirebiliyor ve bunu reddetmek doğru çevirileri atardı.
+ * Aranan şey AYNI KALEM olması; bunun için baştaki yirmi karakter
+ * yeterli ve fazlası kırılganlık.
+ */
+export function yankiTutuyor(gonderilen: string, yanki: unknown): boolean {
+  if (typeof yanki !== "string") return false;
+  const a = sadeMetin(gonderilen);
+  const b = sadeMetin(yanki);
+  if (a === b) return true;
+  const kisa = Math.min(20, a.length, b.length);
+  return kisa > 0 && a.slice(0, kisa) === b.slice(0, kisa);
+}
+
 /** Kaynak hedef grupla başlıyorsa çeviri karşılığını taşıyor mu? */
 export function hedefGrubuKoruyor(kaynak: string, ceviri: string): boolean {
   const temiz = kaynak.trim();
@@ -248,8 +291,9 @@ export function urunIstemi(
     "",
     "Rules:",
     "- Output ONLY a JSON array, no prose, no markdown fences.",
-    '- Each item: {"id": <number>, "name": "...", "description": "..."}',
+    '- Each item: {"id": <number>, "source": "...", "name": "...", "description": "..."}',
     "- Copy the id number unchanged. Return one item per input id.",
+    '- "source" must be the Turkish name copied EXACTLY, character for character.',
     "- Keep product attributes (sizes, colours, materials, counts).",
     "- Use the wording a UK/US clothing retailer would use.",
     "- Use the possessive for gendered items: \"Men's\", \"Women's\", \"Kids'\".",
@@ -273,10 +317,10 @@ export function urunIstemi(
       hedef grubun korunması ve giysi türünün doğruluğu.
     */
     "Examples:",
-    'Turkish: "Çocuk Unisex Baskılı T-Shirt - Siyah"',
-    'English: "Kids\' Unisex Printed T-Shirt - Black"',
-    'Turkish: "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi"',
-    'English: "Women\'s Real Mink Fur Gilet Hooded - Brown"',
+    'Input:  {"id": 7, "name": "Çocuk Unisex Baskılı T-Shirt - Siyah"}',
+    'Output: {"id": 7, "source": "Çocuk Unisex Baskılı T-Shirt - Siyah", "name": "Kids\' Unisex Printed T-Shirt - Black", "description": ""}',
+    'Input:  {"id": 8, "name": "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi"}',
+    'Output: {"id": 8, "source": "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi", "name": "Women\'s Real Mink Fur Gilet Hooded - Brown", "description": ""}',
     "",
     JSON.stringify(liste),
   ].join("\n");
@@ -291,8 +335,9 @@ export function koleksiyonIstemi(
     "",
     "Rules:",
     "- Output ONLY a JSON array, no prose, no markdown fences.",
-    '- Each item: {"id": <number>, "title": "...", "description": "..."}',
+    '- Each item: {"id": <number>, "source": "...", "title": "...", "description": "..."}',
     "- Copy the id number unchanged. Return one item per input id.",
+    '- "source" must be the Turkish title copied EXACTLY, character for character.',
     "- Use short category names a clothing retailer would use",
     '  (e.g. "Kadın" -> "Women", "Fırsatlar" -> "Sale").',
     "- Use the possessive for gendered categories: \"Men's T-Shirts\".",

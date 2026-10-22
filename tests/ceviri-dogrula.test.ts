@@ -19,6 +19,7 @@ import {
   jsonCikar,
   koleksiyonIstemi,
   urunIstemi,
+  yankiTutuyor,
 } from "@/lib/ceviri/dogrula";
 
 const KAYNAK = "Kadın Yazlık Şort";
@@ -199,4 +200,67 @@ test("istem terim sözlüğünü ve örnekleri taşıyor", () => {
      ediyor ve sözlük tek başına yelek→gilet'i çözmedi. */
   assert.match(istem, /Kids' Unisex Printed T-Shirt/);
   assert.match(istem, /Fur Gilet/);
+});
+
+/*
+  YANKI DENETİMİ — YANLIŞ KALEME YAZMAYI ENGELLİYOR.
+
+  Canlıda ölçüldü (22.10.2026): kimlik sayı yapıldıktan sonra
+  eşleşme sıraya dayandı ve 7b model partideki BAŞKA kalemin
+  cevabını veriyordu. Veritabanına "Yağlar" → "Women's T-Shirts",
+  "Duş Jelleri" → "Bath Mats", "El Kremleri" → "Cuticles" yazıldı;
+  kırk dokuz koleksiyonun çoğu yanlıştı ve geri alınması gerekti.
+
+  Önceki tasarım (slug ile eşleşme) bu hatayı GÖRÜYORDU — model
+  slug'ı çevirince kayıt atlanıyordu. Sayıya geçmek görünür bir
+  hatayı GÖRÜNMEZ bir hataya çevirdi; bu depodaki en pahalı kusur
+  sınıfı tam olarak bu.
+
+  Ölçüt: atlamak yanlış yazmaktan iyidir. Atlanan kayıt Türkçe
+  adıyla görünüyor; yanlış yazılan kayıt müşteriye BAŞKA bir ürünün
+  adını gösteriyor.
+*/
+test("yankı tutuyorsa kabul, tutmuyorsa red", () => {
+  assert.equal(yankiTutuyor("Yağlar", "Yağlar"), true);
+  /* Asıl yakalanan hata: model başka kalemin kaynağını yankıladı. */
+  assert.equal(yankiTutuyor("Yağlar", "Erkek T-shirt"), false);
+  assert.equal(yankiTutuyor("Duş Jelleri", "Banyo Paspası"), false);
+});
+
+test("yankıda boşluk ve harf durumu farkı bağışlanıyor", () => {
+  /*
+    Model tireyi ya da çift boşluğu normalleştirebiliyor; bunu
+    reddetmek DOĞRU çevirileri atardı. Aranan şey aynı KALEM olması.
+  */
+  assert.equal(yankiTutuyor("Erkek  Şort", "erkek şort"), true);
+  assert.equal(yankiTutuyor("Kadın Yazlık Şort", "Kadın Yazlık Şort "), true);
+});
+
+test("yankı yoksa red", () => {
+  /* Alanı hiç döndürmeyen model, karışıp karışmadığını
+     kanıtlayamıyor demektir. */
+  assert.equal(yankiTutuyor("Yağlar", undefined), false);
+  assert.equal(yankiTutuyor("Yağlar", null), false);
+  assert.equal(yankiTutuyor("Yağlar", 42), false);
+});
+
+test("uzun adlarda baştaki yirmi karakter yetiyor", () => {
+  /*
+    Tam eşitlik kırılgan: uzun tedarikçi adlarında model sonu
+    kırpabiliyor. Baş yirmi karakter aynıysa aynı kalemdir — ve
+    farklı kalemlerin ilk yirmi karakteri bu katalogda ayrışıyor
+    ("Erkek Pike…" ile "Erkek Şort…").
+  */
+  const uzun = "Erkek Premium Motorcu Kurye Yağmurluk Takım Su Geçirmez";
+  assert.equal(yankiTutuyor(uzun, uzun.slice(0, 30)), true);
+  assert.equal(yankiTutuyor(uzun, "Kadın Premium Motorcu Kurye"), false);
+});
+
+test("istem yankı alanını ve örneği taşıyor", () => {
+  const istem = urunIstemi([{ slug: "a", name: "Yağlar", description: null }]);
+  assert.match(istem, /"source"/);
+  assert.match(istem, /copied EXACTLY/);
+  /* Örnek de yankılı: küçük modeller kuralı okuyup örneği taklit
+     ediyor. */
+  assert.match(istem, /"source": "Çocuk Unisex Baskılı T-Shirt - Siyah"/);
 });
