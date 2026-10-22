@@ -107,7 +107,13 @@ describe("yurtdışı kargo tarifesi", () => {
       assert.equal(Number(o.shipping), 100000);
       /* Sipariş LİRA kalıyor: sağlayıcı lira çekiyor. */
       assert.equal(o.currency, "TRY");
-      assert.equal(Number(o.total), 380000 + 100000);
+      /*
+        Mal bedeli KÂR PAYLI (20261022190527): 380.000 × 1,05 =
+        399.000. Önceden burada 380.000 bekleniyordu, çünkü kâr payı
+        yalnızca gösterime uygulanıyordu ve tahsil edilmiyordu.
+      */
+      assert.equal(Number(o.subtotal), 399000);
+      assert.equal(Number(o.total), 399000 + 100000);
     });
   });
 
@@ -221,6 +227,86 @@ describe("yurtdışı kargo tarifesi", () => {
       await siparisReddedilir("U-1", "US", /gönderim yapılmıyor/i);
       /* Tarifesi olan ülke etkilenmiyor. */
       assert.equal(Number((await kayit((await siparis("U-1", "DE")).rows[0].order_id)).shipping), 60000);
+    });
+  });
+});
+
+/*
+  KÂR PAYI TAHSİL EDİLİYOR (20261022190527).
+
+  Kâr payı yalnızca vitrinin GÖSTERİMİNE uygulanıyordu: ekranda
+  1.000 TL'lik ürün 27,71 $ yazıyor, karttan 1.000 TL (20,53 $)
+  çekiliyordu. Kâr payı hiçbir şey kazandırmıyor, üstelik ekranla
+  tahsilat %35 ayrışıyordu.
+
+  Buradaki ölçüt tek cümle: gösterilen dolar = tahsil edilen TL ÷ kur.
+*/
+describe("yurtdışı kâr payı", () => {
+  test("yurtdışı kaleminin birim fiyatı kâr payını içeriyor", async () => {
+    await islem(db, async () => {
+      await tohum();
+      const { rows } = await siparis("U-1", "US");
+      const o = await kayit(rows[0].order_id);
+      /* 380.000 kuruş × 1,05 = 399.000 */
+      assert.equal(Number(o.subtotal), 399000);
+
+      /* KALEMLER TOPLAMI ARA TOPLAMI TUTUYOR: kâr payı ara toplama
+         sonradan eklenseydi sipariş detayı "rakamlar toplanmıyor"
+         derdi (AC261017-F93525). */
+      const { rows: kalemler } = await db.query(
+        `select unit_price, quantity, total from public.arc_order_items where order_id = $1`,
+        [rows[0].order_id],
+      );
+      assert.equal(Number(kalemler[0].unit_price), 399000);
+      assert.equal(
+        kalemler.reduce((t, k) => t + Number(k.total), 0),
+        Number(o.subtotal),
+      );
+    });
+  });
+
+  test("yurt içinde kâr payı UYGULANMIYOR", async () => {
+    await islem(db, async () => {
+      await tohum();
+      const o = await kayit((await siparis("U-1", "TR")).rows[0].order_id);
+      assert.equal(Number(o.subtotal), 380000);
+    });
+  });
+
+  test("gösterilen dolar = tahsil edilen TL ÷ kur", async () => {
+    await islem(db, async () => {
+      await tohum();
+      const o = await kayit((await siparis("U-1", "US")).rows[0].order_id);
+      /*
+        Kur 40. Mal 399.000 kuruş = 3.990 TL → 99,75 $.
+        Kargo 2.500 sent × 40 = 100.000 kuruş = 1.000 TL → 25,00 $.
+        Toplam 499.000 kuruş = 4.990 TL → 124,75 $.
+
+        Vitrin fiyatı TL × 1,05 ÷ 40 ile gösteriyor; aynı rakam:
+        3.800 × 1,05 ÷ 40 = 99,75.
+      */
+      assert.equal(Number(o.total), 499000);
+      assert.equal(Number(o.total) / 100 / 40, 124.75);
+    });
+  });
+
+  test("bölge eşiği kâr payını İKİ KEZ uygulamıyor", async () => {
+    await islem(db, async () => {
+      await tohum({ bolgeler: ["esikli"] });
+      /*
+        Eşik 100 $. Ara toplam artık kâr paylı: 3.800 × 1,05 = 3.990 TL
+        → 99,75 $, eşiğin ALTINDA, kargo var. Eski kod burada bir kez
+        daha 1,05 ile çarpıyordu (104,74 $) ve eşiği müşterinin
+        gördüğünden ÖNCE aşıyordu.
+      */
+      const ucuz = await kayit((await siparis("U-1", "US")).rows[0].order_id);
+      assert.equal(Number(ucuz.shipping), 100000);
+      assert.equal(Number(ucuz.metadata.subtotal_usd_cents), 9975);
+
+      /* 3.840 × 1,05 = 4.032 TL → 100,80 $: eşiğin üstünde. */
+      const pahali = await kayit((await siparis("P-1", "US")).rows[0].order_id);
+      assert.equal(Number(pahali.shipping), 0);
+      assert.equal(Number(pahali.metadata.subtotal_usd_cents), 10080);
     });
   });
 });
