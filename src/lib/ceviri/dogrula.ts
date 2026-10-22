@@ -316,7 +316,24 @@ export function ceviriKarari(
     return { kabul: false, sebep: "hedef grup düştü (çocuk/kadın/erkek)" };
   }
 
-  if (hedefGrubuSina && !sayilariKoruyor(kaynak, metin)) {
+  /*
+    SAYI DENETİMİ HER METİNDE — AÇIKLAMADA DAHA DA GEREKLİ.
+
+    Önceden yalnızca adlarda çalışıyordu (`hedefGrubuSina` ile aynı
+    bayrağa bağlıydı) ve açıklama denetimsizdi. Oysa bu katalogda
+    açıklama bir BEDEN TABLOSU:
+
+      "S Beden 49-69 Kiloya Uygun · M Beden 69-79 Kiloya Uygun"
+
+    Model bir kiloyu değiştirse kimse görmezdi ve müşteri yanlış
+    beden alırdı. Türkçe kalan bir tablo, yanlış kilolu bir
+    tablodan İYİDİR: biri görünür bir eksik, diğeri görünmeyen bir
+    hata.
+
+    Hedef grup denetimi açıklamada hâlâ YOK ve bu bilinçli: açıklama
+    metninde "Kadın" sözcüğünün geçmesi zorunlu değil.
+  */
+  if (!sayilariKoruyor(kaynak, metin)) {
     return { kabul: false, sebep: "sayı düştü (içerik kaybı)" };
   }
 

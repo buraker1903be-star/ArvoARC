@@ -336,14 +336,31 @@ test("kaynaktaki sayı çeviride yoksa red", () => {
   );
 });
 
-test("sayı denetimi karar işlevine bağlı (yalnızca adda)", () => {
+test("sayı denetimi ADDA DA AÇIKLAMADA DA uygulanıyor", () => {
   const kaynak = "10 Kasım Atatürk'ü Anma Günü Baskılı T-shirt - Beyaz";
   const dusuk = ceviriKarari("Unisex Printed T-Shirt - White", kaynak, AD_SINIRI, true);
   assert.equal(dusuk.kabul, false);
   assert.match(!dusuk.kabul ? dusuk.sebep : "", /sayı düştü/);
-  /* Açıklamada uygulanmıyor: metinde her sayının geçmesi
-     beklenemez. */
-  assert.equal(ceviriKarari("A printed tee.", kaynak, 4000).kabul, true);
+
+  /*
+    AÇIKLAMADA DA REDDEDİLİYOR. Önceden burada `kabul: true`
+    bekleniyordu ("metinde her sayının geçmesi beklenemez") ve bu
+    katalog için YANLIŞTI: açıklama bir beden tablosu —
+
+      "S Beden 49-69 Kiloya Uygun · M Beden 69-79 Kiloya Uygun"
+
+    Düşen ya da değişen bir kilo, müşterinin yanlış beden alması
+    demek ve hiçbir yerde görünmez. Türkçe kalan tablo, yanlış
+    kilolu tablodan iyidir.
+  */
+  assert.equal(ceviriKarari("A printed tee.", kaynak, 4000).kabul, false);
+});
+
+test("açıklamada hedef grup denetimi YOK", () => {
+  /* Açıklama metninde "Kadın" sözcüğünün geçmesi zorunlu değil;
+     zorlamak doğru çevirileri atardı. Sayı denetimi bundan ayrı. */
+  const kaynak = "Kadın Yazlık Şort";
+  assert.equal(ceviriKarari("A light summer piece.", kaynak, 4000).kabul, true);
 });
 
 test("sayısız kaynakta denetim devreye girmiyor", () => {
