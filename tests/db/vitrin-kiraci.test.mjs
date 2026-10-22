@@ -223,8 +223,15 @@ describe("çok kiracılı vitrin", () => {
     almaktan iyidir.
 
     Ölçülen şey bu yüzden değişti: dosyanın yeniden uygulanması
-    REDDEDİLMELİ ve reddedilme sebebi tam olarak o fonksiyon olmalı.
-    Başka bir satırda patlıyorsa ortada başka bir çakışma var.
+    REDDEDİLMELİ ve sebebi dönüş tipi çakışması (42P13) olmalı.
+
+    HANGİ fonksiyonda patladığı ÇİVİLENMİYOR ve bu bir düzeltme:
+    önce `arc_storefront_settings` adı aranıyordu, sonra
+    20261022201254 koleksiyon fonksiyonunun da dönüş tipini
+    değiştirdi ve dosya artık daha ERKEN patlıyor. Test o gün
+    kırıldı — ölçtüğü şey değişmemişti, yalnızca hangi satıra
+    çarptığı değişmişti. Aşılan fonksiyon sayısı zamanla artıyor;
+    adı sabitlemek her artırımda bu testi kırmak demekti.
   */
   test("eskiyen dosya yeniden uygulanamıyor, sessizce geri almıyor", async () => {
     await islem(db, async () => {
@@ -238,7 +245,9 @@ describe("çok kiracılı vitrin", () => {
       }
       assert.ok(hata, "dosya bütün hâliyle yeniden uygulanamamalı");
       assert.equal(hata.code, "42P13", `beklenen 42P13, gelen: ${hata.code} — ${hata.message}`);
-      assert.match(String(hata.hint ?? ""), /arc_storefront_settings/);
+      /* Aşılan bir VİTRİN fonksiyonunda patlamalı; hangisi olduğu
+         artırımlara göre değişiyor. */
+      assert.match(String(hata.hint ?? ""), /arc_storefront_|arc_vitrin_/);
     });
   });
 
