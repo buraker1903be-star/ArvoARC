@@ -416,6 +416,9 @@
       "updated_at",
       "usd_margin_percent",
       "usd_rate",
+      "usd_rate_auto",
+      "usd_rate_source",
+      "usd_rate_updated_at",
       "whatsapp_number"
     ],
     "arc_store_themes": [

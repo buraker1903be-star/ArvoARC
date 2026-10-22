@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/oz-denetim",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/kur",
+      "schedule": "45 13 * * *"
     }
   ]
 }

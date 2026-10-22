@@ -18,6 +18,8 @@
   okunmayan bir rapor, hiç olmayan rapordan kötüdür.
 */
 
+import { kurYasi } from "@/lib/kur-yasi";
+
 export type MagazaOlcumu = {
   magazaId: string;
   magazaAdi: string;
@@ -35,6 +37,14 @@ export type MagazaOlcumu = {
   siteHaritasiUrun: number | null;
   /** Site haritasından seçilen bir ürün sayfasının HTTP kodu; null = denenemedi. */
   ornekUrunDurumu: number | null;
+  /*
+    YURTDIŞI SATIŞI AÇIK MI ve kuru ne zaman yazıldı. Kapalı mağazada
+    kur bakılmıyor: orada kur hiç kullanılmıyor ve olmayan bir fiyatın
+    bayatlığı diye bir şey yok.
+  */
+  yurtdisiAcik: boolean;
+  /** Dolar kurunun son yazıldığı an (ISO); yoksa null. */
+  kurDamgasi: string | null;
 };
 
 export type Bulgu = {
@@ -68,6 +78,38 @@ export function magazaBulgulari(olcum: MagazaOlcumu, simdi: Date): Bulgu[] {
   */
   if (!olcum.odemeYontemiVar) {
     ekle("odeme_yok", "Ödeme yöntemi yok", "Hiçbir ödeme yöntemi etkin değil; müşteri ödeme adımını tamamlayamaz.");
+  }
+
+  /*
+    DONMUŞ KUR, YANLIŞ FİYAT DEMEK — ve sessiz.
+
+    Yurtdışı fiyatı TL fiyatı kura bölerek bulunuyor; kur donduğunda
+    sayfa fiyat göstermeye DEVAM ediyor, yalnızca yanlış gösteriyor.
+    TCMB biçim değiştirse ya da zamanlanmış iş düşse hiçbir ekranda
+    hata çıkmaz: bu depodaki en pahalı kusurların ortak özelliği bu.
+
+    Eşik panelin kullandığıyla AYNI (lib/kur-yasi → BAYAT_GUN): iki
+    yerde iki ayrı eşik, panelin "güncel" dediği bir kuru denetimin
+    "bayat" sayması demekti.
+
+    Kuru HİÇ yazılmamış mağaza da bildiriliyor: yurtdışı satışı açık
+    ama kuru bilinmiyorsa fiyatın neye göre hesaplandığı belirsiz.
+  */
+  if (olcum.yurtdisiAcik) {
+    const yas = kurYasi(olcum.kurDamgasi, simdi.getTime());
+    if (!yas) {
+      ekle(
+        "kur_bilinmiyor",
+        "Dolar kurunun tarihi bilinmiyor",
+        "Yurtdışı satışı açık ama kurun ne zaman girildiği kayıtlı değil. Ayarlar → Yurtdışı satış'tan kuru kaydedin ya da otomatik kipi açın.",
+      );
+    } else if (yas.bayat) {
+      ekle(
+        "kur_bayat",
+        "Dolar kuru güncellenmiyor",
+        `Kur ${yas.metin} yazıldı (${yas.gun} gün). Yurtdışı fiyatları bu kurla hesaplanıyor; otomatik güncelleme durmuş olabilir.`,
+      );
+    }
   }
 
   if (olcum.vitrinDurumu !== null && olcum.vitrinDurumu !== 200) {

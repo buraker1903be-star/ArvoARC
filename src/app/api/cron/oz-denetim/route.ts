@@ -84,7 +84,7 @@ export async function GET(istek: Request) {
   const [{ data: magazalar, error: magazaHatasi }, { data: tedarikciler }] = await Promise.all([
     supabase
       .from("arc_store_settings")
-      .select("organization_id,store_name,custom_domain,domain_verified_at,platform_subdomain,storefront_url,paytr_enabled,garanti_enabled,bank_transfer_enabled"),
+      .select("organization_id,store_name,custom_domain,domain_verified_at,platform_subdomain,storefront_url,paytr_enabled,garanti_enabled,bank_transfer_enabled,international_enabled,usd_rate_updated_at"),
     supabase.from("arc_suppliers").select("organization_id,active,last_synced_at"),
   ]);
 
@@ -123,6 +123,10 @@ export async function GET(istek: Request) {
       magazaId: magaza.organization_id as string,
       magazaAdi: (magaza.store_name as string) || "Mağaza",
       vitrinAcik,
+      /* Yurtdışı satışı kapalıysa kur hiç kullanılmıyor; bayatlığı
+         diye bir şey de yok (lib/oz-denetim). */
+      yurtdisiAcik: magaza.international_enabled === true,
+      kurDamgasi: (magaza.usd_rate_updated_at as string | null) ?? null,
       odemeYontemiVar: Boolean(magaza.paytr_enabled || magaza.garanti_enabled || magaza.bank_transfer_enabled),
       tedarikciVar: tedarikcisiVar.has(magaza.organization_id as string),
       sonTedarikciTaramasi: sonTarama.get(magaza.organization_id as string) ?? null,

@@ -757,6 +757,7 @@ export async function updateInternationalSettings(formData: FormData) {
   }
 
   const acik = formData.get("international_enabled") === "on";
+  const otomatik = formData.get("usd_rate_auto") === "on";
   /* Kur ondalıklı ve Türkçe yazımla girilebiliyor: "42,50". */
   const kurHam = String(formData.get("usd_rate") ?? "").trim().replace(",", ".");
   const kur = kurHam ? Number(kurHam) : 0;
@@ -781,12 +782,41 @@ export async function updateInternationalSettings(formData: FormData) {
     });
   }
 
+  /*
+    KURUN DAMGASI YALNIZCA DEĞER DEĞİŞTİYSE yenileniyor.
+
+    Her kaydetmede `now()` yazmak, kâr payını değiştirmek için formu
+    açıp kaydeden kişinin BİR HAFTALIK kurunu "bugün güncellendi"
+    diye göstermesi olurdu — ve öz denetim o yüzden bayatlığı hiç
+    görmezdi. Bayatlık ölçüsü ancak gerçekten yazılan değerle
+    anlamlı.
+
+    Kaynak da buna bağlı: elle girilen yeni bir kur "manuel" oluyor
+    ve otomatik iş onu bir sonraki turda TCMB kuruyla değiştiriyor
+    (otomatik kip açıksa). Kip kapalıysa kur olduğu gibi kalıyor.
+  */
+  const oncekiKur = Number(
+    (
+      await supabase
+        .from("arc_store_settings")
+        .select("usd_rate")
+        .eq("organization_id", organization.id)
+        .maybeSingle()
+    ).data?.usd_rate ?? 0,
+  );
+  const yeniKur = kur > 0 ? kur : null;
+  const kurDegisti = (yeniKur ?? 0) !== oncekiKur;
+
   const { error } = await supabase.from("arc_store_settings").upsert({
     organization_id: organization.id,
     ...(await magazaAdiTabani(supabase, organization.id, organization.name)),
     international_enabled: acik,
-    usd_rate: kur > 0 ? kur : null,
+    usd_rate: yeniKur,
     usd_margin_percent: kar,
+    usd_rate_auto: otomatik,
+    ...(kurDegisti
+      ? { usd_rate_updated_at: new Date().toISOString(), usd_rate_source: "manuel" }
+      : {}),
     updated_at: new Date().toISOString(),
   });
 

@@ -15,6 +15,8 @@ const SAGLAM: MagazaOlcumu = {
   vitrinDurumu: 200,
   siteHaritasiUrun: 2876,
   ornekUrunDurumu: 200,
+  yurtdisiAcik: false,
+  kurDamgasi: null,
 };
 
 const kodlar = (olcum: Partial<MagazaOlcumu>) =>
@@ -104,4 +106,58 @@ test("uzun metin cümlenin ortasında kesilmiyor", () => {
   const mesaj = bildirimMetni(cok);
   assert.ok(mesaj!.metin.length <= 380);
   assert.ok(mesaj!.metin.endsWith("…"));
+});
+
+/*
+  DONMUŞ KUR, YANLIŞ FİYAT DEMEK — ve sessiz: yurtdışı sayfası fiyat
+  göstermeye devam ediyor, yalnızca yanlış gösteriyor. TCMB biçim
+  değiştirse ya da zamanlanmış iş düşse hiçbir ekranda hata çıkmaz.
+*/
+test("yurtdışı açıkken bayat kur bildiriliyor", () => {
+  const bulgular = magazaBulgulari(
+    {
+      ...SAGLAM,
+      yurtdisiAcik: true,
+      kurDamgasi: new Date(SIMDI.getTime() - 5 * 86_400_000).toISOString(),
+    },
+    SIMDI,
+  );
+  assert.deepEqual(bulgular.map((b) => b.kod), ["kur_bayat"]);
+  assert.match(bulgular[0].metin, /5 gün/);
+});
+
+test("hafta sonunu geçen kur bayat SAYILMIYOR", () => {
+  /*
+    TCMB bülteni hafta sonu ve resmî tatilde yayımlanmıyor: cuma
+    akşamı yazılan kur pazartesi sabahı üç günlüktür ve bu olağan.
+    Eşiği bir güne çekmek her hafta sonu yanlış alarm üretirdi ve
+    her hafta gelen bir uyarı, okunmayan bir uyarıdır.
+  */
+  const bulgular = magazaBulgulari(
+    {
+      ...SAGLAM,
+      yurtdisiAcik: true,
+      kurDamgasi: new Date(SIMDI.getTime() - 3 * 86_400_000).toISOString(),
+    },
+    SIMDI,
+  );
+  assert.deepEqual(bulgular, []);
+});
+
+test("yurtdışı KAPALIYSA kura hiç bakılmıyor", () => {
+  /* Kapalı mağazada kur kullanılmıyor; olmayan bir fiyatın
+     bayatlığı diye bir şey yok. */
+  const bulgular = magazaBulgulari(
+    { ...SAGLAM, yurtdisiAcik: false, kurDamgasi: null },
+    SIMDI,
+  );
+  assert.deepEqual(bulgular, []);
+});
+
+test("yurtdışı açık ama kurun tarihi yoksa bildiriliyor", () => {
+  const bulgular = magazaBulgulari(
+    { ...SAGLAM, yurtdisiAcik: true, kurDamgasi: null },
+    SIMDI,
+  );
+  assert.deepEqual(bulgular.map((b) => b.kod), ["kur_bilinmiyor"]);
 });

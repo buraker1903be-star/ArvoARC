@@ -1,4 +1,5 @@
 import { requireTenant } from "@/lib/tenant";
+import { kurYasiYazisi } from "@/lib/kur-yasi";
 import { DurumSecici } from "@/components/arvo-ui/durum-secici";
 import { ALT_ALAN_SONEKI, altAlanAdresi, magazaAdresi } from "@/lib/magaza-adresi";
 import { removeBrandAsset,removeWhatsappNumber,saveEmailTemplate,saveStorePage,saveWhatsappNumber,updatePanelDomainSettings,updatePaymentSettings,updateSalesSettings,updateShippingIntegration,updateStorefrontDomainSettings,updateStoreSettings,uploadBrandAsset,verifyPanelDomain,verifyStorefrontDomain,verifyWhatsappNumber } from "./actions";
@@ -44,7 +45,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
   const {bolum:bolumParametresi}=await searchParams;
   const bolum:AyarBolumu=AYAR_BOLUMLERI.some(([k])=>k===bolumParametresi)?(bolumParametresi as AyarBolumu):"marka";
   const {supabase,organization,membership,user}=await requireTenant();
-  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,storefront_mode,domain_verification_token,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,garanti_enabled,garanti_test_mode,garanti_isyeri_no,garanti_terminal_no,garanti_api_surumu,garanti_guvenlik_duzeyi,garanti_yari_guvenli_kabul,garanti_provizyon_sifresi_enc,garanti_magaza_anahtari_enc,garanti_iade_sifresi_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country,international_enabled,usd_rate,usd_margin_percent").eq("organization_id",organization.id).maybeSingle();
+  const {data:settings,error}=await supabase.from("arc_store_settings").select("store_name,storefront_url,currency,locale,low_stock_threshold,logo_path,favicon_path,primary_color,accent_color,custom_domain,platform_subdomain,domain_status,domain_verified_at,panel_custom_domain,panel_domain_status,panel_domain_verified_at,storefront_mode,domain_verification_token,bank_transfer_enabled,bank_name,bank_account_holder,bank_iban,bank_transfer_instructions,paytr_enabled,paytr_test_mode,paytr_merchant_id,paytr_no_installment,paytr_max_installment,paytr_merchant_key_enc,garanti_enabled,garanti_test_mode,garanti_isyeri_no,garanti_terminal_no,garanti_api_surumu,garanti_guvenlik_duzeyi,garanti_yari_guvenli_kabul,garanti_provizyon_sifresi_enc,garanti_magaza_anahtari_enc,garanti_iade_sifresi_enc,odeme_saglayicisi,email_from,email_reply_to,order_prefix,shipping_fee,free_shipping_threshold,bank_transfer_discount_percent,tryoto_enabled,tryoto_test_mode,tryoto_pickup_location_code,tryoto_refresh_token_enc,legal_name,contact_phone,contact_email,address_line,address_district,address_city,address_country,international_enabled,usd_rate,usd_margin_percent,usd_rate_auto,usd_rate_updated_at,usd_rate_source").eq("organization_id",organization.id).maybeSingle();
   if(error)throw new Error(error.message);
   const disVitrin=settings?.storefront_mode==="external";
   const canManage=["owner","admin","manager"].includes(membership.role);
@@ -74,6 +75,17 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
   /* Kargo bölgeleri yalnızca o bölüm açıkken okunuyor: ayarlar
      sayfası sekiz bölüm ve her açılışta hepsinin verisini çekmek
      en sık açılan "marka" bölümünü yavaşlatırdı. */
+  /*
+    KURUN YAŞI İNSAN DİLİNDE. Ham damga ("2026-10-22T13:45:02Z")
+    bayatlığı okunur kılmıyor; bakan kişi "dün" ile "on bir gün önce"
+    arasındaki farkı bir bakışta görmeli.
+
+    Hesap render DIŞINDA: bileşen içinde Date.now() çağırmak saf
+    olmayan bir çağrı (lint kuralı) ve bu depoda aynı kalıp
+    indirimler sayfasında da böyle çözüldü.
+  */
+  const kurYasi = kurYasiYazisi(settings?.usd_rate_updated_at ?? null);
+
   const bolgeler = bolum==="yurtdisi"
     ? ((await supabase.from("arc_shipping_zones")
         .select("id,label,countries,fee_cents,free_over_cents,sira")
@@ -186,20 +198,39 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
             <input type="checkbox" name="international_enabled" defaultChecked={settings?.international_enabled===true}/>
             <span>Yurtdışı satışı açık</span>
           </label>
+          {/*
+            OTOMATİK KİP (22.10.2026). Kur elle güncelleniyordu ve bu
+            sürdürülebilir değildi: her gün oynuyor ve güncellenmeyen
+            kur kataloğu yanlış fiyatlıyor.
+          */}
+          <label className="settings-switch">
+            <input type="checkbox" name="usd_rate_auto" defaultChecked={settings?.usd_rate_auto===true}/>
+            <span>Kuru TCMB&apos;den otomatik güncelle</span>
+          </label>
           <label>Dolar kuru (1 USD = ? ₺)<input name="usd_rate" type="text" inputMode="decimal" autoComplete="off" defaultValue={settings?.usd_rate??""} placeholder="42,50"/></label>
           <label>Kâr payı (%)<input name="usd_margin_percent" type="number" min="0" max="500" step="0.5" defaultValue={settings?.usd_margin_percent??0}/></label>
           {/*
-            Kur CANLI DEĞİL ve bu bilerek: dış bir kur servisine
-            bağlanmak, servis düştüğü gün fiyatın ne olacağı
-            sorusunu doğuruyor — yedek kura düşmek sessizce yanlış
-            fiyat, satışı durdurmak ciro kaybı.
+            KURUN YAŞI YAZILIYOR. Servis düştüğünde ya da TCMB biçim
+            değiştirdiğinde kur DONUYOR ve donmuş bir kur, fiyatı
+            sessizce bayatlatıyor — "yanlış bilgi göstermek, hiç
+            göstermemekten kötüdür" kuralının buradaki karşılığı bu
+            satır. Günlük öz denetim de aynı alanı okuyup kurum
+            sahibine bildiriyor.
           */}
           <p className="list-hint">
+            {kurYasi
+              ? <>Kur <b>{kurYasi}</b> güncellendi{settings?.usd_rate_source==="tcmb"?" (TCMB)":settings?.usd_rate_source==="manuel"?" (elle)":""}.</>
+              : <>Kurun ne zaman girildiği <b>bilinmiyor</b>; otomatik kipi açarsanız ilk güncellemede yazılır.</>}
+          </p>
+          <p className="list-hint">
             Kur ve kâr payı dolar fiyatını birlikte belirliyor:
-            <b> TL fiyat ÷ kur × (1 + kâr payı)</b>. Kur canlı
-            çekilmiyor; siz değiştirene kadar sabit kalır. Kuru
-            girmeden yurtdışı satışı açılamaz — fiyat
-            gösteremeyen bir vitrin, kapalı vitrinden kötüdür.
+            <b> TL fiyat ÷ kur × (1 + kâr payı)</b>. Otomatik kipte
+            kur her gün TCMB bülteninden (alış kuru) yazılıyor; bülten
+            yayımlanmayan günlerde (hafta sonu, tatil) son kur
+            olduğu gibi kalıyor. Kapalıyken kuru siz
+            değiştirene kadar sabit kalır. Kur olmadan yurtdışı
+            satışı açılamaz — fiyat gösteremeyen bir vitrin, kapalı
+            vitrinden kötüdür.
           </p>
           <button className="panel-primary" type="submit">Yurtdışı ayarlarını kaydet</button>
         </form>:<p className="list-hint">{yetkiYok("mağaza ayarları")}</p>}
