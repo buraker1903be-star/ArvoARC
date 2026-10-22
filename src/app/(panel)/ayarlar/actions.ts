@@ -713,8 +713,16 @@ export async function saveStorePage(formData:FormData){
 
   const baslik=String(formData.get("title")??"").trim().slice(0,BASLIK_SINIRI);
   const govde=String(formData.get("body")??"").trim().slice(0,GOVDE_SINIRI);
+  /* İngilizce metin SEÇMELİ: boşsa vitrin kendi yansız İngilizce
+     varsayılanını çiziyor. Türkçe metni İngilizce sayfaya koymak
+     bilerek yapılmıyor — çevirinin yarıda kaldığını gösterir. */
+  const baslikEn=String(formData.get("title_en")??"").trim().slice(0,BASLIK_SINIRI);
+  const govdeEn=String(formData.get("body_en")??"").trim().slice(0,GOVDE_SINIRI);
 
-  if(!baslik&&!govde){
+  /* DÖRT ALANIN DÖRDÜ de boşsa satır siliniyor. Önceden yalnızca
+     Türkçe ikisine bakıyordu: yalnızca İngilizcesini yazan kiracının
+     kaydı siliniyordu ve hiçbir yerde hata görünmüyordu. */
+  if(!baslik&&!govde&&!baslikEn&&!govdeEn){
     const {error}=await supabase.from("arc_store_pages").delete()
       .eq("organization_id",organization.id).eq("page_key",anahtar);
     if(error)return await bildirimliDonus("/ayarlar?bolum=sayfalar",{hata:error.message});
@@ -727,6 +735,8 @@ export async function saveStorePage(formData:FormData){
     page_key:anahtar,
     title:baslik,
     body:govde,
+    title_en:baslikEn||null,
+    body_en:govdeEn||null,
     updated_by:user.id,
     updated_at:new Date().toISOString(),
   },{onConflict:"organization_id,page_key"});

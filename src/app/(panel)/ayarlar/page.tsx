@@ -68,9 +68,9 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
     :[];
   /* Sayfalar yalnızca o bölüm açıkken okunur. */
   const sayfaSatirlari=bolum==="sayfalar"
-    ?(await supabase.from("arc_store_pages").select("page_key,title,body").eq("organization_id",organization.id)).data??[]
+    ?(await supabase.from("arc_store_pages").select("page_key,title,body,title_en,body_en").eq("organization_id",organization.id)).data??[]
     :[];
-  const sayfaKayitlari=new Map(sayfaSatirlari.map((s)=>[s.page_key as string,{baslik:s.title as string,govde:s.body as string}]));
+  const sayfaKayitlari=new Map(sayfaSatirlari.map((s)=>[s.page_key as string,{baslik:s.title as string,govde:s.body as string,baslikEn:(s.title_en as string|null)??"",govdeEn:(s.body_en as string|null)??""}]));
   const sablonKayitlari=new Map(sablonSatirlari.map((s)=>[s.template_key as string,{baslik:s.subject as string,govde:s.body as string}]));
   /* Kargo bölgeleri yalnızca o bölüm açıkken okunuyor: ayarlar
      sayfası sekiz bölüm ve her açılışta hepsinin verisini çekmek
@@ -757,6 +757,7 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
         {Object.entries(SAYFA_KAYDI).map(([anahtar,tanim])=>{
           const kayit=sayfaKayitlari.get(anahtar)??null;
           const ozel=Boolean((kayit?.baslik??"").trim()||(kayit?.govde??"").trim());
+          const ingilizceVar=Boolean((kayit?.baslikEn??"").trim()||(kayit?.govdeEn??"").trim());
           return <form key={anahtar} action={saveStorePage} className="settings-form eposta-sablon">
             <input type="hidden" name="page_key" value={anahtar}/>
             <div className="eposta-sablon-bas">
@@ -766,6 +767,22 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
             <label>Sayfa başlığı<input name="title" defaultValue={kayit?.baslik??""} placeholder={tanim.ad} maxLength={BASLIK_SINIRI}/></label>
             <label>Metin<textarea name="body" rows={tanim.satir} defaultValue={kayit?.govde??""} maxLength={GOVDE_SINIRI}/></label>
             {tanim.ipucu&&<p className="list-hint">{tanim.ipucu}</p>}
+            {/*
+              İNGİLİZCE SEÇMELİ. Boş bırakılırsa İngilizce vitrin
+              KENDİ yansız metnini çiziyor; Türkçe metni İngilizce
+              sayfaya koymuyor — bu, çevirinin yarıda kaldığını
+              göstermekten başka bir şey yapmaz.
+
+              Ürün çevirisi gibi makineye verilmiyor: bu metin
+              kiracının kendi sesi ve "en iyi tahmin" bir marka
+              anlatısı, kiracının ağzından bizim yazdığımız bir
+              paragraf olurdu.
+            */}
+            <details className="ingilizce-alanlar">
+              <summary>İngilizce <span className="list-hint">{ingilizceVar?"yazılmış":"boş — vitrin varsayılanı görünür"}</span></summary>
+              <label>Title (English)<input name="title_en" defaultValue={kayit?.baslikEn??""} placeholder={tanim.ad} maxLength={BASLIK_SINIRI}/></label>
+              <label>Text (English)<textarea name="body_en" rows={tanim.satir} defaultValue={kayit?.govdeEn??""} maxLength={GOVDE_SINIRI}/></label>
+            </details>
             <div className="eposta-sablon-eylem">
               <button className="panel-primary" type="submit">Kaydet</button>
               <span className="list-hint">Varsayılana dönmek için alanları boşaltıp kaydedin.</span>
