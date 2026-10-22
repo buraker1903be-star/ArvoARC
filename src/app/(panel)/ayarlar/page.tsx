@@ -86,6 +86,37 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
   */
   const kurYasi = kurYasiYazisi(settings?.usd_rate_updated_at ?? null);
 
+  /*
+    İNGİLİZCE ÇEVİRİ KAPSAMI. Çeviri geliştiricinin makinesinde elle
+    koşan bir betikten geliyor (model kurum sahibinin kendi
+    sunucusunda) ve işin NEREDE kaldığı hiçbir ekranda görünmüyordu:
+    kapsamı bilmeyen biri "İngilizce vitrin hazır mı" sorusunu
+    yanıtlayamaz. İki sayım, yalnızca bu bölüm açıkken.
+
+    Yurtdışına gönderilemeyen ürün sayıma GİRMİYOR: İngilizce
+    vitrinde hiç görünmüyor, yani çevirisi de beklenmiyor ve onları
+    saymak kapsamı olduğundan düşük gösterirdi.
+  */
+  const ceviriKapsami = bolum==="yurtdisi"&&canManage
+    ? await (async () => {
+        const temel = supabase.from("arc_products")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", organization.id)
+          .eq("status", "active")
+          .eq("international_blocked", false);
+        const [{ count: toplam }, { count: cevrili }] = await Promise.all([
+          temel,
+          supabase.from("arc_products")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", organization.id)
+            .eq("status", "active")
+            .eq("international_blocked", false)
+            .not("name_en", "is", null),
+        ]);
+        return { toplam: toplam ?? 0, cevrili: cevrili ?? 0 };
+      })()
+    : null;
+
   const bolgeler = bolum==="yurtdisi"
     ? ((await supabase.from("arc_shipping_zones")
         .select("id,label,countries,fee_cents,free_over_cents,sira")
@@ -232,6 +263,20 @@ export default async function Settings({searchParams}:{searchParams:Promise<{bol
             satışı açılamaz — fiyat gösteremeyen bir vitrin, kapalı
             vitrinden kötüdür.
           </p>
+          {/*
+            KAPSAM YAZIYOR, çünkü çeviri kademeli yürüyor ve
+            çevirisi olmayan ürün İngilizce vitrinde TÜRKÇE
+            görünüyor. Sayı olmadan "İngilizce vitrin hazır mı"
+            sorusu yanıtlanamaz.
+          */}
+          {ceviriKapsami?.toplam ? (
+            <p className="list-hint">
+              İngilizce çeviri: <b>{ceviriKapsami.cevrili}</b> / {ceviriKapsami.toplam} ürün
+              {ceviriKapsami.cevrili < ceviriKapsami.toplam
+                ? <> — kalanlar İngilizce vitrinde Türkçe adıyla görünüyor.</>
+                : <> — tamamlandı.</>}
+            </p>
+          ) : null}
           <button className="panel-primary" type="submit">Yurtdışı ayarlarını kaydet</button>
         </form>:<p className="list-hint">{yetkiYok("mağaza ayarları")}</p>}
       </section>
