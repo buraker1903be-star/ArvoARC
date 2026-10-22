@@ -20,7 +20,7 @@
     "olc:rehber": "node scripts/olc-rehber.mjs",
     "check:rls": "node scripts/check-rls.mjs",
     "check:ikizler": "node scripts/check-ikizler.mjs",
-    "ceviri": "node scripts/ceviri-uret.mjs"
+    "ceviri": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/ceviri-uret.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
