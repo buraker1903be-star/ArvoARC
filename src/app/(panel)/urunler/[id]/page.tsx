@@ -15,6 +15,7 @@ import { trIsoToLocal } from "@/lib/tr-time";
 import { yayinOzeti } from "@/lib/yayin-plani";
 import { terimiTemizle } from "@/lib/panel-arama";
 import { SeoFields } from "./seo-fields";
+import { IngilizceAlanlar } from "./ingilizce-alanlar";
 import { VaryantFiyatlari, YeniVaryantFiyatlari } from "./fiyat-alanlari";
 // Düzenleyicinin iç biçimi (product-*, variant-*, kitaplik) hâlâ orada; kabuk ve başlık ArvoOS.
 import "../../catalog.css";
@@ -39,7 +40,7 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
      ekranı çıkıyordu (lib/kimlik). */
   if (!kimlikMi(id)) notFound();
   const [{data:product,error},{data:variants,error:variantError},{data:settings}]=await Promise.all([
-    supabase.from("arc_products").select("id,name,slug,description,status,source,metadata,created_at,publish_at,unpublish_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
+    supabase.from("arc_products").select("id,name,slug,description,status,source,metadata,created_at,publish_at,unpublish_at,name_en,description_en,translated_at,updated_at").eq("organization_id",organization.id).eq("id",id).maybeSingle(),
     supabase.from("arc_product_variants").select("id,sku,title,price,compare_at_price,currency,stock,allow_backorder,attributes,cost_price,image_path").eq("organization_id",organization.id).eq("product_id",id).order("title"),
     supabase.from("arc_store_settings").select("storefront_url,custom_domain,domain_verified_at,platform_subdomain").eq("organization_id",organization.id).maybeSingle(),
   ]);
@@ -252,6 +253,23 @@ export default async function ProductDetail({params,searchParams}:{params:Promis
                 <label className="full-field">Ürün açıklaması<textarea name="description" defaultValue={product.description??""} rows={12} maxLength={20000} placeholder="Ürünün özelliklerini, faydalarını ve kullanım bilgisini detaylandırın."/></label>
               </div>
             </section>
+
+            {/*
+              İNGİLİZCE İÇERİK. Çeviri açık ağırlıklı bir modelden
+              geliyor ve kalitesi değişken; birkaç adın tuhaf çıkması
+              kaçınılmaz ve elle düzeltmenin tek yolu SQL olmamalı.
+
+              BAYATLIK UYARISI: Türkçe ad çeviriden SONRA değiştiyse
+              (tedarikçi güncellemesi, elle düzeltme) çeviri eskimiş
+              demektir ve bunu hiçbir şey söylemiyordu. Damga tam bu
+              soru için var.
+            */}
+            <IngilizceAlanlar
+              adEn={product.name_en??""}
+              aciklamaEn={product.description_en??""}
+              turkceAd={product.name}
+              bayat={Boolean(product.translated_at)&&new Date(product.updated_at as string)>new Date(product.translated_at as string)}
+            />
 
             <SeoFields defaultTitle={meta.seo_title??product.name} defaultDescription={meta.seo_description??""} defaultSlug={product.slug??""} productName={product.name} alanAdi={magazaKoku?new URL(magazaKoku).host:null}/>
 

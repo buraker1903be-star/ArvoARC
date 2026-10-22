@@ -66,13 +66,36 @@ export async function updateProduct(formData: FormData) {
 
   const { data: currentProduct, error: currentProductError } = await supabase
     .from("arc_products")
-    .select("metadata")
+    .select("metadata, name_en, description_en, translated_at")
     .eq("id", id)
     .eq("organization_id", organization.id)
     .maybeSingle();
 
   if (currentProductError || !currentProduct) return await bildirimliDonus(`/urunler/${id}`,{hata:hataMetni("product-not-found")});
   const currentMetadata = (currentProduct.metadata ?? {}) as EditableProductMetadata;
+
+  /*
+    ÇEVİRİ DAMGASI YALNIZCA METİN DEĞİŞTİYSE yenileniyor.
+
+    Form her kaydetmede `name_en` gönderiyor; her seferinde `now()`
+    yazmak, İngilizceye hiç dokunmayan biri ürünü kaydettiğinde
+    damgayı tazelemek olurdu. O da BAYATLIK UYARISINI GİZLERDİ:
+    Türkçe adı değiştirip kaydeden kişi hem `updated_at`'i hem
+    `translated_at`'i ileri alır ve "çeviri eskidi" uyarısı hiç
+    çıkmazdı — yani uyarı tam gerektiği anda susardı.
+
+    Kur damgasında da aynı karar verilmişti (20261022183355).
+  */
+  const adEn = field(formData, "name_en", 200) || null;
+  const aciklamaEn = field(formData, "description_en", 4000) || null;
+  const ceviriDegisti =
+    adEn !== (currentProduct.name_en ?? null) ||
+    aciklamaEn !== (currentProduct.description_en ?? null);
+  const translatedAt = adEn
+    ? ceviriDegisti
+      ? new Date().toISOString()
+      : ((currentProduct.translated_at as string | null) ?? new Date().toISOString())
+    : null;
   const metadata: EditableProductMetadata = {
     ...currentMetadata,
     subtitle: field(formData, "subtitle", 240),
@@ -102,7 +125,35 @@ export async function updateProduct(formData: FormData) {
 
   const { error } = await supabase
     .from("arc_products")
-    .update({ name, slug, description, status, metadata, publish_at: plan.publishAt, unpublish_at: plan.unpublishAt, updated_at: new Date().toISOString() })
+    /*
+      İNGİLİZCE ALANLAR DA BURADAN YAZILIYOR. Çeviri açık ağırlıklı
+      bir modelden geliyor (scripts/ceviri-uret.mjs) ve kalitesi
+      değişken; birkaç adın tuhaf çıkması kaçınılmaz. Elle düzeltmenin
+      tek yolu SQL olmasın.
+
+      BOŞALTILABİLİR: alan silinince `null` yazılıyor ve ürün
+      İngilizce vitrinde Türkçe adıyla görünüyor — yani yanlış bir
+      çeviriyi geri almanın yolu var. Boş metni "" olarak yazmak,
+      çeviriyi "var ama boş" hâline sokar ve vitrin boş bir ad
+      basardı.
+
+      `translated_at` ELLE YAZIMDA DA yenileniyor: damga "bu çeviri ne
+      zamandan beri geçerli" sorusunu yanıtlıyor ve elle düzeltilen
+      bir çeviri de o soruya dahil.
+    */
+    .update({
+      name,
+      slug,
+      description,
+      status,
+      metadata,
+      name_en: adEn,
+      description_en: aciklamaEn,
+      translated_at: translatedAt,
+      publish_at: plan.publishAt,
+      unpublish_at: plan.unpublishAt,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id)
     .eq("organization_id", organization.id);
 
