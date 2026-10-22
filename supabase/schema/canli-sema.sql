@@ -1,4 +1,4 @@
--- Canlı şema dışa aktarımı: 2026-10-18
+-- Canlı şema dışa aktarımı: 2026-10-22
 -- scripts/sema-disa-aktar.sql ile üretildi. Elle düzenlemeyin.
 -- Sıra: tipler, sekanslar, tablolar, fonksiyonlar, varsayılanlar,
 -- kısıtlar, yabancı anahtarlar, indeksler, görünümler, RLS, politikalar,
@@ -13,6 +13,8 @@ do $t$ begin create type public.membership_role as enum ('owner', 'admin', 'mana
 do $t$ begin create type public.organization_status as enum ('trial', 'active', 'suspended', 'archived'); exception when duplicate_object then null; end $t$;
 
 do $t$ begin create type public.plan_code as enum ('starter', 'professional', 'enterprise'); exception when duplicate_object then null; end $t$;
+
+create sequence if not exists public.arc_visits_id_seq;
 
 create table if not exists public.arc_collection_products (
   organization_id uuid not null,
@@ -92,6 +94,31 @@ create table if not exists public.arc_email_templates (
   updated_by uuid,
   created_at timestamp with time zone not null,
   updated_at timestamp with time zone not null
+);
+
+create table if not exists public.arc_gift_card_uses (
+  id uuid not null,
+  gift_card_id uuid not null,
+  order_id uuid,
+  amount bigint not null,
+  note text,
+  created_at timestamp with time zone not null
+);
+
+create table if not exists public.arc_gift_cards (
+  id uuid not null,
+  organization_id uuid not null,
+  code text not null,
+  initial_amount bigint not null,
+  balance bigint not null,
+  status text not null,
+  recipient_email text,
+  recipient_name text,
+  note text,
+  expires_at timestamp with time zone,
+  created_at timestamp with time zone not null,
+  updated_at timestamp with time zone not null,
+  minimum_subtotal bigint not null
 );
 
 create table if not exists public.arc_import_batches (
@@ -255,7 +282,8 @@ create table if not exists public.arc_products (
   supplier_synced_at timestamp with time zone,
   tax_rate numeric(5,2),
   publish_at timestamp with time zone,
-  unpublish_at timestamp with time zone
+  unpublish_at timestamp with time zone,
+  international_blocked boolean not null
 );
 
 create table if not exists public.arc_return_requests (
@@ -319,6 +347,18 @@ create table if not exists public.arc_shipments (
   supplier text,
   pickup_location_code text,
   customer_notified_at timestamp with time zone
+);
+
+create table if not exists public.arc_shipping_zones (
+  id uuid not null,
+  organization_id uuid not null,
+  label text not null,
+  countries text[] not null,
+  fee_cents bigint not null,
+  free_over_cents bigint not null,
+  sira integer not null,
+  created_at timestamp with time zone not null,
+  updated_at timestamp with time zone not null
 );
 
 create table if not exists public.arc_store_pages (
@@ -410,7 +450,13 @@ create table if not exists public.arc_store_settings (
   garanti_api_surumu text not null,
   garanti_guvenlik_duzeyi text not null,
   garanti_yari_guvenli_kabul boolean not null,
-  storefront_mode text not null
+  storefront_mode text not null,
+  parent_organization_name text,
+  parent_organization_url text,
+  legal_disclosure text,
+  international_enabled boolean not null,
+  usd_rate numeric(12,4),
+  usd_margin_percent numeric(6,2) not null
 );
 
 create table if not exists public.arc_store_themes (
@@ -445,6 +491,20 @@ create table if not exists public.arc_suppliers (
   sync_total integer not null,
   service_fee bigint not null,
   stock_buffer integer not null
+);
+
+create table if not exists public.arc_visits (
+  id bigint not null,
+  organization_id uuid not null,
+  path text not null,
+  product_slug text,
+  country text,
+  city text,
+  lat double precision,
+  lon double precision,
+  ip_hash text,
+  created_at timestamp with time zone not null,
+  source text
 );
 
 create table if not exists public.organization_memberships (
@@ -1739,7 +1799,22 @@ declare
   v_variant record;
   v_count integer := 0;
   v_addr jsonb;
+  /* Teslimat ülkesi: yurtdışına gönderilemeyen ürün denetimi
+     buna bakıyor. Boş adreste 'TR' varsayılıyor (aşağıda). */
+  v_ulke text;
   v_free_shipping_coupon boolean := false;
+  -- Kupona TABİ ara toplam: indirimli satırlar bunun dışında.
+  v_kuponlanabilir bigint := 0;
+  -- Kuponun uygulanacağı taban (birleşebilir mi sorusuna göre).
+  v_kupon_tabani bigint := 0;
+  /* Yurtdışı: mod, kur, kâr payı ve bölge tarifesi. */
+  v_international boolean;
+  v_usd_rate numeric;
+  v_usd_margin numeric;
+  v_bolge record;
+  /* Sepetin MÜŞTERİYE GÖSTERİLEN dolar karşılığı (sent). */
+  v_usd_ara_toplam_sent bigint := 0;
+  v_kargo_senti bigint := 0;
 begin
   if p_organization_id is null then
     raise exception 'Mağaza belirtilmedi';
@@ -1747,8 +1822,12 @@ begin
 
   select coalesce(s.order_prefix, 'AC'),
          coalesce(s.shipping_fee, 12000),
-         coalesce(s.free_shipping_threshold, 200000)
-    into v_prefix, v_shipping_fee, v_free_threshold
+         coalesce(s.free_shipping_threshold, 200000),
+         coalesce(s.international_enabled, false),
+         s.usd_rate,
+         coalesce(s.usd_margin_percent, 0)
+    into v_prefix, v_shipping_fee, v_free_threshold,
+         v_international, v_usd_rate, v_usd_margin
   from public.arc_store_settings s
   where s.organization_id = p_organization_id;
 
@@ -1784,6 +1863,17 @@ begin
     'country', coalesce(nullif(trim(coalesce(p_address ->> 'country', '')), ''), 'TR')
   );
 
+  /*
+    ÜLKE KODU TEK BİÇİMDE. Adres alanı serbest metin: "TR", "tr",
+    "Türkiye", "Turkey" hepsi gelebiliyor. Denetim bunların
+    hepsini Türkiye saymak zorunda, yoksa "Türkiye" yazan müşteri
+    yurtdışı sayılıp LR ürünü alamazdı.
+  */
+  v_ulke := upper(trim(coalesce(v_addr ->> 'country', 'TR')));
+  if v_ulke in ('TURKIYE', 'TÜRKIYE', 'TÜRKİYE', 'TURKEY', 'TURKIYE CUMHURIYETI') then
+    v_ulke := 'TR';
+  end if;
+
   v_order_number := v_prefix || to_char(now() at time zone 'Europe/Istanbul', 'YYMMDD') || '-' ||
                     upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
 
@@ -1814,7 +1904,8 @@ begin
       raise exception 'Geçersiz sepet kalemi';
     end if;
 
-    select v.id, v.price, v.stock, v.allow_backorder, v.supplier, p.name
+    select v.id, v.price, v.stock, v.allow_backorder, v.supplier,
+           v.compare_at_price, p.name, p.international_blocked
       into v_variant
     from public.arc_product_variants v
     join public.arc_products p
@@ -1857,6 +1948,29 @@ begin
       Değişen yalnızca tedarikçi ürünü, çünkü orada o alan bir
       tercih değil, yazılmamış bir varsayılan.
     */
+    /*
+      YURTDIŞINA GÖNDERİLEMEYEN ÜRÜN.
+
+      Kural DİLDE ya da para biriminde değil, TESLİMAT ÜLKESİNDE:
+      müşteri siteyi Türkçe de gezse, adresi yurtdışıysa o ürün
+      gönderilemiyor. Dil seçimine bağlasaydık İngilizce vitrine
+      hiç uğramadan yurtdışı adresi yazan müşteri engele
+      takılmazdı.
+
+      Denetim BURADA, yani siparişin yazıldığı tek yerde. Vitrin
+      listeyi süzüyor olsa da süzgeç bir gün atlarsa sipariş yine
+      geçmemeli: görünürlük kolaylık, bu satır kural.
+
+      Ülke bilinmiyorsa engellenmiyor: adres alanı boş gelen eski
+      akışlarda bütün siparişleri reddetmek, çalışan satışı
+      durdurmak olurdu.
+    */
+    if coalesce(v_variant.international_blocked, false)
+       and v_ulke is not null
+       and v_ulke <> 'TR' then
+      raise exception 'Bu ürün yurtdışına gönderilemiyor: %', v_variant.name;
+    end if;
+
     if v_variant.stock < v_qty
        and (
          v_variant.supplier is not null
@@ -1876,6 +1990,15 @@ begin
     );
 
     v_subtotal := v_subtotal + (v_variant.price * v_qty);
+
+    /*
+      Satır indirimliyse kupona girmiyor. Ölçüt ürün kartındaki
+      üstü çizili fiyatla AYNI: compare_at_price > price.
+    */
+    if coalesce(v_variant.compare_at_price, 0) <= v_variant.price then
+      v_kuponlanabilir := v_kuponlanabilir + (v_variant.price * v_qty);
+    end if;
+
     v_count := v_count + 1;
   end loop;
 
@@ -1884,11 +2007,38 @@ begin
   end if;
 
   if p_coupon_code is not null and length(trim(p_coupon_code)) > 0 then
+    /*
+      TABAN: birleşebilir kuponda sepetin tamamı, değilse yalnızca
+      indirimsiz satırlar.
+
+      Asgari sepet tutarı (minimum_subtotal) SEPETİN TAMAMIYLA
+      karşılaştırılmaya devam ediyor: "500 TL ve üzeri sepetlerde
+      geçerli" cümlesi sepetin büyüklüğü hakkında, kuponun tabanı
+      hakkında değil.
+
+      Taban ayrı bir sorguyla okunuyor; aşağıdaki seçim kuponun
+      bütün geçerlilik koşullarını (tarih, kullanım sınırı, asgari
+      tutar) da sınıyor ve taban o koşullardan bağımsız. Kupon
+      geçersizse v_discount zaten sıfır kalıyor.
+    */
+    select case
+             when coalesce(d.combinable, false) then v_subtotal
+             else v_kuponlanabilir
+           end
+      into v_kupon_tabani
+    from public.arc_discounts d
+    where d.organization_id = p_organization_id
+      and upper(d.code) = upper(trim(p_coupon_code))
+      and d.status = 'active'
+    limit 1;
+
+    v_kupon_tabani := coalesce(v_kupon_tabani, 0);
+
     select case
              when d.discount_type = 'percentage'
-               then (v_subtotal * d.value) / 100
+               then (v_kupon_tabani * d.value) / 100
              when d.discount_type = 'fixed_amount'
-               then least(d.value, v_subtotal)
+               then least(d.value, v_kupon_tabani)
              else 0
            end,
            d.discount_type = 'free_shipping'
@@ -1907,10 +2057,117 @@ begin
     v_free_shipping_coupon := coalesce(v_free_shipping_coupon, false);
   end if;
 
-  if v_free_shipping_coupon or v_subtotal >= v_free_threshold then
-    v_shipping := 0;
+  /*
+    KARGO: YURT İÇİ TARİFE İLE YURTDIŞI TARİFESİ AYRI HESAPLANIR.
+
+    Önceden tek yol vardı — yurt içi ücreti ve TL eşiği. Teslimat
+    ülkesi yurtdışı olsa da sipariş 120 TL kargoyla geçiyordu;
+    gerçek maliyet bunun on katı. Yurtdışına satış kapalı olduğu
+    için canlıda zarar doğmadı ama açıldığı gün doğacaktı.
+
+    TL EŞİĞİ YURTDIŞINDA GEÇMEZ. "2.000 TL üzeri ücretsiz kargo"
+    yurt içi kargo maliyetine göre konmuş bir söz; aynı eşiği
+    yurtdışında uygulamak hemen her siparişte kargoyu bedava
+    yapardı. Yurtdışında eşik BÖLGENİN kendi eşiği
+    (`free_over_cents`, dolar) ve bölge başına ayrı konabiliyor.
+
+    ÜCRETSİZ KARGO KUPONU DA YURTDIŞINDA GEÇMEZ. Mevcut kuponlar
+    yurt içi ücretine göre tanımlandı; biri yurtdışı siparişinde
+    çalışırsa mağaza bir sipariş için yüzlerce lirayı üstlenir ve
+    bunu hiçbir ekran söylemez. Kupon tanımına "yalnızca yurt içi"
+    diye bir alan eklemek de aynı kararı mağazaya bırakmak olurdu;
+    oysa karar teknik: tutarlar farklı büyüklükte.
+  */
+  if v_ulke = 'TR' then
+    if v_free_shipping_coupon or v_subtotal >= v_free_threshold then
+      v_shipping := 0;
+    else
+      v_shipping := v_shipping_fee;
+    end if;
   else
-    v_shipping := v_shipping_fee;
+    /*
+      MOD KAPALIYSA YURTDIŞI SİPARİŞİ HİÇ GEÇMEZ. Vitrin yurtdışı
+      adresini sormuyorken bile bu uç doğrudan çağrılabilir; kararın
+      tek yeri burası.
+    */
+    if not coalesce(v_international, false) then
+      raise exception 'Yurtdışına satış kapalı';
+    end if;
+
+    /*
+      KUR YOKSA SİPARİŞ GEÇMEZ. Kur olmadan bölge tarifesi (dolar)
+      liraya çevrilemiyor; uydurma bir kurla çevirmek müşteriye
+      gösterilenden farklı tutar tahsil etmek olurdu.
+    */
+    if v_usd_rate is null or v_usd_rate <= 0 then
+      raise exception 'Dolar kuru tanımlı değil';
+    end if;
+
+    /*
+      EŞİK, MÜŞTERİNİN GÖRDÜĞÜ DOLAR TUTARIYLA karşılaştırılıyor —
+      yani kâr payı dahil. Ham karşılıkla karşılaştırsaydık sepette
+      "205 $" yazan müşteri eşiği 200 $ olan bölgede kargo ücreti
+      görürdü: ekranla tahsilatın ayrıldığı, bu depoda bir kez
+      yaşanmış kusur.
+    */
+    v_usd_ara_toplam_sent := ceil(
+      (v_subtotal::numeric / 100 / v_usd_rate) * (1 + v_usd_margin / 100) * 100
+    );
+
+    /*
+      BÖLGE SEÇİMİ: önce ülkeyi AÇIKÇA sayan bölge, sonra "öteki her
+      yer" (boş ülke listesi). Ters sırada olsaydı genel bölge, kendi
+      tarifesi olan ülkeyi de yutardı. Aynı sıra lib/kargo-bolgesi.ts
+      içinde ve vitrinin ikizinde de var.
+    */
+    select z.fee_cents, z.free_over_cents
+      into v_bolge
+    from public.arc_shipping_zones z
+    where z.organization_id = p_organization_id
+      and exists (
+        select 1 from unnest(z.countries) k
+        where upper(trim(k)) = v_ulke
+      )
+    order by z.sira
+    limit 1;
+
+    if not found then
+      select z.fee_cents, z.free_over_cents
+        into v_bolge
+      from public.arc_shipping_zones z
+      where z.organization_id = p_organization_id
+        and coalesce(cardinality(z.countries), 0) = 0
+      order by z.sira
+      limit 1;
+    end if;
+
+    /*
+      BÖLGE YOKSA SATIŞ YOK — ücretsiz kargo DEĞİL. Tarifesi
+      tanımlanmamış bir ülkeye sıfır kargoyla satmak, o siparişin
+      bütün maliyetini üstlenmek demek (lib/kargo-bolgesi.ts'te de
+      `null` dönüyor, sıfır değil).
+    */
+    if not found then
+      raise exception 'Bu ülkeye gönderim yapılmıyor: %', v_ulke;
+    end if;
+
+    if v_bolge.free_over_cents > 0
+       and v_usd_ara_toplam_sent >= v_bolge.free_over_cents then
+      v_kargo_senti := 0;
+    else
+      v_kargo_senti := v_bolge.fee_cents;
+    end if;
+
+    /*
+      TAHSİLAT LİRA. Sipariş TRY cinsinden yazılıyor ve ödeme
+      sağlayıcısı da lira tahsil ediyor; dolar yalnızca GÖSTERİM.
+      Sipariş para birimini USD yapmak, sağlayıcının lira çektiği
+      bir siparişi dolar olarak kaydetmek olurdu — tutarın iki
+      yerde ayrılması.
+
+      Sent × kur = kuruş: (USD×100) × (TL/USD) = TL×100.
+    */
+    v_shipping := round(v_kargo_senti * v_usd_rate);
   end if;
 
   v_total := greatest(v_subtotal - v_discount, 0) + v_shipping;
@@ -1919,7 +2176,23 @@ begin
      set subtotal = v_subtotal,
          shipping = v_shipping,
          total = v_total,
-         metadata = metadata || jsonb_build_object('discount', v_discount),
+         /*
+           YURTDIŞI İZİ KAYITTA KALIYOR: hangi kurla, hangi kâr
+           payıyla ve kaç sentlik tarifeyle hesaplandığı sonradan
+           sorulabilir bir soru (iade, muhasebe, itiraz). Kur
+           panelden değişiyor; siparişin kendi kuru kayıtta
+           olmasaydı eski bir sipariş bugünkü kurla yeniden
+           hesaplanırdı.
+         */
+         metadata = metadata || jsonb_build_object('discount', v_discount)
+           || case when v_ulke = 'TR' then '{}'::jsonb else jsonb_build_object(
+                'international', true,
+                'shipping_country', v_ulke,
+                'usd_rate', v_usd_rate,
+                'usd_margin_percent', v_usd_margin,
+                'shipping_usd_cents', v_kargo_senti,
+                'subtotal_usd_cents', v_usd_ara_toplam_sent
+              ) end,
          updated_at = now()
    where id = v_order_id;
 
@@ -2121,6 +2394,205 @@ AS $function$
     ),
     null
   );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_gift_card_apply(p_organization_id uuid, p_order_id uuid, p_code text, p_max bigint)
+ RETURNS bigint
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_card public.arc_gift_cards%rowtype;
+  v_onceki bigint;
+  v_tutar bigint;
+  v_ara_toplam bigint;
+begin
+  if p_organization_id is null or p_order_id is null then
+    return 0;
+  end if;
+
+  if p_code is null or length(trim(p_code)) = 0 then
+    return 0;
+  end if;
+
+  /*
+    AYNI SİPARİŞ İÇİN İKİNCİ KEZ ÇAĞRILDIYSA bakiyeye dokunmadan
+    ilk uygulanan tutar dönüyor: ödeme ucu yeniden çağrılabiliyor
+    (müşteri PayTR ekranını kapatıp tekrar deniyor). Yükleme
+    hareketi (negatif) hesaba katılmıyor; yalnızca harcamalar.
+  */
+  select coalesce(sum(u.amount), 0) into v_onceki
+  from public.arc_gift_card_uses u
+  where u.order_id = p_order_id
+    and u.amount > 0;
+
+  if v_onceki > 0 then
+    return v_onceki;
+  end if;
+
+  /* SATIR KİLİTLENİR: iki sekmeden aynı anda ödeme denenirse
+     bakiye iki kez harcanabilirdi. */
+  select * into v_card
+  from public.arc_gift_cards g
+  where g.organization_id = p_organization_id
+    and upper(g.code) = upper(trim(p_code))
+  limit 1
+  for update;
+
+  if v_card.id is null then return 0; end if;
+  if v_card.status <> 'active' then return 0; end if;
+  if v_card.expires_at is not null and v_card.expires_at < now() then
+    return 0;
+  end if;
+  if coalesce(v_card.balance, 0) <= 0 then return 0; end if;
+
+  /*
+    ASGARİ SEPET TUTARI. Ölçüt ARA TOPLAM: kupon düşülmüş tutar
+    değil, sepetin kendi büyüklüğü — kupondaki kuralla aynı
+    (`v_subtotal >= d.minimum_subtotal`). Sipariş okunamazsa çek
+    uygulanmıyor: bilinmeyen bir sepete kural uygulanmış sayılamaz.
+  */
+  if coalesce(v_card.minimum_subtotal, 0) > 0 then
+    select o.subtotal into v_ara_toplam
+    from public.arc_orders o
+    where o.id = p_order_id
+      and o.organization_id = p_organization_id;
+
+    if v_ara_toplam is null then return 0; end if;
+    if v_ara_toplam < v_card.minimum_subtotal then return 0; end if;
+  end if;
+
+  /* Ödenecek tutardan fazlası harcanmaz: çek para, fazlası
+     müşterinin hakkı olarak çekte kalır. */
+  v_tutar := least(v_card.balance, greatest(coalesce(p_max, 0), 0));
+  if v_tutar <= 0 then return 0; end if;
+
+  update public.arc_gift_cards
+     set balance = balance - v_tutar,
+         updated_at = now()
+   where id = v_card.id;
+
+  insert into public.arc_gift_card_uses (gift_card_id, order_id, amount, note)
+  values (v_card.id, p_order_id, v_tutar, 'Siparişte kullanıldı');
+
+  return v_tutar;
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_gift_card_issue(p_organization_id uuid, p_code text, p_amount bigint, p_recipient_email text DEFAULT NULL::text, p_recipient_name text DEFAULT NULL::text, p_expires_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_note text DEFAULT NULL::text, p_minimum_subtotal bigint DEFAULT 0)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_id uuid;
+begin
+  if p_organization_id is null then
+    raise exception 'Mağaza belirtilmedi.';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Hediye çeki tutarı sıfırdan büyük olmalı.';
+  end if;
+
+  if p_code is null or length(trim(p_code)) < 4 then
+    raise exception 'Hediye çeki kodu en az dört karakter olmalı.';
+  end if;
+
+  if coalesce(p_minimum_subtotal, 0) < 0 then
+    raise exception 'Asgari sepet tutarı eksi olamaz.';
+  end if;
+
+  insert into public.arc_gift_cards (
+    organization_id, code, initial_amount, balance,
+    recipient_email, recipient_name, expires_at, note, minimum_subtotal
+  )
+  values (
+    p_organization_id, upper(trim(p_code)), p_amount, p_amount,
+    nullif(trim(lower(p_recipient_email)), ''),
+    nullif(trim(p_recipient_name), ''),
+    p_expires_at,
+    nullif(trim(p_note), ''),
+    coalesce(p_minimum_subtotal, 0)
+  )
+  returning id into v_id;
+
+  /*
+    Yükleme de bir hareket: bakiyenin nereden geldiği kütükte
+    görünsün. Negatif, çünkü harcama pozitif.
+  */
+  insert into public.arc_gift_card_uses (gift_card_id, amount, note)
+  values (v_id, -p_amount, 'Çek tanımlandı');
+
+  return v_id;
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_gift_card_refund(p_organization_id uuid, p_order_id uuid, p_amount bigint)
+ RETURNS bigint
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_cek_id uuid;
+  v_net bigint;
+  v_tutar bigint;
+begin
+  if p_organization_id is null or p_order_id is null then
+    return 0;
+  end if;
+
+  /*
+    Bu siparişte hangi çek kullanıldı? Kütükteki satırlar yalnızca
+    bu siparişe ait; yükleme hareketi (order_id null) buraya
+    girmiyor.
+  */
+  select u.gift_card_id, sum(u.amount)
+    into v_cek_id, v_net
+  from public.arc_gift_card_uses u
+  join public.arc_gift_cards g on g.id = u.gift_card_id
+  where u.order_id = p_order_id
+    and g.organization_id = p_organization_id
+  group by u.gift_card_id
+  limit 1;
+
+  if v_cek_id is null then return 0; end if;
+
+  /* Net harcama: iade edilmiş kısım zaten düşülmüş durumda. */
+  v_net := coalesce(v_net, 0);
+  if v_net <= 0 then return 0; end if;
+
+  /*
+    p_amount null ise TAMAMI döner (iptal). Değilse istenen
+    kadar, ama harcanandan fazlası değil — çek kendi bakiyesinden
+    fazlasını geri alamaz.
+  */
+  v_tutar := least(v_net, greatest(coalesce(p_amount, v_net), 0));
+  if v_tutar <= 0 then return 0; end if;
+
+  /* Satır kilitleniyor: iki ekrandan aynı anda iade denenebilir. */
+  perform 1 from public.arc_gift_cards where id = v_cek_id for update;
+
+  update public.arc_gift_cards
+     set balance = balance + v_tutar,
+         updated_at = now()
+   where id = v_cek_id;
+
+  /*
+    Harcama pozitif, iade NEGATİF. Çekin tanımlanması da negatif
+    ama onun order_id'si yok; ikisi karışmıyor.
+  */
+  insert into public.arc_gift_card_uses (gift_card_id, order_id, amount, note)
+  values (v_cek_id, p_order_id, -v_tutar, 'Siparişten iade edildi');
+
+  return v_tutar;
+end;
 $function$
 ;
 
@@ -2830,6 +3302,16 @@ AS $function$
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.arc_storefront_blocked_products(p_host text)
+ RETURNS TABLE(slug text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_engelli_urunler(public.arc_storefront_org(p_host));
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[] DEFAULT NULL::text[], p_menu_groups text[] DEFAULT NULL::text[])
  RETURNS TABLE(brands jsonb, sizes jsonb, max_price bigint, total_count bigint)
  LANGUAGE sql
@@ -2935,8 +3417,31 @@ AS $function$
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.arc_storefront_my_gift_cards(p_host text)
+ RETURNS TABLE(id uuid, code text, balance bigint, initial_amount bigint, status text, expires_at timestamp with time zone, minimum_subtotal bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select g.id, g.code, g.balance, g.initial_amount, g.status, g.expires_at,
+         coalesce(g.minimum_subtotal, 0)
+  from public.arc_gift_cards g
+  where g.organization_id = public.arc_storefront_org(p_host)
+    and g.status = 'active'
+    /*
+      Oturumdaki e-posta. auth.uid() üzerinden okunuyor; istemcinin
+      gönderdiği bir parametreye bakılsaydı herkes başkasının
+      e-postasını yazıp onun bakiyesini görürdü.
+    */
+    and lower(g.recipient_email) = lower((
+      select u.email from auth.users u where u.id = auth.uid()
+    ))
+  order by (g.balance > 0) desc, g.created_at desc;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.arc_storefront_my_orders(p_host text)
- RETURNS TABLE(order_number text, status text, payment_status text, subtotal bigint, discount bigint, shipping bigint, total bigint, currency text, coupon_code text, address jsonb, billing_address jsonb, note text, created_at timestamp with time zone, items jsonb, shipments jsonb)
+ RETURNS TABLE(order_number text, status text, payment_status text, subtotal bigint, discount bigint, shipping bigint, total bigint, currency text, coupon_code text, payment_method text, address jsonb, billing_address jsonb, note text, created_at timestamp with time zone, items jsonb, shipments jsonb)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
@@ -2951,6 +3456,15 @@ AS $function$
     coalesce(o.total, 0) as total,
     o.currency,
     o.metadata ->> 'coupon_code' as coupon_code,
+
+    /*
+      ÖDEME YÖNTEMİ. metadata'da SERBEST METİN duruyor
+      ("Banka havalesi / EFT", "Kredi kartı", "Nakit"); vitrin
+      ödeme servisi ve panel oraya yazıyor. Eski siparişlerde
+      alan BOŞ — geçmişi "kart" varsayıp doldurmak, varsayımı
+      veriye dönüştürmek olurdu (bkz. src/lib/payment-method.ts).
+    */
+    public.arc_clean(o.metadata ->> 'payment_method') as payment_method,
 
     -- Teslimat adresi: hangi yapıda gelirse gelsin normalleştirilir.
     coalesce(
@@ -3319,7 +3833,7 @@ $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.arc_storefront_seller(p_host text)
- RETURNS TABLE(legal_name text, trade_name text, mersis_no text, tax_office text, tax_number text, trade_registry_no text, address_line text, address_district text, address_city text, address_country text, contact_email text, contact_phone text, whatsapp_number text, kep_address text, etbis_verified boolean, storefront_url text)
+ RETURNS TABLE(legal_name text, trade_name text, mersis_no text, tax_office text, tax_number text, trade_registry_no text, address_line text, address_district text, address_city text, address_country text, contact_email text, contact_phone text, whatsapp_number text, kep_address text, etbis_verified boolean, storefront_url text, bank_name text, bank_iban text, bank_account_holder text, bank_transfer_instructions text, parent_organization_name text, parent_organization_url text, legal_disclosure text)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
@@ -3340,7 +3854,18 @@ AS $function$
     s.whatsapp_number,
     s.kep_address,
     coalesce(s.etbis_verified, false) as etbis_verified,
-    s.storefront_url
+    s.storefront_url,
+    s.bank_name,
+    s.bank_iban,
+    /* Hesap sahibi boşsa unvana düşülüyor: çoğu mağazada ikisi
+       aynı ve panelde boş bırakılmış olması "bilgi yok" demek
+       değil. Yanlış bir ad YAZILMIYOR, yalnızca bilinen ad
+       kullanılıyor. */
+    coalesce(nullif(btrim(s.bank_account_holder), ''), s.legal_name) as bank_account_holder,
+    s.bank_transfer_instructions,
+    s.parent_organization_name,
+    s.parent_organization_url,
+    s.legal_disclosure
   from public.arc_store_settings s
   join public.organizations o
     on o.id = s.organization_id
@@ -3350,12 +3875,22 @@ $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.arc_storefront_settings(p_host text)
- RETURNS TABLE(shipping_fee bigint, free_shipping_threshold bigint, bank_transfer_enabled boolean, bank_transfer_discount_percent numeric)
+ RETURNS TABLE(shipping_fee bigint, free_shipping_threshold bigint, bank_transfer_enabled boolean, bank_transfer_discount_percent numeric, international_enabled boolean, usd_rate numeric, usd_margin_percent numeric)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
   select * from public.arc_vitrin_ayarlar(public.arc_storefront_org(p_host));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_shipping_zones(p_host text)
+ RETURNS TABLE(label text, countries text[], fee_cents bigint, free_over_cents bigint, sira integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_kargo_bolgeleri(public.arc_storefront_org(p_host));
 $function$
 ;
 
@@ -3366,6 +3901,80 @@ CREATE OR REPLACE FUNCTION public.arc_storefront_variants(p_host text, p_slug te
  SET search_path TO ''
 AS $function$
   select * from public.arc_vitrin_varyantlar(public.arc_storefront_org(p_host), p_slug);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_storefront_visit(p_host text, p_path text, p_product_slug text DEFAULT NULL::text, p_country text DEFAULT NULL::text, p_city text DEFAULT NULL::text, p_lat double precision DEFAULT NULL::double precision, p_lon double precision DEFAULT NULL::double precision, p_ip text DEFAULT NULL::text, p_source text DEFAULT NULL::text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_org uuid;
+  v_hash text;
+  v_son integer;
+begin
+  v_org := public.arc_storefront_org(p_host);
+  if v_org is null then return; end if;
+  if p_path is null or length(p_path) = 0 then return; end if;
+
+  /*
+    GÜNLÜK TUZ. Karma yalnızca "aynı ziyaretçi bir dakikada kaç
+    kez yazdı" sorusuna yarıyor; tuza günün tarihi karıştığı için
+    kayıtlar günler arasında birbirine bağlanamıyor.
+  */
+  if p_ip is not null and length(p_ip) > 0 then
+    /*
+      md5, pgcrypto'nun digest'i DEĞİL: bu bir güvenlik sınırı
+      değil, dakikalık bir kova anahtarı. pgcrypto'ya bağlanmak
+      kurulumu olmayan bir projede fonksiyonu çalışmaz yapardı ve
+      ziyaret kaydı sessizce düşerdi.
+    */
+    v_hash := md5(
+      p_ip || to_char(now() at time zone 'Europe/Istanbul', 'YYYY-MM-DD')
+    );
+
+    /*
+      HIZ SINIRI. Dakikada otuz sayfadan fazlası bot sayılıyor ve
+      yazılmıyor; sınır yoksa tek bir tarayıcı haritayı ve ürün
+      sayımını tek başına belirleyebilir.
+    */
+    select count(*) into v_son
+    from public.arc_visits
+    where organization_id = v_org
+      and ip_hash = v_hash
+      and created_at > now() - interval '1 minute';
+
+    if v_son >= 30 then return; end if;
+  end if;
+
+  insert into public.arc_visits
+    (organization_id, path, product_slug, country, city, lat, lon, ip_hash, source)
+  values (
+    v_org,
+    left(p_path, 300),
+    nullif(left(coalesce(p_product_slug, ''), 200), ''),
+    nullif(left(coalesce(p_country, ''), 8), ''),
+    nullif(left(coalesce(p_city, ''), 120), ''),
+    p_lat,
+    p_lon,
+    v_hash,
+    /* Küçük harfe indiriliyor: "Instagram" ve "instagram" tek
+       satır olsun, listede iki kez görünmesin. */
+    nullif(lower(left(coalesce(p_source, ''), 80)), '')
+  );
+
+  /*
+    TEMİZLİK YAZIMIN İÇİNDE. Ayrı bir zamanlayıcı işi,
+    unutulduğunda sessizce büyüyen bir tablo demek. Yüz yazımdan
+    birinde koşuyor.
+  */
+  if random() < 0.01 then
+    delete from public.arc_visits
+    where created_at < now() - interval '30 days';
+  end if;
+end;
 $function$
 ;
 
@@ -3476,7 +4085,7 @@ $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.arc_vitrin_ayarlar(p_organization_id uuid)
- RETURNS TABLE(shipping_fee bigint, free_shipping_threshold bigint, bank_transfer_enabled boolean, bank_transfer_discount_percent numeric)
+ RETURNS TABLE(shipping_fee bigint, free_shipping_threshold bigint, bank_transfer_enabled boolean, bank_transfer_discount_percent numeric, international_enabled boolean, usd_rate numeric, usd_margin_percent numeric)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
@@ -3485,12 +4094,32 @@ AS $function$
     coalesce(s.shipping_fee, 12000),
     coalesce(s.free_shipping_threshold, 200000),
     coalesce(s.bank_transfer_enabled, true),
-    coalesce(s.bank_transfer_discount_percent, 3)
+    coalesce(s.bank_transfer_discount_percent, 3),
+    coalesce(s.international_enabled, false),
+    /* Mod kapalıysa kur da yok: kapalı mod "dolar yok" demek. */
+    case when coalesce(s.international_enabled, false) then s.usd_rate end,
+    case when coalesce(s.international_enabled, false)
+         then coalesce(s.usd_margin_percent, 0) end
   from public.organizations o
   left join public.arc_store_settings s
     on s.organization_id = o.id
   where o.id = p_organization_id
   limit 1;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_vitrin_engelli_urunler(p_organization_id uuid)
+ RETURNS TABLE(slug text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select p.slug
+  from public.arc_products p
+  where p.organization_id = p_organization_id
+    and p.status = 'active'
+    and p.international_blocked
+  order by p.slug;
 $function$
 ;
 
@@ -3677,6 +4306,19 @@ AS $function$
     and (d.ends_at is null or d.ends_at>now())
     and (d.usage_limit is null or d.usage_count<d.usage_limit)
   order by d.code nulls first,d.created_at;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.arc_vitrin_kargo_bolgeleri(p_organization_id uuid)
+ RETURNS TABLE(label text, countries text[], fee_cents bigint, free_over_cents bigint, sira integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select z.label, z.countries, z.fee_cents, z.free_over_cents, z.sira
+  from public.arc_shipping_zones z
+  where z.organization_id = p_organization_id
+  order by z.sira, z.label;
 $function$
 ;
 
@@ -3989,9 +4631,22 @@ AS $function$
   left join public.arc_products p
     on p.id = cp.product_id
    and p.status = 'active'
+   /*
+     SATILABİLİR EN AZ BİR VARYANTI OLAN ÜRÜN. Tek bedeni kalan
+     ürün sayılıyor; hepsi tükenmiş ürün sayılmıyor.
+   */
+   and exists (
+     select 1
+     from public.arc_product_variants v
+     where v.product_id = p.id
+       and public.arc_variant_available(v.stock, v.allow_backorder, v.supplier)
+   )
   where c.status = 'active'
   group by c.id, c.title, c.slug, c.description, c.metadata
-  -- Boş koleksiyon menüde yer kaplamasın.
+  /*
+    Satılabilir ürünü kalmayan koleksiyon menüde YER KAPLAMIYOR.
+    Önce yalnızca hiç ürünü olmayan koleksiyon eleniyordu.
+  */
   having count(distinct p.id) > 0
   order by count(distinct p.id) desc;
 $function$
@@ -4251,6 +4906,23 @@ CREATE OR REPLACE FUNCTION public.arc_vitrin_urunler(p_organization_id uuid, p_l
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
+  with secilen as (
+    select p.id, p.slug, p.name, p.description, p.metadata, p.updated_at
+    from public.arc_products p
+    where p.organization_id = p_organization_id
+      and p.status = 'active'
+      /* Eski INNER JOIN'in koşulu: varyantı olmayan ürün listede
+         görünmüyordu. Buraya taşınmasaydı sayfa eksik dönerdi. */
+      and exists (
+        select 1
+        from public.arc_product_variants v
+        where v.product_id = p.id
+          and v.organization_id = p_organization_id
+      )
+    order by p.updated_at desc
+    limit greatest(1, least(coalesce(p_limit, 24), 5000))
+    offset greatest(0, coalesce(p_offset, 0))
+  )
   select
     p.slug, p.name, p.description,
     coalesce(
@@ -4275,16 +4947,11 @@ AS $function$
         ),
       '[]'::jsonb
     ) as sizes
-  from public.arc_products p
+  from secilen p
   join public.arc_product_variants v
-    on v.product_id = p.id and v.organization_id = p.organization_id
-  join public.organizations o
-    on o.id = p.organization_id and o.id = p_organization_id
-  where p.status = 'active'
+    on v.product_id = p.id and v.organization_id = p_organization_id
   group by p.id, p.slug, p.name, p.description, p.metadata, p.updated_at
-  order by p.updated_at desc
-  limit greatest(1, least(coalesce(p_limit, 24), 5000))
-  offset greatest(0, coalesce(p_offset, 0));
+  order by p.updated_at desc;
 $function$
 ;
 
@@ -4593,7 +5260,7 @@ $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.get_arvoculture_my_orders()
- RETURNS TABLE(order_number text, status text, payment_status text, subtotal bigint, discount bigint, shipping bigint, total bigint, currency text, coupon_code text, address jsonb, billing_address jsonb, note text, created_at timestamp with time zone, items jsonb, shipments jsonb)
+ RETURNS TABLE(order_number text, status text, payment_status text, subtotal bigint, discount bigint, shipping bigint, total bigint, currency text, coupon_code text, payment_method text, address jsonb, billing_address jsonb, note text, created_at timestamp with time zone, items jsonb, shipments jsonb)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
@@ -4608,6 +5275,8 @@ AS $function$
     coalesce(o.total, 0) as total,
     o.currency,
     o.metadata ->> 'coupon_code' as coupon_code,
+    /* Çok kiracılı ikizle aynı: serbest metin, eski siparişte boş. */
+    public.arc_clean(o.metadata ->> 'payment_method') as payment_method,
 
     -- Teslimat adresi: hangi yapıda gelirse gelsin normalleştirilir.
     coalesce(
@@ -4718,6 +5387,17 @@ AS $function$
   where r.user_id = auth.uid()
   order by r.created_at desc
   limit 50;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_blocked_products()
+ RETURNS TABLE(slug text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_engelli_urunler(
+    (select id from public.organizations where slug = 'arvoculture' limit 1));
 $function$
 ;
 
@@ -4876,12 +5556,23 @@ $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_settings()
- RETURNS TABLE(shipping_fee bigint, free_shipping_threshold bigint, bank_transfer_enabled boolean, bank_transfer_discount_percent numeric)
+ RETURNS TABLE(shipping_fee bigint, free_shipping_threshold bigint, bank_transfer_enabled boolean, bank_transfer_discount_percent numeric, international_enabled boolean, usd_rate numeric, usd_margin_percent numeric)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
   select * from public.arc_vitrin_ayarlar(
+    (select id from public.organizations where slug = 'arvoculture' limit 1));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.get_arvoculture_storefront_shipping_zones()
+ RETURNS TABLE(label text, countries text[], fee_cents bigint, free_over_cents bigint, sira integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select * from public.arc_vitrin_kargo_bolgeleri(
     (select id from public.organizations where slug = 'arvoculture' limit 1));
 $function$
 ;
@@ -5027,6 +5718,20 @@ alter table public.arc_email_templates alter column subject set default ''::text
 
 alter table public.arc_email_templates alter column updated_at set default now();
 
+alter table public.arc_gift_card_uses alter column created_at set default now();
+
+alter table public.arc_gift_card_uses alter column id set default gen_random_uuid();
+
+alter table public.arc_gift_cards alter column created_at set default now();
+
+alter table public.arc_gift_cards alter column id set default gen_random_uuid();
+
+alter table public.arc_gift_cards alter column minimum_subtotal set default 0;
+
+alter table public.arc_gift_cards alter column status set default 'active'::text;
+
+alter table public.arc_gift_cards alter column updated_at set default now();
+
 alter table public.arc_import_batches alter column created_at set default now();
 
 alter table public.arc_import_batches alter column error_rows set default 0;
@@ -5133,6 +5838,8 @@ alter table public.arc_products alter column description set default ''::text;
 
 alter table public.arc_products alter column id set default gen_random_uuid();
 
+alter table public.arc_products alter column international_blocked set default false;
+
 alter table public.arc_products alter column metadata set default '{}'::jsonb;
 
 alter table public.arc_products alter column source set default 'native'::text;
@@ -5173,6 +5880,20 @@ alter table public.arc_shipments alter column status set default 'draft'::text;
 
 alter table public.arc_shipments alter column updated_at set default now();
 
+alter table public.arc_shipping_zones alter column countries set default '{}'::text[];
+
+alter table public.arc_shipping_zones alter column created_at set default now();
+
+alter table public.arc_shipping_zones alter column fee_cents set default 0;
+
+alter table public.arc_shipping_zones alter column free_over_cents set default 0;
+
+alter table public.arc_shipping_zones alter column id set default gen_random_uuid();
+
+alter table public.arc_shipping_zones alter column sira set default 0;
+
+alter table public.arc_shipping_zones alter column updated_at set default now();
+
 alter table public.arc_store_pages alter column body set default ''::text;
 
 alter table public.arc_store_pages alter column created_at set default now();
@@ -5211,6 +5932,8 @@ alter table public.arc_store_settings alter column garanti_test_mode set default
 
 alter table public.arc_store_settings alter column garanti_yari_guvenli_kabul set default false;
 
+alter table public.arc_store_settings alter column international_enabled set default false;
+
 alter table public.arc_store_settings alter column locale set default 'tr-TR'::text;
 
 alter table public.arc_store_settings alter column low_stock_threshold set default 5;
@@ -5242,6 +5965,8 @@ alter table public.arc_store_settings alter column tryoto_enabled set default fa
 alter table public.arc_store_settings alter column tryoto_test_mode set default true;
 
 alter table public.arc_store_settings alter column updated_at set default now();
+
+alter table public.arc_store_settings alter column usd_margin_percent set default 0;
 
 alter table public.arc_store_themes alter column config set default '{}'::jsonb;
 
@@ -5278,6 +6003,10 @@ alter table public.arc_suppliers alter column sync_cursor set default 0;
 alter table public.arc_suppliers alter column sync_total set default 0;
 
 alter table public.arc_suppliers alter column updated_at set default now();
+
+alter table public.arc_visits alter column created_at set default now();
+
+alter table public.arc_visits alter column id set default nextval('arc_visits_id_seq'::regclass);
 
 alter table public.organization_memberships alter column is_active set default true;
 
@@ -5378,6 +6107,20 @@ alter table public.arc_email_templates add constraint arc_email_templates_key_ch
 alter table public.arc_email_templates add constraint arc_email_templates_length_check CHECK (((char_length(subject) <= 200) AND (char_length(body) <= 2000)));
 
 alter table public.arc_email_templates add constraint arc_email_templates_pkey PRIMARY KEY (organization_id, template_key);
+
+alter table public.arc_gift_card_uses add constraint arc_gift_card_uses_amount_check CHECK ((amount <> 0));
+
+alter table public.arc_gift_card_uses add constraint arc_gift_card_uses_pkey PRIMARY KEY (id);
+
+alter table public.arc_gift_cards add constraint arc_gift_cards_bakiye_tavani CHECK ((balance <= initial_amount));
+
+alter table public.arc_gift_cards add constraint arc_gift_cards_balance_check CHECK ((balance >= 0));
+
+alter table public.arc_gift_cards add constraint arc_gift_cards_initial_amount_check CHECK ((initial_amount > 0));
+
+alter table public.arc_gift_cards add constraint arc_gift_cards_pkey PRIMARY KEY (id);
+
+alter table public.arc_gift_cards add constraint arc_gift_cards_status_check CHECK ((status = ANY (ARRAY['active'::text, 'disabled'::text])));
 
 alter table public.arc_import_batches add constraint arc_import_batches_error_rows_check CHECK ((error_rows >= 0));
 
@@ -5513,6 +6256,12 @@ alter table public.arc_shipments add constraint arc_shipments_source_check CHECK
 
 alter table public.arc_shipments add constraint arc_shipments_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'created'::text, 'picked_up'::text, 'in_transit'::text, 'delivered'::text, 'cancelled'::text, 'failed'::text])));
 
+alter table public.arc_shipping_zones add constraint arc_shipping_zones_fee_cents_check CHECK ((fee_cents >= 0));
+
+alter table public.arc_shipping_zones add constraint arc_shipping_zones_free_over_cents_check CHECK ((free_over_cents >= 0));
+
+alter table public.arc_shipping_zones add constraint arc_shipping_zones_pkey PRIMARY KEY (id);
+
 alter table public.arc_store_pages add constraint arc_store_pages_key_check CHECK ((page_key = ANY (ARRAY['hakkimizda'::text, 'sss'::text, 'iletisim'::text])));
 
 alter table public.arc_store_pages add constraint arc_store_pages_pkey PRIMARY KEY (organization_id, page_key);
@@ -5531,6 +6280,8 @@ alter table public.arc_store_settings add constraint arc_store_settings_domain_s
 
 alter table public.arc_store_settings add constraint arc_store_settings_garanti_api_surumu_check CHECK ((garanti_api_surumu = ANY (ARRAY['v512'::text, 'v0.01'::text])));
 
+alter table public.arc_store_settings add constraint arc_store_settings_legal_disclosure_check CHECK (((legal_disclosure IS NULL) OR (length(legal_disclosure) <= 2000)));
+
 alter table public.arc_store_settings add constraint arc_store_settings_locale_check CHECK (((char_length(locale) >= 2) AND (char_length(locale) <= 20)));
 
 alter table public.arc_store_settings add constraint arc_store_settings_low_stock_threshold_check CHECK (((low_stock_threshold >= 0) AND (low_stock_threshold <= 10000)));
@@ -5542,6 +6293,8 @@ alter table public.arc_store_settings add constraint arc_store_settings_order_pr
 alter table public.arc_store_settings add constraint arc_store_settings_panel_custom_domain_check CHECK (((panel_custom_domain IS NULL) OR (panel_custom_domain ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$'::text)));
 
 alter table public.arc_store_settings add constraint arc_store_settings_panel_domain_status_check CHECK ((panel_domain_status = ANY (ARRAY['not_configured'::text, 'pending_dns'::text, 'verifying'::text, 'active'::text, 'failed'::text])));
+
+alter table public.arc_store_settings add constraint arc_store_settings_parent_org_check CHECK ((((parent_organization_name IS NULL) OR (length(parent_organization_name) <= 200)) AND ((parent_organization_url IS NULL) OR (((length(parent_organization_url) >= 11) AND (length(parent_organization_url) <= 300)) AND (parent_organization_url ~ '^https?://[^[:space:]]+$'::text)))));
 
 alter table public.arc_store_settings add constraint arc_store_settings_paytr_installment_check CHECK (((paytr_max_installment >= 0) AND (paytr_max_installment <= 12)));
 
@@ -5574,6 +6327,8 @@ alter table public.arc_store_themes add constraint arc_store_themes_version_chec
 alter table public.arc_suppliers add constraint arc_suppliers_organization_id_code_key UNIQUE (organization_id, code);
 
 alter table public.arc_suppliers add constraint arc_suppliers_pkey PRIMARY KEY (id);
+
+alter table public.arc_visits add constraint arc_visits_pkey PRIMARY KEY (id);
 
 alter table public.organization_memberships add constraint organization_memberships_permissions_check CHECK ((jsonb_typeof(permissions) = 'object'::text));
 
@@ -5649,6 +6404,12 @@ CREATE INDEX arc_discounts_org_type_idx ON public.arc_discounts USING btree (org
 
 CREATE INDEX arc_email_templates_org_idx ON public.arc_email_templates USING btree (organization_id);
 
+CREATE INDEX arc_gift_card_uses_cek ON public.arc_gift_card_uses USING btree (gift_card_id, created_at DESC);
+
+CREATE INDEX arc_gift_cards_alici ON public.arc_gift_cards USING btree (organization_id, lower(recipient_email));
+
+CREATE UNIQUE INDEX arc_gift_cards_kod_tek ON public.arc_gift_cards USING btree (organization_id, upper(code));
+
 CREATE INDEX arc_import_batches_org_created_idx ON public.arc_import_batches USING btree (organization_id, created_at DESC);
 
 CREATE INDEX arc_import_errors_batch_idx ON public.arc_import_errors USING btree (batch_id, created_at);
@@ -5693,6 +6454,8 @@ CREATE UNIQUE INDEX arc_variants_product_sku_uniq ON public.arc_product_variants
 
 CREATE UNIQUE INDEX arc_variants_supplier_sku_uniq ON public.arc_product_variants USING btree (organization_id, supplier_sku) WHERE (supplier_sku IS NOT NULL);
 
+CREATE INDEX arc_products_org_status_guncel_idx ON public.arc_products USING btree (organization_id, status, updated_at DESC);
+
 CREATE INDEX arc_products_org_status_idx ON public.arc_products USING btree (organization_id, status);
 
 CREATE INDEX arc_products_supplier_idx ON public.arc_products USING btree (organization_id, supplier, supplier_product_code);
@@ -5700,6 +6463,8 @@ CREATE INDEX arc_products_supplier_idx ON public.arc_products USING btree (organ
 CREATE INDEX arc_products_yayin_bitisi_idx ON public.arc_products USING btree (unpublish_at) WHERE (unpublish_at IS NOT NULL);
 
 CREATE INDEX arc_products_yayin_zamani_idx ON public.arc_products USING btree (publish_at) WHERE (publish_at IS NOT NULL);
+
+CREATE INDEX arc_products_yurtdisi ON public.arc_products USING btree (organization_id) WHERE international_blocked;
 
 CREATE INDEX arc_return_requests_order_idx ON public.arc_return_requests USING btree (order_id);
 
@@ -5721,6 +6486,8 @@ CREATE INDEX arc_shipments_supplier_idx ON public.arc_shipments USING btree (org
 
 CREATE UNIQUE INDEX arc_shipments_tracking_idx ON public.arc_shipments USING btree (organization_id, carrier_code, tracking_number) WHERE (tracking_number IS NOT NULL);
 
+CREATE INDEX arc_shipping_zones_kurum ON public.arc_shipping_zones USING btree (organization_id, sira);
+
 CREATE UNIQUE INDEX arc_store_settings_custom_domain_uidx ON public.arc_store_settings USING btree (custom_domain) WHERE (custom_domain IS NOT NULL);
 
 CREATE UNIQUE INDEX arc_store_settings_custom_domain_unique_idx ON public.arc_store_settings USING btree (lower(custom_domain)) WHERE ((custom_domain IS NOT NULL) AND (TRIM(BOTH FROM custom_domain) <> ''::text));
@@ -5736,6 +6503,12 @@ CREATE UNIQUE INDEX arc_store_settings_platform_subdomain_uidx ON public.arc_sto
 CREATE UNIQUE INDEX arc_store_settings_platform_subdomain_unique_idx ON public.arc_store_settings USING btree (lower(platform_subdomain)) WHERE ((platform_subdomain IS NOT NULL) AND (TRIM(BOTH FROM platform_subdomain) <> ''::text));
 
 CREATE INDEX arc_store_themes_org_mode_idx ON public.arc_store_themes USING btree (organization_id, mode);
+
+CREATE INDEX arc_visits_kaynak ON public.arc_visits USING btree (organization_id, source, created_at DESC) WHERE (source IS NOT NULL);
+
+CREATE INDEX arc_visits_kurum_zaman ON public.arc_visits USING btree (organization_id, created_at DESC);
+
+CREATE INDEX arc_visits_urun ON public.arc_visits USING btree (organization_id, product_slug, created_at DESC) WHERE (product_slug IS NOT NULL);
 
 CREATE INDEX organization_memberships_user_active_idx ON public.organization_memberships USING btree (user_id, is_active);
 
@@ -5770,6 +6543,12 @@ alter table public.arc_customer_favourites add constraint arc_customer_favourite
 alter table public.arc_discounts add constraint arc_discounts_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
 alter table public.arc_email_templates add constraint arc_email_templates_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_gift_card_uses add constraint arc_gift_card_uses_gift_card_id_fkey FOREIGN KEY (gift_card_id) REFERENCES arc_gift_cards(id) ON DELETE CASCADE;
+
+alter table public.arc_gift_card_uses add constraint arc_gift_card_uses_order_id_fkey FOREIGN KEY (order_id) REFERENCES arc_orders(id) ON DELETE SET NULL;
+
+alter table public.arc_gift_cards add constraint arc_gift_cards_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
 alter table public.arc_import_batches add constraint arc_import_batches_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
@@ -5835,6 +6614,8 @@ alter table public.arc_shipments add constraint arc_shipments_order_id_fkey FORE
 
 alter table public.arc_shipments add constraint arc_shipments_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
+alter table public.arc_shipping_zones add constraint arc_shipping_zones_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
 alter table public.arc_store_pages add constraint arc_store_pages_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
 alter table public.arc_store_settings add constraint arc_store_settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
@@ -5844,6 +6625,8 @@ alter table public.arc_store_themes add constraint arc_store_themes_organization
 alter table public.arc_store_themes add constraint arc_store_themes_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 alter table public.arc_suppliers add constraint arc_suppliers_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+alter table public.arc_visits add constraint arc_visits_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
 alter table public.organization_memberships add constraint organization_memberships_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
@@ -5866,6 +6649,10 @@ alter table public.arc_customer_favourites enable row level security;
 alter table public.arc_discounts enable row level security;
 
 alter table public.arc_email_templates enable row level security;
+
+alter table public.arc_gift_card_uses enable row level security;
+
+alter table public.arc_gift_cards enable row level security;
 
 alter table public.arc_import_batches enable row level security;
 
@@ -5895,6 +6682,8 @@ alter table public.arc_shipment_items enable row level security;
 
 alter table public.arc_shipments enable row level security;
 
+alter table public.arc_shipping_zones enable row level security;
+
 alter table public.arc_store_pages enable row level security;
 
 alter table public.arc_store_settings enable row level security;
@@ -5902,6 +6691,8 @@ alter table public.arc_store_settings enable row level security;
 alter table public.arc_store_themes enable row level security;
 
 alter table public.arc_suppliers enable row level security;
+
+alter table public.arc_visits enable row level security;
 
 alter table public.organization_memberships enable row level security;
 
@@ -6377,6 +7168,15 @@ revoke all on function public.arc_first_text(p_source jsonb, VARIADIC p_keys tex
 grant execute on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) to service_role;
 grant execute on function public.arc_first_text(p_source jsonb, VARIADIC p_keys text[]) to authenticated;
 
+revoke all on function public.arc_gift_card_apply(p_organization_id uuid, p_order_id uuid, p_code text, p_max bigint) from public;
+grant execute on function public.arc_gift_card_apply(p_organization_id uuid, p_order_id uuid, p_code text, p_max bigint) to service_role;
+
+revoke all on function public.arc_gift_card_issue(p_organization_id uuid, p_code text, p_amount bigint, p_recipient_email text, p_recipient_name text, p_expires_at timestamp with time zone, p_note text, p_minimum_subtotal bigint) from public;
+grant execute on function public.arc_gift_card_issue(p_organization_id uuid, p_code text, p_amount bigint, p_recipient_email text, p_recipient_name text, p_expires_at timestamp with time zone, p_note text, p_minimum_subtotal bigint) to service_role;
+
+revoke all on function public.arc_gift_card_refund(p_organization_id uuid, p_order_id uuid, p_amount bigint) from public;
+grant execute on function public.arc_gift_card_refund(p_organization_id uuid, p_order_id uuid, p_amount bigint) to service_role;
+
 revoke all on function public.arc_log_order_event() from public;
 grant execute on function public.arc_log_order_event() to service_role;
 
@@ -6432,6 +7232,11 @@ grant execute on function public.arc_store_stage(p_organization_id uuid) to anon
 grant execute on function public.arc_store_stage(p_organization_id uuid) to authenticated;
 grant execute on function public.arc_store_stage(p_organization_id uuid) to service_role;
 
+revoke all on function public.arc_storefront_blocked_products(p_host text) from public;
+grant execute on function public.arc_storefront_blocked_products(p_host text) to service_role;
+grant execute on function public.arc_storefront_blocked_products(p_host text) to anon;
+grant execute on function public.arc_storefront_blocked_products(p_host text) to authenticated;
+
 revoke all on function public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[], p_menu_groups text[]) from public;
 grant execute on function public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[], p_menu_groups text[]) to service_role;
 grant execute on function public.arc_storefront_collection_facets(p_host text, p_collection_slugs text[], p_menu_groups text[]) to anon;
@@ -6472,6 +7277,10 @@ revoke all on function public.arc_storefront_facets(p_host text) from public;
 grant execute on function public.arc_storefront_facets(p_host text) to service_role;
 grant execute on function public.arc_storefront_facets(p_host text) to anon;
 grant execute on function public.arc_storefront_facets(p_host text) to authenticated;
+
+revoke all on function public.arc_storefront_my_gift_cards(p_host text) from public;
+grant execute on function public.arc_storefront_my_gift_cards(p_host text) to service_role;
+grant execute on function public.arc_storefront_my_gift_cards(p_host text) to authenticated;
 
 revoke all on function public.arc_storefront_my_orders(p_host text) from public;
 grant execute on function public.arc_storefront_my_orders(p_host text) to service_role;
@@ -6555,10 +7364,20 @@ grant execute on function public.arc_storefront_settings(p_host text) to service
 grant execute on function public.arc_storefront_settings(p_host text) to anon;
 grant execute on function public.arc_storefront_settings(p_host text) to authenticated;
 
+revoke all on function public.arc_storefront_shipping_zones(p_host text) from public;
+grant execute on function public.arc_storefront_shipping_zones(p_host text) to service_role;
+grant execute on function public.arc_storefront_shipping_zones(p_host text) to anon;
+grant execute on function public.arc_storefront_shipping_zones(p_host text) to authenticated;
+
 revoke all on function public.arc_storefront_variants(p_host text, p_slug text) from public;
 grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to service_role;
 grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to anon;
 grant execute on function public.arc_storefront_variants(p_host text, p_slug text) to authenticated;
+
+revoke all on function public.arc_storefront_visit(p_host text, p_path text, p_product_slug text, p_country text, p_city text, p_lat double precision, p_lon double precision, p_ip text, p_source text) from public;
+grant execute on function public.arc_storefront_visit(p_host text, p_path text, p_product_slug text, p_country text, p_city text, p_lat double precision, p_lon double precision, p_ip text, p_source text) to service_role;
+grant execute on function public.arc_storefront_visit(p_host text, p_path text, p_product_slug text, p_country text, p_city text, p_lat double precision, p_lon double precision, p_ip text, p_source text) to anon;
+grant execute on function public.arc_storefront_visit(p_host text, p_path text, p_product_slug text, p_country text, p_city text, p_lat double precision, p_lon double precision, p_ip text, p_source text) to authenticated;
 
 revoke all on function public.arc_total_stock_units() from public;
 grant execute on function public.arc_total_stock_units() to service_role;
@@ -6579,6 +7398,9 @@ grant execute on function public.arc_vitrin_arama_dizini(p_organization_id uuid,
 revoke all on function public.arc_vitrin_ayarlar(p_organization_id uuid) from public;
 grant execute on function public.arc_vitrin_ayarlar(p_organization_id uuid) to service_role;
 
+revoke all on function public.arc_vitrin_engelli_urunler(p_organization_id uuid) from public;
+grant execute on function public.arc_vitrin_engelli_urunler(p_organization_id uuid) to service_role;
+
 revoke all on function public.arc_vitrin_firsatlar(p_organization_id uuid, p_limit integer) from public;
 grant execute on function public.arc_vitrin_firsatlar(p_organization_id uuid, p_limit integer) to service_role;
 
@@ -6587,6 +7409,9 @@ grant execute on function public.arc_vitrin_iade_talebi(p_organization_id uuid, 
 
 revoke all on function public.arc_vitrin_indirimler(p_organization_id uuid) from public;
 grant execute on function public.arc_vitrin_indirimler(p_organization_id uuid) to service_role;
+
+revoke all on function public.arc_vitrin_kargo_bolgeleri(p_organization_id uuid) from public;
+grant execute on function public.arc_vitrin_kargo_bolgeleri(p_organization_id uuid) to service_role;
 
 revoke all on function public.arc_vitrin_koleksiyon_sayfasi(p_organization_id uuid, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) from public;
 grant execute on function public.arc_vitrin_koleksiyon_sayfasi(p_organization_id uuid, p_collection_slugs text[], p_menu_groups text[], p_limit integer, p_offset integer, p_brand text, p_size text, p_max_price bigint, p_only_discounted boolean, p_only_available boolean, p_sort text) to service_role;
@@ -6648,6 +7473,11 @@ grant execute on function public.get_arvoculture_my_orders() to authenticated;
 revoke all on function public.get_arvoculture_my_returns() from public;
 grant execute on function public.get_arvoculture_my_returns() to service_role;
 grant execute on function public.get_arvoculture_my_returns() to authenticated;
+
+revoke all on function public.get_arvoculture_storefront_blocked_products() from public;
+grant execute on function public.get_arvoculture_storefront_blocked_products() to service_role;
+grant execute on function public.get_arvoculture_storefront_blocked_products() to anon;
+grant execute on function public.get_arvoculture_storefront_blocked_products() to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_collection_facets(p_collection_slugs text[], p_menu_groups text[]) from public;
 grant execute on function public.get_arvoculture_storefront_collection_facets(p_collection_slugs text[], p_menu_groups text[]) to service_role;
@@ -6722,9 +7552,14 @@ grant execute on function public.get_arvoculture_storefront_search_index(p_limit
 grant execute on function public.get_arvoculture_storefront_search_index(p_limit integer, p_offset integer) to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_settings() from public;
+grant execute on function public.get_arvoculture_storefront_settings() to service_role;
 grant execute on function public.get_arvoculture_storefront_settings() to anon;
 grant execute on function public.get_arvoculture_storefront_settings() to authenticated;
-grant execute on function public.get_arvoculture_storefront_settings() to service_role;
+
+revoke all on function public.get_arvoculture_storefront_shipping_zones() from public;
+grant execute on function public.get_arvoculture_storefront_shipping_zones() to service_role;
+grant execute on function public.get_arvoculture_storefront_shipping_zones() to anon;
+grant execute on function public.get_arvoculture_storefront_shipping_zones() to authenticated;
 
 revoke all on function public.get_arvoculture_storefront_variants(p_slug text) from public;
 grant execute on function public.get_arvoculture_storefront_variants(p_slug text) to service_role;

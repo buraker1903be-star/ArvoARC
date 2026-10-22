@@ -107,6 +107,19 @@ const IKIZSIZ_SERBEST = new Set([
     (silinirse hukuki sayfalar yedek sabitlere düşer).
   */
   "arc_storefront_seller",
+  /*
+    ZİYARET SAYACI: ikizi hiç olmadı ve olmamalı. Fonksiyon
+    19.10.2026'da, yani vitrin çok kiracılı aileye TAMAMEN geçtikten
+    sonra yazıldı; eski adı çağıran bir kod yok (vitrinde tek çağrı
+    `arc_storefront_visit`, src/app/api/ziyaret/route.ts). İkiz
+    yazmak yalnızca bu denetimi memnun etmek için ikinci bir yazma
+    fonksiyonu açmak olurdu — üstelik YAZAN bir fonksiyonun gereksiz
+    ikizi, sayacın iki ayrı yoldan artırılabilmesi demek.
+
+    Bu satır 22.10.2026'da döküm yenilenince gerekti: eski döküm
+    fonksiyonu hiç içermiyordu, yani denetim onu göremiyordu bile.
+  */
+  "arc_storefront_visit",
 ]);
 
 /*

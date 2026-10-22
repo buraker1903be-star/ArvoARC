@@ -237,6 +237,7 @@
       "description",
       "external_id",
       "id",
+      "international_blocked",
       "metadata",
       "name",
       "organization_id",
@@ -310,6 +311,17 @@
       "tracking_url",
       "updated_at"
     ],
+    "arc_shipping_zones": [
+      "countries",
+      "created_at",
+      "fee_cents",
+      "free_over_cents",
+      "id",
+      "label",
+      "organization_id",
+      "sira",
+      "updated_at"
+    ],
     "arc_store_pages": [
       "body",
       "created_at",
@@ -355,7 +367,9 @@
       "garanti_terminal_no",
       "garanti_test_mode",
       "garanti_yari_guvenli_kabul",
+      "international_enabled",
       "kep_address",
+      "legal_disclosure",
       "legal_name",
       "locale",
       "logo_path",
@@ -368,6 +382,8 @@
       "panel_domain_status",
       "panel_domain_verification_token",
       "panel_domain_verified_at",
+      "parent_organization_name",
+      "parent_organization_url",
       "paytr_enabled",
       "paytr_max_installment",
       "paytr_merchant_id",
@@ -398,6 +414,8 @@
       "tryoto_refresh_token_enc",
       "tryoto_test_mode",
       "updated_at",
+      "usd_margin_percent",
+      "usd_rate",
       "whatsapp_number"
     ],
     "arc_store_themes": [
@@ -442,7 +460,8 @@
       "lon",
       "organization_id",
       "path",
-      "product_slug"
+      "product_slug",
+      "source"
     ],
     "organization_memberships": [
       "is_active",

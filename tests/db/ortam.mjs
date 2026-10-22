@@ -53,6 +53,20 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   bir ardında; döküm yenilendiğinde aynı
   şekilde ileri alın.
 
+  22.10.2026 anlık görüntüsü yurtdışı satışının üç migration'ını
+  içeriyor: vitrin ayarlarına kur/kâr payı/mod (20261018221955),
+  kargo tarifesinin siparişe bağlanması ve bölgeleri vitrine açan
+  üçlü (20261018223636), yurtdışına gönderilemeyen ürünlerin listesi
+  (20261018225502). Dökümdeki sayılar 31→32 tablo ve 120 fonksiyona
+  çıktı. İmleç sonuncunun bir ardında.
+
+  BU YENİLEMENİN ASIL KAZANCI İKİZ DENETİMİ: kiracı ikizi denetimi
+  dökümü okuyor ve eski döküm üç yeni fonksiyonun hiçbirini
+  içermediği için yeni vitrin/ArvoCulture çiftlerini HİÇ ölçmüyordu
+  — 18 çift sayıp yeşil geçiyordu. Yani denetim yeşildi ama
+  denetlemiyordu; aynı körlüğün başka bir biçimi Windows'ta CRLF
+  yüzünden yaşandı (d37d20b).
+
   İMLEÇ GERİDE KALIRSA NE OLUR: harness, görüntüde ZATEN olan bir
   fonksiyonu eski gövdesiyle yeniden kurmaya çalışır. Dönüş tipi
   daralmışsa "cannot change return type" ile bütün paket düşer
@@ -65,7 +79,7 @@ const KOK = path.resolve(import.meta.dirname, "../../supabase");
   yanıtlanıyor (her migration'ı dosya yerinde ve yerinden alınmış
   hâlde koşturarak).
 */
-const ILK_UYGULANAN = "20261017213836";
+const ILK_UYGULANAN = "20261018225503";
 
 /*
   PGLITE'TA PGCRYPTO YOK.
