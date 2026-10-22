@@ -118,6 +118,10 @@ async function tohum() {
     */
     update public.arc_products set international_blocked = true
      where organization_id in ('${A}', '${B}');
+
+    -- İngilizce ad: her mağazanın KENDİ çevirisi.
+    update public.arc_products set name_en = 'A Product' where organization_id = '${A}';
+    update public.arc_products set name_en = 'B Product' where organization_id = '${B}';
   `);
 }
 
@@ -191,6 +195,13 @@ const PLAN = [
     tarafından çağırıyor. A'nın adresinden B'nin tarifesi hesaplanırsa
     müşteri yanlış kargo görür ve öder.
   */
+  /*
+    İngilizce ad: A'nın adresinden B'nin çevirisi görünürse yabancı
+    müşteri komşunun ürün adını okur.
+  */
+  { ad: "arc_storefront_translations", kip: "deger", alan: "name_en",
+    sql: "select name_en from public.arc_storefront_translations($1::text, array['a-urun','b-urun']::text[])",
+    a: "A Product", b: "B Product" },
   { ad: "arc_storefront_shipping_quote", kip: "deger", alan: "fee_cents", rol: "service_role",
     sql: "select fee_cents from public.arc_storefront_shipping_quote($1::text, 'DE', '[{\"sku\":\"A-1\",\"quantity\":1}]'::jsonb)",
     a: 2500, b: 3900 },

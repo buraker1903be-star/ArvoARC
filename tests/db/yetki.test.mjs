@@ -76,6 +76,11 @@ const ANON = [
   */
   "public.arc_storefront_shipping_zones",
   /*
+    İNGİLİZCE ÜRÜN ADLARI anon'a açık: ürün adı herkese açık bir bilgi
+    ve İngilizce sayfalarda zaten basılıyor.
+  */
+  "public.arc_storefront_translations",
+  /*
     Yurtdışına gönderilemeyen ürünlerin slug listesi anon'a açık:
     vitrin yurtdışı modunda o kartları gizliyor. Dönen şey ürün
     adresinden başka bir şey değil ve o adresler zaten herkese açık
@@ -113,6 +118,7 @@ const ANON = [
   "public.arc_storefront_visit",
   "public.get_arvoculture_storefront_blocked_products",
   "public.get_arvoculture_storefront_shipping_zones",
+  "public.get_arvoculture_storefront_translations",
   "public.get_storefront_seller",
 ];
 
