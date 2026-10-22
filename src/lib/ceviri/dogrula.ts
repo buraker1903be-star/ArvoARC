@@ -44,6 +44,43 @@ const KONUSMA = [
   /^\s*(işte|buyurun)/i,
 ];
 
+/*
+  HEDEF GRUP KORUNMALI — MEKANİK DENETİM.
+
+  Canlıda ölçüldü: "Çocuk Unisex Baskılı T-Shirt" → "Unisex Crew Neck
+  T-Shirt". "Çocuk" DÜŞTÜ ve bu ciddi: çocuk bedeni bir ürünü
+  yetişkin ürünü gibi listelemek, müşterinin yanlış ürün almasıyla
+  sonuçlanır ve iade kaçınılmaz.
+
+  Bu hata anlamsal ama MEKANİK OLARAK YAKALANABİLİR: kaynak adı
+  bilinen bir hedef grup sözcüğüyle başlıyorsa, çevirinin
+  karşılığını TAŞIMASI gerekiyor. Taşımıyorsa çeviri reddediliyor ve
+  ürün Türkçe adıyla kalıyor — dürüst olan bu.
+
+  SIRA ÖNEMLİ: "Erkek Çocuk" (boys) "Erkek" ile BAŞLIYOR; uzun
+  ifadeler önce aranıyor, yoksa erkek çocuk ürünü "Men's" sayılırdı.
+*/
+const HEDEF_GRUPLAR: Array<[RegExp, string[]]> = [
+  [/^kız\s+çocuk/i, ["girl"]],
+  [/^erkek\s+çocuk/i, ["boy"]],
+  [/^çocuk/i, ["kid", "child", "junior"]],
+  [/^bebek/i, ["baby", "infant"]],
+  [/^kadın/i, ["women", "woman", "ladies"]],
+  [/^erkek/i, ["men", "man"]],
+];
+
+/** Kaynak hedef grupla başlıyorsa çeviri karşılığını taşıyor mu? */
+export function hedefGrubuKoruyor(kaynak: string, ceviri: string): boolean {
+  const temiz = kaynak.trim();
+  for (const [desen, karsiliklar] of HEDEF_GRUPLAR) {
+    if (!desen.test(temiz)) continue;
+    const dusuk = ceviri.toLowerCase();
+    return karsiliklar.some((k) => dusuk.includes(k));
+  }
+  /* Hedef grupla başlamayan ad bu denetimin dışında. */
+  return true;
+}
+
 export type CeviriKarari =
   | { kabul: true; metin: string }
   | { kabul: false; sebep: string };
@@ -58,6 +95,12 @@ export function ceviriKarari(
   ham: unknown,
   kaynak: string,
   sinir: number,
+  /*
+    Hedef grup denetimi yalnızca ADA uygulanıyor: açıklama metninde
+    "Kadın" sözcüğü geçmek zorunda değil ve zorlamak doğru
+    çevirileri atardı.
+  */
+  hedefGrubuSina = false,
 ): CeviriKarari {
   if (typeof ham !== "string") return { kabul: false, sebep: "metin değil" };
 
@@ -86,8 +129,71 @@ export function ceviriKarari(
     return { kabul: false, sebep: "kaynakla aynı" };
   }
 
+  if (hedefGrubuSina && !hedefGrubuKoruyor(kaynak, metin)) {
+    return { kabul: false, sebep: "hedef grup düştü (çocuk/kadın/erkek)" };
+  }
+
   return { kabul: true, metin };
 }
+
+/*
+  TERİM SÖZLÜĞÜ — İSTEMİN İÇİNE GİRİYOR.
+
+  NEDEN VAR: 7b'lik bir model genel çeviride iyi ama MAĞAZANIN
+  terimlerinde yanılıyor. Canlıda ölçüldü (22.10.2026): "Kürk" →
+  "Coats". Kürk "coat" değil, fur — ve bu ticari olarak yanlış,
+  mağazanın en pahalı kategorisini yanlış adlandırıyor ve müşteriye
+  ürünün ne olduğunu yanlış söylüyor.
+
+  BU HATA DENETİMİN GÖREMEDİĞİ TÜRDEN: çıktı geçerli İngilizce,
+  Türkçe harf yok, kaynaktan farklı. Mekanik denetim anlam hatasını
+  yakalayamaz — o yüzden sözlük İSTEME konuyor (hatayı baştan
+  önlemek) ve panelde elle düzeltme duruyor (kaçanı düzeltmek).
+
+  Liste KISA tutuluyor: 7b modelin bağlamı sınırlı ve uzun bir
+  sözlük, asıl işi (ürün adını çevirmeyi) bastırıyor. Yalnızca
+  modelin YANILDIĞI ya da mağazaya özgü terimler.
+*/
+export const TERIMLER: Array<[string, string]> = [
+  ["kürk", "fur (NOT coat)"],
+  ["şardonsuz", "unbrushed"],
+  ["şardonlu", "brushed"],
+  ["3 iplik", "three-thread fleece"],
+  ["2 iplik", "two-thread fleece"],
+  ["pike", "piqué"],
+  ["bisiklet yaka", "crew neck"],
+  ["eşofman altı", "joggers"],
+  ["lastikli", "elasticated"],
+  ["bağcıklı", "drawstring"],
+  ["yağmurluk", "raincoat"],
+  ["tişört", "t-shirt"],
+  ["şort", "shorts"],
+  ["takım", "set"],
+  ["beden", "size"],
+  ["yelek", "gilet (NOT coat)"],
+  ["kapüşonlu", "hooded"],
+  ["cepli", "with pockets"],
+  ["vizon", "mink"],
+  /*
+    RENKLER AÇIKÇA YAZILIYOR. Canlıda ölçüldü: "Füme" → "Fleece".
+    Füme bir RENK (antrasit), model onu kumaş sandı; müşteri
+    "fleece" okuyup antrasit bir ürün alırdı. Renk, müşterinin
+    gözüyle doğruladığı ilk özellik ve yanlış olamaz.
+  */
+  ["füme", "charcoal"],
+  ["bej", "beige"],
+  ["lacivert", "navy"],
+  ["haki", "khaki"],
+  ["vizon rengi", "taupe"],
+  ["antrasit", "anthracite"],
+  ["ekru", "ecru"],
+  ["bordo", "burgundy"],
+  ["turkuaz", "turquoise"],
+  ["mint yeşili", "mint green"],
+];
+
+const terimSatirlari = () =>
+  TERIMLER.map(([tr, en]) => `- "${tr}" -> ${en}`).join("\n");
 
 /** Ürün için istem; model JSON döndürüyor. */
 export function urunIstemi(
@@ -114,8 +220,31 @@ export function urunIstemi(
     "- Keep the slug EXACTLY as given.",
     "- Keep product attributes (sizes, colours, materials, counts).",
     "- Use the wording a UK/US clothing retailer would use.",
+    "- Use the possessive for gendered items: \"Men's\", \"Women's\", \"Kids'\".",
     "- Do not invent details that are not in the Turkish text.",
+    "- Keep EVERY attribute from the Turkish name, including the",
+    "  audience (Women's / Men's / Kids') and the colour after the dash.",
+    "",
+    "Glossary (use these exact English terms):",
+    terimSatirlari(),
     "- If a description is empty, return an empty string for it.",
+    "",
+    /*
+      ÇALIŞILMIŞ ÖRNEK — soyut sözlükten daha etkili.
+
+      Canlıda ölçüldü: sözlükte "yelek -> gilet (NOT coat)" yazdığı
+      hâlde 7b model "Kürk Yelek"i "Fur Coat" diye çevirdi. Küçük
+      modeller kuralı okuyup ÖRNEĞİ taklit ediyor; iki tam örnek, on
+      satır kuraldan çok iş görüyor.
+
+      Örnekler mağazanın gerçek hata yaptığı iki noktayı gösteriyor:
+      hedef grubun korunması ve giysi türünün doğruluğu.
+    */
+    "Examples:",
+    'Turkish: "Çocuk Unisex Baskılı T-Shirt - Siyah"',
+    'English: "Kids\' Unisex Printed T-Shirt - Black"',
+    'Turkish: "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi"',
+    'English: "Women\'s Real Mink Fur Gilet Hooded - Brown"',
     "",
     JSON.stringify(liste),
   ].join("\n");
@@ -134,7 +263,11 @@ export function koleksiyonIstemi(
     "- Keep the slug EXACTLY as given.",
     "- Use short category names a clothing retailer would use",
     '  (e.g. "Kadın" -> "Women", "Fırsatlar" -> "Sale").',
+    "- Use the possessive for gendered categories: \"Men's T-Shirts\".",
     "- Do not invent details.",
+    "",
+    "Glossary (use these exact English terms):",
+    terimSatirlari(),
     "",
     JSON.stringify(
       koleksiyonlar.map((k) => ({

@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import {
   AD_SINIRI,
   ceviriKarari,
+  hedefGrubuKoruyor,
   jsonCikar,
   koleksiyonIstemi,
   urunIstemi,
@@ -122,4 +123,70 @@ test("istemler yalnızca JSON istiyor", () => {
     assert.match(istem, /ONLY a JSON array/);
     assert.match(istem, /Keep the slug EXACTLY/);
   }
+});
+
+/*
+  HEDEF GRUP KORUNMALI.
+
+  Canlıda ölçüldü (22.10.2026): "Çocuk Unisex Baskılı T-Shirt" →
+  "Unisex Crew Neck T-Shirt". "Çocuk" DÜŞTÜ. Çocuk bedeni bir ürünü
+  yetişkin ürünü gibi listelemek müşterinin yanlış ürün almasıyla
+  sonuçlanır ve iade kaçınılmaz.
+
+  Bu hata ANLAMSAL ama mekanik olarak yakalanabiliyor — o yüzden
+  denetime girdi. Yakalanamayan anlamsal hatalar için panelde elle
+  düzeltme var.
+*/
+test("hedef grup düşerse çeviri reddediliyor", () => {
+  const kaynak = "Çocuk Unisex Baskılı T-Shirt - Siyah";
+  assert.equal(
+    ceviriKarari("Unisex Printed T-Shirt - Black", kaynak, AD_SINIRI, true).kabul,
+    false,
+  );
+  assert.equal(
+    ceviriKarari("Kids' Unisex Printed T-Shirt - Black", kaynak, AD_SINIRI, true).kabul,
+    true,
+  );
+});
+
+test("hedef grup eşleşmesi UZUN ifadeyi önce arıyor", () => {
+  /*
+    "Erkek Çocuk" (boys) "Erkek" ile BAŞLIYOR; kısa desen önce
+    aranırsa erkek çocuk ürünü "Men's" sayılır ve denetim o hatayı
+    onaylardı.
+  */
+  assert.equal(hedefGrubuKoruyor("Erkek Çocuk Şort", "Boys' Shorts"), true);
+  assert.equal(hedefGrubuKoruyor("Erkek Çocuk Şort", "Men's Shorts"), false);
+  assert.equal(hedefGrubuKoruyor("Kız Çocuk Tişört", "Girls' T-Shirt"), true);
+});
+
+test("hedef grupla başlamayan ad denetimin dışında", () => {
+  /* Zorlamak doğru çevirileri atardı. */
+  assert.equal(hedefGrubuKoruyor("Unisex Baskılı Tişört", "Unisex Printed T-Shirt"), true);
+  assert.equal(hedefGrubuKoruyor("Pamuklu Çorap", "Cotton Socks"), true);
+});
+
+test("hedef grup denetimi AÇIKLAMADA uygulanmıyor", () => {
+  /* Açıklama metninde "Kadın" geçmek zorunda değil. */
+  const karar = ceviriKarari("A comfortable summer piece.", "Kadın için rahat bir yazlık.", 4000);
+  assert.equal(karar.kabul, true);
+});
+
+/*
+  TERİM SÖZLÜĞÜ İSTEMDE.
+
+  7b model genel çeviride iyi ama mağazanın terimlerinde yanılıyor:
+  canlıda "Kürk" → "Coats" ve "Füme" → "Fleece" çıktı. İkincisi bir
+  RENGİ kumaş sanmak demek ve renk, müşterinin gözüyle doğruladığı
+  ilk özellik.
+*/
+test("istem terim sözlüğünü ve örnekleri taşıyor", () => {
+  const istem = urunIstemi([{ slug: "a", name: "Kürk Yelek", description: null }]);
+  assert.match(istem, /fur \(NOT coat\)/);
+  assert.match(istem, /"füme" -> charcoal/);
+  assert.match(istem, /gilet \(NOT coat\)/);
+  /* Çalışılmış örnek: küçük modeller kuralı okuyup ÖRNEĞİ taklit
+     ediyor ve sözlük tek başına yelek→gilet'i çözmedi. */
+  assert.match(istem, /Kids' Unisex Printed T-Shirt/);
+  assert.match(istem, /Fur Gilet/);
 });

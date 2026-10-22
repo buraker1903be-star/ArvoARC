@@ -182,7 +182,22 @@ async function calistir() {
       }
 
       const kaynakAd = KOLEKSIYON ? kayit.title : kayit.name;
-      const adKarari = ceviriKarari(KOLEKSIYON ? satir.title : satir.name, kaynakAd, AD_SINIRI);
+      /*
+        HEDEF GRUP DENETİMİ AÇIK (son parametre): kaynak adı
+        "Çocuk"/"Kadın"/"Erkek" ile başlıyorsa çeviri karşılığını
+        taşımak zorunda. Canlıda ölçüldü — model "Çocuk Unisex
+        Baskılı T-Shirt"i "Unisex ... T-Shirt" diye çevirdi ve
+        çocuk bedeni bir ürün yetişkin ürünü gibi listelenecekti.
+
+        Açıklamada denetim YOK: açıklama metninde "Kadın" sözcüğü
+        geçmek zorunda değil ve zorlamak doğru çevirileri atardı.
+      */
+      const adKarari = ceviriKarari(
+        KOLEKSIYON ? satir.title : satir.name,
+        kaynakAd,
+        AD_SINIRI,
+        !KOLEKSIYON,
+      );
       if (!adKarari.kabul) {
         /* AD KABUL EDİLMEZSE SATIR HİÇ YAZILMIYOR: açıklaması
            çevrilmiş ama adı Türkçe kalmış bir ürün, çevirisiz
