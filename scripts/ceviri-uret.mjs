@@ -97,6 +97,19 @@ async function sor(istem) {
       model,
       /* Sıcaklık 0: çeviri yaratıcılık değil, kararlılık istiyor. */
       temperature: 0,
+      /*
+        ÇIKTI SINIRI AÇIKÇA VERİLİYOR — canlıda ölçüldü.
+
+        Sınır verilmeyince Ollama kendi varsayılanında kesiyor ve
+        model on kalemlik partinin ilk üç-dördünü yazıp duruyordu:
+        JSON geçerli ama EKSİK. Betik kalanları "yanıtta yok" diye
+        atlıyordu — yani çeviri sessizce yarım kalıyor, hata da
+        vermiyordu. İlk koşuda 22 kaydın 20'si bu yüzden atlandı.
+
+        Dört bin jeton on kalemlik bir partiye bol: ürün adı ~40,
+        açıklama ~300 jeton.
+      */
+      max_tokens: 4000,
       messages: [{ role: "user", content: istem }],
     }),
   });
@@ -151,8 +164,30 @@ async function calistir() {
 
   let kabul = 0;
   const atlanan = [];
+  /* İkinci turda tek tek denenecek kayıtlar. */
+  const yeniden = [];
 
-  for (const parti of partilere(kayitlar, PARTI)) {
+  /*
+    İKİ TUR: önce partiler, sonra atlananlar TEK TEK.
+
+    Sıcaklık 0 olduğu için betiği yeniden koşturmak AYNI sonucu
+    veriyor — atlanan kayıt sonsuza kadar atlanırdı. Ama bağlam
+    değişince sonuç da değişiyor: on kalemlik bir partide atlanan
+    ürün, tek başına sorulduğunda genellikle doğru çevriliyor
+    (model bütün dikkatini ona veriyor).
+
+    İkinci tur yalnızca BAŞARISIZ olanları alıyor, yani maliyeti
+    hatanın büyüklüğüyle sınırlı.
+  */
+  for (let tur = 1; tur <= 2; tur += 1) {
+    const kaynak = tur === 1 ? kayitlar : yeniden.slice();
+    if (tur === 2) {
+      if (kaynak.length === 0) break;
+      console.log(`\n! ${kaynak.length} kayıt tek tek yeniden deneniyor…`);
+      yeniden.length = 0;
+    }
+
+    for (const parti of partilere(kaynak, tur === 1 ? PARTI : 1)) {
     const istem = KOLEKSIYON ? koleksiyonIstemi(parti) : urunIstemi(parti);
     let ham;
     try {
@@ -162,6 +197,7 @@ async function calistir() {
          denenmeye devam ediyor, bu parti bir sonraki koşuda gelir. */
       console.error(`  ✗ parti atlandı (${sorun.message})`);
       atlanan.push(...parti.map((k) => `${k.slug}:model`));
+      if (tur === 1) yeniden.push(...parti);
       continue;
     }
 
@@ -169,15 +205,28 @@ async function calistir() {
     if (!dizi) {
       console.error(`  ✗ parti atlandı (JSON çıkmadı): ${ham.slice(0, 120)}`);
       atlanan.push(...parti.map((k) => `${k.slug}:json`));
+      if (tur === 1) yeniden.push(...parti);
       continue;
     }
 
-    const gelen = new Map(dizi.filter((s) => s && typeof s.slug === "string").map((s) => [s.slug, s]));
+    /*
+      EŞLEŞME SAYISAL KİMLİKLE. Önce slug ile eşleşiliyordu ve model
+      slug'ı ÇEVİRİYORDU ("erkek-atlet" → "men-atlet"): otuz kaydın
+      yirmisi "yanıtta yok" diye atlandı, yani çeviri sessizce yarım
+      kalıyordu. Kimlik, isteme gönderilen SIRA numarası
+      (lib/ceviri/dogrula).
+    */
+    const gelen = new Map(
+      dizi
+        .filter((s) => s && Number.isFinite(Number(s.id)))
+        .map((s) => [Number(s.id), s]),
+    );
 
-    for (const kayit of parti) {
-      const satir = gelen.get(kayit.slug);
+    for (const [sira, kayit] of parti.entries()) {
+      const satir = gelen.get(sira + 1);
       if (!satir) {
         atlanan.push(`${kayit.slug}:yanıtta yok`);
+        if (tur === 1) yeniden.push(kayit);
         continue;
       }
 
@@ -203,6 +252,7 @@ async function calistir() {
            çevrilmiş ama adı Türkçe kalmış bir ürün, çevirisiz
            üründen kötü görünüyor. */
         atlanan.push(`${kayit.slug}:${adKarari.sebep}`);
+        if (tur === 1) yeniden.push(kayit);
         continue;
       }
 
@@ -240,14 +290,26 @@ async function calistir() {
       kabul += 1;
       process.stdout.write(".");
     }
+    }
   }
 
   console.log(`\n✓ ${kabul} kayıt ${KURU ? "çevrilebilir görünüyor" : "yazıldı"}`);
+  /*
+    LİSTE DENEMELERİ sayıyor, kayıtları değil: ikinci turda düzelen
+    bir kayıt birinci turun satırını da taşıyor. Ayıklamak için
+    kaydın son durumunu tutmak gerekirdi ve bu liste bir TANI
+    aracı — hangi kaydın neden atlandığını görmek için. Başlık bunu
+    söylüyor ki sayı yanlış okunmasın.
+  */
   if (atlanan.length) {
-    console.log(`! ${atlanan.length} atlandı:`);
+    console.log(`! ${atlanan.length} deneme atlandı (ikinci turda düzelenler de listede):`);
     for (const satir of atlanan.slice(0, 30)) console.log(`   ${satir}`);
     if (atlanan.length > 30) console.log(`   … ve ${atlanan.length - 30} tane daha`);
-    console.log("  Atlananlar çevirisiz kaldı ve vitrinde TÜRKÇE görünüyor; betik yeniden koşturulabilir.");
+    console.log(
+      "  İki turda da başarısız olan kayıt çevirisiz kaldı ve vitrinde TÜRKÇE görünüyor.\n" +
+        "  Sıcaklık 0 olduğu için betiği yeniden koşturmak AYNI sonucu verir; kalanları\n" +
+        "  panelden elle yazın (Ürünler → ürün → İngilizce ad) ya da modeli büyütün.",
+    );
   }
 }
 

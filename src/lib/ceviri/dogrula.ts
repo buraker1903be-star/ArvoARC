@@ -171,6 +171,27 @@ export const TERIMLER: Array<[string, string]> = [
   ["takım", "set"],
   ["beden", "size"],
   ["yelek", "gilet (NOT coat)"],
+  /*
+    GİYSİ TÜRLERİ — canlıda ölçüldü: model "Gömlek"i "T-Shirt",
+    "Hırka"yı "Vest" diye çevirdi. İkisi de ürünün NE OLDUĞUNU
+    yanlış söylüyor; müşteri gömlek bekleyip tişört alır.
+  */
+  ["gömlek", "shirt (NOT t-shirt)"],
+  ["hırka", "cardigan"],
+  ["atlet", "vest top"],
+  ["body", "bodysuit"],
+  ["boxer", "boxer shorts"],
+  ["çorap", "socks"],
+  ["deniz şortu", "swim shorts"],
+  ["eşofman", "tracksuit"],
+  ["eşofman takımı", "tracksuit set"],
+  ["kazak", "jumper"],
+  ["mont", "coat"],
+  ["pantolon", "trousers"],
+  ["rüzgarlık", "windbreaker"],
+  ["sweatshirt", "sweatshirt"],
+  ["bakım ürünleri", "care products"],
+  ["iç giyim", "underwear"],
   ["kapüşonlu", "hooded"],
   ["cepli", "with pockets"],
   ["vizon", "mink"],
@@ -205,8 +226,19 @@ export function urunIstemi(
     doldurup adı bile çevirmemesine yol açıyordu. Kırpılan kısım
     zaten ürün sayfasında Türkçe duruyor.
   */
-  const liste = urunler.map((urun) => ({
-    slug: urun.slug,
+  const liste = urunler.map((urun, sira) => ({
+    /*
+      KİMLİK SAYI, SLUG DEĞİL — canlıda ölçüldü.
+
+      Slug gönderildiğinde model onu ÇEVİRİYORDU: "erkek-atlet" →
+      "men-atlet". Eşleşme slug'la yapıldığı için otuz kaydın
+      yirmisi "yanıtta yok" diye atlandı — çeviri sessizce yarım
+      kalıyor, hata da vermiyordu. "Slug'ı aynen koru" demek
+      yetmedi; 7b model metni görünce çevirmeye meyilli.
+
+      Sayıyı çevirmeye kalkmıyor.
+    */
+    id: sira + 1,
     name: urun.name,
     description: (urun.description ?? "").replace(/<[^>]*>/g, " ").trim().slice(0, 1500),
   }));
@@ -216,8 +248,8 @@ export function urunIstemi(
     "",
     "Rules:",
     "- Output ONLY a JSON array, no prose, no markdown fences.",
-    '- Each item: {"slug": "...", "name": "...", "description": "..."}',
-    "- Keep the slug EXACTLY as given.",
+    '- Each item: {"id": <number>, "name": "...", "description": "..."}',
+    "- Copy the id number unchanged. Return one item per input id.",
     "- Keep product attributes (sizes, colours, materials, counts).",
     "- Use the wording a UK/US clothing retailer would use.",
     "- Use the possessive for gendered items: \"Men's\", \"Women's\", \"Kids'\".",
@@ -259,8 +291,8 @@ export function koleksiyonIstemi(
     "",
     "Rules:",
     "- Output ONLY a JSON array, no prose, no markdown fences.",
-    '- Each item: {"slug": "...", "title": "...", "description": "..."}',
-    "- Keep the slug EXACTLY as given.",
+    '- Each item: {"id": <number>, "title": "...", "description": "..."}',
+    "- Copy the id number unchanged. Return one item per input id.",
     "- Use short category names a clothing retailer would use",
     '  (e.g. "Kadın" -> "Women", "Fırsatlar" -> "Sale").',
     "- Use the possessive for gendered categories: \"Men's T-Shirts\".",
@@ -270,8 +302,10 @@ export function koleksiyonIstemi(
     terimSatirlari(),
     "",
     JSON.stringify(
-      koleksiyonlar.map((k) => ({
-        slug: k.slug,
+      koleksiyonlar.map((k, sira) => ({
+        /* Kimlik sayı: model slug'ı çeviriyordu (ürün isteminde
+           ayrıntılı gerekçe). */
+        id: sira + 1,
         title: k.title,
         description: (k.description ?? "").slice(0, 600),
       })),

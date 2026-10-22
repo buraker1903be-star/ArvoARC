@@ -108,9 +108,17 @@ test("ürün istemi HTML'i ayıklıyor ve açıklamayı kırpıyor", () => {
     { slug: "a", name: "Şort", description: "<p>" + "x".repeat(3000) + "</p>" },
   ]);
   assert.ok(!istem.includes("<p>"));
-  const veri = JSON.parse(istem.slice(istem.indexOf("[")));
+  const veri = JSON.parse(istem.slice(istem.indexOf("[{")));
   assert.equal(veri[0].description.length, 1500);
-  assert.equal(veri[0].slug, "a");
+  /*
+    KİMLİK SAYI, SLUG DEĞİL. Canlıda ölçüldü: slug gönderildiğinde
+    model onu ÇEVİRİYORDU ("erkek-atlet" → "men-atlet") ve eşleşme
+    slug'la yapıldığı için elli kaydın yirmisi "yanıtta yok" diye
+    atlanıyordu — çeviri sessizce yarım kalıyor, hata da
+    vermiyordu. Sayıyı çevirmeye kalkmıyor.
+  */
+  assert.equal(veri[0].id, 1);
+  assert.equal(veri[0].slug, undefined);
 });
 
 test("istemler yalnızca JSON istiyor", () => {
@@ -121,7 +129,9 @@ test("istemler yalnızca JSON istiyor", () => {
     koleksiyonIstemi([{ slug: "kadin", title: "Kadın", description: null }]),
   ]) {
     assert.match(istem, /ONLY a JSON array/);
-    assert.match(istem, /Keep the slug EXACTLY/);
+    /* Kimlik sayı ve DEĞİŞMEDEN kopyalanmalı: slug'ı "aynen koru"
+       demek yetmemişti (yukarıdaki gerekçe). */
+    assert.match(istem, /Copy the id number unchanged/);
   }
 });
 
