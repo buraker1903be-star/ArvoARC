@@ -1,7 +1,13 @@
 import "server-only";
 import { requireTenant } from "@/lib/tenant";
 import { createServiceClient } from "@/lib/paytr/service-client";
-import { kaynakAdi } from "@/lib/ziyaret-kaynagi";
+import {
+  canliOzet,
+  type CanliOzet,
+  type Nokta,
+  type Olay,
+  type ZiyaretSatiri,
+} from "@/lib/canli-ozet";
 
 /**
  * Canlı ziyaret verisi.
@@ -10,28 +16,17 @@ import { kaynakAdi } from "@/lib/ziyaret-kaynagi";
  * çağıranın yetkisiyle okunursa sessizce BOŞ döner ve ekran "hiç
  * ziyaret yok" der — en kötü hata türü, çünkü doğru görünür.
  * Mağaza kapsamı sorguda ve requireTenant'tan geliyor.
+ *
+ * HESAP BURADA DEĞİL: bütün sayılar `lib/canli-ozet` içinde ve saf,
+ * testi var. Bu dosya yalnızca okuyup ürün adlarını ekliyor —
+ * zaman eşikleri (5 dk, 1 saat, 30 dk) ve konuma göre toplama
+ * Supabase'e bağlı bir dosyada kalsa sınanamazdı.
  */
 
-export type Nokta = {
-  lat: number;
-  lon: number;
-  city: string | null;
-  country: string | null;
-  dakika: number;
-};
+export type { Nokta, Olay };
 
-export type CanliVeri = {
-  /** Son bir saatin konumlu ziyaretleri (harita noktaları). */
-  noktalar: Nokta[];
-  /** Son beş dakikada ayrı ziyaretçi sayısı. */
-  suAn: number;
-  /** Son yirmi dört saatte sayfa açılışı. */
-  gunluk: number;
-  ulkeler: Array<{ ad: string; adet: number }>;
-  sehirler: Array<{ ad: string; adet: number }>;
+export type CanliVeri = Omit<CanliOzet, "urunSayimi"> & {
   urunler: Array<{ slug: string; ad: string; adet: number }>;
-  /** Hangi platformdan gelindiği (Google, Instagram, Doğrudan…). */
-  kaynaklar: Array<{ ad: string; adet: number }>;
   okunamadi: boolean;
 };
 
@@ -39,28 +34,17 @@ const BOS: CanliVeri = {
   noktalar: [],
   suAn: 0,
   gunluk: 0,
+  sonSaatZiyaretci: 0,
+  sonSaatGoruntuleme: 0,
+  sonSaatUrun: 0,
+  akis: [],
+  acikSayfalar: [],
   ulkeler: [],
   sehirler: [],
-  urunler: [],
   kaynaklar: [],
+  urunler: [],
   okunamadi: true,
 };
-
-/** En çok tekrar edenler; eşitlikte ada göre kararlı sıra. */
-function enCok<T extends string>(
-  degerler: Array<T | null>,
-  kac: number,
-): Array<{ ad: T; adet: number }> {
-  const sayac = new Map<T, number>();
-  for (const deger of degerler) {
-    if (!deger) continue;
-    sayac.set(deger, (sayac.get(deger) ?? 0) + 1);
-  }
-  return [...sayac.entries()]
-    .map(([ad, adet]) => ({ ad, adet }))
-    .sort((a, b) => b.adet - a.adet || a.ad.localeCompare(b.ad, "tr"))
-    .slice(0, kac);
-}
 
 export async function canliVeriOku(): Promise<CanliVeri> {
   const { organization } = await requireTenant();
@@ -69,10 +53,11 @@ export async function canliVeriOku(): Promise<CanliVeri> {
   const gunOnce = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   /*
-    TEK SORGU, SON 24 SAAT. Sayfa başına birkaç ayrı sayım
-    sorgusu atmak yerine satırlar bir kez okunup bellekte
-    özetleniyor; 24 saatlik hacim bu mağaza için birkaç bin satır.
-    Tavan aşılırsa ekranda yazıyor (kapsam notu).
+    TEK SORGU, SON 24 SAAT. Sayfa başına birkaç ayrı sayım sorgusu
+    atmak yerine satırlar bir kez okunup bellekte özetleniyor; 24
+    saatlik hacim bu mağaza için birkaç bin satır.
+
+    SIRA ÖNEMLİ: özet akışı bu sıraya göre kuruyor (yeniden eskiye).
   */
   const { data, error } = await servis
     .from("arc_visits")
@@ -87,41 +72,7 @@ export async function canliVeriOku(): Promise<CanliVeri> {
     return BOS;
   }
 
-  type Satir = {
-    path: string;
-    product_slug: string | null;
-    country: string | null;
-    city: string | null;
-    lat: number | null;
-    lon: number | null;
-    ip_hash: string | null;
-    source: string | null;
-    created_at: string;
-  };
-  const satirlar = (data ?? []) as Satir[];
-  const simdi = Date.now();
-
-  const noktalar: Nokta[] = [];
-  const sonBesDakika = new Set<string>();
-  for (const satir of satirlar) {
-    const yas = (simdi - Date.parse(satir.created_at)) / 60000;
-    if (yas <= 5 && satir.ip_hash) sonBesDakika.add(satir.ip_hash);
-    /* Haritada son bir saat: daha eskisi "canlı" değil, geçmiş. */
-    if (yas <= 60 && satir.lat !== null && satir.lon !== null) {
-      noktalar.push({
-        lat: satir.lat,
-        lon: satir.lon,
-        city: satir.city,
-        country: satir.country,
-        dakika: Math.max(0, Math.round(yas)),
-      });
-    }
-  }
-
-  const urunSayimi = enCok(
-    satirlar.map((s) => s.product_slug),
-    8,
-  );
+  const { urunSayimi, ...ozet } = canliOzet((data ?? []) as ZiyaretSatiri[], Date.now());
 
   /* Ürün adları: slug listesi kısa, tek sorgu yetiyor. */
   let adlar = new Map<string, string>();
@@ -135,34 +86,12 @@ export async function canliVeriOku(): Promise<CanliVeri> {
         urunSayimi.map((u) => u.ad),
       );
     adlar = new Map(
-      ((urunler ?? []) as Array<{ slug: string; name: string }>).map((u) => [
-        u.slug,
-        u.name,
-      ]),
+      ((urunler ?? []) as Array<{ slug: string; name: string }>).map((u) => [u.slug, u.name]),
     );
   }
 
   return {
-    noktalar,
-    suAn: sonBesDakika.size,
-    gunluk: satirlar.length,
-    ulkeler: enCok(
-      satirlar.map((s) => s.country),
-      6,
-    ),
-    /*
-      Ham kaynak ("l.instagram.com") okunabilir ada çevriliyor
-      ÖNCE, sayım sonra: yoksa aynı platform üç ayrı satıra
-      bölünürdü (lib/ziyaret-kaynagi).
-    */
-    kaynaklar: enCok(
-      satirlar.map((s) => kaynakAdi(s.source)),
-      6,
-    ),
-    sehirler: enCok(
-      satirlar.map((s) => s.city),
-      6,
-    ),
+    ...ozet,
     urunler: urunSayimi.map((u) => ({
       slug: u.ad,
       /* Adı bulunamayan ürün silinmiş olabilir; slug'ı gösteriyoruz

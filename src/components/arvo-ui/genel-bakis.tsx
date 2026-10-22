@@ -17,7 +17,7 @@ import "./genel-bakis.css";
 
 export const GENEL_BAKIS_SATIR = 6;
 
-export function GenelBakis({ baslik, gizliBaslik, ust, uyari, children }: {
+export function GenelBakis({ baslik, gizliBaslik, ust, uyari, sinif, children }: {
   /** Görünen başlık (ana ekranda selamlama). Modül genel bakışlarında yok. */
   baslik?: ReactNode;
   /*
@@ -31,10 +31,17 @@ export function GenelBakis({ baslik, gizliBaslik, ust, uyari, children }: {
   ust?: ReactNode;
   /** Okunamayan veriler için uyarı satırı. */
   uyari?: string[];
+  /*
+    EK SINIF: kendi düzenini kuran ekranlar için (Analitik · Canlı,
+    tek ekrana sabit). ArvoOS'un aynı bileşeninde bu alan vardı,
+    burada yoktu; analitik modülü taşınırken eklendi (22.10.2026).
+    Verilmezse davranış değişmiyor.
+  */
+  sinif?: string;
   children: ReactNode;
 }) {
   return (
-    <div className="dash dash-v2">
+    <div className={["dash dash-v2", sinif].filter(Boolean).join(" ")}>
       {baslik ? (
         <header className="dash-hero">
           <div>
