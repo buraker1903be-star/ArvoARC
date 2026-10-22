@@ -310,3 +310,151 @@ describe("yurtdışı kâr payı", () => {
     });
   });
 });
+
+/*
+  AĞIRLIK KADEMESİ (20261022191631).
+
+  Düz tarife kürkte zarar ettiriyordu: 3–5 kg'lık bir kürk Avrupa'ya
+  22 $'a gitmiyor. Hesap tek yerde (`arc_kargo_senti`) ve vitrin de
+  onu çağırıyor; ekranda görünen ile tahsil edilen aynı satırdan
+  çıkıyor.
+*/
+describe("kargo ağırlık kademesi", () => {
+  /** Kademeli bölge: taban 2 kg / 25 $, aşan her kilo 10 $. */
+  const kademeli = async () => {
+    await db.exec(`
+      update public.arc_shipping_zones
+         set base_kg = 2, fee_per_kg_cents = 1000
+       where organization_id = '${KURUM}';
+    `);
+  };
+
+  test("taban ağırlığın altında ek ücret yok", async () => {
+    await islem(db, async () => {
+      await tohum();
+      await kademeli();
+      /* Ürünün ağırlığı girilmemiş: mağaza varsayılanı 500 g. */
+      const o = await kayit((await siparis("U-1", "US")).rows[0].order_id);
+      assert.equal(Number(o.shipping), 100000); // 2.500 sent × 40
+      assert.equal(Number(o.metadata.shipping_weight_grams), 500);
+    });
+  });
+
+  test("ağır ürün kilo başına ücretlendiriliyor", async () => {
+    await islem(db, async () => {
+      await tohum();
+      await kademeli();
+      /* Kürk: 4.200 g. Taban 2 kg'ı aşan 2,2 kg → YUKARI yuvarlanıp
+         3 kilo; 2.500 + 3 × 1.000 = 5.500 sent. */
+      await db.exec(`
+        update public.arc_products set shipping_weight_grams = 4200
+         where organization_id = '${KURUM}' and slug = 'ucuz';
+      `);
+      const o = await kayit((await siparis("U-1", "US")).rows[0].order_id);
+      assert.equal(Number(o.metadata.shipping_usd_cents), 5500);
+      assert.equal(Number(o.shipping), 220000); // 5.500 × 40
+    });
+  });
+
+  test("kilolar YUKARI yuvarlanıyor", async () => {
+    await islem(db, async () => {
+      await tohum();
+      await kademeli();
+      /* 2.100 g → taban 2 kg'ı 0,1 kg aşıyor, bir kilo sayılıyor.
+         Aşağı yuvarlamak her ağır siparişte zarar demekti; kargo
+         firmaları da yukarı yuvarlıyor. */
+      await db.exec(`
+        update public.arc_products set shipping_weight_grams = 2100
+         where organization_id = '${KURUM}' and slug = 'ucuz';
+      `);
+      const o = await kayit((await siparis("U-1", "US")).rows[0].order_id);
+      assert.equal(Number(o.metadata.shipping_usd_cents), 3500);
+    });
+  });
+
+  test("kademe sıfırken davranış ESKİSİYLE AYNI", async () => {
+    await islem(db, async () => {
+      await tohum();
+      /* fee_per_kg_cents öntanımlı 0: bugünkü bölgeler böyle ve bu
+         migration tek başına hiçbir fiyatı değiştirmiyor. */
+      await db.exec(`
+        update public.arc_products set shipping_weight_grams = 9000
+         where organization_id = '${KURUM}' and slug = 'ucuz';
+      `);
+      const o = await kayit((await siparis("U-1", "US")).rows[0].order_id);
+      assert.equal(Number(o.metadata.shipping_usd_cents), 2500);
+    });
+  });
+
+  test("ücretsiz eşiği BÜTÜN ücreti siliyor, kademeyi ayırmıyor", async () => {
+    await islem(db, async () => {
+      await tohum({ bolgeler: ["esikli"] });
+      await kademeli();
+      await db.exec(`
+        update public.arc_products set shipping_weight_grams = 4200
+         where organization_id = '${KURUM}' and slug = 'pahali';
+      `);
+      /*
+        "Ücretsiz kargo" yazıp 30 $ tahsil etmek müşteriye
+        açıklanamaz. Bedeli şu: ağır ürün satılan bir bölgede eşiği
+        düşük tutmak o siparişin kargosunu üstlenmek demek.
+      */
+      const o = await kayit((await siparis("P-1", "US")).rows[0].order_id);
+      assert.equal(Number(o.shipping), 0);
+    });
+  });
+
+  test("vitrinin sorduğu ücret siparişte tahsil edilenle AYNI", async () => {
+    await islem(db, async () => {
+      await tohum();
+      await kademeli();
+      await db.exec(`
+        update public.arc_products set shipping_weight_grams = 4200
+         where organization_id = '${KURUM}' and slug = 'ucuz';
+      `);
+      /*
+        ASIL ÖLÇÜM BU: vitrin ödeme adımında bu işlevi çağırıyor ve
+        rakamı ekranda gösteriyor. Sipariş fonksiyonu da aynı hesabı
+        kullanıyor; ayrışırlarsa müşteri gösterilenden farklı tutar
+        öder (bu depodaki en pahalı kusur).
+      */
+      const { rows: teklif } = await db.query(
+        `select fee_cents, fee_try, weight_grams, goods_try, engel
+           from public.arc_vitrin_kargo_fiyati($1::uuid, 'US', '[{"sku":"U-1","quantity":1}]'::jsonb)`,
+        [KURUM],
+      );
+      const o = await kayit((await siparis("U-1", "US")).rows[0].order_id);
+
+      assert.equal(teklif[0].engel, null);
+      assert.equal(Number(teklif[0].fee_cents), Number(o.metadata.shipping_usd_cents));
+      assert.equal(Number(teklif[0].fee_try), Number(o.shipping));
+      assert.equal(Number(teklif[0].weight_grams), Number(o.metadata.shipping_weight_grams));
+      assert.equal(Number(teklif[0].goods_try), Number(o.subtotal));
+    });
+  });
+
+  test("vitrin sorgusu engeli sebebiyle söylüyor", async () => {
+    await islem(db, async () => {
+      await tohum({ mod: false });
+      const { rows } = await db.query(
+        `select engel from public.arc_vitrin_kargo_fiyati($1::uuid, 'US', '[{"sku":"U-1","quantity":1}]'::jsonb)`,
+        [KURUM],
+      );
+      assert.equal(rows[0].engel, "mod");
+    });
+  });
+
+  test("vitrin sorgusu yurt içinde yanıt vermiyor", async () => {
+    await islem(db, async () => {
+      await tohum();
+      /* Yurt içi tarifeyi vitrin kendisi hesaplıyor (ayar
+         fonksiyonundaki ücret ve eşikle); burada yanıt yok. */
+      const { rows } = await db.query(
+        `select fee_cents, engel from public.arc_vitrin_kargo_fiyati($1::uuid, 'Türkiye', '[{"sku":"U-1","quantity":1}]'::jsonb)`,
+        [KURUM],
+      );
+      assert.equal(rows[0].fee_cents, null);
+      assert.equal(rows[0].engel, null);
+    });
+  });
+});

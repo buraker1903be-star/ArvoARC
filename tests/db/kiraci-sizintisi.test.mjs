@@ -57,14 +57,17 @@ async function tohum() {
     insert into public.arc_store_settings
       (organization_id, store_name, order_prefix, custom_domain, domain_verified_at, shipping_fee,
        free_shipping_threshold, bank_transfer_enabled, bank_transfer_discount_percent,
-       legal_name, contact_email, bank_iban) values
+       legal_name, contact_email, bank_iban,
+       /* Yurtdışı AÇIK: kargo fiyatı sorgusu kapalı modda her iki
+          mağazada da 'mod' döndürür, yani kiracıyı ayırt etmez. */
+       international_enabled, usd_rate) values
       ('${A}', 'Mağaza A', 'MA', '${A_HOST}', now(), 11100, 100000, true,  7,
-       'A ŞİRKETİ LİMİTED', 'a@ornek.test', 'TR100000000000000000000001'),
+       'A ŞİRKETİ LİMİTED', 'a@ornek.test', 'TR100000000000000000000001', true, 40),
       ('${B}', 'Mağaza B', 'MB', '${B_HOST}', now(), 22200, 200000, false, 3,
-       'B ŞİRKETİ LİMİTED', 'b@ornek.test', 'TR100000000000000000000002'),
+       'B ŞİRKETİ LİMİTED', 'b@ornek.test', 'TR100000000000000000000002', true, 40),
       -- C alan adını yazmış ama DOĞRULAMAMIŞ: mağazası açılmamalı.
       ('${C}', 'Mağaza C', 'MC', '${C_HOST}', null,  33300, 300000, true,  5,
-       'C ŞİRKETİ LİMİTED', 'c@ornek.test', 'TR100000000000000000000003');
+       'C ŞİRKETİ LİMİTED', 'c@ornek.test', 'TR100000000000000000000003', false, null);
 
     /* Tanıtım sayfası metni: kiracının kendi anlatısı. A'nın
        "hakkımızda"sı B'nin vitrininde görünmemeli. */
@@ -183,6 +186,14 @@ const PLAN = [
     Engelli ürün listesi: A'nın adresinden B'nin ürünü görünürse o
     kart B'nin vitrininde değil A'nın vitrininde gizlenirdi.
   */
+  /*
+    KARGO FİYATI yalnızca service_role'a açık: vitrin onu SUNUCU
+    tarafından çağırıyor. A'nın adresinden B'nin tarifesi hesaplanırsa
+    müşteri yanlış kargo görür ve öder.
+  */
+  { ad: "arc_storefront_shipping_quote", kip: "deger", alan: "fee_cents", rol: "service_role",
+    sql: "select fee_cents from public.arc_storefront_shipping_quote($1::text, 'DE', '[{\"sku\":\"A-1\",\"quantity\":1}]'::jsonb)",
+    a: 2500, b: 3900 },
   { ad: "arc_storefront_blocked_products", kip: "satir", alan: "slug",
     sql: "select slug from public.arc_storefront_blocked_products($1::text)",
     a: "a-urun", b: "b-urun" },
