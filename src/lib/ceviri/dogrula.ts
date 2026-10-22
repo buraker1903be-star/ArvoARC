@@ -240,6 +240,106 @@ export function hedefGrubuKoruyor(kaynak: string, ceviri: string): boolean {
   return true;
 }
 
+/*
+  HEDEF GRUP UYDURMA DENETİMİ — DÜŞMENİN TERSİ.
+
+  `hedefGrubuKoruyor` yalnızca bir yönü sınıyordu: kaynakta varsa
+  çeviride de olmalı. Ters yön açıktı ve canlıda ölçüldü
+  (23.10.2026, 199 çevrili üründe 5 kayıt):
+
+    "Basic Regular Fit Mint Yeşili Tişört" → "Men's Basic ..."
+    "Biker Sporcu Şort - Bej"              → "Women's Biker ..."
+
+  Kaynakta cinsiyet YOK; model uydurdu. Koleksiyonlarda aynısı
+  olmuştu ("Göz" → "Men's Makeup"), yani bu modelin bilinen bir
+  eğilimi.
+
+  ZARARI: unisex bir ürünü erkek ürünü diye listelemek, müşterinin
+  yanlış ürün alması ve iade demek — düşen hedef grubuyla aynı
+  zarar, ters yönden.
+
+  ÇOCUK ÜRÜNÜ İSTİSNA: "Kız Çocuk" çevirisi "Girls'" oluyor ve
+  "girl" sözcüğü kadın desenine takılmıyor, ama "Çocuk Unisex" gibi
+  adlarda model "Kids'" derken bazen "Boys'" diyebiliyor — kaynakta
+  çocuk geçiyorsa cinsiyet eklemesi bu denetimin dışında kalıyor,
+  çünkü hedef grup zaten doğru taşınmış sayılıyor ve ayrımı burada
+  zorlamak doğru çevirileri atardı.
+*/
+export function hedefGrubuUydurmuyor(kaynak: string, ceviri: string): boolean {
+  const k = kaynak.toLocaleLowerCase("tr");
+  const c = ceviri.toLowerCase();
+
+  /*
+    Kaynakta herhangi bir yaş/cinsiyet işareti varsa denetim dışı.
+
+    ÖN EK EŞLEŞMESİ, TAM SÖZCÜK DEĞİL: Türkçe ekli bir dil ve
+    "Kadınlar Günü" kalıbı `\bkadın\b` ile eşleşmiyordu. Sonuç yanlış
+    pozitifti — "8 Mart Dünya Kadınlar Günü Baskılı Tişört"ün doğru
+    çevirisi "International Women's Day" ifadesini TAŞIMAK zorunda
+    ve denetim onu "uydurma" sayıyordu.
+  */
+  if (/(kadın|erkek|çocuk|kız|bebek|unisex)/.test(k)) return true;
+
+  return !/\b(men|men's|mens|women|women's|womens|ladies|boys?|girls?)\b/.test(c);
+}
+
+/*
+  GİYSİ TÜRÜ MEKANİK OLARAK ZORLANIYOR.
+
+  Sözlük yalnızca İSTEMDE duruyordu, yani modele bir öneriydi ve
+  7b onu düzenli olarak yok sayıyor. Canlıda ölçüldü (23.10.2026,
+  199 çevrili ürün):
+
+    "Çocuk Selanik Yaka Nakışlı Kazak" → "Kids' ... Jacket"   (0/4)
+    "Çocuk Yakalı Parçalı Kürk"        → "... Mink"           (1/2)
+    "... Kanguru Cepli Hırka"          → "... Hoodie"         (5/7)
+
+  Hepsi geçerli İngilizce, yani diğer denetimler göremiyor — ama
+  ürünün NE OLDUĞUNU yanlış söylüyor. Kazak bekleyip ceket alan
+  müşteri iade ediyor.
+
+  YALNIZCA GİYSİ TÜRÜ, özellik değil: "nakışlı" yerine "printed"
+  yazılması can sıkıcı ama müşteri yanlış ürün almıyor. Tür yanlışsa
+  alıyor.
+
+  BİRDEN ÇOK KARŞILIK KABUL: "kazak" için hem "jumper" hem "sweater"
+  doğru. Tek karşılığa zorlamak doğru çevirileri atardı.
+
+  KÜRK ASTARI İSTİSNA: "kürk astarlı mont" bir mont ve çevirisinde
+  "fur" geçmek zorunda değil (kargo ağırlığı betiğindeki ayrımın
+  aynısı, scripts/urun-agirliklari.sql).
+*/
+const GIYSI_TURU: Array<{ tr: RegExp; en: RegExp; ad: string }> = [
+  { tr: /\bkürk(?!\s*astarl)/u, en: /\bfur/, ad: "kürk → fur" },
+  { tr: /\bkazak/u, en: /\b(jumper|sweater|pullover|knit)/, ad: "kazak → jumper" },
+  { tr: /\bhırka/u, en: /\bcardigan/, ad: "hırka → cardigan" },
+  /*
+    "T-SHIRT" GÖMLEK DEĞİL. Düz `\bshirt` kalıbı "T-Shirt" ve
+    "Sweatshirt" içindeki "shirt"i de yakalıyordu, yani "Erkek
+    Gömlek" → "Men's T-Shirt" denetimden GEÇİYORDU — sözlüğün
+    uyardığı karışıklığın ta kendisi ("gömlek → shirt NOT t-shirt").
+  */
+  { tr: /\bgömlek/u, en: /(?<![a-z-])shirt/, ad: "gömlek → shirt" },
+  { tr: /\belbise/u, en: /\bdress/, ad: "elbise → dress" },
+  { tr: /\btayt/u, en: /\b(leggings|tights)/, ad: "tayt → leggings" },
+  { tr: /\btulum/u, en: /\b(jumpsuit|overall|playsuit)/, ad: "tulum → jumpsuit" },
+  { tr: /\bçorap/u, en: /\bsocks/, ad: "çorap → socks" },
+  { tr: /\bşort/u, en: /\bshorts/, ad: "şort → shorts" },
+  { tr: /\byelek/u, en: /\b(gilet|waistcoat|vest)/, ad: "yelek → gilet" },
+  { tr: /\betek/u, en: /\bskirt/, ad: "etek → skirt" },
+  { tr: /\bpijama/u, en: /\b(pyjama|pajama)/, ad: "pijama → pyjamas" },
+];
+
+/** Giysi türü doğru çevrilmiş mi? Değilse hangi terim olduğunu söyler. */
+export function giysiTuruDogru(kaynak: string, ceviri: string): string | null {
+  const k = kaynak.toLocaleLowerCase("tr");
+  const c = ceviri.toLowerCase();
+  for (const { tr, en, ad } of GIYSI_TURU) {
+    if (tr.test(k) && !en.test(c)) return ad;
+  }
+  return null;
+}
+
 export type CeviriKarari =
   | { kabul: true; metin: string }
   | { kabul: false; sebep: string };
@@ -314,6 +414,15 @@ export function ceviriKarari(
 
   if (hedefGrubuSina && !hedefGrubuKoruyor(kaynak, metin)) {
     return { kabul: false, sebep: "hedef grup düştü (çocuk/kadın/erkek)" };
+  }
+
+  if (hedefGrubuSina && !hedefGrubuUydurmuyor(kaynak, metin)) {
+    return { kabul: false, sebep: "hedef grup UYDURULDU (kaynakta yok)" };
+  }
+
+  if (hedefGrubuSina) {
+    const tur = giysiTuruDogru(kaynak, metin);
+    if (tur) return { kabul: false, sebep: `giysi türü yanlış (${tur})` };
   }
 
   /*

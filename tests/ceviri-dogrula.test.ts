@@ -16,6 +16,8 @@ import {
   AD_SINIRI,
   ceviriKarari,
   hedefGrubuKoruyor,
+  hedefGrubuUydurmuyor,
+  giysiTuruDogru,
   jsonCikar,
   koleksiyonIstemi,
   sayilariKoruyor,
@@ -394,4 +396,73 @@ test("Türkçe kaynak aynen geri gelirse YİNE reddediliyor", () => {
   /* Marka istisnası, çeviri yapmamak için bahane değil. */
   const karar = ceviriKarari("Kadın Şort", "Kadın Şort", AD_SINIRI);
   assert.equal(karar.kabul, false);
+});
+
+test("HEDEF GRUP UYDURULAMAZ", () => {
+  /*
+    CANLIDA ÖLÇÜLDÜ (23.10.2026, 199 çevrili üründe 5 kayıt):
+    kaynakta cinsiyet YOKKEN model ekliyordu.
+
+      "Basic Regular Fit Mint Yeşili Tişört" → "Men's Basic ..."
+      "Biker Sporcu Şort - Bej"              → "Women's Biker ..."
+
+    Unisex bir ürünü erkek ürünü diye listelemek, müşterinin yanlış
+    ürün alması demek — düşen hedef grubuyla aynı zarar, ters yönden.
+  */
+  const karar = ceviriKarari(
+    "Men's Basic Regular Fit Mint Green T-Shirt",
+    "Basic Regular Fit Mint Yeşili Tişört",
+    AD_SINIRI,
+    true,
+  );
+  assert.equal(karar.kabul, false);
+  assert.match(!karar.kabul ? karar.sebep : "", /UYDURULDU/);
+});
+
+test("kaynakta hedef grup varsa uydurma denetimi devreye girmiyor", () => {
+  /* "Kadın … Şort" → "Women's … Shorts": ekleme değil, taşıma. */
+  assert.equal(
+    hedefGrubuUydurmuyor("Kadın Yazlık Şort", "Women's Summer Shorts"),
+    true,
+  );
+  /* Unisex yazan ad da denetim dışı: kaynak zaten grup söylüyor. */
+  assert.equal(
+    hedefGrubuUydurmuyor("Unisex Baskılı Tişört", "Men's Printed T-Shirt"),
+    true,
+  );
+});
+
+test("GİYSİ TÜRÜ MEKANİK OLARAK ZORLANIYOR", () => {
+  /*
+    Sözlük yalnızca istemdeydi, yani modele bir öneriydi ve 7b onu
+    düzenli olarak yok sayıyordu. Canlıda ölçüldü (23.10.2026):
+    "Kazak" → "Jacket" DÖRT ürünün dördünde, "Kürk" → "Mink".
+    Hepsi geçerli İngilizce; diğer denetimler göremiyor.
+  */
+  assert.equal(
+    giysiTuruDogru("Çocuk Selanik Yaka Nakışlı Kazak - Gri", "Kids' Printed Jacket - Grey"),
+    "kazak → jumper",
+  );
+  assert.equal(
+    giysiTuruDogru("Çocuk Yakalı Parçalı Kürk - Kahve", "Kids' Partially Furred Mink - Brown"),
+    null, /* "Furred" içinde "fur" geçiyor: tür doğru taşınmış. */
+  );
+  assert.equal(giysiTuruDogru("Erkek Gömlek", "Men's T-Shirt"), "gömlek → shirt");
+});
+
+test("giysi türünde BİRDEN ÇOK karşılık kabul ediliyor", () => {
+  /* "kazak" için hem jumper hem sweater doğru; tek karşılığa
+     zorlamak doğru çevirileri atardı. */
+  for (const ceviri of ["Kids' Knitted Jumper", "Kids' Sweater", "Kids' Pullover"]) {
+    assert.equal(giysiTuruDogru("Çocuk Kazak", ceviri), null, ceviri);
+  }
+});
+
+test("KÜRK ASTARLI mont kürk sayılmıyor", () => {
+  /* Kürk yalnızca astar; çevirisinde "fur" geçmek zorunda değil.
+     Kargo ağırlığı betiğindeki ayrımın aynısı. */
+  assert.equal(
+    giysiTuruDogru("Erkek Çocuk Peluş Kürk Astarlı Şişme Mont", "Boys' Padded Puffer Coat"),
+    null,
+  );
 });
