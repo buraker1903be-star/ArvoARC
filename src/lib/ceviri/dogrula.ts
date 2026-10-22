@@ -24,14 +24,90 @@ export const AD_SINIRI = 200;
 export const ACIKLAMA_SINIRI = 4000;
 
 /*
-  TÜRKÇEYE ÖZGÜ HARFLER. "ı", "ş", "ğ" ve "İ" İngilizce metinde
-  geçmiyor; biri varsa model çevirmemiş ya da yarım çevirmiş.
+  TÜRKÇE KALMIŞ MI? — İKİ ÖLÇÜT, BİRİ YETMİYOR.
 
-  "ö", "ü", "ç" BİLEREK YOK: İngilizcede alıntı sözcüklerde
-  geçebiliyor (ör. marka adları, "façade") ve onları reddetmek
-  doğru çevirileri de atardı.
+  Önce tek bir kural vardı: çıktıda "ı", "ş", "ğ" varsa reddet.
+  Mantığı şuydu — bu harfler İngilizce metinde geçmiyor, yani model
+  çevirmemiş. Baskı kuralı eklenince (22.10.2026) bu kural KENDİ
+  KURALIMLA ÇELİŞTİ: modele "özel adları Türkçe bırak" diyoruz ve
+  doğru çeviri artık Türkçe harf TAŞIYOR —
+
+    "1 Mayıs Emek ve Dayanışma Bayrağı Printed Crew Neck T-Shirt"
+
+  Bu doğru bir İngilizce ürün adı ve eski kural onu atıyordu.
+
+  Yerine iki ölçüt:
+
+  1. ÇEVRİLMESİ GEREKEN KELİME KALMIŞ MI. Sözlükteki Türkçe
+     karşılıklar (tişört, gömlek, şort, yaka…) çıktıda geçmemeli:
+     geçiyorsa model giysiyi çevirmemiş. Özel adlar bu listede
+     olmadığı için geçebiliyor.
+
+  2. ORAN. Kelimelerin yarısından fazlası Türkçeye özgü harf
+     taşıyorsa metin toptan çevrilmemiş demektir. Korunan bir ifade
+     adın küçük bir bölümü; bütünü değil.
+
+  "ö", "ü", "ç" ikisinde de yok: İngilizcede alıntı sözcüklerde ve
+  özel adlarda geçiyor ("Atatürk", "façade").
 */
 const TURKCE_HARF = /[ışğİıŞĞ]/;
+
+/*
+  ÇEVRİLMESİ ZORUNLU SÖZCÜKLER — KATALOĞUN KENDİ SÖZCÜKLERİ.
+
+  Liste tahminle yazılmadı: 3.442 ürün adındaki sözcükler sıklığa göre
+  sayıldı ve Türkçe olanlar buraya alındı (en sıkı: "erkek" 1765,
+  "baskılı" 1761, "yaka" 1605, "tişört" 1116). İngilizce olarak geçen
+  sözcükler (shirt, sweatshirt, hoodie, oversize, regular, unisex,
+  basic, premium, polo, slim, fit) BİLEREK yok — onlar zaten İngilizce.
+
+  TAM SÖZCÜK aranıyor, ön ek değil: "gri" ön ek olarak arandığında
+  İngilizce "Grid" baskısını, "alt" ise "Alternative"i reddedecekti.
+  Çekimli biçimler bu yüzden tek tek yazılı (kol/kollu/kolsuz,
+  yaka/yakalı) — hangileri geçiyorsa katalog söyledi.
+
+  Bir baskı konusu bu sözcüklerden birini taşıyorsa (ör. "Kadın
+  Hakları") kayıt reddediliyor. Bu bilinçli: ATLAMAK, YANLIŞ YAZMAKTAN
+  İYİDİR — atlanan ürün Türkçe adıyla görünüyor, o dürüst; yanlış
+  yazılan ürün sessizce yanlış kalıyor (22.10.2026'da koleksiyonlarda
+  tam bu oldu, "Yağlar" → "Women's T-Shirts").
+*/
+const CEVRILMELI = [
+  // Hedef grubu
+  "erkek", "kadın", "çocuk", "kız", "bebek", "unisex ürün",
+  // Giysi türü
+  "tişört", "gömlek", "kazak", "hırka", "yelek", "kürk", "mont", "ceket",
+  "pantolon", "şort", "eşofman", "takım", "atlet", "çorap", "triko",
+  // Kesim ve ayrıntı
+  "yaka", "yakalı", "kol", "kollu", "kolsuz", "kısa", "uzun", "yarım",
+  "bisiklet", "boğazlı", "kapüşonlu", "fermuarlı", "düğmeli", "bağcıklı",
+  "cepli", "kanguru", "kalıp", "paça", "lastikli", "kapitone", "astarlı",
+  "balıkçı", "üst", "alt", "arka", "düz",
+  // Kumaş ve doku
+  "pamuklu", "iplik", "dokuma", "dokulu", "kumaş", "fitilli", "likralı",
+  "desenli", "baskılı", "yumuşak", "kalın", "itici",
+  // Renk
+  "siyah", "beyaz", "gri", "bej", "lacivert", "bordo", "füme", "kırmızı",
+  "haki", "mavisi", "yeşili", "mavi", "yeşil", "sarı", "pembe", "mor",
+  // Mevsim ve kullanım
+  "yazlık", "kışlık", "günlük", "rahat",
+  // Alan adları
+  "bakım", "beden", "renk", "ürün", "koku",
+];
+
+/** Giysi/özellik sözcüğü çevrilmeden kalmış mı? */
+function cevrilmemisKelime(metin: string): string | null {
+  const dusuk = metin.toLocaleLowerCase("tr");
+  return CEVRILMELI.find((kelime) => new RegExp(`(^|[^\\p{L}])${kelime}([^\\p{L}]|$)`, "u").test(dusuk)) ?? null;
+}
+
+/** Kelimelerin yarısından fazlası Türkçe harf taşıyor mu? */
+function toptanTurkce(metin: string): boolean {
+  const kelimeler = metin.split(/[\s\-/]+/).filter((k) => k.length > 2);
+  if (kelimeler.length === 0) return false;
+  const turkce = kelimeler.filter((k) => TURKCE_HARF.test(k)).length;
+  return turkce / kelimeler.length > 0.5;
+}
 
 /*
   MODEL KONUŞMASI. Açık modeller yanıtı cümleyle sarmaya meyilli;
@@ -41,7 +117,15 @@ const KONUSMA = [
   /^\s*(here\s+is|here's|sure[,!]|certainly|of\s+course|translation\s*:)/i,
   /^\s*```/,
   /\bas\s+an\s+ai\b/i,
-  /^\s*(işte|buyurun)/i,
+  /*
+    "İ" AYRICA YAZILI. `/i` bayrağı büyük İ'yi küçük i'ye KATLAMIYOR
+    (ECMAScript büyük harfe çevirerek karşılaştırıyor: "i" → "I",
+    "İ" → "İ"), yani `/işte/i` "İşte"yi görmüyordu. Eskiden Türkçe
+    harf kuralı bu gevezeliği tesadüfen yakalıyordu; o kural
+    daraltılınca "İşte çeviri: Women's Shorts" kabul edildi
+    (22.10.2026, testle yakalandı).
+  */
+  /^\s*([iİ]şte|[bB]uyurun)/,
 ];
 
 /*
@@ -195,7 +279,9 @@ export function ceviriKarari(
     if (desen.test(metin)) return { kabul: false, sebep: "çeviri değil, model konuşmuş" };
   }
 
-  if (TURKCE_HARF.test(metin)) return { kabul: false, sebep: "Türkçe harf kalmış" };
+  const kalan = cevrilmemisKelime(metin);
+  if (kalan) return { kabul: false, sebep: `"${kalan}" çevrilmemiş` };
+  if (toptanTurkce(metin)) return { kabul: false, sebep: "metin toptan Türkçe kalmış" };
 
   /* Kaynakla aynıysa çeviri yapılmamış. Karşılaştırma büyük/küçük
      harf ve boşluk duyarsız: "Şort" → "Şort " de çeviri değil. */
@@ -264,6 +350,14 @@ export const TERIMLER: Array<[string, string]> = [
   ["deniz şortu", "swim shorts"],
   ["eşofman", "tracksuit"],
   ["eşofman takımı", "tracksuit set"],
+  /*
+    "ALT ÜST TAKIM" İÇ GİYİM DEĞİL. Model "Erkek Alt Üst Takım"ı
+    "Men's Underwear Set" diye çevirdi (22.10.2026, kuru tur): ürünün
+    ne olduğunu yanlış söylüyor ve müşteri iç çamaşırı bekleyip
+    takım alır.
+  */
+  ["alt üst takım", "top and bottom set (NOT underwear)"],
+  ["alt", "bottom (NOT underwear)"],
   ["kazak", "jumper"],
   ["mont", "coat"],
   ["pantolon", "trousers"],
@@ -336,8 +430,23 @@ export function urunIstemi(
     "- Do not invent details that are not in the Turkish text.",
     "- Keep EVERY attribute from the Turkish name, including the",
     "  audience (Women's / Men's / Kids') and the colour after the dash.",
-    "- For printed items the PRINT SUBJECT is the product: keep dates,",
-    '  names and slogans ("1 Mayıs", "10 Kasım Atatürk", "HAKLIYIZ").',
+    /*
+      BASKI KONUSU ÇEVRİLMİYOR, OLDUĞU GİBİ KALIYOR.
+
+      Katalogdaki 3.290 ürünün 1.757'si "Baskılı" ve baskının konusu
+      çoğunlukla ÖZEL AD: "1 Mayıs", "10 Kasım Atatürk", "HAKLIYIZ".
+      Model bunları çevirmeye kalkınca ya anlamsız bir şey üretiyor
+      ya da tamamen atıyordu — ve atınca farklı ürünler aynı ada
+      çöküyordu.
+
+      Doğrusu zaten çevirmemek: üzerinde Türkçe yazan bir tişörtün
+      İngilizce adı da o Türkçe ifadeyi taşır. "Atatürk Silhouette
+      Printed T-Shirt" doğru İngilizce bir ad.
+    */
+    "- For printed items the PRINT SUBJECT identifies the product.",
+    "  Keep proper nouns, dates and slogans EXACTLY as written in",
+    '  Turkish ("1 Mayıs", "Atatürk", "HAKLIYIZ") and translate only',
+    "  the garment words around them.",
     "  Never reduce two different prints to the same generic name.",
     "",
     "Glossary (use these exact English terms):",
@@ -360,6 +469,8 @@ export function urunIstemi(
     'Output: {"id": 7, "source": "Çocuk Unisex Baskılı T-Shirt - Siyah", "name": "Kids\' Unisex Printed T-Shirt - Black", "description": ""}',
     'Input:  {"id": 8, "name": "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi"}',
     'Output: {"id": 8, "source": "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi", "name": "Women\'s Real Mink Fur Gilet Hooded - Brown", "description": ""}',
+    'Input:  {"id": 9, "name": "10 Kasım Atatürk Anma Günü Silüet Baskılı Oversize Bisiklet Yaka T-shirt - Siyah"}',
+    'Output: {"id": 9, "source": "10 Kasım Atatürk Anma Günü Silüet Baskılı Oversize Bisiklet Yaka T-shirt - Siyah", "name": "10 Kasım Atatürk Memorial Day Silhouette Printed Oversized Crew Neck T-Shirt - Black", "description": ""}',
     "",
     JSON.stringify(liste),
   ].join("\n");

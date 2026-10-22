@@ -30,14 +30,59 @@ test("düzgün çeviri kabul ediliyor", () => {
   assert.deepEqual(karar, { kabul: true, metin: "Women's Summer Shorts" });
 });
 
-test("Türkçe harf kalmışsa reddediliyor", () => {
-  /* "ı", "ş", "ğ" İngilizce metinde geçmiyor: biri varsa model
-     çevirmemiş ya da yarım çevirmiş. */
-  for (const metin of ["Kadin Yazlık Shorts", "Women's Şort", "Yazlik Sort ğ"]) {
+test("çevrilmesi gereken sözcük kalmışsa reddediliyor", () => {
+  /* Giysi ve özellik sözcükleri çevrilmek ZORUNDA: biri kalmışsa
+     model yarım çevirmiş. Liste kataloğun kendi sözcüklerinden
+     (3.442 ürün adı sayıldı). */
+  for (const metin of ["Kadin Yazlık Shorts", "Women's Şort", "Men's Pamuklu T-Shirt"]) {
     const karar = ceviriKarari(metin, KAYNAK, AD_SINIRI);
     assert.equal(karar.kabul, false, metin);
-    assert.match(!karar.kabul ? karar.sebep : "", /Türkçe harf/);
+    assert.match(!karar.kabul ? karar.sebep : "", /çevrilmemiş/);
   }
+});
+
+test("metin toptan Türkçe kalmışsa reddediliyor", () => {
+  /* Listede olmayan sözcüklerle de olsa toptan çevrilmemiş bir
+     metin geçmemeli: kelimelerin yarısından fazlası Türkçeye özgü
+     harf taşıyorsa çeviri yapılmamış demektir. */
+  const karar = ceviriKarari("Işıltılı parıltı sağlayan karışım", KAYNAK, AD_SINIRI);
+  assert.equal(karar.kabul, false);
+});
+
+test("BASKI KONUSU TÜRKÇE KALABİLİR", () => {
+  /*
+    Önceden tek kural vardı: çıktıda "ı", "ş", "ğ" varsa reddet.
+    Baskı konusunun (özel ad, tarih, slogan) Türkçe kalması kuralı
+    eklenince o kural KENDİ KURALIMIZLA ÇELİŞTİ — aşağıdaki ad
+    DOĞRU bir İngilizce ürün adı ve eski kural onu atıyordu
+    (22.10.2026'da yerel modelle ölçüldü).
+
+    Baskının üzerindeki yazı çevrilirse ürün yanlış tanıtılır:
+    tişörtte "Emek ve Dayanışma" yazıyor, "Labour and Solidarity"
+    yazmıyor.
+  */
+  const kaynak = "1 Mayıs Emek ve Dayanışma Bayraklı Baskılı Bisiklet Yaka T-shirt - Siyah";
+  const karar = ceviriKarari(
+    "1 Mayıs Emek ve Dayanışma Flag Printed Crew Neck T-Shirt - Black",
+    kaynak,
+    AD_SINIRI,
+    true,
+  );
+  assert.equal(karar.kabul, true, !karar.kabul ? karar.sebep : "");
+});
+
+test("baskı konusu korunurken giysi sözcüğü çevrilmeden kalamaz", () => {
+  /* Korunan ifade, çevirmemek için bahane değil: "Tişört" kalmışsa
+     kayıt yine reddediliyor. */
+  const kaynak = "1 Mayıs Emek ve Dayanışma Baskılı Tişört - Siyah";
+  const karar = ceviriKarari(
+    "1 Mayıs Emek ve Dayanışma Printed Tişört - Black",
+    kaynak,
+    AD_SINIRI,
+    true,
+  );
+  assert.equal(karar.kabul, false);
+  assert.match(!karar.kabul ? karar.sebep : "", /çevrilmemiş/);
 });
 
 test("ö, ü, ç REDDEDİLMİYOR", () => {
