@@ -112,6 +112,38 @@ export function yankiTutuyor(gonderilen: string, yanki: unknown): boolean {
   return kisa > 0 && a.slice(0, kisa) === b.slice(0, kisa);
 }
 
+/*
+  SAYI DENETİMİ — İÇERİK KAYBINI YAKALIYOR.
+
+  NEDEN VAR (canlıda ölçüldü, 22.10.2026): baskılı tişörtlerde model
+  ürünün TEK AYIRT EDİCİ ÖZELLİĞİNİ atıyordu:
+
+    "1 Mayıs Emek ve Dayanışma Bayraklı Emekçi Baskılı Bisiklet
+     Yaka T-shirt - Siyah"
+      → "Unisex Oversized Crew Neck T-Shirt - Black"
+
+  Baskının konusu (1 Mayıs, 10 Kasım Atatürk, "HAKLIYIZ") tamamen
+  kayboluyor ve farklı ürünler AYNI ada çöküyor — baskılı bir
+  tişörtte müşterinin aldığı şey tam olarak o konu.
+
+  Yankı denetimi bunu göremiyor: kaynak doğru yankılanıyor, kaybolan
+  şey çevirinin kendisi.
+
+  SAYILAR EN GÜVENİLİR İŞARET: "1 Mayıs", "10 Kasım", "3 İplik",
+  "4 Mevsim" — ay adı çevrilse de SAYI kalmalı. Özel adları
+  (Atatürk) aramak daha kırılgan olurdu: model onları
+  harfçevirebiliyor. Sayı ya duruyor ya yok.
+*/
+
+/** Kaynaktaki sayı öbekleri çeviride de var mı? */
+export function sayilariKoruyor(kaynak: string, ceviri: string): boolean {
+  const sayilar = kaynak.match(/\d+/g);
+  if (!sayilar) return true;
+  /* Tekil sayılar yeterli: aynı sayı iki kez geçiyorsa bir kez
+     geçmesi de kaybolmadığını gösteriyor. */
+  return [...new Set(sayilar)].every((sayi) => ceviri.includes(sayi));
+}
+
 /** Kaynak hedef grupla başlıyorsa çeviri karşılığını taşıyor mu? */
 export function hedefGrubuKoruyor(kaynak: string, ceviri: string): boolean {
   const temiz = kaynak.trim();
@@ -174,6 +206,10 @@ export function ceviriKarari(
 
   if (hedefGrubuSina && !hedefGrubuKoruyor(kaynak, metin)) {
     return { kabul: false, sebep: "hedef grup düştü (çocuk/kadın/erkek)" };
+  }
+
+  if (hedefGrubuSina && !sayilariKoruyor(kaynak, metin)) {
+    return { kabul: false, sebep: "sayı düştü (içerik kaybı)" };
   }
 
   return { kabul: true, metin };
@@ -300,6 +336,9 @@ export function urunIstemi(
     "- Do not invent details that are not in the Turkish text.",
     "- Keep EVERY attribute from the Turkish name, including the",
     "  audience (Women's / Men's / Kids') and the colour after the dash.",
+    "- For printed items the PRINT SUBJECT is the product: keep dates,",
+    '  names and slogans ("1 Mayıs", "10 Kasım Atatürk", "HAKLIYIZ").',
+    "  Never reduce two different prints to the same generic name.",
     "",
     "Glossary (use these exact English terms):",
     terimSatirlari(),

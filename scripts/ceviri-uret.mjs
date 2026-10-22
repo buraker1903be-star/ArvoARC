@@ -175,6 +175,18 @@ async function calistir() {
 
   let kabul = 0;
   const atlanan = [];
+  /*
+    AYNI ADA ÇÖKEN KAYITLAR. Canlıda ölçüldü: baskılı tişörtlerde
+    model baskının konusunu atıyor ve farklı ürünler aynı İngilizce
+    ada iniyordu ("Unisex Printed Oversized Crew Neck T-Shirt -
+    White" iki ayrı ürün için). Katalogda iki ürünün aynı adı
+    taşıması, müşterinin hangisini aldığını bilememesi demek.
+
+    İlk gören kabul ediliyor, sonrası reddediliyor: hangisinin
+    doğru olduğunu bilemiyoruz ama ikisini de aynı adla yazmak
+    kesin yanlış.
+  */
+  const yazilanAdlar = new Map();
   /* İkinci turda tek tek denenecek kayıtlar. */
   const yeniden = [];
 
@@ -297,6 +309,16 @@ async function calistir() {
         if (karar.kabul) aciklama = karar.metin;
         else atlanan.push(`${kayit.slug}:açıklama ${karar.sebep}`);
       }
+
+      /* Aynı ada çökme denetimi. */
+      const adAnahtari = adKarari.metin.toLocaleLowerCase("en");
+      const oncekiSlug = yazilanAdlar.get(adAnahtari);
+      if (oncekiSlug && oncekiSlug !== kayit.slug) {
+        atlanan.push(`${kayit.slug}:aynı ada çöktü (${oncekiSlug} ile)`);
+        if (tur === 1) yeniden.push(kayit);
+        continue;
+      }
+      yazilanAdlar.set(adAnahtari, kayit.slug);
 
       if (KURU) {
         console.log(`  ${kayit.slug}\n    ${kaynakAd}\n    → ${adKarari.metin}`);

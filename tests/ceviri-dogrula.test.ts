@@ -18,6 +18,7 @@ import {
   hedefGrubuKoruyor,
   jsonCikar,
   koleksiyonIstemi,
+  sayilariKoruyor,
   urunIstemi,
   yankiTutuyor,
 } from "@/lib/ceviri/dogrula";
@@ -263,4 +264,50 @@ test("istem yankı alanını ve örneği taşıyor", () => {
   /* Örnek de yankılı: küçük modeller kuralı okuyup örneği taklit
      ediyor. */
   assert.match(istem, /"source": "Çocuk Unisex Baskılı T-Shirt - Siyah"/);
+});
+
+/*
+  SAYI DENETİMİ — İÇERİK KAYBI.
+
+  Canlıda ölçüldü (22.10.2026): baskılı tişörtlerde model ürünün TEK
+  AYIRT EDİCİ ÖZELLİĞİNİ atıyordu —
+
+    "1 Mayıs Emek ve Dayanışma Bayraklı Emekçi Baskılı ... T-shirt"
+      → "Unisex Oversized Crew Neck T-Shirt - Black"
+
+  Baskının konusu kayboluyor ve farklı ürünler aynı ada çöküyor.
+  Baskılı bir tişörtte müşterinin aldığı şey tam olarak o konu.
+
+  Yankı denetimi bunu GÖREMİYOR: kaynak doğru yankılanıyor, kaybolan
+  şey çevirinin kendisi. Sayı en güvenilir işaret — ay adı çevrilse
+  de sayı kalmalı.
+*/
+test("kaynaktaki sayı çeviride yoksa red", () => {
+  const kaynak = "1 Mayıs Emek ve Dayanışma Baskılı Bisiklet Yaka T-shirt - Siyah";
+  assert.equal(sayilariKoruyor(kaynak, "Unisex Crew Neck T-Shirt - Black"), false);
+  assert.equal(
+    sayilariKoruyor(kaynak, "1 May Labour and Solidarity Printed Crew Neck T-Shirt - Black"),
+    true,
+  );
+});
+
+test("sayı denetimi karar işlevine bağlı (yalnızca adda)", () => {
+  const kaynak = "10 Kasım Atatürk'ü Anma Günü Baskılı T-shirt - Beyaz";
+  const dusuk = ceviriKarari("Unisex Printed T-Shirt - White", kaynak, AD_SINIRI, true);
+  assert.equal(dusuk.kabul, false);
+  assert.match(!dusuk.kabul ? dusuk.sebep : "", /sayı düştü/);
+  /* Açıklamada uygulanmıyor: metinde her sayının geçmesi
+     beklenemez. */
+  assert.equal(ceviriKarari("A printed tee.", kaynak, 4000).kabul, true);
+});
+
+test("sayısız kaynakta denetim devreye girmiyor", () => {
+  /* Çoğu ürün adında sayı yok; zorlamak doğru çevirileri atardı. */
+  assert.equal(sayilariKoruyor("Erkek Gömlek - Beyaz", "Men's Shirt - White"), true);
+});
+
+test("tekrarlanan sayı bir kez geçse yeter", () => {
+  /* "3 İplik ... 3 Renk" gibi adlarda sayının iki kez geçmesi
+     gerekmiyor; kaybolmadığını göstermek yeterli. */
+  assert.equal(sayilariKoruyor("3 İplik 3 Renk Şort", "Three-thread 3 Shorts"), true);
 });
