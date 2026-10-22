@@ -356,3 +356,25 @@ test("tekrarlanan sayı bir kez geçse yeter", () => {
      gerekmiyor; kaybolmadığını göstermek yeterli. */
   assert.equal(sayilariKoruyor("3 İplik 3 Renk Şort", "Three-thread 3 Shorts"), true);
 });
+
+test("MARKA ADI KENDİSİ OLARAK KABUL EDİLİYOR", () => {
+  /*
+    Kaynakta çevrilecek sözcük ve Türkçe harf yoksa metin zaten
+    İngilizce ya da özel ad; olduğu gibi bırakmak doğru. Önceden
+    "kaynakla aynı" diye reddediliyordu ve on dört koleksiyon
+    çevirisiz kaldı (22.10.2026).
+
+    Çevrilmeye zorlanınca ne olduğu ölçüldü: "L-Recapin" →
+    "ArvoCulture", "Beauty Diamonds" → "Beauty".
+  */
+  for (const marka of ["Aloe Via", "Nanogold", "Racine Q10", "Zeitgard", "Mood Infusion"]) {
+    const karar = ceviriKarari(marka, marka, AD_SINIRI);
+    assert.equal(karar.kabul, true, marka);
+  }
+});
+
+test("Türkçe kaynak aynen geri gelirse YİNE reddediliyor", () => {
+  /* Marka istisnası, çeviri yapmamak için bahane değil. */
+  const karar = ceviriKarari("Kadın Şort", "Kadın Şort", AD_SINIRI);
+  assert.equal(karar.kabul, false);
+});

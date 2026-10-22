@@ -283,6 +283,28 @@ export function ceviriKarari(
   if (kalan) return { kabul: false, sebep: `"${kalan}" çevrilmemiş` };
   if (toptanTurkce(metin)) return { kabul: false, sebep: "metin toptan Türkçe kalmış" };
 
+  /*
+    MARKA ADININ DOĞRU ÇEVİRİSİ KENDİSİDİR.
+
+    Kaynakta çevrilmesi gereken hiçbir sözcük ve Türkçeye özgü hiçbir
+    harf yoksa metin zaten İngilizce ya da bir özel ad: "Aloe Via",
+    "Nanogold", "Racine Q10", "Zeitgard". Bunları olduğu gibi
+    bırakmak DOĞRU davranış.
+
+    Önceden "kaynakla aynı" diye reddediliyorlardı ve on dört
+    koleksiyon çevirisiz kaldı (22.10.2026). Baskı konusuyla aynı
+    hata şekli: kendi kuralımız doğru cevabı eliyordu.
+
+    Marka adı çevrilirse ne olur, ölçüldü: model "L-Recapin"i
+    "ArvoCulture", "Beauty Diamonds"ı "Beauty", "Mood Infusion"ı
+    "Mood" yaptı — biri bizim markamızı başkasının ürününe yazmak.
+  */
+  const kaynakCevrilmeli =
+    cevrilmemisKelime(kaynak) !== null || TURKCE_HARF.test(kaynak);
+  if (!kaynakCevrilmeli && sadeMetin(metin) === sadeMetin(kaynak)) {
+    return { kabul: true, metin };
+  }
+
   /* Kaynakla aynıysa çeviri yapılmamış. Karşılaştırma büyük/küçük
      harf ve boşluk duyarsız: "Şort" → "Şort " de çeviri değil. */
   if (metin.toLocaleLowerCase("tr").replace(/\s+/g, " ") ===
@@ -358,6 +380,30 @@ export const TERIMLER: Array<[string, string]> = [
   */
   ["alt üst takım", "top and bottom set (NOT underwear)"],
   ["alt", "bottom (NOT underwear)"],
+  /*
+    KOLEKSİYON TURUNDA ÖLÇÜLEN HATALAR (22.10.2026). Hepsi geçerli
+    İngilizceydi, yani mekanik denetim göremedi; hepsi ürünün NE
+    OLDUĞUNU yanlış söylüyordu. Aynı sözcükler ürün adlarında da
+    geçtiği için 3.290 üründe tekrarlanacaktı.
+  */
+  ["duş jeli", "shower gel (NOT bath mitt)"],
+  ["saç kremi", "conditioner (NOT hair cream)"],
+  ["saç dökülmesi", "hair loss"],
+  ["elbise", "dress (NOT top)"],
+  ["tayt", "leggings"],
+  ["tulum", "jumpsuit"],
+  ["bere", "beanie (NOT bag)"],
+  ["kol saati", "watch (NOT bracelet)"],
+  ["alt giyim", "bottoms (NOT underwear)"],
+  ["göz çevresi", "eye contour"],
+  ["temizleyici", "cleanser (NOT cleaner)"],
+  ["dudak", "lip (NOT lipstick)"],
+  /*
+    MONT, CEKET VE KABAN ÜÇ AYRI ŞEY. Model üçünü de "coat" dedi ve
+    üç koleksiyon tek ada çöktü.
+  */
+  ["ceket", "jacket"],
+  ["kaban", "overcoat"],
   ["kazak", "jumper"],
   ["mont", "coat"],
   ["pantolon", "trousers"],
