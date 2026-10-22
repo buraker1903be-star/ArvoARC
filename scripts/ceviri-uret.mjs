@@ -132,7 +132,7 @@ async function sor(istem) {
 async function urunler() {
   const { data, error } = await supabase
     .from("arc_products")
-    .select("slug, name, description")
+    .select("slug, name, description, organization_id")
     .is("name_en", null)
     .eq("status", "active")
     /* Yurtdışına gönderilemeyen ürün İngilizce vitrinde HİÇ
@@ -147,7 +147,7 @@ async function urunler() {
 async function koleksiyonlar() {
   const { data, error } = await supabase
     .from("arc_collections")
-    .select("slug, title, description")
+    .select("slug, title, description, organization_id")
     .is("title_en", null)
     .eq("status", "active")
     .order("slug")
@@ -187,6 +187,13 @@ async function calistir() {
     kesin yanlış.
   */
   const yazilanAdlar = new Map();
+  /*
+    AÇIKLAMASI YAZILMAYAN KAYITLAR — ATLANANLARDAN AYRI.
+    Bu kayıtlar YAZILDI, yalnızca açıklaması Türkçe kaldı. İkisi aynı
+    listede olduğu için rapor "56 atlandı" diyor ama 32 kayıt yazılmış
+    oluyordu; sayı işin durumunu yanlış anlatıyordu.
+  */
+  const aciklamaAtlanan = [];
   /* İkinci turda tek tek denenecek kayıtlar. */
   const yeniden = [];
 
@@ -307,18 +314,35 @@ async function calistir() {
       if (kaynakAciklama) {
         const karar = ceviriKarari(satir.description, kaynakAciklama, ACIKLAMA_SINIRI);
         if (karar.kabul) aciklama = karar.metin;
-        else atlanan.push(`${kayit.slug}:açıklama ${karar.sebep}`);
+        /* KAYIT ATLANMIYOR, yalnızca açıklama boş kalıyor: ad
+           yazıldığı için kart ve menü İngilizce görünüyor, açıklama
+           Türkçeye düşüyor. Önceden bu not `atlanan` listesine
+           giriyordu ve rapor "56 atlandı" diyordu — oysa kayıtların
+           çoğu YAZILMIŞTI. Rapor kendi işini yanlış anlatıyordu. */
+        else aciklamaAtlanan.push(`${kayit.slug}:${karar.sebep}`);
       }
 
-      /* Aynı ada çökme denetimi. */
+      /*
+        AYNI ADA ÇÖKME DENETİMİ — KAYNAK ADLARI KARŞILAŞTIRILIYOR.
+
+        Önceden yalnızca İngilizce ad karşılaştırılıyordu ve denetim
+        1.247 meşru kaydı reddediyordu: katalogda AYNI Türkçe adı
+        taşıyan 220 ürün grubu var (birinde 32 ürün — "Erkek Baskılı
+        T-Shirt Kısa Kol Bisiklet Yaka Regular Fit…" renk/beden
+        ayrımı adda değil varyantta). Kaynakları aynıysa çevirinin de
+        aynı olması DOĞRU; çökme ancak FARKLI iki ürün tek ada
+        inerse olur — 22.10.2026'da "Yağlar" ile "Duş Jelleri"nin
+        ikisi de "Women's T-Shirts" olmuştu.
+      */
       const adAnahtari = adKarari.metin.toLocaleLowerCase("en");
-      const oncekiSlug = yazilanAdlar.get(adAnahtari);
-      if (oncekiSlug && oncekiSlug !== kayit.slug) {
-        atlanan.push(`${kayit.slug}:aynı ada çöktü (${oncekiSlug} ile)`);
+      const kaynakAnahtari = kaynakAd.toLocaleLowerCase("tr").replace(/\s+/g, " ").trim();
+      const onceki = yazilanAdlar.get(adAnahtari);
+      if (onceki && onceki.kaynak !== kaynakAnahtari) {
+        atlanan.push(`${kayit.slug}:aynı ada çöktü (${onceki.slug} ile)`);
         if (tur === 1) yeniden.push(kayit);
         continue;
       }
-      yazilanAdlar.set(adAnahtari, kayit.slug);
+      yazilanAdlar.set(adAnahtari, { slug: kayit.slug, kaynak: kaynakAnahtari });
 
       if (KURU) {
         console.log(`  ${kayit.slug}\n    ${kaynakAd}\n    → ${adKarari.metin}`);
@@ -330,9 +354,21 @@ async function calistir() {
         ? { title_en: adKarari.metin, description_en: aciklama, translated_at: new Date().toISOString() }
         : { name_en: adKarari.metin, description_en: aciklama, translated_at: new Date().toISOString() };
 
+      /*
+        YAZMA MAĞAZA KAPSAMLI. Önceden yalnızca `slug` ile
+        eşleşiyordu; slug mağazalar arasında benzersiz DEĞİL, yani
+        ikinci bir kiracının aynı slug'lı ürününe de İngilizce ad
+        yazardı — hata vermeden, başkasının katalogunu değiştirerek.
+        Bugün tek kiracı var, açıldığı gün etkileyecekti
+        (AGENTS.md: "Her şey mağaza kapsamlıdır").
+
+        Kapsam kaydın KENDİ organization_id'sinden geliyor; betiğe
+        ayrıca ayar girmek gerekmiyor.
+      */
       const { error } = await supabase
         .from(KOLEKSIYON ? "arc_collections" : "arc_products")
         .update(yazilacak)
+        .eq("organization_id", kayit.organization_id)
         .eq("slug", kayit.slug);
 
       if (error) {
@@ -354,8 +390,19 @@ async function calistir() {
     aracı — hangi kaydın neden atlandığını görmek için. Başlık bunu
     söylüyor ki sayı yanlış okunmasın.
   */
+  if (aciklamaAtlanan.length) {
+    console.log(
+      `\n! ${aciklamaAtlanan.length} kaydın AÇIKLAMASI yazılmadı (adı yazıldı, ` +
+        `açıklama Türkçeye düşüyor):`,
+    );
+    for (const satir of aciklamaAtlanan.slice(0, 12)) console.log(`   ${satir}`);
+    if (aciklamaAtlanan.length > 12) {
+      console.log(`   … ve ${aciklamaAtlanan.length - 12} tane daha`);
+    }
+  }
+
   if (atlanan.length) {
-    console.log(`! ${atlanan.length} deneme atlandı (ikinci turda düzelenler de listede):`);
+    console.log(`\n! ${atlanan.length} kayıt HİÇ yazılmadı (ikinci turda düzelenler de listede):`);
     for (const satir of atlanan.slice(0, 30)) console.log(`   ${satir}`);
     if (atlanan.length > 30) console.log(`   … ve ${atlanan.length - 30} tane daha`);
     console.log(
