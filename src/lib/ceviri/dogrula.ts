@@ -309,25 +309,35 @@ export function hedefGrubuUydurmuyor(kaynak: string, ceviri: string): boolean {
   "fur" geçmek zorunda değil (kargo ağırlığı betiğindeki ayrımın
   aynısı, scripts/urun-agirliklari.sql).
 */
+/*
+  SINIR `\b` DEĞİL, UNICODE BAKIŞI.
+
+  JavaScript'te `\b` ASCII sözcük karakterine göre çalışıyor ve
+  "ş", "ç", "ü" sözcük karakteri SAYILMIYOR. Sonuç: `\bşort` ve
+  `\bçorap` HİÇ eşleşmiyordu — iki denetim yazıldığı günden beri
+  ölüydü ve hiçbir yerde hata vermiyordu (23.10.2026'da ölçüldü).
+  `kürk`, `hırka`, `kazak` ASCII harfle başladığı için çalışıyordu;
+  kusuru örtmesi de bu yüzden.
+*/
 const GIYSI_TURU: Array<{ tr: RegExp; en: RegExp; ad: string }> = [
-  { tr: /\bkürk(?!\s*astarl)/u, en: /\bfur/, ad: "kürk → fur" },
-  { tr: /\bkazak/u, en: /\b(jumper|sweater|pullover|knit)/, ad: "kazak → jumper" },
-  { tr: /\bhırka/u, en: /\bcardigan/, ad: "hırka → cardigan" },
+  { tr: /(?<![\p{L}\d])kürk(?!\s*astarl)/u, en: /\bfur/, ad: "kürk → fur" },
+  { tr: /(?<![\p{L}\d])kazak/u, en: /\b(jumper|sweater|pullover|knit)/, ad: "kazak → jumper" },
+  { tr: /(?<![\p{L}\d])hırka/u, en: /\bcardigan/, ad: "hırka → cardigan" },
   /*
     "T-SHIRT" GÖMLEK DEĞİL. Düz `\bshirt` kalıbı "T-Shirt" ve
     "Sweatshirt" içindeki "shirt"i de yakalıyordu, yani "Erkek
     Gömlek" → "Men's T-Shirt" denetimden GEÇİYORDU — sözlüğün
     uyardığı karışıklığın ta kendisi ("gömlek → shirt NOT t-shirt").
   */
-  { tr: /\bgömlek/u, en: /(?<![a-z-])shirt/, ad: "gömlek → shirt" },
-  { tr: /\belbise/u, en: /\bdress/, ad: "elbise → dress" },
-  { tr: /\btayt/u, en: /\b(leggings|tights)/, ad: "tayt → leggings" },
-  { tr: /\btulum/u, en: /\b(jumpsuit|overall|playsuit)/, ad: "tulum → jumpsuit" },
-  { tr: /\bçorap/u, en: /\bsocks/, ad: "çorap → socks" },
-  { tr: /\bşort/u, en: /\bshorts/, ad: "şort → shorts" },
-  { tr: /\byelek/u, en: /\b(gilet|waistcoat|vest)/, ad: "yelek → gilet" },
-  { tr: /\betek/u, en: /\bskirt/, ad: "etek → skirt" },
-  { tr: /\bpijama/u, en: /\b(pyjama|pajama)/, ad: "pijama → pyjamas" },
+  { tr: /(?<![\p{L}\d])gömlek/u, en: /(?<![a-z-])shirt/, ad: "gömlek → shirt" },
+  { tr: /(?<![\p{L}\d])elbise/u, en: /\bdress/, ad: "elbise → dress" },
+  { tr: /(?<![\p{L}\d])tayt/u, en: /\b(leggings|tights)/, ad: "tayt → leggings" },
+  { tr: /(?<![\p{L}\d])tulum/u, en: /\b(jumpsuit|overall|playsuit)/, ad: "tulum → jumpsuit" },
+  { tr: /(?<![\p{L}\d])çorap/u, en: /\bsocks/, ad: "çorap → socks" },
+  { tr: /(?<![\p{L}\d])şort/u, en: /\bshorts/, ad: "şort → shorts" },
+  { tr: /(?<![\p{L}\d])yelek/u, en: /\b(gilet|waistcoat|vest)/, ad: "yelek → gilet" },
+  { tr: /(?<![\p{L}\d])etek/u, en: /\bskirt/, ad: "etek → skirt" },
+  { tr: /(?<![\p{L}\d])pijama/u, en: /\b(pyjama|pajama)/, ad: "pijama → pyjamas" },
 ];
 
 /** Giysi türü doğru çevrilmiş mi? Değilse hangi terim olduğunu söyler. */

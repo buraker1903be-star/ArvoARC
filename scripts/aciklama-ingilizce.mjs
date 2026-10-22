@@ -1,0 +1,127 @@
+/*
+  ÜRÜN AÇIKLAMALARININ İNGİLİZCESİNİ YAZAR — MODEL KULLANMAZ.
+
+  Çeviri kararı `src/lib/ceviri/aciklama.ts` içinde ve saf; burada
+  yalnızca okuma/yazma var. Gerekçe orada yazılı: açıklama bir HTML
+  tablosu, sözcük dağarcığı dar ve kapalı, sayılar beden-kilo
+  eşlemesi. Eşleme tablosu modelden hem hızlı hem KESİN.
+
+  KAPSAM EŞİĞİNİ GEÇEMEYEN AÇIKLAMA YAZILMAZ ve bu bilinçli: yarı
+  Türkçe bir tablo, Türkçe bir tablodan kötü.
+
+  ADI ÇEVRİLMEMİŞ ÜRÜNE AÇIKLAMA YAZILMAZ. Adı Türkçe, açıklaması
+  İngilizce bir kart tutarsız görünüyor; ad çeviri turunda
+  yazıldığında bu betik yeniden koşturulur.
+
+  Varsayılan KURU TUR. Yazmak için: npm run aciklama -- --yaz
+*/
+import { createClient } from "@supabase/supabase-js";
+import { readFileSync } from "node:fs";
+import { aciklamaCevir, KAPSAM_ESIGI } from "../src/lib/ceviri/aciklama.ts";
+
+for (const satir of readFileSync(new URL("../.env.local", import.meta.url), "utf8").split("\n")) {
+  const esit = satir.indexOf("=");
+  if (esit > 0 && !satir.trimStart().startsWith("#")) {
+    const ad = satir.slice(0, esit).trim();
+    if (!process.env[ad]) process.env[ad] = satir.slice(esit + 1).trim();
+  }
+}
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const anahtar = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!url || !anahtar) {
+  console.error("NEXT_PUBLIC_SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY gerekli (.env.local).");
+  process.exit(1);
+}
+
+const YAZ = process.argv.includes("--yaz");
+const arg = (ad, varsayilan) => {
+  const i = process.argv.indexOf(`--${ad}`);
+  return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : varsayilan;
+};
+const ADET = Number(arg("adet", 4000));
+
+const supabase = createClient(url, anahtar, { auth: { persistSession: false } });
+
+const { data, error } = await supabase
+  .from("arc_products")
+  .select("slug, organization_id, name, name_en, description")
+  .eq("status", "active")
+  .eq("international_blocked", false)
+  /* Adı çevrilmiş ama açıklaması çevrilmemiş ürünler. */
+  .not("name_en", "is", null)
+  .is("description_en", null)
+  .order("slug")
+  .limit(ADET);
+
+if (error) {
+  console.error("ürünler okunamadı:", error.message);
+  process.exit(1);
+}
+
+console.log(
+  `${data.length} ürün · eşik %${KAPSAM_ESIGI * 100} · ${YAZ ? "YAZILACAK" : "KURU TUR"}\n`,
+);
+
+let yazilan = 0;
+let elenen = 0;
+let bosAciklama = 0;
+const ornekler = [];
+
+for (const urun of data) {
+  const kaynak = (urun.description ?? "").trim();
+  if (!kaynak) {
+    bosAciklama += 1;
+    continue;
+  }
+
+  const { html, kapsam } = aciklamaCevir(kaynak);
+
+  if (kapsam < KAPSAM_ESIGI) {
+    elenen += 1;
+    if (ornekler.length < 5) {
+      ornekler.push(`  ${urun.slug}: kapsam %${(kapsam * 100).toFixed(0)}`);
+    }
+    continue;
+  }
+
+  /*
+    SON DENETİM — SAYI KORUNMASI. Eşleme tablosu sayılara hiç
+    dokunmuyor ama bu bir VARSAYIM; varsayımı her kayıtta sınamak
+    ucuz ve bozulduğu gün sessiz kalmasını engelliyor.
+  */
+  const oncesi = (kaynak.match(/\d+/g) ?? []).join(",");
+  const sonrasi = (html.match(/\d+/g) ?? []).join(",");
+  if (oncesi !== sonrasi) {
+    console.error(`  ✗ ${urun.slug}: SAYI DEĞİŞTİ, yazılmadı`);
+    elenen += 1;
+    continue;
+  }
+
+  if (!YAZ) {
+    yazilan += 1;
+    continue;
+  }
+
+  const { error: yazmaHatasi } = await supabase
+    .from("arc_products")
+    .update({ description_en: html })
+    .eq("organization_id", urun.organization_id)
+    .eq("slug", urun.slug);
+
+  if (yazmaHatasi) {
+    console.error(`  ✗ ${urun.slug}: ${yazmaHatasi.message}`);
+    continue;
+  }
+  yazilan += 1;
+  if (yazilan % 100 === 0) process.stdout.write(".");
+}
+
+console.log(`\n✓ ${yazilan} açıklama ${YAZ ? "yazıldı" : "yazılabilir"}`);
+console.log(`! ${elenen} açıklama eşiği geçemedi (Türkçe kalıyor)`);
+if (bosAciklama) console.log(`  ${bosAciklama} üründe açıklama yok`);
+if (ornekler.length) {
+  console.log("\nelenen örnekler:");
+  for (const o of ornekler) console.log(o);
+}
+if (!YAZ) console.log("\n(kuru tur — hiçbir şey yazılmadı; --yaz ile uygulanır)");
