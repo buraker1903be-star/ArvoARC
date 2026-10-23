@@ -1,7 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { fetchTarzyeri, parseDetail, slugify } from "@/lib/supplier/tarzyeri";
+import { fetchTarzyeri, parseDetail } from "@/lib/supplier/tarzyeri";
+import { urunSlugu } from "@/lib/supplier/urun-slugu";
 import { akisTamMi, sellableStock } from "@/lib/supplier-stock";
 
 export const runtime = "nodejs";
@@ -369,7 +370,7 @@ async function runSync(mode: "tam" | "stok") {
 
         const fresh = {
           name: product.name,
-          slug: `${slugify(product.name)}-${product.productCode.toLowerCase()}`,
+          slug: urunSlugu(product.name, product.productCode),
           description: detail.intro || product.description,
           metadata: {
             specs: detail.specs,

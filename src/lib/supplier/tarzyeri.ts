@@ -236,17 +236,5 @@ export function parseDetail(html: string): {
   return { intro, specs, sizeGuide };
 }
 
-/** Ürün adından URL uyumlu slug üretir. */
-export function slugify(value: string) {
-  return value
-    .toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .replace(/ş/g, "s")
-    .replace(/ğ/g, "g")
-    .replace(/ü/g, "u")
-    .replace(/ö/g, "o")
-    .replace(/ç/g, "c")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 90);
-}
+/* Adres kuralı test edilebilir ayrı dosyada (bu dosya server-only). */
+export { slugify } from "./urun-slugu";
