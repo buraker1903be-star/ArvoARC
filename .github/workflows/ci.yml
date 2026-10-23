@@ -56,3 +56,8 @@ jobs:
       # 60'ta kalmıştı. İkinci kiracı açılırken yaşanacaktı.
       - name: Kiracı ikizleri
         run: npm run check:ikizler
+      # Panelde sabit renk/yarıçap ve dengesiz seçici parantezi
+      # (scripts/check-css*.mjs). 23.10.2026'ya kadar CI'da yoktu: analitik
+      # ekranındaki sabit 999px yarıçap yerelde kırmızıydı, CI yeşil geçti.
+      - name: CSS denetimi
+        run: npm run check:css

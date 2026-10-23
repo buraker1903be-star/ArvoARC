@@ -40,7 +40,7 @@
 .an-harita{position:relative;flex:1;min-height:0;border-radius:var(--r-sm);background:var(--surface-2);overflow:hidden}
 .an-harita svg{display:block;width:100%;height:100%}
 .an-harita-arac{position:absolute;top:var(--sp-2);right:var(--sp-2);z-index:1;display:flex;gap:var(--sp-1)}
-.an-hap{display:inline-flex;align-items:center;min-height:32px;padding:0 var(--sp-3);border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink-soft);font-size:var(--fs-sm);text-decoration:none}
+.an-hap{display:inline-flex;align-items:center;min-height:32px;padding:0 var(--sp-3);border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface);color:var(--ink-soft);font-size:var(--fs-sm);text-decoration:none}
 .an-hap:hover{border-color:var(--primary);color:var(--primary)}
 .an-harita-arac .an-hap{min-height:28px;cursor:pointer;font:inherit;font-size:var(--fs-micro)}
 .an-harita-arac .an-hap[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-soft);color:var(--primary-strong)}
@@ -70,14 +70,14 @@
 
 /* ---------- Kart başlığı ve pencere ---------- */
 .an-kart-bas{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-2)}
-.an-tumu{flex:none;display:inline-flex;align-items:center;min-height:28px;padding:0 var(--sp-3);border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink-soft);font:inherit;font-size:var(--fs-micro);font-weight:var(--fw-medium);cursor:pointer;white-space:nowrap}
+.an-tumu{flex:none;display:inline-flex;align-items:center;min-height:28px;padding:0 var(--sp-3);border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface);color:var(--ink-soft);font:inherit;font-size:var(--fs-micro);font-weight:var(--fw-medium);cursor:pointer;white-space:nowrap}
 .an-tumu:hover{border-color:var(--primary);color:var(--primary)}
 .an-pencere{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--sp-4)}
 .an-pencere .an-pencere-kart{padding:0;border:0;box-shadow:none;background:transparent}
 
 /* Haritanın altındaki şehir etiketleri */
 .an-sehir-etiketleri{display:flex;flex-wrap:wrap;gap:var(--sp-1);margin:0;padding:0;list-style:none}
-.an-sehir-etiketleri li{display:inline-flex;align-items:center;gap:var(--sp-1);padding:2px var(--sp-2);border-radius:999px;background:var(--surface-2);color:var(--ink-soft);font-size:var(--fs-micro)}
+.an-sehir-etiketleri li{display:inline-flex;align-items:center;gap:var(--sp-1);padding:2px var(--sp-2);border-radius:var(--r-pill);background:var(--surface-2);color:var(--ink-soft);font-size:var(--fs-micro)}
 .an-sehir-etiketleri b{color:var(--ink)}
 
 /*
