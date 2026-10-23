@@ -129,19 +129,45 @@ async function sor(istem) {
   return veri?.choices?.[0]?.message?.content ?? "";
 }
 
+/*
+  POSTGREST BİN SATIRDA KESİYOR ve bunu SÖYLEMİYOR.
+
+  `.limit(4000)` yazmak yetmiyor: Supabase'in `max-rows` ayarı
+  yanıtı 1.000 satırda kesiyor, hata da vermiyor. Betik 3.090
+  ürünün hepsini aldığını sanıp 1.000'ini işledi ve "bitti" dedi
+  (23.10.2026 — 779 kayıt yazıldı, kalan 2.100 ürüne hiç
+  bakılmadı ve hiçbir yerde hata görünmedi).
+
+  Aynı tuzak bu depoda daha önce de kuruldu: arama dizini ve site
+  haritası "limit 20000" yazıp 1.000'de kesilmişti ve müşteri satın
+  alabildiği ürünü arayıp bulamıyordu (AGENTS.md, 17.10.2026).
+
+  Çözüm sayfalama: `range` ile bin'er bin'er okunuyor ve istenen
+  adede ulaşana kadar sürüyor.
+*/
+const SAYFA = 1000;
+
 async function urunler() {
-  const { data, error } = await supabase
-    .from("arc_products")
-    .select("slug, name, description, organization_id")
-    .is("name_en", null)
-    .eq("status", "active")
-    /* Yurtdışına gönderilemeyen ürün İngilizce vitrinde HİÇ
-       görünmüyor; çevirisi boşa iş olurdu. */
-    .eq("international_blocked", false)
-    .order("slug")
-    .limit(ADET);
-  if (error) throw new Error(`ürünler okunamadı: ${error.message}`);
-  return data ?? [];
+  const toplanan = [];
+  for (let sayfa = 0; toplanan.length < ADET; sayfa += 1) {
+    const bas = sayfa * SAYFA;
+    const { data, error } = await supabase
+      .from("arc_products")
+      .select("slug, name, description, organization_id")
+      .is("name_en", null)
+      .eq("status", "active")
+      /* Yurtdışına gönderilemeyen ürün İngilizce vitrinde HİÇ
+         görünmüyor; çevirisi boşa iş olurdu. */
+      .eq("international_blocked", false)
+      .order("slug")
+      .range(bas, Math.min(bas + SAYFA, ADET) - 1);
+    if (error) throw new Error(`ürünler okunamadı: ${error.message}`);
+    if (!data || data.length === 0) break;
+    toplanan.push(...data);
+    /* Sayfa dolmadıysa katalogun sonundayız. */
+    if (data.length < SAYFA) break;
+  }
+  return toplanan;
 }
 
 async function koleksiyonlar() {
