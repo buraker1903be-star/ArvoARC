@@ -38,6 +38,7 @@ import {
   AD_SINIRI,
   ACIKLAMA_SINIRI,
   ceviriKarari,
+  giysiTuruDogru,
   jsonCikar,
   koleksiyonIstemi,
   urunIstemi,
@@ -63,6 +64,21 @@ const arg = (ad, varsayilan) => {
 };
 const KURU = process.argv.includes("--kuru");
 const KOLEKSIYON = process.argv.includes("--koleksiyon");
+/*
+  YENİDEN KİPİ (25.10.2026).
+
+  Betik yalnızca `name_en is null` olana bakıyor, yani KURAL
+  DÜZELDİĞİNDE eski adlar olduğu yerde kalıyor. Yazılmış 3.134 ad
+  tarandığında 111'inde giysi türü yanlıştı ("Triko Kazak" →
+  "Sweatshirt Jacket", "Balıkçı Yaka" → "Fishing Neck") ve o gün
+  denetim bu hataları göremiyordu; artık görüyor
+  (lib/ceviri/dogrula → GIYSI_TURU, iki yönlü).
+
+  `--yeniden` çevirisi OLAN ama bugünkü denetimden GEÇEMEYEN adları
+  alıyor. Denetimden geçen ad ELLENMİYOR: 3.000 doğru adı yeniden
+  üretmek hem saatler sürer hem iyileştirme garantisi yok.
+*/
+const YENIDEN = process.argv.includes("--yeniden");
 const ADET = Number(arg("adet", 50));
 /*
   PARTİ BOYU BEŞ — canlıda ölçüldü.
@@ -157,26 +173,32 @@ async function urunler() {
   const toplanan = [];
   for (let sayfa = 0; toplanan.length < ADET; sayfa += 1) {
     const bas = sayfa * SAYFA;
-    const { data, error } = await supabase
+    let sorgu = supabase
       .from("arc_products")
       /* Açıklama OKUNMUYOR: modele sorulmuyor (lib/ceviri/dogrula
          → urunIstemi). Açıklamayı eşleme tablosu çeviriyor
          (scripts/aciklama-ingilizce.mjs). */
-      .select("slug, name, organization_id")
-      .is("name_en", null)
+      .select("slug, name, name_en, organization_id")
       .eq("status", "active")
       /* Yurtdışına gönderilemeyen ürün İngilizce vitrinde HİÇ
          görünmüyor; çevirisi boşa iş olurdu. */
       .eq("international_blocked", false)
       .order("slug")
       .range(bas, Math.min(bas + SAYFA, ADET) - 1);
+    /* Varsayılan: yalnızca çevirisi olmayanlar. */
+    if (!YENIDEN) sorgu = sorgu.is("name_en", null);
+    const { data, error } = await sorgu;
     if (error) throw new Error(`ürünler okunamadı: ${error.message}`);
     if (!data || data.length === 0) break;
     toplanan.push(...data);
     /* Sayfa dolmadıysa katalogun sonundayız. */
     if (data.length < SAYFA) break;
   }
-  return toplanan;
+  /* Yeniden kipinde denetimden GEÇEN adlar elenir; geri kalan
+     (çevirisi olmayan + bugünkü kurala takılan) yeniden sorulur. */
+  return YENIDEN
+    ? toplanan.filter((u) => !u.name_en || giysiTuruDogru(u.name, u.name_en) !== null)
+    : toplanan;
 }
 
 async function koleksiyonlar() {

@@ -319,7 +319,24 @@ export function hedefGrubuUydurmuyor(kaynak: string, ceviri: string): boolean {
   `kürk`, `hırka`, `kazak` ASCII harfle başladığı için çalışıyordu;
   kusuru örtmesi de bu yüzden.
 */
-const GIYSI_TURU: Array<{ tr: RegExp; en: RegExp; ad: string }> = [
+/*
+  İKİ YÖNLÜ DENETİM (25.10.2026).
+
+  Kural ilk hâlinde yalnızca "kaynakta X varsa çeviride Y OLMALI"
+  diyordu. Yazılmış 3.134 ad tarandığında bunun yetmediği görüldü:
+  çeviri doğru terimi taşıyıp YANLIŞINI da taşıyabiliyor —
+
+    "Triko Kazak … Dokuma" → "Sweatshirt JACKET … Knit"
+
+  "knit" geçtiği için kazak kuralı tatmin oluyor, ama ürün ekranda
+  CEKET diye duruyor. O yüzden `yasak` alanı eklendi: kaynakta
+  karşılığı olmayan bir terim çeviride geçemez.
+
+  `yasakSerbest` yanlış alarmı önlüyor: kaynak gerçekten o sözcüğü
+  taşıyorsa terim meşrudur ("Baskılı Likralı" ürününde "print"
+  doğru). Tek yönlü bir yasak 1.757 baskılı ürünü reddederdi.
+*/
+const GIYSI_TURU: Array<{ tr: RegExp; en?: RegExp; yasak?: RegExp; yasakSerbest?: RegExp; ad: string }> = [
   { tr: /(?<![\p{L}\d])kürk(?!\s*astarl)/u, en: /\bfur/, ad: "kürk → fur" },
   { tr: /(?<![\p{L}\d])kazak/u, en: /\b(jumper|sweater|pullover|knit)/, ad: "kazak → jumper" },
   { tr: /(?<![\p{L}\d])hırka/u, en: /\bcardigan/, ad: "hırka → cardigan" },
@@ -338,14 +355,62 @@ const GIYSI_TURU: Array<{ tr: RegExp; en: RegExp; ad: string }> = [
   { tr: /(?<![\p{L}\d])yelek/u, en: /\b(gilet|waistcoat|vest)/, ad: "yelek → gilet" },
   { tr: /(?<![\p{L}\d])etek/u, en: /\bskirt/, ad: "etek → skirt" },
   { tr: /(?<![\p{L}\d])pijama/u, en: /\b(pyjama|pajama)/, ad: "pijama → pyjamas" },
+  /*
+    AŞAĞIDAKİLERİN HEPSİ CANLIDA ÖLÇÜLDÜ (25.10.2026): yazılmış
+    3.134 adın 111'i bu hatalardan birini taşıyordu ve mekanik
+    denetim hiçbirini görmemişti — çıktı geçerli İngilizce, Türkçe
+    harf yok, kaynaktan farklı.
+  */
+  { tr: /(?<![\p{L}\d])kaşkorse/u, en: /\bribbed/, ad: "kaşkorse → ribbed jersey" },
+  {
+    tr: /(?<![\p{L}\d])balıkçı\s+yaka/u,
+    en: /(roll|turtle|funnel|polo)\s*neck/,
+    yasak: /\bfishing/,
+    ad: "balıkçı yaka → roll neck",
+  },
+  {
+    tr: /(?<![\p{L}\d])kadife/u,
+    en: /\b(velvet|corduroy)/,
+    yasak: /\bleather/,
+    yasakSerbest: /(?<![\p{L}\d])deri/u,
+    ad: "kadife → velvet",
+  },
+  { tr: /(?<![\p{L}\d])triko/u, en: /\bknit/, ad: "triko → knitwear" },
+  {
+    tr: /(?<![\p{L}\d])atlet/u,
+    en: /\b(vest|tank)/,
+    yasak: /\bsweatshirt/,
+    yasakSerbest: /(?<![\p{L}\d])sweat/u,
+    ad: "atlet → vest top",
+  },
+  {
+    tr: /(?<![\p{L}\d])kazak/u,
+    yasak: /\bjacket/,
+    yasakSerbest: /(?<![\p{L}\d])ceket/u,
+    ad: "kazak ceket değil",
+  },
+  {
+    tr: /(?<![\p{L}\d])fitilli/u,
+    yasak: /\bpiped/,
+    yasakSerbest: /(?<![\p{L}\d])biye/u,
+    ad: "fitilli → ribbed",
+  },
+  {
+    tr: /(?<![\p{L}\d])likralı/u,
+    yasak: /\bprint/,
+    yasakSerbest: /(?<![\p{L}\d])bask/u,
+    ad: "likralı → stretch",
+  },
 ];
 
 /** Giysi türü doğru çevrilmiş mi? Değilse hangi terim olduğunu söyler. */
 export function giysiTuruDogru(kaynak: string, ceviri: string): string | null {
   const k = kaynak.toLocaleLowerCase("tr");
   const c = ceviri.toLowerCase();
-  for (const { tr, en, ad } of GIYSI_TURU) {
-    if (tr.test(k) && !en.test(c)) return ad;
+  for (const { tr, en, yasak, yasakSerbest, ad } of GIYSI_TURU) {
+    if (!tr.test(k)) continue;
+    if (en && !en.test(c)) return ad;
+    if (yasak && yasak.test(c) && !(yasakSerbest && yasakSerbest.test(k))) return ad;
   }
   return null;
 }
@@ -481,8 +546,8 @@ export const TERIMLER: Array<[string, string]> = [
   ["kürk", "fur (NOT coat)"],
   ["şardonsuz", "unbrushed"],
   ["şardonlu", "brushed"],
-  ["3 iplik", "three-thread fleece"],
-  ["2 iplik", "two-thread fleece"],
+  ["3 iplik", "3-thread fleece (KEEP the digit 3)"],
+  ["2 iplik", "2-thread fleece (KEEP the digit 2)"],
   ["pike", "piqué"],
   ["bisiklet yaka", "crew neck"],
   ["eşofman altı", "joggers"],
@@ -566,6 +631,33 @@ export const TERIMLER: Array<[string, string]> = [
   ["bordo", "burgundy"],
   ["turkuaz", "turquoise"],
   ["mint yeşili", "mint green"],
+  /*
+    25.10.2026'DA YAZILMIŞ ADLAR TARANDI ve mekanik denetimin
+    göremediği anlam hataları çıktı. Hepsi geçerli İngilizce,
+    Türkçe harf yok, kaynaktan farklı — yani denetim "kabul"
+    diyor ve müşteri yanlış ürünü okuyor:
+
+      "Fitilli Kadife Cepli Gömlek" → "Piped LEATHER Pocked Shirt"
+      "Balıkçı Yaka Kazak … Triko"  → "FISHING NECK JACKET … Knit"
+      "Kaşkorse Boğazlı … Kazak"    → "KASOKESE Neck … Jumper"
+                          (aynı kaynak ikinci üründe "Kascoarse")
+      "Full Likralı Fitilli"        → "Full PRINT Piped"
+
+    Sözlük hatayı BAŞTAN önlemek için; kaçanı panelden elle
+    düzeltmek gerekiyor (dosyanın başındaki gerekçe).
+  */
+  ["kaşkorse", "ribbed jersey (NOT a brand name — never transliterate)"],
+  ["balıkçı yaka", "roll neck (NOT fishing)"],
+  ["kadife", "velvet (NOT leather)"],
+  ["fitilli", "ribbed (NOT piped)"],
+  ["likralı", "stretch (NOT print)"],
+  ["triko", "knitwear"],
+  ["boğazlı", "turtleneck"],
+  ["dik yaka", "stand collar"],
+  ["penye", "jersey"],
+  ["selanik örgü", "milano knit"],
+  ["sporcu atlet", "sports vest (NOT sweatshirt)"],
+  ["kolsuz", "sleeveless"],
 ];
 
 const terimSatirlari = () =>
@@ -690,8 +782,16 @@ export function urunIstemi(urunler: Array<{ name: string }>): string {
     'Output: {"id": 2, "source": "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi", "name": "Women\'s Real Mink Fur Gilet Hooded - Brown"}',
     'Input:  {"id": 3, "name": "Basic Regular Fit Gri Tişört"}',
     'Output: {"id": 3, "source": "Basic Regular Fit Gri Tişört", "name": "Basic Regular Fit Grey T-Shirt"}',
+    /*
+      "3 İPLİK" HEM SAYI HEM ÇEVRİLECEK SÖZCÜK. Örnek ilk hâlinde
+      "3 İplik Cotton…" diyordu ve KENDİ DENETİMİMİZE takılıyordu:
+      "iplik" çevrilmemiş sayılıyor. Ters yönde de tuzak var —
+      "three-thread" yazmak rakamı düşürüyor ve "sayı düştü"
+      reddine giriyor. Doğrusu ikisini birden tutan "3-Thread";
+      canlıda kabul edilmiş 2.900 adın kullandığı biçim de bu.
+    */
     'Input:  {"id": 4, "name": "3 İplik Pamuklu Cepli Kapüşonlu 10 Kasıma Özel Sweatshirt - Siyah"}',
-    'Output: {"id": 4, "source": "3 İplik Pamuklu Cepli Kapüşonlu 10 Kasıma Özel Sweatshirt - Siyah", "name": "3 İplik Cotton Pocket Hooded 10 Kasım Special Sweatshirt - Black"}',
+    'Output: {"id": 4, "source": "3 İplik Pamuklu Cepli Kapüşonlu 10 Kasıma Özel Sweatshirt - Siyah", "name": "3-Thread Cotton Pocket Hooded 10 Kasım Special Sweatshirt - Black"}',
     'Input:  {"id": 5, "name": "10 Kasım Atatürk Anma Günü Silüet Baskılı Oversize Bisiklet Yaka T-shirt - Siyah"}',
     'Output: {"id": 5, "source": "10 Kasım Atatürk Anma Günü Silüet Baskılı Oversize Bisiklet Yaka T-shirt - Siyah", "name": "10 Kasım Atatürk Memorial Day Silhouette Printed Oversized Crew Neck T-Shirt - Black"}',
     "",

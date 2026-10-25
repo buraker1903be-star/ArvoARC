@@ -485,3 +485,90 @@ test("KÜRK ASTARLI mont kürk sayılmıyor", () => {
     null,
   );
 });
+
+test('"3 İPLİK" ÖRNEĞİ KENDİ DENETİMİMİZDEN GEÇİYOR', () => {
+  /*
+    İstemdeki çalışılmış örnekler küçük modelin taklit ettiği şey;
+    geçersiz bir örnek, sistematik olarak reddedilen çıktı üretir.
+    25.10.2026'da tam bu oldu: örnek "3 İplik Cotton…" diyordu ve
+    "iplik" çevrilmemiş sayıldığı için ret sebeplerinden biri
+    oldu. Ters yönde de tuzak var — "three-thread" yazmak rakamı
+    düşürüyor ve "sayı düştü" reddine giriyor.
+
+    Bu test istemdeki HER örneğin çıktısını, o çıktıyı
+    değerlendirecek kuralın kendisinden geçiriyor.
+  */
+  const istem = urunIstemi([{ name: "x" }]);
+  const ornekler = [...istem.matchAll(/^Output: (\{.*\})$/gm)].map((e) => JSON.parse(e[1]));
+  assert.ok(ornekler.length >= 5, "örnekler okunamadı");
+  for (const ornek of ornekler) {
+    const karar = ceviriKarari(ornek.name, ornek.source, AD_SINIRI, true);
+    const sebep = karar.kabul ? "" : karar.sebep;
+    assert.equal(karar.kabul, true, `örnek kendi denetimimize takılıyor: ${ornek.name} (${sebep})`);
+  }
+});
+
+test("sözlük rakamı DÜŞÜRMEYİ öğretmiyor", () => {
+  /* `3 iplik -> three-thread` yazmak modele rakamı atmayı
+     öğretiyordu ve sayı denetimi o adı reddediyordu; sözlük
+     kuralın kendisiyle çelişiyordu. */
+  const istem = urunIstemi([{ name: "x" }]);
+  assert.match(istem, /"3 iplik" -> 3-thread fleece \(KEEP the digit 3\)/);
+  assert.doesNotMatch(istem, /iplik" -> three-thread/);
+});
+
+test("ÖLÇÜLEN ANLAM HATALARI sözlükte karşılığını buluyor", () => {
+  /* Mekanik denetim anlam hatasını yakalayamıyor: "Balıkçı Yaka"
+     → "Fishing Neck" geçerli İngilizce, Türkçe harf yok,
+     kaynaktan farklı. Tek savunma sözlüğü isteme koymak. */
+  const istem = urunIstemi([{ name: "x" }]);
+  for (const terim of ["roll neck (NOT fishing)", "velvet (NOT leather)",
+                       "ribbed (NOT piped)", "stretch (NOT print)", "kaşkorse"]) {
+    assert.ok(istem.includes(terim), terim);
+  }
+});
+
+test("GİYSİ TÜRÜ DENETİMİ İKİ YÖNLÜ: doğruyu arar, yanlışı da eler", () => {
+  /*
+    Kural ilk hâlinde yalnızca "kaynakta X varsa çeviride Y OLMALI"
+    diyordu. 25.10.2026'da yazılmış 3.134 ad tarandı: 111'i doğru
+    terimi taşıyıp YANLIŞINI da taşıyordu —
+
+      "Triko Kazak … Dokuma" → "Sweatshirt JACKET … Knit"
+
+    "knit" geçtiği için kazak kuralı tatmin oluyordu ama ürün
+    ekranda CEKET diye duruyordu. Mekanik denetim bunu görmüyordu;
+    çıktı geçerli İngilizce, Türkçe harf yok, kaynaktan farklı.
+  */
+  assert.equal(giysiTuruDogru("Erkek Triko Kazak Dokuma", "Men's Sweatshirt Jacket Knit"), "kazak ceket değil");
+  assert.equal(giysiTuruDogru("Erkek Triko Kazak Dokuma", "Men's Knitwear Jumper"), null);
+
+  assert.equal(giysiTuruDogru("Balıkçı Yaka Kazak", "Fishing Neck Jumper"), "balıkçı yaka → roll neck");
+  assert.equal(giysiTuruDogru("Balıkçı Yaka Kazak", "Roll Neck Jumper"), null);
+
+  /* Bu ad İKİ kuralı birden çiğniyor; işlev ilk bulduğunu söylüyor
+     ve ret için biri yeter. */
+  assert.equal(giysiTuruDogru("Fitilli Kadife Gömlek", "Piped Leather Shirt"), "kadife → velvet");
+  assert.equal(giysiTuruDogru("Fitilli Pamuklu Gömlek", "Piped Cotton Shirt"), "fitilli → ribbed");
+  assert.equal(giysiTuruDogru("Fitilli Kadife Gömlek", "Ribbed Corduroy Shirt"), null);
+
+  assert.equal(giysiTuruDogru("Kolsuz Sporcu Atlet Seti", "Sleeveless Athlete Set Sweatshirt"), "atlet → vest top");
+  assert.equal(giysiTuruDogru("Kolsuz Sporcu Atlet Seti", "Sleeveless Sports Vest Set"), null);
+
+  assert.equal(giysiTuruDogru("Kaşkorse Boğazlı Body", "Kascoarse Neck Bodysuit"), "kaşkorse → ribbed jersey");
+  assert.equal(giysiTuruDogru("Kaşkorse Boğazlı Body", "Ribbed Jersey Turtleneck Bodysuit"), null);
+});
+
+test("YASAK TERİM KAYNAKTA VARSA SERBEST — yanlış alarm yok", () => {
+  /*
+    Tek yönlü bir yasak katalogdaki 1.757 baskılı ürünü reddederdi:
+    "Baskılı Likralı" ürününde "print" DOĞRU karşılık. Yasak
+    yalnızca kaynakta karşılığı yokken işliyor.
+  */
+  assert.equal(giysiTuruDogru("Full Likralı Fitilli Body", "Full Print Piped Bodysuit"), "fitilli → ribbed");
+  assert.equal(giysiTuruDogru("Baskılı Likralı Ribanalı Body", "Printed Stretch Ribbed Bodysuit"), null);
+  /* "Deri Kadife" gibi bir kaynakta "leather" meşru. */
+  assert.equal(giysiTuruDogru("Deri Kadife Detaylı Ceket", "Leather Velvet Detail Jacket"), null);
+  /* Kazak ile ceket aynı adda geçiyorsa "jacket" meşru. */
+  assert.equal(giysiTuruDogru("Kazak Ceket Takımı", "Jumper Jacket Set"), null);
+});
