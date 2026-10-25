@@ -367,6 +367,33 @@ bozuyordu: beş açıklama istemi 13 KB'a çıkarıyor ve aynı on üründe
 kabul 0/10 oluyordu; açıklamasız istemde 8/10. Bir isteme yeni bir
 alan eklerken örneği de DOLU yazın.
 
+**Mekanik denetim ANLAM hatasını yakalayamaz; iki yönü de kapatın.**
+`src/lib/ceviri/dogrula.ts` iki tabloyla koruyor: `GIYSI_TURU`
+(kaynaktaki tür çeviride var mı, ve kaynakta olmayan tür çeviride
+yok mu) ve `UYDURMA` (çeviride geçen özelliğin kaynakta karşılığı
+var mı). İkincisi 25.10.2026'da eklendi: yazılmış 3.198 adın 379'u
+kaynakta HİÇ OLMAYAN bir özellik taşıyordu — "Bisiklet Yaka
+T-Shirt" → "HOODED T-Shirt", "Düz Tişört" → "PIQUÉ PRINTED",
+"Pamuklu" → "WOOL". Hepsi geçerli İngilizce, Türkçe harf yok,
+kaynaktan farklı, sayılar yerinde.
+
+Örüntü şu: **model bilmediği kumaşı bildiği bir kumaşla
+değiştiriyor.** O yüzden doğru karşılığı sözlüğe yazmak, uydurmayı
+reddetmekten iyi bir çözüm — ret kaydı çevirisiz bırakır, sözlük
+onu kurtarır.
+
+**Karşılık listeleri YAZIM HATALARINI da içermeli.** Katalog
+tedarikçiden geliyor: "Kapaşonlu", "Farmuarlı", "Kıloya", "Dık",
+"Adetir". Dar bir liste doğru çeviriyi "uydurma" sayar ve
+`--temizle` ile birlikte DOĞRU bir adı siler; bu, denetimin en
+pahalı hatasıdır. Aynı tuzağa üç kez düşüldü, üçünde de ölçüm
+betiğinin kendisi yanıldı.
+
+**`/i` bayrağı Türkçe İ/ı çiftini KATLAMIYOR.** `/iplik/i` kalıbı
+"İplik"i görmez; kaynak önce `toLocaleLowerCase("tr")` ile
+küçültülüp ı→i'ye indirilir. Bu depoda dört ayrı yerde aynı hata
+yapıldı (kiloya, su itici, balıkcı, uydurma denetimi).
+
 **Çevrilmeyen kayıt Türkçe kalır ve bu doğrudur.** Yarı Türkçe bir ad
 ya da tablo, Türkçe olanından kötü: biri görünür bir eksik, öteki
 görünmeyen bir hata. Denetimler (`src/lib/ceviri/dogrula.ts`) kuşkulu
