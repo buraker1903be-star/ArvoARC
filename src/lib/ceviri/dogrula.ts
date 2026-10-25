@@ -447,6 +447,28 @@ const UYDURMA: Array<{ en: RegExp; kaynak: RegExp; ad: string }> = [
   { en: /\bleather/, kaynak: /deri|süet|suni deri/, ad: "deri uydurulmuş" },
   { en: /\bwool\b/, kaynak: /yün|yun|wool|kaşmir|merinos/, ad: "yün uydurulmuş" },
   { en: /\bvelvet|corduroy/, kaynak: /kadife|fitilli/, ad: "kadife uydurulmuş" },
+  /*
+    KALIP VE KOL — MÜŞTERİNİN ALDIĞI ŞEYİ DEĞİŞTİRİR (25.10.2026).
+
+    Ölçüldü: 3.260 adın 98'i kaynakta olmayan bir kalıp ya da kol
+    bilgisi taşıyor ve 27'si düpedüz ÇELİŞKİLİ —
+
+      "… Bisiklet Yaka Regular Fit Rahat Kalıp Günlük Tişört"
+      → "… Crew Neck REGULAR FIT OVERSIZED Everyday T-Shirt"
+
+    Aynı adda hem "regular fit" hem "oversized" yazıyor; müşteri ne
+    aldığını bilemez. Kumaş uydurması gibi bunu da hiçbir denetim
+    görmüyordu: geçerli İngilizce, Türkçe harf yok, sayılar yerinde.
+
+    Çelişki ayrı bir kural istemiyor: kaynakta "oversize" yoksa
+    aşağıdaki kural zaten reddediyor.
+  */
+  { en: /\boversize/, kaynak: /oversize|oversiz|salaş|bol kalip|battal/, ad: "oversize uydurulmuş" },
+  { en: /\bregular fit\b/, kaynak: /regular|tam kalip|normal kalip|rahat kalip/, ad: "regular fit uydurulmuş" },
+  { en: /\bslim[- ]fit\b/, kaynak: /slim|dar kalip|dar kesim/, ad: "slim fit uydurulmuş" },
+  { en: /\bcrop(ped)?\b/, kaynak: /crop|kisa boy/, ad: "crop uydurulmuş" },
+  { en: /\bsleeveless\b/, kaynak: /kolsuz|askili|atlet|sleeveless/, ad: "kolsuz uydurulmuş" },
+  { en: /\blong[- ]sleeve/, kaynak: /uzun kol|long sleeve/, ad: "uzun kol uydurulmuş" },
 ];
 
 /** Çeviride kaynakta olmayan bir özellik var mı? Varsa hangisi. */

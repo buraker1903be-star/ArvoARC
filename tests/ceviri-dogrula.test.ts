@@ -638,3 +638,22 @@ test("UYDURMALARIN YERİNİ ALAN KUMAŞ TERİMLERİ sözlükte", () => {
     assert.ok(istem.includes(terim), terim);
   }
 });
+
+test("KALIP VE KOL uydurması da reddediliyor", () => {
+  /*
+    Kalıp müşterinin aldığı şeyi değiştirir. Ölçüldü: 3.260 adın
+    98'i kaynakta olmayan bir kalıp/kol bilgisi taşıyor ve 27'si
+    ÇELİŞKİLİ — aynı adda hem "regular fit" hem "oversized".
+    Müşteri ne aldığını bilemez.
+  */
+  assert.equal(
+    uydurmaOzellik("Erkek Baskılı T-Shirt Bisiklet Yaka Regular Fit Rahat Kalıp", "Men's Printed Crew Neck Regular Fit Oversized T-Shirt"),
+    "oversize uydurulmuş",
+  );
+  assert.equal(uydurmaOzellik("Erkek Kısa Kol Tişört", "Men's Long-Sleeve T-Shirt"), "uzun kol uydurulmuş");
+  assert.equal(uydurmaOzellik("Kadın Uzun Kollu Bluz", "Women's Long Sleeve Crop Blouse"), "crop uydurulmuş");
+  /* Kaynakta varsa serbest. */
+  assert.equal(uydurmaOzellik("Erkek Oversize Baskılı T-Shirt", "Men's Oversized Printed T-Shirt"), null);
+  assert.equal(uydurmaOzellik("Erkek Bol Kalıp T-Shirt", "Men's Oversized T-Shirt"), null);
+  assert.equal(uydurmaOzellik("Kadın Kolsuz Atlet", "Women's Sleeveless Vest Top"), null);
+});
