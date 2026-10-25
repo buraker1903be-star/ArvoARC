@@ -43,20 +43,42 @@ const ADET = Number(arg("adet", 4000));
 
 const supabase = createClient(url, anahtar, { auth: { persistSession: false } });
 
-const { data, error } = await supabase
-  .from("arc_products")
-  .select("slug, organization_id, name, name_en, description")
-  .eq("status", "active")
-  .eq("international_blocked", false)
-  /* Adı çevrilmiş ama açıklaması çevrilmemiş ürünler. */
-  .not("name_en", "is", null)
-  .is("description_en", null)
-  .order("slug")
-  .limit(ADET);
+/*
+  POSTGREST BİN SATIRDA KESİYOR ve bunu SÖYLEMİYOR (25.10.2026).
 
-if (error) {
-  console.error("ürünler okunamadı:", error.message);
-  process.exit(1);
+  `.limit(4000)` yazmak yetmiyor: Supabase'in `max-rows` ayarı yanıtı
+  1.000 satırda kesiyor, hata da vermiyor. Bu betik 2.625 ürünün
+  hepsini aldığını sanıp 1.000'ini işliyor, "832 açıklama yazılabilir"
+  deyip bitiyordu — kalan 1.600 ürüne hiç bakılmadı ve hiçbir yerde
+  hata görünmedi. Vitrinde o ürünlerin açıklaması Türkçe duruyordu.
+
+  Aynı tuzak bu depoda üç kez kuruldu: arama dizini ve site haritası
+  (AGENTS.md, 17.10.2026), çeviri betiği (23.10.2026) ve burası.
+  Çözüm aynı: `range` ile bin'er bin'er okumak.
+*/
+const SAYFA = 1000;
+const data = [];
+for (let sayfa = 0; data.length < ADET; sayfa += 1) {
+  const bas = sayfa * SAYFA;
+  const { data: dilim, error } = await supabase
+    .from("arc_products")
+    .select("slug, organization_id, name, name_en, description")
+    .eq("status", "active")
+    .eq("international_blocked", false)
+    /* Adı çevrilmiş ama açıklaması çevrilmemiş ürünler. */
+    .not("name_en", "is", null)
+    .is("description_en", null)
+    .order("slug")
+    .range(bas, Math.min(bas + SAYFA, ADET) - 1);
+
+  if (error) {
+    console.error("ürünler okunamadı:", error.message);
+    process.exit(1);
+  }
+  if (!dilim || dilim.length === 0) break;
+  data.push(...dilim);
+  /* Sayfa dolmadıysa katalogun sonundayız. */
+  if (dilim.length < SAYFA) break;
 }
 
 console.log(

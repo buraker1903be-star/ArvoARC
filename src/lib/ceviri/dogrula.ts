@@ -572,14 +572,34 @@ const terimSatirlari = () =>
   TERIMLER.map(([tr, en]) => `- "${tr}" -> ${en}`).join("\n");
 
 /** Ürün için istem; model JSON döndürüyor. */
-export function urunIstemi(
-  urunler: Array<{ slug: string; name: string; description: string | null }>,
-): string {
+export function urunIstemi(urunler: Array<{ name: string }>): string {
   /*
-    AÇIKLAMA KIRPILIYOR (1.500 karakter): tedarikçi açıklamaları HTML
-    ve tekrar dolu, tamamını göndermek küçük bir modelin bağlamını
-    doldurup adı bile çevirmemesine yol açıyordu. Kırpılan kısım
-    zaten ürün sayfasında Türkçe duruyor.
+    İSTEM YALNIZCA ADLARI İSTİYOR (25.10.2026).
+
+    Önceden aynı istemde açıklama da isteniyordu ve iki şey birden
+    bozuluyordu:
+
+    1. AÇIKLAMA HİÇ GELMİYORDU. Üç çalışılmış örneğin üçünde de
+       `"description": ""` yazıyordu; 7b model kuralı değil ÖRNEĞİ
+       taklit ediyor ve her kaydın açıklamasını boş döndürüyordu.
+       Ölçüldü: 1.500–2.600 karakterlik beş Türkçe açıklama
+       gönderildi, beşine de `""` geldi ve `finish_reason` "stop"tu
+       — yani kesilme değil, model gerçekten yazmıyordu. Betiğin
+       raporunda bu "1.956 kayıt boş" diye görünüyordu ve bir model
+       kusuru sanılıyordu.
+
+    2. AD DA ÇEVRİLMİYORDU. Beş ürünün açıklaması istemi 13 KB'a
+       çıkarıyor ve küçük modelin dikkatini dağıtıyordu. Aynı on
+       ürün iki istemle ölçüldü: açıklamalı istemde 0/10 kabul
+       (onunun da yanıtı hiç gelmedi), adlara odaklı istemde 8/10 —
+       kalan iki ret de haklıydı (şort → "Short", kazak →
+       "Jacket").
+
+    Açıklama zaten MODELE SORULMUYOR olmalıydı: bu katalogda
+    açıklama bir beden-kilo tablosu ve `lib/ceviri/aciklama.ts`
+    onu eşleme tablosuyla, hem hızlı hem KESİN çeviriyor
+    (scripts/aciklama-ingilizce.mjs). İki yol aynı alana
+    yazıyordu; biri çalışmıyor, öteki çalışıyordu.
   */
   const liste = urunler.map((urun, sira) => ({
     /*
@@ -595,23 +615,39 @@ export function urunIstemi(
     */
     id: sira + 1,
     name: urun.name,
-    description: (urun.description ?? "").replace(/<[^>]*>/g, " ").trim().slice(0, 1500),
   }));
 
   return [
-    "Translate Turkish e-commerce product texts into natural English.",
+    "Translate Turkish clothing product NAMES into natural English.",
     "",
     "Rules:",
     "- Output ONLY a JSON array, no prose, no markdown fences.",
-    '- Each item: {"id": <number>, "source": "...", "name": "...", "description": "..."}',
+    '- Each item: {"id": <number>, "source": "...", "name": "..."}',
     "- Copy the id number unchanged. Return one item per input id.",
     '- "source" must be the Turkish name copied EXACTLY, character for character.',
-    "- Keep product attributes (sizes, colours, materials, counts).",
+    "- Keep EVERY attribute from the Turkish name: audience, garment type,",
+    "  fabric, fit, neckline, sleeve, pocket and the colour after the dash.",
     "- Use the wording a UK/US clothing retailer would use.",
     "- Use the possessive for gendered items: \"Men's\", \"Women's\", \"Kids'\".",
+    /*
+      SAYI KURALI İSTEME YAZILI, ÇÜNKÜ EN SIK RET SEBEBİ BUYDU.
+      Denetim sayı düşmesini zaten yakalıyor ("sayı düştü (içerik
+      kaybı)") ama yakalamak kaydı ATIYOR; istemde söylemek
+      kaydı KURTARIYOR. Katalogda sayı ürünün kendisi: "3 İplik"
+      kumaş kalınlığı, "2'li" takım adedi, "10 Kasım" bir tarih.
+    */
+    "- Numbers are part of the product (\"3 İplik\" is a fabric type,",
+    "  \"2'li\" means a 2-piece set, \"10 Kasım\" is a date).",
+    "  Never drop, merge or change a number.",
+    /*
+      HEDEF GRUBU UYDURMAK da sık ret sebebiydi: model
+      "Basic Regular Fit Gri Tişört"e kendiliğinden "Men's"
+      ekliyordu. Kaynakta olmayan bir hedef grup, kadın ürününü
+      erkek ürünü gibi listelemek demek.
+    */
+    "- Do NOT add an audience word (Men's/Women's/Kids') if the Turkish",
+    "  name does not have one.",
     "- Do not invent details that are not in the Turkish text.",
-    "- Keep EVERY attribute from the Turkish name, including the",
-    "  audience (Women's / Men's / Kids') and the colour after the dash.",
     /*
       BASKI KONUSU ÇEVRİLMİYOR, OLDUĞU GİBİ KALIYOR.
 
@@ -633,32 +669,95 @@ export function urunIstemi(
     "",
     "Glossary (use these exact English terms):",
     terimSatirlari(),
-    "- If a description is empty, return an empty string for it.",
     "",
     /*
-      ÇALIŞILMIŞ ÖRNEK — soyut sözlükten daha etkili.
+      ÇALIŞILMIŞ ÖRNEKLER — soyut sözlükten daha etkili.
 
       Canlıda ölçüldü: sözlükte "yelek -> gilet (NOT coat)" yazdığı
       hâlde 7b model "Kürk Yelek"i "Fur Coat" diye çevirdi. Küçük
-      modeller kuralı okuyup ÖRNEĞİ taklit ediyor; iki tam örnek, on
-      satır kuraldan çok iş görüyor.
+      modeller kuralı okuyup ÖRNEĞİ taklit ediyor; birkaç tam örnek,
+      on satır kuraldan çok iş görüyor.
 
-      Örnekler mağazanın gerçek hata yaptığı iki noktayı gösteriyor:
-      hedef grubun korunması ve giysi türünün doğruluğu.
+      Beş örneğin her biri canlıda ÖLÇÜLEN bir ret sebebine karşılık
+      geliyor: hedef grubun korunması, giysi türünün doğruluğu,
+      hedef grubun uydurulmaması, sayının düşmemesi ve baskı
+      konusunun çevrilmemesi.
     */
     "Examples:",
-    'Input:  {"id": 7, "name": "Çocuk Unisex Baskılı T-Shirt - Siyah"}',
-    'Output: {"id": 7, "source": "Çocuk Unisex Baskılı T-Shirt - Siyah", "name": "Kids\' Unisex Printed T-Shirt - Black", "description": ""}',
-    'Input:  {"id": 8, "name": "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi"}',
-    'Output: {"id": 8, "source": "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi", "name": "Women\'s Real Mink Fur Gilet Hooded - Brown", "description": ""}',
-    'Input:  {"id": 9, "name": "10 Kasım Atatürk Anma Günü Silüet Baskılı Oversize Bisiklet Yaka T-shirt - Siyah"}',
-    'Output: {"id": 9, "source": "10 Kasım Atatürk Anma Günü Silüet Baskılı Oversize Bisiklet Yaka T-shirt - Siyah", "name": "10 Kasım Atatürk Memorial Day Silhouette Printed Oversized Crew Neck T-Shirt - Black", "description": ""}',
+    'Input:  {"id": 1, "name": "Çocuk Unisex Baskılı T-Shirt - Siyah"}',
+    'Output: {"id": 1, "source": "Çocuk Unisex Baskılı T-Shirt - Siyah", "name": "Kids\' Unisex Printed T-Shirt - Black"}',
+    'Input:  {"id": 2, "name": "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi"}',
+    'Output: {"id": 2, "source": "Kadın Gerçek Vizon Kürk Yelek Kapüşonlu - Kahverengi", "name": "Women\'s Real Mink Fur Gilet Hooded - Brown"}',
+    'Input:  {"id": 3, "name": "Basic Regular Fit Gri Tişört"}',
+    'Output: {"id": 3, "source": "Basic Regular Fit Gri Tişört", "name": "Basic Regular Fit Grey T-Shirt"}',
+    'Input:  {"id": 4, "name": "3 İplik Pamuklu Cepli Kapüşonlu 10 Kasıma Özel Sweatshirt - Siyah"}',
+    'Output: {"id": 4, "source": "3 İplik Pamuklu Cepli Kapüşonlu 10 Kasıma Özel Sweatshirt - Siyah", "name": "3 İplik Cotton Pocket Hooded 10 Kasım Special Sweatshirt - Black"}',
+    'Input:  {"id": 5, "name": "10 Kasım Atatürk Anma Günü Silüet Baskılı Oversize Bisiklet Yaka T-shirt - Siyah"}',
+    'Output: {"id": 5, "source": "10 Kasım Atatürk Anma Günü Silüet Baskılı Oversize Bisiklet Yaka T-shirt - Siyah", "name": "10 Kasım Atatürk Memorial Day Silhouette Printed Oversized Crew Neck T-Shirt - Black"}',
     "",
     JSON.stringify(liste),
   ].join("\n");
 }
 
-/** Koleksiyon için istem. */
+/*
+  AÇIKLAMA PARÇASI İSTEMİ (25.10.2026).
+
+  Ürün açıklaması bir HTML tablosu ve çoğu hücresini eşleme tablosu
+  KESİN çeviriyor (lib/ceviri/aciklama). Modele tablonun tamamını
+  vermek iki şeyi birden riske atardı: yapıyı (3 KB HTML'i 7b bir
+  model bozar) ve sayıları (beden-kilo eşlemesi). Burada yalnızca
+  eşleme tablosunun kapatamadığı HÜCRELER soruluyor — çoğu kısa bir
+  cümle, medyanı 41 karakter.
+
+  Parçalar ÜRÜNDEN BAĞIMSIZ: aynı cümle 497 üründe 947 kez geçiyor,
+  yani benzersiz metin başına bir kez sorulup hepsine yazılıyor.
+*/
+export function aciklamaParcaIstemi(parcalar: string[]): string {
+  return [
+    "Translate Turkish e-commerce product detail texts into natural English.",
+    "",
+    "These are cells from a product specification table: short labels,",
+    "values, size rows and one-sentence marketing lines.",
+    "",
+    "Rules:",
+    "- Output ONLY a JSON array, no prose, no markdown fences.",
+    '- Each item: {"id": <number>, "source": "...", "text": "..."}',
+    "- Copy the id number unchanged. Return one item per input id.",
+    '- "source" must be the Turkish text copied EXACTLY, character for character.',
+    /*
+      SAYI KURALI: hücrelerin bir kısmı beden-kilo tablosu ("50-65
+      Kilo İçin Uygundur") ve bir kilo değişirse müşteri yanlış
+      beden alır. Betik bunu ayrıca denetliyor ama istemde
+      söylemek kaydı kurtarıyor, denetim yalnızca atıyor.
+    */
+    "- Keep EVERY number exactly as written, in the same order.",
+    "- Keep the text the same KIND of thing: a label stays a short label,",
+    "  a sentence stays one sentence. Do not expand or summarise.",
+    "- Use the wording a UK/US clothing retailer would use.",
+    "- Do not invent details that are not in the Turkish text.",
+    "- Keep brand names, proper nouns and codes as written.",
+    "",
+    "Glossary (use these exact English terms):",
+    terimSatirlari(),
+    "",
+    /*
+      ÇALIŞILMIŞ ÖRNEKLER — üçü de gerçek hücre. Ürün adı isteminde
+      ölçüldüğü gibi küçük modeller kuralı okuyup ÖRNEĞİ taklit
+      ediyor; örnekte boş bir alan bırakmak (orada `description: ""`
+      idi) modele "burayı boş geç" diye öğretiyordu.
+    */
+    "Examples:",
+    'Input:  {"id": 1, "text": "Materyal Bileşeni"}',
+    'Output: {"id": 1, "source": "Materyal Bileşeni", "text": "Material composition"}',
+    'Input:  {"id": 2, "text": "50-65 Kilo İçin Uygundur"}',
+    'Output: {"id": 2, "source": "50-65 Kilo İçin Uygundur", "text": "Suitable for 50-65 kg"}',
+    'Input:  {"id": 3, "text": "Görsellerde kullanılan aksesuarlar dekor amaçlıdır, ürüne dahil değildir."}',
+    'Output: {"id": 3, "source": "Görsellerde kullanılan aksesuarlar dekor amaçlıdır, ürüne dahil değildir.", "text": "Accessories shown in the photographs are for display only and are not included."}',
+    "",
+    JSON.stringify(parcalar.map((metin, sira) => ({ id: sira + 1, text: metin }))),
+  ].join("\n");
+}
+
 export function koleksiyonIstemi(
   koleksiyonlar: Array<{ slug: string; title: string; description: string | null }>,
 ): string {
@@ -701,10 +800,37 @@ export function koleksiyonIstemi(
 export function jsonCikar(yanit: string): unknown[] | null {
   const bas = yanit.indexOf("[");
   const son = yanit.lastIndexOf("]");
-  if (bas < 0 || son <= bas) return null;
+  if (bas >= 0 && son > bas) {
+    try {
+      const veri = JSON.parse(yanit.slice(bas, son + 1));
+      if (Array.isArray(veri)) return veri;
+    } catch {
+      /* Dizi gibi görünüp ayrışmayan metin: aşağıdaki tek nesne
+         yolu denenir, o da tutmazsa parti atlanır. */
+    }
+  }
+
+  /*
+    TEK NESNE DE KABUL EDİLİYOR (25.10.2026).
+
+    İkinci tur kalemleri TEK TEK soruyor ve model tek kalem
+    istendiğinde doğal olarak tek NESNE döndürüyor:
+    `{"id":1,"source":"ÜRÜN 3 ADETTİR","text":"There are 3 items…"}`.
+    Önceden bu "dizi değil" diye reddediliyordu ve ikinci turun
+    varlık sebebi olan kayıtlar — çevirisi DOĞRU gelmiş olanlar
+    dahil — atılıyordu. Canlıda ölçüldü: 31 parçanın 8'i iki turda
+    da geçemedi, üçü yalnızca bu yüzden.
+
+    Tek nesneyi tek elemanlı diziye sarmak sözleşmeyi gevşetmiyor:
+    çağıran zaten `id` ile eşleştiriyor ve yankı denetiminden
+    geçiriyor, yani yanlış kaleme yazma riski değişmiyor.
+  */
+  const nBas = yanit.indexOf("{");
+  const nSon = yanit.lastIndexOf("}");
+  if (nBas < 0 || nSon <= nBas) return null;
   try {
-    const veri = JSON.parse(yanit.slice(bas, son + 1));
-    return Array.isArray(veri) ? veri : null;
+    const veri = JSON.parse(yanit.slice(nBas, nSon + 1));
+    return veri && typeof veri === "object" && !Array.isArray(veri) ? [veri] : null;
   } catch {
     return null;
   }

@@ -143,22 +143,41 @@ test("JSON cümlenin içinden çıkarılıyor", () => {
   assert.deepEqual(jsonCikar(yanit), [{ slug: "a", name: "A" }]);
   assert.equal(jsonCikar("hiç json yok"), null);
   assert.equal(jsonCikar('[{"bozuk":]'), null);
-  /* Nesne döndürmüşse dizi değil: reddediliyor. */
-  assert.equal(jsonCikar('{"slug":"a"}'), null);
+  /*
+    TEK NESNE tek elemanlı diziye sarılıyor (25.10.2026). İkinci tur
+    kalemleri tek tek soruyor ve model tek kalem istendiğinde doğal
+    olarak tek nesne döndürüyor; "dizi değil" diye reddetmek ikinci
+    turun varlık sebebi olan kayıtları — çevirisi DOĞRU gelmiş
+    olanlar dahil — atıyordu. Çağıran zaten `id` ile eşleştirip
+    yankı denetiminden geçiriyor.
+  */
+  assert.deepEqual(jsonCikar('{"id":1,"text":"a"}'), [{ id: 1, text: "a" }]);
+  /* Ne dizi ne nesne: yine reddediliyor. */
+  assert.equal(jsonCikar("çeviri yapamıyorum"), null);
+  assert.equal(jsonCikar('{"bozuk":}'), null);
 });
 
-test("ürün istemi HTML'i ayıklıyor ve açıklamayı kırpıyor", () => {
+test("ÜRÜN İSTEMİ AÇIKLAMA İSTEMİYOR — yalnızca ad", () => {
   /*
-    Tedarikçi açıklamaları HTML ve tekrar dolu; tamamını göndermek
-    küçük bir modelin bağlamını doldurup adı bile çevirmemesine yol
-    açıyordu.
+    25.10.2026'da ölçüldü. Önceden aynı istemde açıklama da isteniyordu
+    ve iki şey birden bozuluyordu:
+
+    1. Açıklama HİÇ gelmiyordu: üç çalışılmış örneğin üçü de
+       `"description": ""` gösterdiği için 7b model kuralı değil
+       ÖRNEĞİ taklit ediyordu. 1.500–2.600 karakterlik beş Türkçe
+       açıklama gönderildi, beşine de `""` geldi ve `finish_reason`
+       "stop"tu — kesilme değil, model yazmıyordu.
+    2. AD da çevrilmiyordu: beş açıklama istemi 13 KB'a çıkarıyor ve
+       küçük modelin dikkati dağılıyordu. Aynı on üründe açıklamalı
+       istem 0/10, açıklamasız istem 8/10 kabul verdi.
+
+    Açıklamayı eşleme tablosu çeviriyor (lib/ceviri/aciklama).
   */
-  const istem = urunIstemi([
-    { slug: "a", name: "Şort", description: "<p>" + "x".repeat(3000) + "</p>" },
-  ]);
-  assert.ok(!istem.includes("<p>"));
+  const istem = urunIstemi([{ name: "Şort" }]);
   const veri = JSON.parse(istem.slice(istem.indexOf("[{")));
-  assert.equal(veri[0].description.length, 1500);
+  assert.equal(veri[0].description, undefined, "açıklama isteme girmemeli");
+  assert.doesNotMatch(istem, /"description"/, "çıktı sözleşmesinde de olmamalı");
+  assert.equal(veri[0].name, "Şort");
   /*
     KİMLİK SAYI, SLUG DEĞİL. Canlıda ölçüldü: slug gönderildiğinde
     model onu ÇEVİRİYORDU ("erkek-atlet" → "men-atlet") ve eşleşme
@@ -174,7 +193,7 @@ test("istemler yalnızca JSON istiyor", () => {
   /* Düz yazı dönen bir model partiyi düşürüyor; istemin bunu açıkça
      söylemesi en ucuz korumadır. */
   for (const istem of [
-    urunIstemi([{ slug: "a", name: "Şort", description: null }]),
+    urunIstemi([{ name: "Şort" }]),
     koleksiyonIstemi([{ slug: "kadin", title: "Kadın", description: null }]),
   ]) {
     assert.match(istem, /ONLY a JSON array/);
@@ -240,7 +259,7 @@ test("hedef grup denetimi AÇIKLAMADA uygulanmıyor", () => {
   ilk özellik.
 */
 test("istem terim sözlüğünü ve örnekleri taşıyor", () => {
-  const istem = urunIstemi([{ slug: "a", name: "Kürk Yelek", description: null }]);
+  const istem = urunIstemi([{ name: "Kürk Yelek" }]);
   assert.match(istem, /fur \(NOT coat\)/);
   assert.match(istem, /"füme" -> charcoal/);
   assert.match(istem, /gilet \(NOT coat\)/);
@@ -305,7 +324,7 @@ test("uzun adlarda baştaki yirmi karakter yetiyor", () => {
 });
 
 test("istem yankı alanını ve örneği taşıyor", () => {
-  const istem = urunIstemi([{ slug: "a", name: "Yağlar", description: null }]);
+  const istem = urunIstemi([{ name: "Yağlar" }]);
   assert.match(istem, /"source"/);
   assert.match(istem, /copied EXACTLY/);
   /* Örnek de yankılı: küçük modeller kuralı okuyup örneği taklit

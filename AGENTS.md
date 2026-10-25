@@ -327,6 +327,42 @@ gösterdi). Yeni sütun/fonksiyon kullanan kodu, migration canlıya uygulanıp
 katalog yenilendikten sonra birleştirin.
 
 
+## İngilizce katalog
+
+Vitrinin İngilizce sürümü `name_en`, `description_en` ve `title_en`
+alanlarından okuyor; boşsa Türkçeye düşüyor. Üç betik, **bu sırayla**:
+
+1. `npm run ceviri -- --adet 500` — ürün ADLARINI çevirir. Model
+   senin makinende (Ollama); betik de orada koşar.
+2. `npm run aciklama -- --yaz` — açıklamayı EŞLEME TABLOSUYLA çevirir
+   (`src/lib/ceviri/aciklama.ts`). Model kullanmaz, kesindir, hızlıdır.
+3. `npm run aciklama-model -- --yaz` — tablonun kapatamadığı DÜZYAZI
+   hücrelerini modele sorar; karşılığı benzersiz metin başına bir kez
+   alıp aynı cümlenin geçtiği her ürüne yazar.
+
+Sıra zorunlu: ikisi de yalnızca ADI çevrilmiş ürüne bakıyor ve
+üçüncüsü ikincisinin bıraktığını alıyor. Hepsi kaldığı yerden devam
+eder, yarıda kesilmek veri bozmaz.
+
+**Açıklama MODELE TOPTAN SORULMAZ.** Açıklama bir HTML tablosu ve
+sayıları beden-kilo eşlemesi; 3 KB HTML'i 7b bir model bozuyor ve bir
+kilonun kayması ekranda hiç görünmeden müşteriye yanlış beden
+aldırıyor. Modele yalnızca tek tek HÜCRE metni gider; yapı ve sayılar
+bu tarafta kalır ve her kayıtta rakamlar yazmadan önce karşılaştırılır.
+
+**İstem ÖRNEĞE bakar, kurala değil.** 25.10.2026'da ölçüldü: ürün
+isteminin üç çalışılmış örneğinin üçü de `"description": ""`
+gösterdiği için 7b model her kaydın açıklamasını boş döndürüyordu
+(`finish_reason` "stop" — kesilme değil, yazmama). Aynı istem adı da
+bozuyordu: beş açıklama istemi 13 KB'a çıkarıyor ve aynı on üründe
+kabul 0/10 oluyordu; açıklamasız istemde 8/10. Bir isteme yeni bir
+alan eklerken örneği de DOLU yazın.
+
+**Çevrilmeyen kayıt Türkçe kalır ve bu doğrudur.** Yarı Türkçe bir ad
+ya da tablo, Türkçe olanından kötü: biri görünür bir eksik, öteki
+görünmeyen bir hata. Denetimler (`src/lib/ceviri/dogrula.ts`) kuşkulu
+çıktıyı atar; atılan kayıt panelden elle yazılabilir.
+
 ## Ortam değişkenleri
 
 Tamamı `.env.example` içinde, her biri için eksik olduğunda ne olacağı

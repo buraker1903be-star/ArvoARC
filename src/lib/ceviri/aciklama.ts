@@ -63,6 +63,76 @@ const ETIKETLER = new Map<string, string>([
   ["marka", "Brand"],
   ["menşei", "Origin"],
   ["materyal", "Material"],
+  /*
+    İKİNCİ ÖLÇÜM (25.10.2026): 497 ürünün açıklaması %85 kapsam
+    eşiğini geçemiyordu ve kapanmayan 853 benzersiz hücrenin 454'ü
+    KISA ETİKET/DEĞER'di — gözlük, saat, parfüm ve pijama
+    kategorileri kataloğa sonradan girmiş, tablo ise yalnızca
+    giyim sözcüklerini tanıyordu.
+
+    Buradakiler o ölçümün en sık geçenleri. Düzyazı cümleleri
+    BİLEREK yok: onları sözcük sözcük çevirmek bozuk İngilizce
+    üretir (dosyanın başındaki gerekçe).
+  */
+  ["materyal bileşeni", "Material composition"],
+  ["ürün tipi", "Product type"],
+  ["ürün bilgileri", "Product information"],
+  ["kutu içeriği", "Box contents"],
+  ["paket içeriği", "Package contents"],
+  ["takım içeriği", "Set contents"],
+  ["iade koşulları", "Returns policy"],
+  ["iade şartları", "Returns policy"],
+  ["cayma hakkı ve iade", "Right of withdrawal and returns"],
+  ["özellik", "Feature"],
+  ["öne çıkan özellikler", "Key features"],
+  ["kullanım alanı", "Use"],
+  ["kullanım şekli", "How to use"],
+  ["kullanım talimatı", "Instructions for use"],
+  ["kullanım tarzı", "Use"],
+  ["kullanım sezonu", "Season"],
+  ["akşam kullanımı", "Evening wear"],
+  ["bakım talimatları (genel)", "Care instructions (general)"],
+  ["çerçeve rengi", "Frame colour"],
+  ["çerçeve formu", "Frame shape"],
+  ["çerçeve üretim yeri", "Frame made in"],
+  ["cam özelliği", "Lens feature"],
+  ["cam şekli", "Lens shape"],
+  ["cam üretim bilgisi", "Lens made in"],
+  ["şişe tipi", "Bottle type"],
+  ["cam şişe", "Glass bottle"],
+  ["şeffaf cam şişe", "Clear glass bottle"],
+  ["koku yoğunluğu", "Fragrance strength"],
+  ["sprey başlıklı", "Spray cap"],
+  ["garanti süresi", "Warranty period"],
+  ["batarya türü", "Battery type"],
+  ["düğme pil", "Button cell"],
+  ["su geçirmezlik", "Water resistance"],
+  ["gönderim şekli", "Delivery"],
+  ["kutulu gönderim sağlanır", "Delivered boxed"],
+  ["çap", "Diameter"],
+  ["sürdürülebilirlik", "Sustainability"],
+  ["menşe", "Origin"],
+  ["türkiye", "Turkey"],
+  ["ithal", "Imported"],
+  ["çelik", "Steel"],
+  ["gümüş", "Silver"],
+  ["nakış işlemeli", "Embroidered"],
+  ["kuşaklı", "Belted"],
+  ["günlük", "Everyday"],
+  ["pijama takımı", "Pyjama set"],
+  ["interlok", "Interlock"],
+  ["beli lastıklı", "Elasticated waist"],
+  ["arkası cepli", "Back pocket"],
+  ["manşetli kol", "Cuffed sleeve"],
+  ["parçalı tasarım", "Panelled design"],
+  ["önden tam düğmeli", "Full button front"],
+  ["önden tam fermuarlı", "Full zip front"],
+  ["kontrast şerit detaylı", "Contrast stripe detail"],
+  ["dokulu keten görünüm", "Textured linen look"],
+  ["yünlü dokuma kaşmir", "Woven wool cashmere"],
+  ["likralı fitilli kaşkorse", "Ribbed lycra jersey"],
+  ["likrali fitilli kaşkorse", "Ribbed lycra jersey"],
+  ["uv400 korumalı", "UV400 protection"],
 ]);
 
 /*
@@ -83,6 +153,30 @@ const IFADELER: Array<[RegExp, string]> = [
   [/(?<![\p{L}\d])k[ıi]loya\s+uygun(?![\p{L}\d])/giu, "kg"],
   /* "11-13 Yaşa Uygun" tablonun en sık hücresi (1.501 kez). */
   [/(?<![\p{L}\d])ya[şs]a?\s+uygun(?![\p{L}\d])/giu, "years"],
+  /*
+    "… İÇİN UYGUNDUR" — KİLO VE YAŞ (25.10.2026'da ölçüldü).
+
+    Tabloda beden satırı dört yazımla geçiyor: "Kiloya Uygun"
+    (zaten vardı), "Kilo İçin Uygundur", "kg için uygundur." ve
+    yaş karşılıkları. Yalnızca ilki tanındığı için "50-65 Kilo
+    İçin Uygundur" hücresinde üç sözcük çevrilmeden kalıyor ve
+    tek bir beden tablosu ürünü eşiğin altına düşürüyordu —
+    yalnızca kilo satırları 300'den fazla geçişti.
+
+    "İÇİN" DE BÜYÜK İ İLE YAZILIYOR: kalıbın kendisi ilk hâlinde
+    `i[çc]in` diyordu ve başlık biçimli hücreyi hiç görmedi —
+    aşağıdaki "Su İtici" notuyla aynı tuzak, aynı dosyada iki kez.
+    Testi olmasaydı kural ölü doğacaktı.
+
+    Karşılık "kg": "Kiloya Uygun" için seçilen biçimin aynısı,
+    yoksa aynı tablonun iki satırı iki ayrı dille yazılırdı.
+    Sayılara dokunulmuyor; betiğin rakam denetimi bunu her
+    kayıtta sınıyor.
+  */
+  [/(?<![\p{L}\d])k[ıi]lo\s+[iİ][çc][iİ]n\s+uygundur\.?(?![\p{L}\d])/giu, "kg"],
+  [/(?<![\p{L}\d])kg\s+[iİ][çc][iİ]n\s+uygundur\.?(?![\p{L}\d])/giu, "kg"],
+  [/(?<![\p{L}\d])ya[şs]\s+[iİ][çc][iİ]n\s+uygundur\.?(?![\p{L}\d])/giu, "years"],
+  [/(?<![\p{L}\d])ya[şs]a\s+uygundur\.?(?![\p{L}\d])/giu, "years"],
   [/(?<![\p{L}\d])(\d+)\s*-\s*(\d+)\s+ya[şs](?![\p{L}\d])/giu, "ages $1-$2"],
   [/(?<![\p{L}\d])standart\s+beden(?![\p{L}\d])/giu, "one size"],
   /* Büyük harf duyarlı: "S Beden" → "size S". Sözcük düzeyinde
@@ -132,6 +226,13 @@ const IFADELER: Array<[RegExp, string]> = [
   [/(?<![\p{L}\d])kısa\s+kol(lu)?(?![\p{L}\d])/giu, "short sleeve"],
   [/(?<![\p{L}\d])uzun\s+kol(lu)?(?![\p{L}\d])/giu, "long sleeve"],
   [/(?<![\p{L}\d])double\s+oversize(?![\p{L}\d])/giu, "double oversize"],
+  /*
+    "Su İtici" BÜYÜK İ İLE DE YAZILIYOR ve `/i` bayrağı onu küçük
+    i'ye katlamıyor: `su\s+itici` kalıbı başlık biçimli hücreyi
+    ("Su İtici Mikro") hiç görmüyordu. Aynı tuzak "kiloya" için
+    bu dosyada zaten yazılı; burada gözden kaçmıştı.
+  */
+  [/(?<![\p{L}\d])su\s+[iİ]tici(?![\p{L}\d])/giu, "water-repellent"],
 ];
 
 /** Tek sözcükler. Bulunmayan sözcük OLDUĞU GİBİ kalıyor. */
@@ -236,7 +337,7 @@ export type AciklamaSonucu = { html: string; kapsam: number };
  * HTML açıklamayı çevirir. Etiket ve özniteliklere dokunmaz;
  * yalnızca metin düğümlerini çevirir.
  */
-export function aciklamaCevir(ham: string): AciklamaSonucu {
+export function aciklamaCevir(ham: string, sozluk?: ReadonlyMap<string, string>): AciklamaSonucu {
   let toplam = 0;
   let cevrilen = 0;
 
@@ -245,6 +346,29 @@ export function aciklamaCevir(ham: string): AciklamaSonucu {
      basit bir tablo, iç içe betik ya da yorum yok. */
   const html = ham.replace(/(^|>)([^<]+)(?=<|$)/g, (tam, onek: string, govde: string) => {
     if (!govde.trim()) return tam;
+    /*
+      HAZIR KARŞILIK VARSA O KULLANILIYOR (25.10.2026).
+
+      Eşleme tablosu kapalı bir dağarcık tanıyor: etiketler,
+      değerler, beden satırları. Tablonun içindeki DÜZYAZI
+      paragrafları ("günlük kullanımda şıklık kazandırır") sözcük
+      sözcük çevrilemiyor — bozuk İngilizce üretir, dosyanın
+      başındaki gerekçe. 25.10.2026'da ölçüldü: eşiği geçemeyen
+      497 ürünün kapanmayan 853 hücresinin 399'u böyle cümleydi.
+
+      Sözlük o cümlelerin MODELDEN gelen karşılığını taşıyor
+      (scripts/aciklama-modelle.mjs). Burası saf kalıyor: ağ yok,
+      karar yok — verilen karşılığı yerine koyuyor.
+
+      Karşılığı olan hücre TAM kapsanmış sayılıyor; kapsam oranı
+      zaten "bilinmeyen bir şey kaldı mı" sorusunun ölçüsü.
+    */
+    const hazir = sozluk?.get(govde.trim().replace(/\s+/g, " "));
+    if (hazir !== undefined) {
+      toplam += 1;
+      cevrilen += 1;
+      return onek + govde.replace(govde.trim(), hazir);
+    }
     const sonuc = hucreCevir(govde);
     toplam += sonuc.toplam;
     cevrilen += sonuc.cevrilen;
@@ -252,6 +376,29 @@ export function aciklamaCevir(ham: string): AciklamaSonucu {
   });
 
   return { html, kapsam: toplam === 0 ? 1 : cevrilen / toplam };
+}
+
+/**
+ * Eşleme tablosunun TAMAMEN kapatamadığı hücrelerin ham metni
+ * (boşlukları sadeleştirilmiş, benzersiz, tabloda göründükleri
+ * sırayla). Modele sorulacak parçalar bunlar.
+ */
+export function kapanmayanHucreler(ham: string): string[] {
+  const cikti: string[] = [];
+  const gorulen = new Set<string>();
+  for (const es of ham.matchAll(/(^|>)([^<]+)(?=<|$)/g)) {
+    const govde = es[2];
+    if (!govde.trim()) continue;
+    const { toplam, cevrilen } = hucreCevir(govde);
+    /* `toplam === 0`: içinde Türkçe sözcük yok (sayı, marka adı,
+       zaten İngilizce). Sorulacak bir şey de yok. */
+    if (toplam === 0 || cevrilen === toplam) continue;
+    const anahtar = govde.trim().replace(/\s+/g, " ");
+    if (gorulen.has(anahtar)) continue;
+    gorulen.add(anahtar);
+    cikti.push(anahtar);
+  }
+  return cikti;
 }
 
 /*

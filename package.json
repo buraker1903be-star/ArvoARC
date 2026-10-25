@@ -21,7 +21,8 @@
     "check:rls": "node scripts/check-rls.mjs",
     "check:ikizler": "node scripts/check-ikizler.mjs",
     "ceviri": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/ceviri-uret.mjs",
-    "aciklama": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/aciklama-ingilizce.mjs"
+    "aciklama": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/aciklama-ingilizce.mjs",
+    "aciklama-model": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/aciklama-modelle.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

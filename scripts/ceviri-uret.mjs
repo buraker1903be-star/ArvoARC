@@ -24,6 +24,12 @@
 // İŞ KALDIĞI YERDEN DEVAM EDER: yalnızca `name_en is null` olan
 // ürünler okunuyor. Yarıda kesilen bir koşu veri bozmuyor, ikinci
 // koşu kalanı alıyor.
+//
+// BU BETİK ÜRÜN ADLARINI ÇEVİRİR, AÇIKLAMALARINI DEĞİL. Açıklama
+// bir beden-kilo tablosu ve eşleme tablosuyla çevriliyor:
+//   npm run aciklama -- --yaz
+// Sıra önemli: açıklama betiği yalnızca ADI çevrilmiş ürünlere
+// bakıyor, yani önce bu betik koşar.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -153,7 +159,10 @@ async function urunler() {
     const bas = sayfa * SAYFA;
     const { data, error } = await supabase
       .from("arc_products")
-      .select("slug, name, description, organization_id")
+      /* Açıklama OKUNMUYOR: modele sorulmuyor (lib/ceviri/dogrula
+         → urunIstemi). Açıklamayı eşleme tablosu çeviriyor
+         (scripts/aciklama-ingilizce.mjs). */
+      .select("slug, name, organization_id")
       .is("name_en", null)
       .eq("status", "active")
       /* Yurtdışına gönderilemeyen ürün İngilizce vitrinde HİÇ
@@ -332,10 +341,23 @@ async function calistir() {
         continue;
       }
 
-      /* Açıklama seçmeli: kaynak boşsa çeviri de boş kalıyor ve bu
-         kusur değil. Reddedilen açıklama null yazılıyor, yani
-         vitrin Türkçe açıklamaya düşüyor. */
-      const kaynakAciklama = (kayit.description ?? "").trim();
+      /*
+        AÇIKLAMA YALNIZCA KOLEKSİYONDA MODELDEN GELİYOR (25.10.2026).
+
+        Ürün açıklaması bu katalogda bir beden-kilo tablosu ve
+        `lib/ceviri/aciklama.ts` onu eşleme tablosuyla hem hızlı hem
+        KESİN çeviriyor. Model yolu aynı alana yazıyordu ve
+        ÇALIŞMIYORDU: istemdeki üç örneğin üçü de boş açıklama
+        gösterdiği için 7b model her kaydın açıklamasını boş
+        döndürüyor, betik de bunu "1.956 kayıt boş" diye bir model
+        kusuruymuş gibi raporluyordu. Üstelik beş açıklama istemi
+        13 KB'a çıkarıp ADIN çevrilmesini de engelliyordu (aynı on
+        üründe 0/10 kabul; açıklamasız istemde 8/10).
+
+        Koleksiyon açıklaması kısa bir tanıtım cümlesi, tablo değil:
+        orada model hâlâ doğru araç.
+      */
+      const kaynakAciklama = KOLEKSIYON ? (kayit.description ?? "").trim() : "";
       let aciklama = null;
       if (kaynakAciklama) {
         const karar = ceviriKarari(satir.description, kaynakAciklama, ACIKLAMA_SINIRI);
@@ -376,9 +398,12 @@ async function calistir() {
         continue;
       }
 
+      /* ÜRÜNDE `description_en` YAZILMIYOR — null bile. Alanı eşleme
+         tablosu dolduruyor ve bu tur ondan sonra koşarsa yazdığını
+         silerdi. */
       const yazilacak = KOLEKSIYON
         ? { title_en: adKarari.metin, description_en: aciklama, translated_at: new Date().toISOString() }
-        : { name_en: adKarari.metin, description_en: aciklama, translated_at: new Date().toISOString() };
+        : { name_en: adKarari.metin, translated_at: new Date().toISOString() };
 
       /*
         YAZMA MAĞAZA KAPSAMLI. Önceden yalnızca `slug` ile
