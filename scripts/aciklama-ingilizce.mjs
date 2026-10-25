@@ -35,6 +35,22 @@ if (!url || !anahtar) {
 }
 
 const YAZ = process.argv.includes("--yaz");
+/*
+  YENİDEN KİPİ (25.10.2026).
+
+  Betik normalde yalnızca `description_en is null` olan ürünlere
+  bakıyor, yani KURAL DÜZELDİĞİNDE eski satırlar olduğu yerde
+  kalıyor. Bedeli ölçüldü: yazılmış 2.451 İngilizce açıklamanın
+  370'inde Türkçe metin duruyordu ("50 - 59 Kg Uygundur." 90
+  üründe) ve kapsam denetimi bunu göremiyordu çünkü "uygundur"
+  Türkçeye özgü harf taşımıyor (lib/ceviri/aciklama → TURKCE_ASCII).
+
+  `--yeniden` çevirisi OLAN ürünleri de alıyor. Yazma koşulu aynı:
+  eşiği geçecek ve rakamlar birebir duracak. Sonuç eskisiyle
+  aynıysa yazılmıyor — gereksiz bir güncelleme kütüğü kabartmaktan
+  başka işe yaramaz.
+*/
+const YENIDEN = process.argv.includes("--yeniden");
 const arg = (ad, varsayilan) => {
   const i = process.argv.indexOf(`--${ad}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : varsayilan;
@@ -60,16 +76,18 @@ const SAYFA = 1000;
 const data = [];
 for (let sayfa = 0; data.length < ADET; sayfa += 1) {
   const bas = sayfa * SAYFA;
-  const { data: dilim, error } = await supabase
+  let sorgu = supabase
     .from("arc_products")
-    .select("slug, organization_id, name, name_en, description")
+    .select("slug, organization_id, name, name_en, description, description_en")
     .eq("status", "active")
     .eq("international_blocked", false)
-    /* Adı çevrilmiş ama açıklaması çevrilmemiş ürünler. */
+    /* Adı çevrilmiş ürünler; açıklama koşulu aşağıda. */
     .not("name_en", "is", null)
-    .is("description_en", null)
     .order("slug")
     .range(bas, Math.min(bas + SAYFA, ADET) - 1);
+  /* Varsayılan: yalnızca çevirisi olmayanlar. */
+  if (!YENIDEN) sorgu = sorgu.is("description_en", null);
+  const { data: dilim, error } = await sorgu;
 
   if (error) {
     console.error("ürünler okunamadı:", error.message);
@@ -82,12 +100,16 @@ for (let sayfa = 0; data.length < ADET; sayfa += 1) {
 }
 
 console.log(
-  `${data.length} ürün · eşik %${KAPSAM_ESIGI * 100} · ${YAZ ? "YAZILACAK" : "KURU TUR"}\n`,
+  `${data.length} ürün · eşik %${KAPSAM_ESIGI * 100} · ` +
+    `${YENIDEN ? "YENİDEN (çevrilmişler dahil)" : "yalnızca çevrilmemişler"} · ` +
+    `${YAZ ? "YAZILACAK" : "KURU TUR"}\n`,
 );
 
 let yazilan = 0;
 let elenen = 0;
 let bosAciklama = 0;
+let degismeyen = 0;
+let kusurlu = 0;
 const ornekler = [];
 
 for (const urun of data) {
@@ -104,6 +126,36 @@ for (const urun of data) {
     if (ornekler.length < 5) {
       ornekler.push(`  ${urun.slug}: kapsam %${(kapsam * 100).toFixed(0)}`);
     }
+    /*
+      ESKİ KUSURLU ÇEVİRİ TEMİZLENİYOR (25.10.2026, yalnızca --yeniden).
+
+      Kurallar düzelmeden yazılmış bazı satırlar YARIM TÜRKÇE:
+      "Fabric Osy Modal soft dokulu … Detail Hemşire neckline".
+      Bu, Türkçe bir tablodan KÖTÜ — müşteri hangi satıra
+      güveneceğini bilemiyor — ve satır eşiği geçemediği için
+      düzeltilemiyor da.
+
+      ÖLÇEREK ayrılıyor, toptan silinmiyor: yazılmış metnin KENDİSİ
+      kapsamdan geçiriliyor; içinde çevrilmemiş Türkçe sözcük
+      kalmışsa kusurludur. Tamamı İngilizce olan satır (ör. elle
+      yazılmış hediye kartı metni) olduğu gibi KALIYOR — 39 satırın
+      biri tam da böyleydi ve toptan silme onu kaybederdi.
+
+      Temizlenen satır Türkçeye düşüyor ve modele gidiyor
+      (scripts/aciklama-modelle.mjs).
+    */
+    if (YENIDEN && urun.description_en) {
+      const { kapsam: yaziliKapsam } = aciklamaCevir(urun.description_en);
+      if (yaziliKapsam >= 1) continue;
+      kusurlu += 1;
+      if (!YAZ) continue;
+      const { error: silmeHatasi } = await supabase
+        .from("arc_products")
+        .update({ description_en: null })
+        .eq("organization_id", urun.organization_id)
+        .eq("slug", urun.slug);
+      if (silmeHatasi) console.error(`  ✗ ${urun.slug}: ${silmeHatasi.message}`);
+    }
     continue;
   }
 
@@ -117,6 +169,12 @@ for (const urun of data) {
   if (oncesi !== sonrasi) {
     console.error(`  ✗ ${urun.slug}: SAYI DEĞİŞTİ, yazılmadı`);
     elenen += 1;
+    continue;
+  }
+
+  /* Sonuç eskisiyle birebir aynıysa yazmaya gerek yok. */
+  if (html === urun.description_en) {
+    degismeyen += 1;
     continue;
   }
 
@@ -140,6 +198,13 @@ for (const urun of data) {
 }
 
 console.log(`\n✓ ${yazilan} açıklama ${YAZ ? "yazıldı" : "yazılabilir"}`);
+if (degismeyen) console.log(`  ${degismeyen} açıklama zaten güncel`);
+if (kusurlu) {
+  console.log(
+    `  ${kusurlu} yarım Türkçe çeviri ${YAZ ? "temizlendi" : "temizlenecek"} ` +
+      "(Türkçeye düşüyor; modele gidecek)",
+  );
+}
 console.log(`! ${elenen} açıklama eşiği geçemedi (Türkçe kalıyor)`);
 if (bosAciklama) console.log(`  ${bosAciklama} üründe açıklama yok`);
 if (ornekler.length) {

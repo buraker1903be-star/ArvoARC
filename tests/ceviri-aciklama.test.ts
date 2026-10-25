@@ -233,3 +233,55 @@ test("sözlük SAYILARA dokunmuyor", () => {
   const { html } = aciklamaCevir(ham, sozluk);
   assert.deepEqual(html.match(/\d+/g), ham.match(/\d+/g));
 });
+
+test("KİLO SATIRININ BÜTÜN YAZIMLARI tanınıyor", () => {
+  /*
+    25.10.2026'da YAZILMIŞ çeviriler tarandı ve 2.451 İngilizce
+    açıklamanın 370'inde Türkçe metin bulundu: "50 - 59 Kg
+    Uygundur." tek başına 90 üründe duruyordu. Kalıp yalnızca
+    "Kiloya Uygun"u tanıyordu; katalogda yazım hatalısı
+    ("Kiloaya"), boşluksuzu ("85-95Kiloya") ve "Kg Uygundur."
+    biçimi de var.
+  */
+  for (const [ham, beklenen] of [
+    ["50-65 Kiloya Uygun", "50-65 kg"],
+    ["70-80 Kiloaya Uygun", "70-80 kg"],
+    ["50 - 59 Kg Uygundur.", "50 - 59 kg"],
+    ["45 – 50 Kg Uygun", "45 – 50 kg"],
+  ] as const) {
+    assert.equal(hucreCevir(ham).metin, beklenen, ham);
+  }
+  /* Rakamdan hemen sonra gelen "Kiloya" da eşleşiyor: önceki sınır
+     `(?<![\p{L}\d])` idi ve bu hücreyi eliyordu. */
+  assert.equal(hucreCevir("85-95Kiloya Uygun").metin, "85-95kg");
+});
+
+test("TÜRKÇE AMA ASCII sözcük kapsama SAYILIYOR", () => {
+  /*
+    KAPSAMIN KÖR NOKTASI. "Çevrilmemiş mi?" sorusu tek ölçütle
+    yanıtlanıyordu: sözcükte ı/ş/ğ/ç/ö/ü var mı. Yoksa "zaten
+    İngilizce" sayılıp kapsama HİÇ girmiyordu — ve "uygundur",
+    "modelin", "bedendir" salt ASCII. Eşik %85'ti ama ölçtüğü şey
+    eksikti: yarı Türkçe tablolar sorunsuz yazılıyordu.
+  */
+  const hucre = hucreCevir("Modelin üzerindeki ürün S / 36 bedendir.");
+  assert.ok(hucre.cevrilen < hucre.toplam, "çevrilmemiş sayılmalı");
+  /* Marka adı hâlâ "çevrilmemiş" sayılmıyor: uydurma bir karşılık
+     yazmaktansa kaynağı korumak (dosyadaki gerekçe). */
+  assert.equal(hucreCevir("Nanogold Zeitgard").toplam, 0);
+  /* Sözlükteki İngilizce sözcük çevrilmiş sayılıyor, eksik değil. */
+  const ingilizce = hucreCevir("Polyester ACRYLIC");
+  assert.equal(ingilizce.cevrilen, ingilizce.toplam);
+});
+
+test("ASCII yazılan DEĞERLER çevriliyor", () => {
+  for (const [tr, en] of [
+    ["Kompakt", "compact"],
+    ["Kordon", "drawstring"],
+    ["Flota Cepli", "patch pocket"],
+    ["Boru Paça", "straight leg"],
+    ["Keten", "linen"],
+  ] as const) {
+    assert.equal(hucreCevir(tr).metin.toLowerCase(), en, tr);
+  }
+});

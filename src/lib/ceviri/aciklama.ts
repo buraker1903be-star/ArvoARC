@@ -63,6 +63,9 @@ const ETIKETLER = new Map<string, string>([
   ["marka", "Brand"],
   ["menşei", "Origin"],
   ["materyal", "Material"],
+  /* Tek başına bir sütun başlığı: "Kilo". Kalıplar "… Kiloya
+     Uygun" biçimini tanıyor, çıplak başlığı değil. */
+  ["kilo", "Weight"],
   /*
     İKİNCİ ÖLÇÜM (25.10.2026): 497 ürünün açıklaması %85 kapsam
     eşiğini geçemiyordu ve kapanmayan 853 benzersiz hücrenin 454'ü
@@ -150,7 +153,22 @@ const IFADELER: Array<[RegExp, string]> = [
     "Kıloya" (noktasız ı) var ve `/i` bayrağı Türkçe İ/ı çiftini
     katlamıyor — düz `kiloya` kalıbı 300 hücreyi kaçırıyordu.
   */
-  [/(?<![\p{L}\d])k[ıi]loya\s+uygun(?![\p{L}\d])/giu, "kg"],
+  /*
+    KİLO SATIRININ YEDİ YAZIMI (25.10.2026'da yazılmış çevirilerde
+    ölçüldü). Eski kalıp yalnızca "50-65 Kiloya Uygun"u tanıyordu;
+    katalogda ayrıca "Kiloaya" (yazım hatası), "85-95Kiloya"
+    (boşluksuz), "50 - 59 Kg Uygundur." ve "45 – 50 Kg Uygun"
+    (uzun tire) var. Tanınmayan yazımlarda "Uygundur" İngilizce
+    metnin ortasında Türkçe duruyordu — 370 üründe, 1.150 geçiş —
+    ve kapsam denetimi bunu göremiyordu çünkü "uygundur" Türkçeye
+    özgü harf taşımıyor (TURKCE_ASCII notu).
+
+    Önceki sınır `(?<![\p{L}\d])` idi ve rakamdan hemen sonra gelen
+    "Kiloya"yı ELİYORDU: "85-95Kiloya Uygun" hiç eşleşmedi. Sınır
+    harfe indirildi; rakam zaten bu satırın normal komşusu.
+  */
+  [/(?<!\p{L})k[ıi]lo(a)?ya\s+uygun(dur)?\.?(?![\p{L}\d])/giu, "kg"],
+  [/(?<![\p{L}\d])kg\s+uygun(dur)?\.?(?![\p{L}\d])/giu, "kg"],
   /* "11-13 Yaşa Uygun" tablonun en sık hücresi (1.501 kez). */
   [/(?<![\p{L}\d])ya[şs]a?\s+uygun(?![\p{L}\d])/giu, "years"],
   /*
@@ -226,6 +244,11 @@ const IFADELER: Array<[RegExp, string]> = [
   [/(?<![\p{L}\d])kısa\s+kol(lu)?(?![\p{L}\d])/giu, "short sleeve"],
   [/(?<![\p{L}\d])uzun\s+kol(lu)?(?![\p{L}\d])/giu, "long sleeve"],
   [/(?<![\p{L}\d])double\s+oversize(?![\p{L}\d])/giu, "double oversize"],
+  /* "Flota Cepli" ve "Boru Paça" tek birer giysi terimi; sözcük
+     sözcük çevrilince "patch pocket" yerine "patch with pockets"
+     gibi bozuk karşılıklar çıkıyordu. */
+  [/(?<![\p{L}\d])flota\s+cep(li)?(?![\p{L}\d])/giu, "patch pocket"],
+  [/(?<![\p{L}\d])boru\s+pa[çc]a(lı|li)?(?![\p{L}\d])/giu, "straight leg"],
   /*
     "Su İtici" BÜYÜK İ İLE DE YAZILIYOR ve `/i` bayrağı onu küçük
     i'ye katlamıyor: `su\s+itici` kalıbı başlık biçimli hücreyi
@@ -288,10 +311,54 @@ const SOZCUKLER = new Map<string, string>([
   ["kazak", "jumper"], ["mont", "coat"], ["ceket", "jacket"], ["yelek", "gilet"],
   ["atlet", "vest top"], ["tayt", "leggings"], ["elbise", "dress"],
   ["pantolon", "trousers"], ["eşofman", "tracksuit"], ["çorap", "socks"],
+  /*
+    TÜRKÇE HARFİ OLMAYAN DEĞERLER (25.10.2026). Yazılmış 2.451
+    İngilizce açıklama tarandı; bunlar metnin içinde Türkçe
+    duruyordu ve kapsam denetimi hiçbirini görmüyordu
+    (TURKCE_ASCII notu). Yalnızca ETİKET/DEĞER sözcükleri burada;
+    düzyazı parçaları bilerek dışarıda, onlar modele gidiyor.
+  */
+  ["kompakt", "compact"], ["kompak", "compact"], ["compack", "compact"],
+  ["kordon", "drawstring"], ["beli", "waist"], ["kollar", "sleeves"],
+  ["kollarda", "sleeves"], ["kolunda", "sleeve"], ["yandan", "side"],
+  ["mikro", "micro"], ["kalite", "quality"], ["ilik", "buttonhole"],
+  ["dokulu", "textured"], ["deri", "leather"], ["derisi", "leather"],
+  ["polyemid", "polyamide"], ["silim", "slim"], ["keten", "linen"],
+  ["petekli", "honeycomb"], ["cepler", "pockets"], ["file", "mesh"],
+  ["pens", "darts"], ["pantalon", "trousers"], ["hakiki", "genuine"],
+  ["suni", "faux"], ["cizgili", "striped"], ["lastik", "elastic"],
+  ["kesim", "cut"], ["tilki", "fox"], ["kolej", "college"],
+  ["koyun", "sheep"], ["su", "water"], ["sol", "left"], ["tam", "full"],
 ]);
 
 /** Türkçeye özgü harf taşıyan sözcük (çevrilmemiş olanı saymak için). */
 const TURKCE_SOZCUK = /[ışğİıŞĞçöüÇÖÜ]/;
+
+/*
+  TÜRKÇE AMA TÜRKÇE HARFİ YOK — KAPSAMIN KÖR NOKTASI (25.10.2026).
+
+  "Çevrilmemiş mi?" sorusu tek ölçütle yanıtlanıyordu: sözcükte
+  ı/ş/ğ/ç/ö/ü var mı. Yoksa "zaten İngilizce ya da marka adı"
+  sayılıp kapsama BİLE GİRMİYORDU. Oysa katalogdaki Türkçe
+  sözcüklerin bir kısmı salt ASCII: "uygundur", "kompakt",
+  "modelin", "bedendir", "kordon", "flota".
+
+  Bedeli ölçüldü: yazılmış 2.451 İngilizce açıklamanın 370'inde
+  Türkçe metin duruyordu ("50 - 59 Kg Uygundur." 90 üründe) ve
+  kapsam oranı bunların hiçbirini görmediği için satırlar
+  sorunsuz yazılmıştı. Eşik %85'ti ama ölçtüğü şey eksikti.
+
+  Buradaki sözcükler çevrilmiyor — bilerek: çoğu düzyazı
+  parçası ("modelin üzerindeki ürün … bedendir") ve sözcük sözcük
+  çevirmek bozuk İngilizce üretir. Sayılmaları yetiyor: hücre
+  kapanmamış görünüyor, ürün eşiğin altında kalıyor ve modele
+  gidiyor (scripts/aciklama-modelle.mjs).
+*/
+const TURKCE_ASCII = new Set([
+  "uygun", "uygundur", "kilo", "kiloya", "kiloaya", "beden", "bedeni", "bedendir",
+  "modelin", "mankenin", "boyu", "bir", "osy", "adet", "adetir", "renk", "urun",
+  "sade", "stil", "model", "modelidir", "rahat", "kombin", "kombinlerde",
+]);
 
 function etiketCevir(metin: string): string | null {
   return ETIKETLER.get(metin.trim().toLocaleLowerCase("tr")) ?? null;
@@ -322,8 +389,10 @@ export function hucreCevir(ham: string): HucreSonucu {
       return karsilik;
     }
     /* Zaten İngilizce ya da marka adı olabilir: Türkçeye özgü harf
-       taşımıyorsa çevrilmemiş SAYILMIYOR. "Polyester", "ACRYLIC". */
-    if (!TURKCE_SOZCUK.test(sozcuk)) return sozcuk;
+       taşımıyorsa çevrilmemiş SAYILMIYOR. "Polyester", "ACRYLIC".
+       Listedeki sözcükler istisna — Türkçe ama ASCII (yukarıdaki
+       gerekçe). */
+    if (!TURKCE_SOZCUK.test(sozcuk) && !TURKCE_ASCII.has(dusuk)) return sozcuk;
     toplam += 1;
     return sozcuk;
   });
