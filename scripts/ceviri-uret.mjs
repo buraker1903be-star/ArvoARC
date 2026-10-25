@@ -39,6 +39,7 @@ import {
   ACIKLAMA_SINIRI,
   ceviriKarari,
   giysiTuruDogru,
+  uydurmaOzellik,
   jsonCikar,
   koleksiyonIstemi,
   urunIstemi,
@@ -213,9 +214,11 @@ async function urunler() {
   }
   /* Yeniden kipinde denetimden GEÇEN adlar elenir; geri kalan
      (çevirisi olmayan + bugünkü kurala takılan) yeniden sorulur. */
-  return YENIDEN
-    ? toplanan.filter((u) => !u.name_en || giysiTuruDogru(u.name, u.name_en) !== null)
-    : toplanan;
+  /* Bugünkü denetimden geçmeyen her ad yeniden sorulur: giysi türü
+     yanlış olanlar ve kaynakta olmayan bir özellik taşıyanlar. */
+  const kusurlu = (u) =>
+    giysiTuruDogru(u.name, u.name_en) !== null || uydurmaOzellik(u.name, u.name_en) !== null;
+  return YENIDEN ? toplanan.filter((u) => !u.name_en || kusurlu(u)) : toplanan;
 }
 
 async function koleksiyonlar() {
@@ -484,7 +487,10 @@ async function calistir() {
     /* Bu turda yazılamamış VE eski adı bugünkü denetime takılan
        kayıtlar: düzeltilemediler, yanlış hâlleriyle kalmasınlar. */
     const kalan = kayitlar.filter(
-      (k) => !yazilanlar.has(k.slug) && k.name_en && giysiTuruDogru(k.name, k.name_en) !== null,
+      (k) =>
+        !yazilanlar.has(k.slug) &&
+        k.name_en &&
+        (giysiTuruDogru(k.name, k.name_en) !== null || uydurmaOzellik(k.name, k.name_en) !== null),
     );
     console.log(`\n${kalan.length} ad düzeltilemedi; ${KURU ? "temizlenecek" : "temizleniyor"} (Türkçeye düşüyor)`);
     if (!KURU) {

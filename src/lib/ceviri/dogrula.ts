@@ -403,6 +403,56 @@ const GIYSI_TURU: Array<{ tr: RegExp; en?: RegExp; yasak?: RegExp; yasakSerbest?
   },
 ];
 
+/*
+  UYDURULMUŞ ÖZELLİK (25.10.2026).
+
+  Giysi türü denetimi "kaynaktaki şey çeviride var mı" diye soruyor.
+  Ters yön de bir hata kaynağı ve ölçüldü: yazılmış 3.198 adın 379'u
+  (%11,9) kaynakta HİÇ OLMAYAN bir özellik taşıyordu —
+
+    "Selanik Yaka Nakışlı Kazak"    → "PIQUÉ Embroidered Jumper"
+    "Bisiklet Yaka … SweatShirt"    → "… HOODED Printed Sweatshirt"
+    "Çıtçıtlı … Sweatshirt"         → "… with Pockets and 3-ZIP"
+    "Boyalı Gri"                    → "PRINTED Grey"
+    "Pamuklu … Regular Fit"         → "… Thick Knit WOOL Regular Fit"
+    "Düz Penye Tişört"              → "Straight-Grain LEATHER T-Shirt"
+
+  Hepsi geçerli İngilizce, Türkçe harf yok, kaynaktan farklı ve
+  sayılar yerinde: eski denetimlerin hiçbiri göremiyordu. Müşteri
+  kapüşonsuz bir sweatshirt'e "hooded" diye bakıyor, pamukluyu yün
+  sanıyor.
+
+  Kural tek yönlü: çeviride terim VARSA kaynakta karşılığı
+  OLMALI. Karşılık listeleri geniş tutuldu (yazım hataları dahil:
+  "farmuar", "kapşon") — dar bir liste doğru çevirileri atardı ve
+  bu denetimin en pahalı hatası odur.
+
+  Kaynak TÜRKÇE KÜÇÜLTÜLÜP ı→i'ye indiriliyor: `/i` bayrağı İ/ı
+  çiftini katlamıyor ve düz bir `iplik` kalıbı "İplik"i görmüyor.
+  Bu tuzağa ilk ölçüm betiğimin kendisi de düştü.
+*/
+const UYDURMA: Array<{ en: RegExp; kaynak: RegExp; ad: string }> = [
+  { en: /piqu[eé]/, kaynak: /pike|piqu/, ad: "piqué uydurulmuş" },
+  { en: /\bfleece/, kaynak: /şardon|sardon|iplik|polar|fleece/, ad: "fleece uydurulmuş" },
+  { en: /\bhood(ed)?\b/, kaynak: /kap[üuş]şon|kapson|kapuson|kapşon|hood/, ad: "kapüşon uydurulmuş" },
+  { en: /\bzip(ped)?\b/, kaynak: /fermuar|farmuar|fermuvar|zip/, ad: "fermuar uydurulmuş" },
+  { en: /\bprint(ed)?\b/, kaynak: /baski|print|desen|temali|silüet|nakiş|yazili|logo/, ad: "baskı uydurulmuş" },
+  { en: /\bleather/, kaynak: /deri|süet|suni deri/, ad: "deri uydurulmuş" },
+  { en: /\bwool\b/, kaynak: /yün|yun|wool|kaşmir|merinos/, ad: "yün uydurulmuş" },
+  { en: /\bvelvet|corduroy/, kaynak: /kadife|fitilli/, ad: "kadife uydurulmuş" },
+];
+
+/** Çeviride kaynakta olmayan bir özellik var mı? Varsa hangisi. */
+export function uydurmaOzellik(kaynak: string, ceviri: string): string | null {
+  /* Türkçe küçültme ve ı→i: "İplik" ile "iplik" aynı sözcük. */
+  const k = kaynak.toLocaleLowerCase("tr").replace(/ı/g, "i");
+  const c = ceviri.toLowerCase();
+  for (const { en, kaynak: trDesen, ad } of UYDURMA) {
+    if (en.test(c) && !trDesen.test(k)) return ad;
+  }
+  return null;
+}
+
 /** Giysi türü doğru çevrilmiş mi? Değilse hangi terim olduğunu söyler. */
 export function giysiTuruDogru(kaynak: string, ceviri: string): string | null {
   const k = kaynak.toLocaleLowerCase("tr");
@@ -498,6 +548,8 @@ export function ceviriKarari(
   if (hedefGrubuSina) {
     const tur = giysiTuruDogru(kaynak, metin);
     if (tur) return { kabul: false, sebep: `giysi türü yanlış (${tur})` };
+    const uydurma = uydurmaOzellik(kaynak, metin);
+    if (uydurma) return { kabul: false, sebep: uydurma };
   }
 
   /*

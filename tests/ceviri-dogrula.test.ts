@@ -22,6 +22,7 @@ import {
   koleksiyonIstemi,
   sayilariKoruyor,
   urunIstemi,
+  uydurmaOzellik,
   yankiTutuyor,
 } from "@/lib/ceviri/dogrula";
 
@@ -571,4 +572,41 @@ test("YASAK TERİM KAYNAKTA VARSA SERBEST — yanlış alarm yok", () => {
   assert.equal(giysiTuruDogru("Deri Kadife Detaylı Ceket", "Leather Velvet Detail Jacket"), null);
   /* Kazak ile ceket aynı adda geçiyorsa "jacket" meşru. */
   assert.equal(giysiTuruDogru("Kazak Ceket Takımı", "Jumper Jacket Set"), null);
+});
+
+test("UYDURULMUŞ ÖZELLİK reddediliyor", () => {
+  /*
+    Giysi türü denetimi "kaynaktaki şey çeviride var mı" diye
+    soruyordu; ters yön de bir hata kaynağı ve ölçüldü: yazılmış
+    3.198 adın 379'u (%11,9) kaynakta HİÇ OLMAYAN bir özellik
+    taşıyordu. Hepsi geçerli İngilizce, Türkçe harf yok, kaynaktan
+    farklı, sayılar yerinde — eski denetimlerin hiçbiri göremedi.
+    Müşteri kapüşonsuz bir sweatshirt'e "hooded" diye bakıyordu.
+  */
+  assert.equal(uydurmaOzellik("Çocuk Selanik Yaka Nakışlı Kazak", "Kids' Piqué Embroidered Jumper"), "piqué uydurulmuş");
+  assert.equal(uydurmaOzellik("Erkek Bisiklet Yaka Sweatshirt", "Men's Hooded Sweatshirt"), "kapüşon uydurulmuş");
+  assert.equal(uydurmaOzellik("Erkek Çıtçıtlı Sweatshirt", "Men's Sweatshirt with 3-Zip"), "fermuar uydurulmuş");
+  assert.equal(uydurmaOzellik("Erkek Pamuklu Kazak", "Men's Wool Jumper"), "yün uydurulmuş");
+  assert.equal(uydurmaOzellik("Erkek Düz Penye Tişört", "Men's Leather T-Shirt"), "deri uydurulmuş");
+});
+
+test("KAYNAKTA KARŞILIĞI OLAN ÖZELLİK serbest — yanlış alarm yok", () => {
+  /*
+    Dar bir karşılık listesi doğru çevirileri atardı; bu denetimin
+    en pahalı hatası odur. Listeler yazım hatalarını da içeriyor
+    ("Farmuarlı", "Kapşonlu") çünkü katalog tedarikçiden geliyor.
+  */
+  assert.equal(uydurmaOzellik("Erkek Kapüşonlu Sweatshirt", "Men's Hooded Sweatshirt"), null);
+  assert.equal(uydurmaOzellik("Erkek Kapşonlu Sweatshirt", "Men's Hooded Sweatshirt"), null);
+  assert.equal(uydurmaOzellik("Yarım Farmuarlı Yakalı", "Half-Zip Collar"), null);
+  assert.equal(uydurmaOzellik("Erkek Yün Kazak", "Men's Wool Jumper"), null);
+  assert.equal(uydurmaOzellik("Baskılı T-shirt", "Printed T-Shirt"), null);
+  /*
+    BÜYÜK İ: "3 İplik" düz bir `iplik` kalıbıyla eşleşmiyor çünkü
+    `/i` bayrağı İ/ı çiftini katlamıyor. Kaynak Türkçe küçültülüp
+    ı→i'ye indiriliyor. İlk ölçüm betiğim bu tuzağa düştü ve
+    438 doğru adı "uydurma" diye işaretledi.
+  */
+  assert.equal(uydurmaOzellik("Erkek 3 İplik Pamuklu Sweatshirt", "Men's 3-Thread Fleece Sweatshirt"), null);
+  assert.equal(uydurmaOzellik("Erkek 3 Iplik Pamuklu Sweatshirt", "Men's 3-Thread Fleece Sweatshirt"), null);
 });
