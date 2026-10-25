@@ -29,7 +29,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { aciklamaCevir, kapanmayanHucreler, KAPSAM_ESIGI } from "../src/lib/ceviri/aciklama.ts";
-import { ACIKLAMA_SINIRI, aciklamaParcaIstemi, ceviriKarari, jsonCikar, yankiTutuyor } from "../src/lib/ceviri/dogrula.ts";
+import { ACIKLAMA_SINIRI, aciklamaParcaIstemi, ceviriKarari, jsonCikar, uydurmaOzellik, yankiTutuyor } from "../src/lib/ceviri/dogrula.ts";
 
 const kok = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 for (const dosya of [".env.local", ".env"]) {
@@ -191,6 +191,20 @@ async function calistir() {
         const karar = ceviriKarari(satir.text, parca, ACIKLAMA_SINIRI);
         if (!karar.kabul) {
           if (tur === 1) yeniden.push(parca); else basarisiz.push(`${karar.sebep}: ${parca.slice(0, 60)}`);
+          continue;
+        }
+        /*
+          UYDURMA ÖZELLİK PARÇA DÜZEYİNDE DE DENETLENİYOR
+          (25.10.2026). Ad tarafında ölçüldüğü gibi model burada da
+          bilmediği kumaşı bildiğiyle değiştiriyor: "Kumaş Full
+          Likralı DALGIÇ" hücresi "Full stretch PIQUE" olarak
+          yazılmıştı. Hücre düzeyinde denetim adı denetlemekten
+          daha güvenli — kaynak ve çeviri AYNI hücre, yani
+          "başka bir satırda geçiyordur" belirsizliği yok.
+        */
+        const uydurma = uydurmaOzellik(parca, karar.metin);
+        if (uydurma) {
+          if (tur === 1) yeniden.push(parca); else basarisiz.push(`${uydurma}: ${parca.slice(0, 60)}`);
           continue;
         }
         sozluk.set(parca, karar.metin);

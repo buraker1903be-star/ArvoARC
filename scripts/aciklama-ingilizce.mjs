@@ -18,6 +18,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { aciklamaCevir, KAPSAM_ESIGI } from "../src/lib/ceviri/aciklama.ts";
+import { uydurmaOzellik } from "../src/lib/ceviri/dogrula.ts";
 
 for (const satir of readFileSync(new URL("../.env.local", import.meta.url), "utf8").split("\n")) {
   const esit = satir.indexOf("=");
@@ -146,7 +147,16 @@ for (const urun of data) {
     */
     if (YENIDEN && urun.description_en) {
       const { kapsam: yaziliKapsam } = aciklamaCevir(urun.description_en);
-      if (yaziliKapsam >= 1) continue;
+      /*
+        KUSUR İKİ TÜRLÜ: Türkçe kalmış olmak ve kaynakta OLMAYAN bir
+        özellik taşımak. İkincisi tamamı İngilizce bir metinde de
+        olabiliyor ve kapsam oranı onu göremez — "Kumaş Full
+        Likralı Dalgıç" hücresi "Full stretch pique" olarak
+        yazılmıştı, kusursuz İngilizce ve tamamen yanlış.
+      */
+      const duz = (metin) => (metin ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+      const uydurma = uydurmaOzellik(duz(kaynak), duz(urun.description_en));
+      if (yaziliKapsam >= 1 && !uydurma) continue;
       kusurlu += 1;
       if (!YAZ) continue;
       const { error: silmeHatasi } = await supabase
