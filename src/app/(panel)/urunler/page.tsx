@@ -34,7 +34,7 @@ const SOURCES = URUN_KAYNAKLARI;
 
 type StatusKey = (typeof STATUS_TABS)[number][0];
 type SourceKey = (typeof SOURCES)[number][0];
-type ListState = { q: string; filter: StatusKey; source: SourceKey; page: number };
+type ListState = { q: string; filter: StatusKey; source: SourceKey; ceviri: boolean; page: number };
 type ProductMeta = { images?: string[]; image_paths?: string[]; vendor?: string; type?: string; tags?: string };
 
 
@@ -44,12 +44,13 @@ function listHref(state: ListState, patch: Partial<ListState>) {
   if (next.q) query.set("q", next.q);
   if (next.filter !== "all") query.set("filter", next.filter);
   if (next.source !== "all") query.set("source", next.source);
+  if (next.ceviri) query.set("ceviri", "eksik");
   if (next.page > 1) query.set("page", String(next.page));
   const text = query.toString();
   return text ? `/urunler?${text}` : "/urunler";
 }
 
-type Params = { error?: string; created?: string; ok?: string; q?: string; filter?: string; source?: string; page?: string; updated?: string; skipped?: string; yeni?: string; pencere?: string };
+type Params = { error?: string; created?: string; ok?: string; q?: string; filter?: string; source?: string; ceviri?: string; page?: string; updated?: string; skipped?: string; yeni?: string; pencere?: string };
 
 export default async function Products({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
@@ -70,7 +71,19 @@ export default async function Products({ searchParams }: { searchParams: Promise
   const statusFilter: StatusKey = STATUS_TABS.some(([key]) => key === params.filter) ? (params.filter as StatusKey) : "all";
   const source: SourceKey = SOURCES.some(([key]) => key === params.source) ? (params.source as SourceKey) : "all";
   const page = Math.min(10_000, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));
-  const state: ListState = { q: search, filter: statusFilter, source, page };
+  /*
+    ÇEVİRİSİ EKSİK SÜZGECİ (25.10.2026). Çeviri betikleri katalogun
+    çoğunu yazıyor ama kuşkulu çıktıyı bilerek ATIYOR — yarım bir
+    İngilizce ad, Türkçe adından kötü. Kalanı panelden elle yazmak
+    gerekiyor ve o ürünleri bulmanın tek yolu SQL'di.
+
+    "Eksik" iki şeyden biri: adı hiç çevrilmemiş ya da Türkçe
+    açıklaması olup İngilizcesi yazılmamış. Yurtdışına kapalı ürün
+    sayılmıyor — İngilizce vitrinde hiç görünmüyor, çevirisi de
+    boşa iş.
+  */
+  const ceviriEksik = params.ceviri === "eksik";
+  const state: ListState = { q: search, filter: statusFilter, source, ceviri: ceviriEksik, page };
   /* Görünüm karşılaştırması için süzgecin kanonik hâli; sayfa numarası düşer. */
   const aktifSorgu = gorunumSorgusu("urunler", params as Record<string, string | undefined>);
 
@@ -89,6 +102,10 @@ export default async function Products({ searchParams }: { searchParams: Promise
     let next = query as unknown as Scopable;
     if (source === "own") next = next.is("supplier", null);
     if (source === "tarzyeri") next = next.eq("supplier", "tarzyeri");
+    if (ceviriEksik) {
+      next = next.eq("international_blocked", "false");
+      next = next.or("name_en.is.null,and(description.not.is.null,description_en.is.null)");
+    }
     if (search) {
       const filters = ["name", "description", "metadata->>vendor", "metadata->>type", "metadata->>tags"].map((column) => `${column}.ilike.%${search}%`);
       if (skuProductIds.length) filters.push(`id.in.(${skuProductIds.join(",")})`);
@@ -119,7 +136,21 @@ export default async function Products({ searchParams }: { searchParams: Promise
     Hepsi head:true — satır taşımıyor, sayı dönüyor.
   */
   const varyantSayimi = () => supabase.from("arc_product_variants").select("id", { count: "exact", head: true }).eq("organization_id", organization.id);
-  const [listResult, variantCountResult, bestSellerResult, katalogSayimi, gorunumler, tukenmisSayimi, stoksuzSatisSayimi, maliyetsizSayimi, tedarikciSayimi, ...countResults] = await Promise.all([
+  /*
+    ÇEVİRİSİ EKSİK SAYIMI süzgeçlerden BAĞIMSIZ: şerit "aramanın
+    içinde kaç tane" değil "katalogda kaç tane" söylemeli, yoksa
+    süzgeç açıkken rozet kendi kendini sıfırlar. İndirimlerdeki
+    "süresi geçmiş" sayımıyla aynı kalıp.
+  */
+  const ceviriEksikSayimi = () => supabase
+    .from("arc_products")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organization.id)
+    .eq("status", "active")
+    .eq("international_blocked", false)
+    .or("name_en.is.null,and(description.not.is.null,description_en.is.null)");
+
+  const [listResult, variantCountResult, bestSellerResult, katalogSayimi, gorunumler, tukenmisSayimi, stoksuzSatisSayimi, maliyetsizSayimi, tedarikciSayimi, ceviriSayimi, ...countResults] = await Promise.all([
     listQuery.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1),
     varyantSayimi(),
     supabase.from("arc_collections").select("id").eq("organization_id", organization.id).eq("title", "Çok Satanlar").eq("status", "active").maybeSingle(),
@@ -131,6 +162,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
     /* Maliyeti olmayan varyantta kâr hesaplanamıyor (lib/siparis-kari). */
     varyantSayimi().is("cost_price", null),
     supabase.from("arc_products").select("id", { count: "exact", head: true }).eq("organization_id", organization.id).not("supplier", "is", null),
+    ceviriEksikSayimi(),
     ...STATUS_TABS.map(([key]) => countQuery(key)),
   ]);
 
@@ -265,7 +297,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
   const pencere = canManage ? (params.pencere === "toplu" ? "toplu" : params.pencere === "yeni" || params.yeni === "1" ? "yeni" : null) : null;
   const pencereAdresi = (kod: string) => { const h = listHref(state, {}); return `${h}${h.includes("?") ? "&" : "?"}pencere=${kod}`; };
   const katalogBos = (katalogSayimi.count ?? 0) === 0;
-  const filtreli = Boolean(search) || statusFilter !== "all" || source !== "all";
+  const filtreli = Boolean(search) || statusFilter !== "all" || source !== "all" || ceviriEksik;
 
   return (
     <main className="talep liste-sayfa urun-listesi">
@@ -291,6 +323,23 @@ export default async function Products({ searchParams }: { searchParams: Promise
               <dd><Link prefetch={false} href={listHref(state, { filter: key, page: 1 })} aria-current={statusFilter === key ? "page" : undefined}>{counts[key].toLocaleString("tr-TR")}</Link></dd>
             </div>
           ))}
+          {/*
+            ÇEVİRİSİ EKSİK yalnızca varken ya da süzgeç açıkken
+            görünüyor: sıfırı olan bir rozet şeridi kalabalıklaştırır
+            ve kullanıcıya yapılacak iş olduğunu söylemez.
+            Sayım okunamadıysa rozet HİÇ çizilmiyor — "0" yazmak,
+            iş yokmuş gibi göstermek olurdu.
+          */}
+          {ceviriSayimi.error === null && (ceviriEksik || (ceviriSayimi.count ?? 0) > 0) ? (
+            <div className={ceviriEksik ? "is-active" : undefined}>
+              <dt>Çevirisi eksik</dt>
+              <dd>
+                <Link prefetch={false} href={listHref(state, { ceviri: !ceviriEksik, page: 1 })} aria-current={ceviriEksik ? "page" : undefined}>
+                  {(ceviriSayimi.count ?? 0).toLocaleString("tr-TR")}
+                </Link>
+              </dd>
+            </div>
+          ) : null}
         </dl>
       </nav>
 
@@ -305,6 +354,7 @@ export default async function Products({ searchParams }: { searchParams: Promise
           <form className="talep-ara" role="search">
             {statusFilter !== "all" ? <input type="hidden" name="filter" value={statusFilter} /> : null}
             {source !== "all" ? <input type="hidden" name="source" value={source} /> : null}
+            {ceviriEksik ? <input type="hidden" name="ceviri" value="eksik" /> : null}
             <input name="q" defaultValue={search} placeholder="Ürün adı, SKU, marka, tür veya etiket" aria-label="Ürünlerde ara" />
           </form>
           <GorunumKaydet liste="urunler" aktifSorgu={aktifSorgu} gorunumler={gorunumler} canManage={canManage} />

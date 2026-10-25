@@ -139,6 +139,11 @@ const SEMA: Record<GorunumListesi, readonly Alan[]> = {
     { anahtar: "q", tur: "metin", onek: "Arama" },
     { anahtar: "filter", tur: "secim", secenekler: URUN_DURUMLARI, varsayilan: "all" },
     { anahtar: "source", tur: "secim", secenekler: URUN_KAYNAKLARI, varsayilan: "all" },
+    /* İngilizce vitrinin eksikleri: betikler katalogun çoğunu
+       çeviriyor ama kuşkulu çıktıyı bilerek ATIYOR ve kalanı elle
+       yazmak gerekiyor (urunler/[id] → İngilizce alanlar). Süzgeç
+       olmadan o ürünler panelden bulunamıyordu. */
+    { anahtar: "ceviri", tur: "bayrak", deger: "eksik", etiket: "Çevirisi eksik" },
   ],
   indirimler: [
     { anahtar: "q", tur: "metin", onek: "Arama" },

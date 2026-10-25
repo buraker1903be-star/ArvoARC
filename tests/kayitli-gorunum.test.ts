@@ -136,3 +136,21 @@ test("iade görünümünde varsayılan durum 'beklemede' yazılmıyor", () => {
 test("iade görünümünün özeti okunur", () => {
   assert.equal(gorunumOzeti("iadeler", "filter=onaylandi&period=7"), "Onaylandı · ürün bekleniyor · Son 7 gün");
 });
+
+test("ÇEVİRİSİ EKSİK süzgeci kaydedilmiş görünümde de geçerli", () => {
+  /*
+    Süzgeç listede var ama şemada yoksa, kaydedilmiş görünüm onu
+    sessizce DÜŞÜRÜYOR: kullanıcı "çevirisi eksik" görünümünü
+    kaydediyor, açtığında bütün katalog geliyor ve neden olduğunu
+    hiçbir yerde göremiyor. Şema bu yüzden tek kaynak.
+  */
+  assert.equal(gorunumSorgusu("urunler", "ceviri=eksik"), "ceviri=eksik");
+  /* Bayrak yalnızca tanımlı değeriyle geçiyor. */
+  assert.equal(gorunumSorgusu("urunler", "ceviri=1"), "");
+  assert.equal(gorunumOzeti("urunler", "ceviri=eksik"), "Çevirisi eksik");
+  /* Öteki süzgeçlerle birlikte sırası sabit. */
+  assert.equal(
+    gorunumSorgusu("urunler", "ceviri=eksik&filter=active"),
+    gorunumSorgusu("urunler", "filter=active&ceviri=eksik"),
+  );
+});
