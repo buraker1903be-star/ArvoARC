@@ -10,3 +10,4 @@ out
 
 # ARC ayrılması: döküm ve aktarım çıktıları (AYRILMA.md)
 .ayrilma/
+.ceviri-onbellek.json

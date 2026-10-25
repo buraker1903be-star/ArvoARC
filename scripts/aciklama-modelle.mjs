@@ -46,6 +46,23 @@ const arg = (ad, varsayilan) => {
   return i < 0 ? varsayilan : (process.argv[i + 1] ?? true);
 };
 const YAZ = process.argv.includes("--yaz");
+/*
+  ARA KAYIT (25.10.2026).
+
+  Betik önce BÜTÜN benzersiz hücreleri çeviriyor, ancak ondan sonra
+  ürünlere yazıyor. 14b modelle bu 2 saat 49 dakika sürdü ve o süre
+  boyunca hiçbir şey kalıcı değildi: süreç ölse, makine uyusa ya da
+  kullanıcı Ctrl+C'ye bassa saatlerin işi çöpe giderdi.
+
+  Bu deponun ilkesi "iş kaldığı yerden devam eder" ve o ilke burada
+  yalnızca ÜRÜN düzeyinde vardı (yazılmış açıklama ikinci koşuda
+  atlanıyor), HÜCRE düzeyinde yoktu.
+
+  Sözlük artık her partiden sonra diske yazılıyor ve açılışta geri
+  okunuyor. Dosya bir ÖNBELLEK: silinmesi veri kaybı değil, yalnızca
+  yeniden çeviri demek. Depoya girmiyor (.gitignore).
+*/
+const ONBELLEK = path.join(kok, ".ceviri-onbellek.json");
 const ADET = Number(arg("adet", 4000));
 /* Parti beş: ürün adı isteminde ölçülen denge (dogrula.ts). */
 const PARTI = Number(arg("parti", 5));
@@ -131,8 +148,38 @@ async function calistir() {
     }
   }
 
+  /*
+    Önbellek bozuksa SESSİZCE yok sayılıyor ve iş baştan başlıyor:
+    yarım bir JSON yüzünden bütün koşuyu durdurmak, önbelleğin
+    amacına ters olurdu.
+  */
+  let sozluk = new Map();
+  if (fs.existsSync(ONBELLEK)) {
+    try {
+      const kayitli = JSON.parse(fs.readFileSync(ONBELLEK, "utf8"));
+      sozluk = new Map(Object.entries(kayitli));
+      console.log(`↻ ${sozluk.size} parça önbellekten okundu`);
+    } catch {
+      console.error("  ! önbellek okunamadı, baştan çevriliyor");
+    }
+  }
+
+  const onbellegeYaz = () => {
+    try {
+      fs.writeFileSync(ONBELLEK, JSON.stringify(Object.fromEntries(sozluk)));
+    } catch (sorun) {
+      /* Yazamamak işi durdurmaz; yalnızca kaldığı yerden devam
+         edememek demek. */
+      console.error(`  ! önbellek yazılamadı (${sorun.message})`);
+    }
+  };
+
+  /* Önbellekte olan parça yeniden sorulmuyor. */
+  const sorulacak = parcalar.filter((p) => !sozluk.has(p));
   console.log(
-    `${kalan.length} ürün · ${parcalar.length} benzersiz parça · parti ${PARTI} · model ${model}` +
+    `${kalan.length} ürün · ${parcalar.length} benzersiz parça` +
+      (sorulacak.length < parcalar.length ? ` (${sorulacak.length} tanesi yeni)` : "") +
+      ` · parti ${PARTI} · model ${model}` +
       (YAZ ? "" : " · KURU TUR"),
   );
   if (parcalar.length === 0) {
@@ -143,7 +190,6 @@ async function calistir() {
   /* Parça → İngilizce karşılık. Yalnızca DENETİMDEN GEÇENLER
      giriyor; geçmeyen parça sözlükte hiç olmuyor ve o hücre
      eşleme tablosuna düşüyor (yani Türkçe kalıyor). */
-  const sozluk = new Map();
   const basarisiz = [];
   const yeniden = [];
 
@@ -151,7 +197,7 @@ async function calistir() {
      betiğindeki gerekçenin aynısı, partinin bağlamı değişince
      sonuç da değişiyor. */
   for (let tur = 1; tur <= 2; tur += 1) {
-    const kaynak = tur === 1 ? parcalar : yeniden.slice();
+    const kaynak = tur === 1 ? sorulacak : yeniden.slice();
     if (tur === 2) {
       if (kaynak.length === 0) break;
       console.log(`\n! ${kaynak.length} parça tek tek yeniden deneniyor…`);
@@ -160,6 +206,7 @@ async function calistir() {
     }
 
     for (const parti of partilere(kaynak, tur === 1 ? PARTI : 1)) {
+      let yeniKayit = false;
       let ham;
       try {
         ham = await sor(aciklamaParcaIstemi(parti));
@@ -209,7 +256,10 @@ async function calistir() {
         }
         sozluk.set(parca, karar.metin);
         process.stdout.write(".");
+        yeniKayit = true;
       }
+      /* Parti bitti: kazanılan ne varsa diske. */
+      if (yeniKayit) onbellegeYaz();
     }
   }
 
