@@ -610,3 +610,18 @@ test("KAYNAKTA KARŞILIĞI OLAN ÖZELLİK serbest — yanlış alarm yok", () =>
   assert.equal(uydurmaOzellik("Erkek 3 İplik Pamuklu Sweatshirt", "Men's 3-Thread Fleece Sweatshirt"), null);
   assert.equal(uydurmaOzellik("Erkek 3 Iplik Pamuklu Sweatshirt", "Men's 3-Thread Fleece Sweatshirt"), null);
 });
+
+test("UYDURMALARIN YERİNİ ALAN KUMAŞ TERİMLERİ sözlükte", () => {
+  /*
+    Model bilmediği kumaşı bildiği bir kumaşla değiştiriyordu:
+    "Selanik" → "Piqué" (139 üründe), "Bürümcük" → "Brushed
+    Fleece", "Çıtçıtlı" → "3-Zip". Doğru karşılığı VERMEK,
+    uydurmayı reddetmekten iyi bir çözüm: ret kaydı çevirisiz
+    bırakıyor, sözlük onu kurtarıyor.
+  */
+  const istem = urunIstemi([{ name: "x" }]);
+  for (const terim of ["milano knit (NOT piqué)", "crinkle fabric (NOT fleece)",
+                       "snap-button (NOT zip)", "dyed (NOT printed)", "plain (NOT printed)"]) {
+    assert.ok(istem.includes(terim), terim);
+  }
+});

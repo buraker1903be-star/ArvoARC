@@ -710,6 +710,26 @@ export const TERIMLER: Array<[string, string]> = [
   ["selanik örgü", "milano knit"],
   ["sporcu atlet", "sports vest (NOT sweatshirt)"],
   ["kolsuz", "sleeveless"],
+  /*
+    UYDURMALARIN YERİNİ ALAN KUMAŞ TERİMLERİ (25.10.2026).
+
+    Model bilmediği kumaşı bildiği bir kumaşla değiştiriyordu:
+    "Selanik" → "Piqué", "Bürümcük" → "Brushed Fleece",
+    "Diagonel" → "Diagonal Fleece", "Çıtçıtlı" → "3-Zip". Doğru
+    karşılığı vermek, uydurmayı reddetmekten daha iyi bir çözüm —
+    ret kaydı çevirisiz bırakıyor, sözlük onu kurtarıyor.
+  */
+  ["selanik", "milano knit (NOT piqué)"],
+  ["bürümcük", "crinkle fabric (NOT fleece)"],
+  ["diagonel", "diagonal weave (NOT fleece)"],
+  ["çıtçıtlı", "snap-button (NOT zip)"],
+  ["kapitone", "quilted"],
+  ["penye", "jersey"],
+  ["file", "mesh"],
+  ["battal beden", "plus size"],
+  ["krep", "crepe (NOT piqué)"],
+  ["boyalı", "dyed (NOT printed)"],
+  ["düz", "plain (NOT printed)"],
 ];
 
 const terimSatirlari = () =>
