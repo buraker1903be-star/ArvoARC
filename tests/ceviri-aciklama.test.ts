@@ -285,3 +285,45 @@ test("ASCII yazılan DEĞERLER çevriliyor", () => {
     assert.equal(hucreCevir(tr).metin.toLowerCase(), en, tr);
   }
 });
+
+test("KAYNAKTAKİ YAZIM HATALARI da tanınıyor", () => {
+  /*
+    25.10.2026, üçüncü ölçüm: çeviri turları bittikten sonra
+    yazılmış 3.131 açıklama tarandı ve 790'ında en az bir Türkçe
+    sözcük kalmıştı. Büyük kısmı sözlükte DOĞRU yazımı olan ama
+    tedarikçi metninde yanlış yazılmış sözcüklerdi.
+
+    Yanlış yazımı sözlüğe eklemek, kaynağı düzeltmekten ucuz ve
+    geri alınabilir: katalog tedarikçiden geliyor ve bir sonraki
+    aktarım aynı yazımı geri getirir.
+  */
+  for (const [ham, beklenen] of [
+    ["Kapaşonlu", "hooded"],
+    ["Kapşünlu", "hooded"],
+    ["Kendınden", "self"],
+    ["Lastıklı", "elasticated"],
+    ["Bagcıklı", "drawstring"],
+    ["Aksesurlı", "with accessories"],
+    ["Adetir", "pieces"],
+    ["Kalıte", "quality"],
+  ] as const) {
+    assert.equal(hucreCevir(ham).metin.toLowerCase(), beklenen, ham);
+  }
+  /* "Balıkcı Yaka" (ç→c) kuralı da eşleşiyor: `/i` bayrağı Türkçe
+     harf çiftlerini katlamıyor ve kural o hücreyi hiç görmüyordu. */
+  assert.equal(hucreCevir("Balıkçı Yaka").metin, "roll neck");
+  assert.equal(hucreCevir("Balıkcı Yaka").metin, "roll neck");
+});
+
+test('"model" ve "osy" YANLIŞ ALARM vermiyor', () => {
+  /*
+    İkisi de ASCII Türkçe listesine konmuştu ve çevrilmiş metinde
+    yanlış alarm veriyordu: "the model is wearing" meşru İngilizce,
+    "Osy Modal" bir kumaş markası. Marka adını çevirmemek doğru
+    davranış (dosyanın başındaki gerekçe).
+  */
+  assert.equal(hucreCevir("Osy Modal").toplam, 0);
+  assert.equal(hucreCevir("model").toplam, 0);
+  /* Türkçe çekimleri hâlâ sayılıyor: onlar düzyazı ve modele gider. */
+  assert.ok(hucreCevir("modelin").toplam > 0);
+});

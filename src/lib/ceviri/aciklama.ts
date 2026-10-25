@@ -203,7 +203,9 @@ const IFADELER: Array<[RegExp, string]> = [
   [/(?<![\p{L}\d])bisiklet\s+yaka(sı|lı|s[ıi])?(?![\p{L}\d])/giu, "crew neck"],
   [/(?<![\p{L}\d])biskilet\s+yaka(?![\p{L}\d])/giu, "crew neck"],
   [/(?<![\p{L}\d])polo\s+yaka(lı)?(?![\p{L}\d])/giu, "polo collar"],
-  [/(?<![\p{L}\d])balıkçı\s+yaka(lı)?(?![\p{L}\d])/giu, "roll neck"],
+  /* Katalogda "Balıkcı Yaka" da geçiyor (ç→c); `/i` bayrağı
+     bunu katlamıyor ve kural o hücreyi hiç görmüyordu. */
+  [/(?<![\p{L}\d])bal[ıi]k[çc][ıi]\s+yaka(lı|lı)?(?![\p{L}\d])/giu, "roll neck"],
   [/(?<![\p{L}\d])yarım\s+boğazlı(?![\p{L}\d])/giu, "half turtleneck"],
   [/(?<![\p{L}\d])kanguru\s+cep(li)?(?![\p{L}\d])/giu, "kangaroo pocket"],
   [/(?<![\p{L}\d])tam\s+kalıp(?![\p{L}\d])/giu, "regular fit"],
@@ -329,6 +331,36 @@ const SOZCUKLER = new Map<string, string>([
   ["suni", "faux"], ["cizgili", "striped"], ["lastik", "elastic"],
   ["kesim", "cut"], ["tilki", "fox"], ["kolej", "college"],
   ["koyun", "sheep"], ["su", "water"], ["sol", "left"], ["tam", "full"],
+  /*
+    ÜÇÜNCÜ ÖLÇÜM (25.10.2026): çeviri turları bittikten sonra
+    YAZILMIŞ 3.131 açıklama tarandı ve 790'ında en az bir Türkçe
+    sözcük kalmıştı. Büyük kısmı KAYNAKTAKİ YAZIM HATALARI —
+    sözlükte doğru yazımı var ama tedarikçi metni yanlış yazmış:
+
+      kapüşonlu → "Kapaşonlu", "Kapşünlu", "Kapşonlua"
+      kendinden → "Kendınden"      lastikli → "Lastıklı"
+      bağcıklı  → "Bagcıklı"       aksesuarlı → "Aksesurlı"
+      dik       → "Dık"            adettir → "Adetir"
+      kalite    → "Kalıte"
+
+    Yanlış yazımı sözlüğe eklemek, kaynağı düzeltmekten ucuz ve
+    geri alınabilir; katalog tedarikçiden geliyor ve bir sonraki
+    aktarım aynı yazımı geri getirir.
+  */
+  ["sırt", "back"], ["dokumalı", "woven"], ["göğüs", "chest"], ["gögüs", "chest"],
+  ["kendınden", "self"], ["lastıklı", "elasticated"], ["parçadır", "pieces"],
+  ["sağ", "right"], ["manşetli", "cuffed"], ["boğaz", "neck"], ["bağazlı", "turtleneck"],
+  ["kürk", "fur"], ["kürkü", "fur"], ["adetir", "pieces"], ["kolları", "sleeves"],
+  ["aksesurlı", "with accessories"], ["aksesuarlı", "with accessories"],
+  ["paraşüt", "parachute"], ["nakış", "embroidery"], ["işlemeli", "embroidered"],
+  ["paçası", "leg"], ["bagcıklı", "drawstring"], ["dık", "stand-up"],
+  ["şeritli", "striped"], ["şerit", "stripe"], ["saç", "hair"],
+  ["kaşkorse", "ribbed jersey"], ["detaylı", "detail"], ["kısmı", "section"],
+  ["kaşmirli", "cashmere"], ["slimfit", "slim fit"], ["önünde", "on the front"],
+  ["yıkamalı", "washed"], ["yıkama", "wash"], ["kalıte", "quality"],
+  ["yırtmaçlı", "with side slits"], ["kapaklı", "flap"], ["kumaşından", "fabric"],
+  ["kapaşonlu", "hooded"], ["kapşünlu", "hooded"], ["kapşonlua", "hooded"],
+  ["kapşona", "hood"], ["arkası", "back"], ["içten", "inside"], ["çift", "double"],
 ]);
 
 /** Türkçeye özgü harf taşıyan sözcük (çevrilmemiş olanı saymak için). */
@@ -356,8 +388,12 @@ const TURKCE_SOZCUK = /[ışğİıŞĞçöüÇÖÜ]/;
 */
 const TURKCE_ASCII = new Set([
   "uygun", "uygundur", "kilo", "kiloya", "kiloaya", "beden", "bedeni", "bedendir",
-  "modelin", "mankenin", "boyu", "bir", "osy", "adet", "adetir", "renk", "urun",
-  "sade", "stil", "model", "modelidir", "rahat", "kombin", "kombinlerde",
+  "modelin", "mankenin", "boyu", "bir", "adet", "adetir", "renk", "urun",
+  "sade", "stil", "modelidir", "rahat", "kombin", "kombinlerde",
+  /* "model" ve "osy" listeden ÇIKARILDI: ilki çevrilmiş
+     metinde de meşru ("the model is wearing"), ikincisi bir
+     kumaş markası ("Osy Modal"). İkisi de yanlış alarm
+     veriyordu. */
 ]);
 
 function etiketCevir(metin: string): string | null {
