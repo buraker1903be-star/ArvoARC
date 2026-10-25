@@ -598,6 +598,19 @@ test("KAYNAKTA KARŞILIĞI OLAN ÖZELLİK serbest — yanlış alarm yok", () =>
   */
   assert.equal(uydurmaOzellik("Erkek Kapüşonlu Sweatshirt", "Men's Hooded Sweatshirt"), null);
   assert.equal(uydurmaOzellik("Erkek Kapşonlu Sweatshirt", "Men's Hooded Sweatshirt"), null);
+  /*
+    KATALOGDAKİ YAZIM HATALARI da karşılık sayılıyor. Ölçüldü:
+    kaynakta "Kapaşonlu" yazan 49 üründe kural "kapüşon uydurulmuş"
+    diyordu — hata çeviride değil KALIPTA'ydı. Dar bir liste doğru
+    çeviriyi atar ve bu, denetimin en pahalı hatasıdır.
+  */
+  assert.equal(uydurmaOzellik("Erkek Kapaşonlu Sweatshirt", "Men's Hooded Sweatshirt"), null);
+  assert.equal(uydurmaOzellik("Erkek Kapşünlu Sweatshirt", "Men's Hooded Sweatshirt"), null);
+  /* "Çıtçıtlı" bir kapama türü: fermuar değil ama "zip" karşılığı
+     verildiğinde kaynakta karşılığı sayılıyor, çünkü sözlük zaten
+     doğrusunu ("snap-button") söylüyor ve ret kaydı çevirisiz
+     bırakırdı. */
+  assert.equal(uydurmaOzellik("Erkek Çıtçıtlı Sweatshirt", "Men's Snap-Button Sweatshirt"), null);
   assert.equal(uydurmaOzellik("Yarım Farmuarlı Yakalı", "Half-Zip Collar"), null);
   assert.equal(uydurmaOzellik("Erkek Yün Kazak", "Men's Wool Jumper"), null);
   assert.equal(uydurmaOzellik("Baskılı T-shirt", "Printed T-Shirt"), null);

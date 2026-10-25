@@ -433,10 +433,17 @@ const GIYSI_TURU: Array<{ tr: RegExp; en?: RegExp; yasak?: RegExp; yasakSerbest?
 */
 const UYDURMA: Array<{ en: RegExp; kaynak: RegExp; ad: string }> = [
   { en: /piqu[eé]/, kaynak: /pike|piqu/, ad: "piqué uydurulmuş" },
-  { en: /\bfleece/, kaynak: /şardon|sardon|iplik|polar|fleece/, ad: "fleece uydurulmuş" },
-  { en: /\bhood(ed)?\b/, kaynak: /kap[üuş]şon|kapson|kapuson|kapşon|hood/, ad: "kapüşon uydurulmuş" },
-  { en: /\bzip(ped)?\b/, kaynak: /fermuar|farmuar|fermuvar|zip/, ad: "fermuar uydurulmuş" },
-  { en: /\bprint(ed)?\b/, kaynak: /baski|print|desen|temali|silüet|nakiş|yazili|logo/, ad: "baskı uydurulmuş" },
+  { en: /\bfleece/, kaynak: /şardon|sardon|sardonlu|iplik|iplık|polar|fleece|peluş|pelus/, ad: "fleece uydurulmuş" },
+  /*
+    KARŞILIK LİSTESİ YAZIM HATALARINI DA İÇERMELİ. Ölçüldü: kaynakta
+    "Kapaşonlu" (kapüşonlu) yazan 49 üründe kural "kapüşon
+    uydurulmuş" diyordu — hata çeviride değil benim kalıbımdaydı.
+    Dar bir liste doğru çeviriyi atar ve bu, denetimin en pahalı
+    hatasıdır; o yüzden katalogda görülen her yazım buraya giriyor.
+  */
+  { en: /\bhood(ed)?\b/, kaynak: /kap[üuaş]şon|kapson|kapuson|kapşon|kapaşon|kapşün|hood/, ad: "kapüşon uydurulmuş" },
+  { en: /\bzip(ped)?\b/, kaynak: /fermuar|farmuar|fermuvar|fermaur|zip|çıtçıt|citcit/, ad: "fermuar uydurulmuş" },
+  { en: /\bprint(ed)?\b/, kaynak: /baski|baskl|print|desen|temali|silüet|silüet|nakiş|nakis|yazili|logo|dijital/, ad: "baskı uydurulmuş" },
   { en: /\bleather/, kaynak: /deri|süet|suni deri/, ad: "deri uydurulmuş" },
   { en: /\bwool\b/, kaynak: /yün|yun|wool|kaşmir|merinos/, ad: "yün uydurulmuş" },
   { en: /\bvelvet|corduroy/, kaynak: /kadife|fitilli/, ad: "kadife uydurulmuş" },
