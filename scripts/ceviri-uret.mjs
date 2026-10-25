@@ -79,6 +79,23 @@ const KOLEKSIYON = process.argv.includes("--koleksiyon");
   üretmek hem saatler sürer hem iyileştirme garantisi yok.
 */
 const YENIDEN = process.argv.includes("--yeniden");
+/*
+  TEMİZLEME (`--yeniden --temizle`).
+
+  Yeniden turunda model bir adı DÜZELTEMEZSE eski yanlış ad yerinde
+  kalıyordu. Canlıda ölçüldü (25.10.2026): kalan 45 adın 26'sı
+  "Sporcu Atlet Seti"ni "Athlete Set Sweatshirt" yapıyor ve
+  bazılarında RENK de kaymış ("Haki, Açık Mavi" → "Brown, Navy").
+  Yanlış renk, müşterinin gözüyle doğruladığı ilk özellik.
+
+  Deponun kuralı açık: atlamak yanlış yazmaktan iyidir. Alanı
+  boşaltmak ürünü İngilizce vitrinde TÜRKÇE adıyla gösteriyor —
+  dürüst — ve panelde "Çevirisi eksik" süzgeciyle bulunabiliyor.
+
+  Ayrı bir bayrak, çünkü silme geri alınamaz ve her koşuda
+  kendiliğinden olmamalı.
+*/
+const TEMIZLE = process.argv.includes("--temizle");
 const ADET = Number(arg("adet", 50));
 /*
   PARTİ BOYU BEŞ — canlıda ölçüldü.
@@ -231,6 +248,8 @@ async function calistir() {
   );
 
   let kabul = 0;
+  /* Temizleme adımı "hangisi düzeldi" sorusunu soruyor. */
+  const yazilanlar = new Set();
   const atlanan = [];
   /*
     AYNI ADA ÇÖKEN KAYITLAR. Canlıda ölçüldü: baskılı tişörtlerde
@@ -417,6 +436,9 @@ async function calistir() {
       if (KURU) {
         console.log(`  ${kayit.slug}\n    ${kaynakAd}\n    → ${adKarari.metin}`);
         kabul += 1;
+        /* Kuru turda da sayılıyor: yoksa "kaç ad temizlenecek"
+           sayısı düzelenleri de sayıp olduğundan büyük çıkardı. */
+        yazilanlar.add(kayit.slug);
         continue;
       }
 
@@ -450,12 +472,32 @@ async function calistir() {
         continue;
       }
       kabul += 1;
+      yazilanlar.add(kayit.slug);
       process.stdout.write(".");
     }
     }
   }
 
   console.log(`\n✓ ${kabul} kayıt ${KURU ? "çevrilebilir görünüyor" : "yazıldı"}`);
+
+  if (YENIDEN && TEMIZLE && !KOLEKSIYON) {
+    /* Bu turda yazılamamış VE eski adı bugünkü denetime takılan
+       kayıtlar: düzeltilemediler, yanlış hâlleriyle kalmasınlar. */
+    const kalan = kayitlar.filter(
+      (k) => !yazilanlar.has(k.slug) && k.name_en && giysiTuruDogru(k.name, k.name_en) !== null,
+    );
+    console.log(`\n${kalan.length} ad düzeltilemedi; ${KURU ? "temizlenecek" : "temizleniyor"} (Türkçeye düşüyor)`);
+    if (!KURU) {
+      for (const kayit of kalan) {
+        const { error } = await supabase
+          .from("arc_products")
+          .update({ name_en: null, translated_at: null })
+          .eq("organization_id", kayit.organization_id)
+          .eq("slug", kayit.slug);
+        if (error) console.error(`  ✗ ${kayit.slug}: ${error.message}`);
+      }
+    }
+  }
   /*
     LİSTE DENEMELERİ sayıyor, kayıtları değil: ikinci turda düzelen
     bir kayıt birinci turun satırını da taşıyor. Ayıklamak için

@@ -344,6 +344,15 @@ Sıra zorunlu: ikisi de yalnızca ADI çevrilmiş ürüne bakıyor ve
 üçüncüsü ikincisinin bıraktığını alıyor. Hepsi kaldığı yerden devam
 eder, yarıda kesilmek veri bozmaz.
 
+**Kural düzelince eski satırlar kendiliğinden düzelmez.** Üç betiğin
+ikisinde `--yeniden` var: çevirisi OLAN ama bugünkü denetimden
+geçemeyen kayıtları da alıyor. Denetimden geçen kayıt ellenmiyor —
+üç bin doğru adı yeniden üretmek saatler sürer ve iyileştirme
+garantisi yok. `npm run ceviri -- --yeniden --temizle` bir adım daha
+atıyor: model DÜZELTEMEDİĞİ adı boşaltıyor, ürün İngilizce vitrinde
+Türkçe adıyla görünüyor ve panelde "Çevirisi eksik" süzgeciyle
+bulunuyor. Silme geri alınamadığı için ayrı bir bayrak.
+
 **Açıklama MODELE TOPTAN SORULMAZ.** Açıklama bir HTML tablosu ve
 sayıları beden-kilo eşlemesi; 3 KB HTML'i 7b bir model bozuyor ve bir
 kilonun kayması ekranda hiç görünmeden müşteriye yanlış beden
